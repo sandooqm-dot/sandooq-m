@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>إنشاء لعبة</title>
+  <style>
+    :root{
+      --bg:#1f4fa3;
+      --yellow:#f4c400;
+      --card:#ffffff;
+      --text:#111;
+    }
+    body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
+    header{position:relative;padding:30px 16px 0}
+    .logo{
+      position:absolute;left:14px;top:14px;
+      width:86px;height:86px;object-fit:contain;
+      pointer-events:none;
+    }
+    h1{margin:18px 0 14px;color:var(--yellow);font-size:28px}
+    .wrap{width:92%;max-width:520px;margin:0 auto}
+    .card{background:var(--card);color:var(--text);border-radius:12px;padding:14px}
+    input{
+      width:100%;box-sizing:border-box;
+      padding:14px;margin:10px 0;
+      font-size:16px;border-radius:10px;border:0;
+    }
+    button{
+      width:100%;padding:16px;margin-top:10px;
+      font-size:18px;border:none;border-radius:12px;cursor:pointer;
+      background:var(--yellow);color:#000
+    }
+    .hint{font-size:13px;opacity:.9;margin-top:8px}
+  </style>
+</head>
+<body>
+  <header>
+    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
+    <h1>إنشاء لعبة</h1>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <input id="name" placeholder="اسم اللعبة">
+      <input id="players" inputmode="numeric" placeholder="عدد اللاعبين (1 إلى 10)">
+      <button id="btn">إنشاء</button>
+      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
+      authDomain: "sabaq-alhorof.firebaseapp.com",
+      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "sabaq-alhorof",
+      storageBucket: "sabaq-alhorof.firebasestorage.app",
+      messagingSenderId: "1053646928152",
+      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    function normalizeDigits(str){
+      const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
+      return String(str ?? "").trim().replace(/[٠-٩]/g, d => map[d]);
+    }
+
+    function random6(){
+      return String(Math.floor(100000 + Math.random()*900000));
+    }
+    function randomKey(){
+      return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    }
+
+    async function createRoom(){
+      const name = document.getElementById("name").value.trim();
+      const pRaw = document.getElementById("players").value;
+      const players = Number(normalizeDigits(pRaw));
+
+      if(!name){ alert("اكتب اسم اللعبة"); return; }
+      if(!Number.isFinite(players) || players < 1 || players > 10){ alert("عدد اللاعبين لازم من 1 إلى 10"); return; }
+
+      document.getElementById("btn").disabled = true;
+
+      let code = "";
+      for(let i=0;i<10;i++){
+        const c = random6();
+        const exists = (await get(ref(db, `rooms/${c}`))).exists();
+        if(!exists){ code = c; break; }
+      }
+      if(!code){
+        document.getElementById("btn").disabled = false;
+        alert("حاول مرة ثانية");
+        return;
+      }
+
+      const presenterKey = randomKey();
+
+      const room = {
+        code,
+        name,
+        maxPlayers: players,
+        presenterKey,
+        status: "lobby",
+        createdAt: Date.now(),
+        activeMap: 0,
+        freeze: false,
+        buzzer: null,
+        current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
+        players: {}
+      };
+
+      await set(ref(db, `rooms/${code}`), room);
+
+      location.href = `game.html?role=host&code=${encodeURIComponent(code)}&key=${encodeURIComponent(presenterKey)}`;
+    }
+
+    document.getElementById("btn").addEventListener("click", createRoom);
+  </script>
+</body>
+</html>
