@@ -23,7 +23,7 @@
 
     body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
     header{position:relative;padding:14px 14px 0}
-    .logo{position:absolute;left:14px;top:14px;width:56px;height:56px;object-fit:contain} /* ✅ تكبير اللوقو */
+    .logo{position:absolute;left:14px;top:14px;width:63px;height:63px;object-fit:contain} /* ✅ تكبير اللوقو 12% */
     .gameName{position:absolute;right:14px;top:20px;font-size:14px;opacity:.95}
     h1{margin:18px 0 10px;color:var(--yellow);font-size:28px}
     .wrap{width:95%;max-width:900px;margin:0 auto}
@@ -259,15 +259,15 @@
       margin-top:4px;
     }
 
-    /* ✅ (تعديل 2) زر شراء اللعبة للاعبين */
+    /* ✅ (تعديل) زر شراء اللعبة (لون واضح مختلف) */
     .buyNowWrap{margin-top:12px;display:flex;justify-content:center}
     .buyNowBtn{
       width:min(92vw, 520px);
       padding:14px 16px;
       border:none;
       border-radius:14px;
-      background:#fff;
-      color:#111;
+      background:#8b5cf6; /* ✅ لون واضح ومختلف */
+      color:#fff;
       font-size:18px;
       font-weight:800;
       cursor:pointer;
@@ -276,6 +276,17 @@
       touch-action: manipulation;
     }
     .buyNowBtn:active{ transform: translateY(1px); box-shadow:0 2px 0 rgba(0,0,0,.15); }
+
+    /* ✅ (تعديل) صفحة الانتظار: نزّل زر الشراء لأسفل ووسط */
+    .waitingLayout{
+      display:flex;
+      flex-direction:column;
+      min-height:60vh; /* ✅ يعطي إحساس (منتصف الشاشة من تحت) */
+    }
+    .waitingLayout .buyNowWrap{
+      margin-top:auto;
+      padding-top:12px;
+    }
 
     /* ✅ نافذة المشاركة */
     .shareBackdrop{
@@ -1267,9 +1278,12 @@
 
     function renderWaiting(msg){
       main.innerHTML = `
-        <div class="muted">${escapeHtml(msg)}</div>
-        <div class="buyNowWrap">
-          <button class="buyNowBtn" data-store-link type="button">اشتري اللعبة الان</button>
+        <div class="waitingLayout">
+          <div class="muted">${escapeHtml(msg)}</div>
+
+          <div class="buyNowWrap">
+            <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+          </div>
         </div>
       `;
     }
@@ -1386,7 +1400,7 @@
             <div class="smallNote">${started ? "اضغط للإجابة" : "بانتظار بدء اللعبة"}</div>
 
             <div class="buyNowWrap">
-              <button class="buyNowBtn" data-store-link type="button">اشتري اللعبة الان</button>
+              <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
             </div>
           </div>
         ` : ""}
