@@ -35,6 +35,106 @@
   </style>
 </head>
 <body>
+
+  <!-- ====== 🔒 بوابة تفعيل للمقدّم فقط ====== -->
+  <div id="licenseGate" style="position:fixed;inset:0;z-index:999999;background:#0b2a5a;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial;">
+    <div style="width:min(520px,92%);background:rgba(255,255,255,.10);padding:18px;border-radius:12px;text-align:center">
+      <h2 style="margin:0 0 10px">تفعيل دخول المقدم</h2>
+      <p style="margin:0 0 12px;opacity:.9">أدخل كود التفعيل اللي وصلك بعد الشراء. سيتم ربطه بهذا الجهاز.</p>
+
+      <input id="licenseCode" placeholder="SNDQ-XXXX-XXXX-XXXX"
+        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;box-sizing:border-box;margin:8px 0" />
+
+      <button id="licenseBtn"
+        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;cursor:pointer;background:#f4c400;color:#000">
+        تفعيل ودخول
+      </button>
+
+      <div id="licenseMsg" style="margin-top:10px;opacity:.95"></div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const VERIFY_URL = "https://script.google.com/macros/s/AKfycbwLgHE2stvtr8fgbWM2egbWzVKyjN0AW1Uwub2CW2JP6NG2YKxsR4ndX384Y8b9W35HAA/exec";
+
+    const gate = document.getElementById('licenseGate');
+    const msgEl = document.getElementById('licenseMsg');
+    const input = document.getElementById('licenseCode');
+    const btn = document.getElementById('licenseBtn');
+
+    function setMsg(t){ msgEl.textContent = t || ""; }
+
+    function getDeviceId(){
+      let id = localStorage.getItem("deviceId");
+      if(!id){
+        id = "dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+        localStorage.setItem("deviceId", id);
+      }
+      return id;
+    }
+
+    // ✅ تحقق JSONP (بدون مشاكل CORS)
+    function verifyJsonp(code){
+      return new Promise((resolve, reject) => {
+        const cbName = "__verify_cb_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+        const script = document.createElement("script");
+        const timeout = setTimeout(() => { cleanup(); reject(new Error("timeout")); }, 12000);
+
+        function cleanup(){
+          clearTimeout(timeout);
+          try { delete window[cbName]; } catch(e){ window[cbName]=undefined; }
+          if (script && script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[cbName] = (data) => { cleanup(); resolve(data); };
+
+        const url =
+          VERIFY_URL +
+          "?code=" + encodeURIComponent(code) +
+          "&deviceId=" + encodeURIComponent(getDeviceId()) +
+          "&callback=" + encodeURIComponent(cbName) +
+          "&_=" + Date.now();
+
+        script.src = url;
+        script.onerror = () => { cleanup(); reject(new Error("network")); };
+        document.body.appendChild(script);
+      });
+    }
+
+    // دخول تلقائي بعد أول تفعيل (نفس الجهاز)
+    async function autoCheck(){
+      const saved = localStorage.getItem("activatedCode");
+      if(!saved) return;
+      try{
+        const data = await verifyJsonp(saved);
+        if(data && data.ok){
+          gate.style.display = "none";
+        }
+      }catch(e){}
+    }
+    autoCheck();
+
+    btn.addEventListener("click", async () => {
+      const code = (input.value || "").trim();
+      if(!code) return setMsg("اكتب الكود أولاً");
+
+      setMsg("جاري التحقق...");
+      try{
+        const data = await verifyJsonp(code);
+        if(!data || !data.ok) return setMsg((data && data.msg) ? data.msg : "مرفوض");
+
+        localStorage.setItem("activatedCode", code);
+        setMsg("تم التفعيل ✅");
+        gate.style.display = "none";
+      }catch(e){
+        setMsg("تعذر الاتصال. تأكد من رابط التحقق");
+      }
+    });
+  })();
+  </script>
+  <!-- ====== نهاية بوابة التفعيل ====== -->
+
   <header>
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
     <h1>لعبة سباق الحروف</h1>
