@@ -10,39 +10,96 @@
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
-      --muted:#666;
-      --red:#c01818;
-      --green:#1aa34a;
+      --muted:#6b7280;
     }
-    body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
-    header{position:relative;padding:28px 16px 0}
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color:#fff;
+      text-align:center;
+    }
+    header{
+      position:relative;
+      padding:18px 14px 0;
+      min-height:72px;
+    }
     .logo{
-      position:absolute;left:14px;top:14px;
-      width:56px;height:56px;object-fit:contain;
-      pointer-events:none;
+      position:absolute;
+      left:14px;
+      top:14px;
+      width:56px;
+      height:56px;
+      object-fit:contain;
     }
-    h1{margin:18px 0 14px;color:var(--yellow);font-size:28px}
-    .wrap{width:92%;max-width:560px;margin:0 auto}
-    .card{background:var(--card);color:var(--text);border-radius:14px;padding:16px}
-
-    input{
-      width:100%;box-sizing:border-box;
-      padding:14px 14px;margin:10px 0;
-      font-size:16px;border-radius:12px;border:0;
+    h1{
+      margin:18px 0 10px;
+      color: var(--yellow);
+      font-size:30px;
+      letter-spacing:.2px;
+    }
+    .wrap{
+      width:95%;
+      max-width:820px;
+      margin:0 auto;
+    }
+    .card{
+      background:var(--card);
+      color:var(--text);
+      border-radius:18px;
+      padding:18px 16px;
+      box-sizing:border-box;
+      margin:14px auto 24px;
+      box-shadow:0 10px 30px rgba(0,0,0,.18);
+    }
+    .input{
+      width:min(92vw, 680px);
+      max-width:680px;
+      height:54px;
+      border:none;
+      outline:none;
+      border-radius:14px;
+      background:#f3f5f9;
+      padding:0 16px;
+      font-size:16px;
+      box-sizing:border-box;
+      margin:10px auto;
       text-align:right;
-      background:#f7f7f7;
     }
-
     .btn{
-      width:100%;
-      padding:16px;margin-top:10px;
-      font-size:18px;border:none;border-radius:12px;cursor:pointer;
-      background:var(--yellow);color:#000
+      width:min(92vw, 680px);
+      max-width:680px;
+      height:56px;
+      border:none;
+      border-radius:14px;
+      background:var(--yellow);
+      color:#000;
+      font-weight:bold;
+      font-size:18px;
+      cursor:pointer;
+      margin:10px auto 0;
     }
-
-    .hint{font-size:13px;color:var(--muted);margin-top:8px}
-    .err{color:#fff;background:rgba(192,24,24,.25);padding:10px;border-radius:12px;margin-top:10px;display:none}
-    .ok{color:#fff;background:rgba(26,163,74,.25);padding:10px;border-radius:12px;margin-top:10px;display:none}
+    .note{
+      margin-top:10px;
+      font-size:13px;
+      color:var(--muted);
+    }
+    .error{
+      margin-top:10px;
+      font-size:14px;
+      color:#b91c1c;
+      background:#fee2e2;
+      border:1px solid #fecaca;
+      padding:10px 12px;
+      border-radius:12px;
+      display:none;
+      text-align:center;
+    }
+    .loading{
+      opacity:.65;
+      pointer-events:none;
+      user-select:none;
+    }
   </style>
 </head>
 <body>
@@ -53,24 +110,21 @@
 
   <div class="wrap">
     <div class="card">
-      <input id="name" placeholder="اسم اللاعب">
+      <input id="playerName" class="input" type="text" placeholder="اسم اللاعب" autocomplete="name" />
 
-      <!-- خانة الرمز (تختفي تلقائياً إذا جاء اللاعب من الباركود) -->
-      <div id="codeWrap">
-        <input id="code" inputmode="numeric" placeholder="اكتب رمز اللعبة (6 أرقام)">
-        <div class="hint" id="hintDigits">تقدر تكتب الأرقام عربي أو إنجليزي</div>
-      </div>
+      <!-- ✅ حسب طلبك: إضافة خيار/خانة رمز اللعبة تحت اسم اللاعب -->
+      <input id="roomCode" class="input" type="text" inputmode="numeric" placeholder="ادخل رمز اللعبة" maxlength="6" />
 
       <button id="joinBtn" class="btn">دخول</button>
 
-      <div id="err" class="err"></div>
-      <div id="ok" class="ok"></div>
+      <div id="err" class="error"></div>
+      <div class="note">تقدر تكتب الأرقام عربي أو إنجليزي</div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -85,102 +139,134 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const nameEl = document.getElementById("name");
-    const codeEl = document.getElementById("code");
-    const codeWrap = document.getElementById("codeWrap");
-    const joinBtn = document.getElementById("joinBtn");
-    const errEl = document.getElementById("err");
-    const okEl = document.getElementById("ok");
-
-    function showErr(msg){
-      errEl.textContent = msg;
-      errEl.style.display = "block";
-      okEl.style.display = "none";
-    }
-    function showOk(msg){
-      okEl.textContent = msg;
-      okEl.style.display = "block";
-      errEl.style.display = "none";
-    }
-
-    function normalizeDigits(str){
-      const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
-      return String(str ?? "").trim().replace(/[٠-٩]/g, d => map[d]);
-    }
-
-    function randomKey(){
-      return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    }
-
-    // ✅ إذا جاء من الباركود: join.html?code=123456
     const params = new URLSearchParams(location.search);
-    const pre = params.get("code");
-    let QR_CODE = null;
+    const codeFromLink = params.get("code") || "";
 
-    if(pre){
-      const n = normalizeDigits(pre);
-      if(/^\d{6}$/.test(n)){
-        QR_CODE = n;
-        // نخفي خانة الرمز بالكامل
-        codeWrap.style.display = "none";
-        // نخزن الكود داخلياً
-        codeEl.value = n;
+    const nameEl = document.getElementById("playerName");
+    const codeEl = document.getElementById("roomCode");
+    const btn = document.getElementById("joinBtn");
+    const err = document.getElementById("err");
+
+    // تعبئة الرمز تلقائياً لو جاي من رابط/باركود
+    if(codeFromLink) codeEl.value = codeFromLink;
+
+    // تذكّر آخر اسم (اختياري ومفيد)
+    const lastName = localStorage.getItem("sandooq_last_player_name");
+    if(lastName && !nameEl.value) nameEl.value = lastName;
+
+    function showError(msg){
+      err.textContent = msg;
+      err.style.display = "block";
+    }
+    function clearError(){
+      err.textContent = "";
+      err.style.display = "none";
+    }
+
+    function normalizeDigits(s){
+      // يحوّل الأرقام العربية/الفارسية إلى إنجليزية
+      const map = {
+        "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+        "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+      };
+      return String(s || "").replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
+    }
+
+    function cleanCode(s){
+      return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
+    }
+
+    function genPid(){
+      try{
+        if(crypto?.randomUUID) return crypto.randomUUID();
+      }catch(e){}
+      return (Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4));
+    }
+
+    async function pickTeam(room){
+      // اختيار فريق مبدئي (الأقل عددًا)
+      const players = room?.players || {};
+      let g = 0, o = 0;
+      for(const id in players){
+        if(players[id]?.team === "orange") o++;
+        else if(players[id]?.team === "green") g++;
+      }
+      return (g <= o) ? "green" : "orange";
+    }
+
+    async function join(){
+      clearError();
+
+      const name = (nameEl.value || "").trim();
+      const code = cleanCode(codeEl.value);
+
+      // اعكس للواجهة القيمة المنظفة
+      codeEl.value = code;
+
+      if(!name){
+        showError("اكتب اسم اللاعب");
+        return;
+      }
+      if(code.length !== 6){
+        showError("اكتب رمز اللعبة (6 أرقام)");
+        return;
+      }
+
+      btn.classList.add("loading");
+      btn.textContent = "جاري الدخول...";
+
+      try{
+        // تحقق من وجود الغرفة
+        const roomSnap = await get(ref(db, `rooms/${code}`));
+        if(!roomSnap.exists()){
+          showError("رمز اللعبة غير صحيح أو الغرفة غير موجودة");
+          return;
+        }
+        const room = roomSnap.val();
+
+        // منع الدخول إذا ما فيه حالة صحيحة (اختياري)
+        if(room.status !== "lobby" && room.status !== "started"){
+          showError("الغرفة غير جاهزة حالياً");
+          return;
+        }
+
+        const team = await pickTeam(room);
+        const pid = genPid();
+
+        // حفظ الاسم محلياً
+        localStorage.setItem("sandooq_last_player_name", name);
+
+        // إضافة اللاعب للغرفة
+        await update(ref(db, `rooms/${code}/players/${pid}`), {
+          name,
+          team,
+          joinedAt: Date.now()
+        });
+
+        // تحويله لصفحة اللعبة
+        const u = new URL("game.html", location.href);
+        u.searchParams.set("role", "player");
+        u.searchParams.set("code", code);
+        u.searchParams.set("pid", pid);
+        location.href = u.toString();
+
+      }catch(e){
+        showError("صار خطأ، حاول مرة ثانية");
+      }finally{
+        btn.classList.remove("loading");
+        btn.textContent = "دخول";
       }
     }
 
-    async function joinRoom(){
-      const name = nameEl.value.trim();
+    // تنسيق الكود أثناء الكتابة
+    codeEl.addEventListener("input", () => {
+      const v = cleanCode(codeEl.value);
+      codeEl.value = v;
+    });
 
-      // لو من QR نستخدمه، غير كذا نأخذ من الخانة
-      const code = QR_CODE ? QR_CODE : normalizeDigits(codeEl.value);
-
-      if(!name){ showErr("اكتب اسم اللاعب"); return; }
-
-      // إذا مو من QR لازم يتحقق من الرمز
-      if(!QR_CODE && !/^\d{6}$/.test(code)){
-        showErr("اكتب رمز صحيح (6 أرقام)");
-        return;
-      }
-
-      joinBtn.disabled = true;
-      showOk("جاري الدخول...");
-
-      const roomRef = ref(db, `rooms/${code}`);
-      const snap = await get(roomRef);
-
-      if(!snap.exists()){
-        joinBtn.disabled = false;
-        showErr("رمز اللعبة غير صحيح أو اللعبة غير موجودة.");
-        return;
-      }
-
-      const room = snap.val();
-      const players = room.players || {};
-      const maxPlayers = Number(room.maxPlayers || 10);
-      const count = Object.keys(players).length;
-
-      if(count >= maxPlayers){
-        joinBtn.disabled = false;
-        showErr("اللعبة مكتملة (عدد اللاعبين وصل للحد).");
-        return;
-      }
-
-      // توزيع فريق بسيط (الأقل عددًا)
-      const list = Object.values(players);
-      const g = list.filter(p => p.team === "green").length;
-      const o = list.filter(p => p.team === "orange").length;
-      const team = (g <= o) ? "green" : "orange";
-
-      const pid = randomKey();
-      const player = { name, team, joinedAt: Date.now() };
-
-      await set(ref(db, `rooms/${code}/players/${pid}`), player);
-
-      // ✅ ينقله لصفحة الانتظار داخل game.html تلقائياً (طالما المقدم في lobby)
-      location.href = `game.html?role=player&code=${encodeURIComponent(code)}&pid=${encodeURIComponent(pid)}`;
-    }
-
-    joinBtn.addEventListener("click", joinRoom);
+    btn.addEventListener("click", join);
+    nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
+    codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 </body>
 </html>
