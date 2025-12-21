@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>الدخول إلى لعبة</title>
+  <style>
+    :root{
+      --bg:#1f4fa3;
+      --yellow:#f4c400;
+      --card:#ffffff;
+      --text:#111;
+      --muted:#666;
+      --red:#c01818;
+      --green:#1aa34a;
+    }
+    body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
+    header{position:relative;padding:28px 16px 0}
+    .logo{
+      position:absolute;left:14px;top:14px;
+      width:56px;height:56px;object-fit:contain;
+      pointer-events:none;
+    }
+    h1{margin:18px 0 14px;color:var(--yellow);font-size:28px}
+    .wrap{width:92%;max-width:560px;margin:0 auto}
+    .card{background:var(--card);color:var(--text);border-radius:14px;padding:16px}
+
+    input{
+      width:100%;box-sizing:border-box;
+      padding:14px 14px;margin:10px 0;
+      font-size:16px;border-radius:12px;border:0;
+      text-align:right;
+      background:#f7f7f7;
+    }
+
+    .btn{
+      width:100%;
+      padding:16px;margin-top:10px;
+      font-size:18px;border:none;border-radius:12px;cursor:pointer;
+      background:var(--yellow);color:#000
+    }
+
+    .hint{font-size:13px;color:var(--muted);margin-top:8px}
+    .err{color:#fff;background:rgba(192,24,24,.25);padding:10px;border-radius:12px;margin-top:10px;display:none}
+    .ok{color:#fff;background:rgba(26,163,74,.25);padding:10px;border-radius:12px;margin-top:10px;display:none}
+  </style>
+</head>
+<body>
+  <header>
+    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
+    <h1>الدخول إلى لعبة</h1>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <input id="name" placeholder="اسم اللاعب">
+
+      <!-- خانة الرمز (تختفي تلقائياً إذا جاء اللاعب من الباركود) -->
+      <div id="codeWrap">
+        <input id="code" inputmode="numeric" placeholder="اكتب رمز اللعبة (6 أرقام)">
+        <div class="hint" id="hintDigits">تقدر تكتب الأرقام عربي أو إنجليزي</div>
+      </div>
+
+      <button id="joinBtn" class="btn">دخول</button>
+
+      <div id="err" class="err"></div>
+      <div id="ok" class="ok"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
+      authDomain: "sabaq-alhorof.firebaseapp.com",
+      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "sabaq-alhorof",
+      storageBucket: "sabaq-alhorof.firebasestorage.app",
+      messagingSenderId: "1053646928152",
+      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const nameEl = document.getElementById("name");
+    const codeEl = document.getElementById("code");
+    const codeWrap = document.getElementById("codeWrap");
+    const joinBtn = document.getElementById("joinBtn");
+    const errEl = document.getElementById("err");
+    const okEl = document.getElementById("ok");
+
+    function showErr(msg){
+      errEl.textContent = msg;
+      errEl.style.display = "block";
+      okEl.style.display = "none";
+    }
+    function showOk(msg){
+      okEl.textContent = msg;
+      okEl.style.display = "block";
+      errEl.style.display = "none";
+    }
+
+    function normalizeDigits(str){
+      const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
+      return String(str ?? "").trim().replace(/[٠-٩]/g, d => map[d]);
+    }
+
+    function randomKey(){
+      return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    }
+
+    // ✅ إذا جاء من الباركود: join.html?code=123456
+    const params = new URLSearchParams(location.search);
+    const pre = params.get("code");
+    let QR_CODE = null;
+
+    if(pre){
+      const n = normalizeDigits(pre);
+      if(/^\d{6}$/.test(n)){
+        QR_CODE = n;
+        // نخفي خانة الرمز بالكامل
+        codeWrap.style.display = "none";
+        // نخزن الكود داخلياً
+        codeEl.value = n;
+      }
+    }
+
+    async function joinRoom(){
+      const name = nameEl.value.trim();
+
+      // لو من QR نستخدمه، غير كذا نأخذ من الخانة
+      const code = QR_CODE ? QR_CODE : normalizeDigits(codeEl.value);
+
+      if(!name){ showErr("اكتب اسم اللاعب"); return; }
+
+      // إذا مو من QR لازم يتحقق من الرمز
+      if(!QR_CODE && !/^\d{6}$/.test(code)){
+        showErr("اكتب رمز صحيح (6 أرقام)");
+        return;
+      }
+
+      joinBtn.disabled = true;
+      showOk("جاري الدخول...");
+
+      const roomRef = ref(db, `rooms/${code}`);
+      const snap = await get(roomRef);
+
+      if(!snap.exists()){
+        joinBtn.disabled = false;
+        showErr("رمز اللعبة غير صحيح أو اللعبة غير موجودة.");
+        return;
+      }
+
+      const room = snap.val();
+      const players = room.players || {};
+      const maxPlayers = Number(room.maxPlayers || 10);
+      const count = Object.keys(players).length;
+
+      if(count >= maxPlayers){
+        joinBtn.disabled = false;
+        showErr("اللعبة مكتملة (عدد اللاعبين وصل للحد).");
+        return;
+      }
+
+      // توزيع فريق بسيط (الأقل عددًا)
+      const list = Object.values(players);
+      const g = list.filter(p => p.team === "green").length;
+      const o = list.filter(p => p.team === "orange").length;
+      const team = (g <= o) ? "green" : "orange";
+
+      const pid = randomKey();
+      const player = { name, team, joinedAt: Date.now() };
+
+      await set(ref(db, `rooms/${code}/players/${pid}`), player);
+
+      // ✅ ينقله لصفحة الانتظار داخل game.html تلقائياً (طالما المقدم في lobby)
+      location.href = `game.html?role=player&code=${encodeURIComponent(code)}&pid=${encodeURIComponent(pid)}`;
+    }
+
+    joinBtn.addEventListener("click", joinRoom);
+  </script>
+</body>
+</html>
