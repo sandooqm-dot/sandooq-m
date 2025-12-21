@@ -199,34 +199,83 @@
       cursor:default;
     }
 
-    /* ✅ أسهم التحكم بالنقاط */
+    /* ✅ (تعديل 1) شريط اختيار النقاط 0-10 */
     .scoreCtrl{
+      position:relative;
       display:flex;
       flex-direction:column;
       gap:6px;
       align-items:center;
+      z-index:5;
     }
-    .scoreArrowBtn{
-      width:56px;
-      height:30px;
-      border:none;
-      border-radius:10px;
-      background:rgba(255,255,255,.92);
-      color:#111;
-      font-size:16px;
-      font-weight:900;
+    .scoreBoxBtn.clickable{
       cursor:pointer;
       box-shadow: 0 2px 0 rgba(0,0,0,.12);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    .scoreArrowBtn:active{ transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+    .scoreBoxBtn.clickable:active{ transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+
+    .scorePicker{
+      position:absolute;
+      top:calc(100% + 6px);
+      left:50%;
+      transform:translateX(-50%) translateY(-6px);
+      opacity:0;
+      pointer-events:none;
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      justify-content:center;
+      width:min(280px, 86vw);
+      background:rgba(255,255,255,.96);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:12px;
+      padding:10px;
+      box-shadow:0 10px 22px rgba(0,0,0,.20);
+      transition: opacity .16s ease, transform .16s ease;
+      z-index:50;
+    }
+    .scorePicker.show{
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+      pointer-events:auto;
+    }
+    .scorePickBtn{
+      width:38px;height:34px;
+      border:none;border-radius:10px;
+      background:rgba(31,79,163,.08);
+      color:#111;
+      font-weight:bold;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .scorePickBtn:active{ transform: translateY(1px); }
 
     .scoreHint{
       font-size:12px;
       opacity:.85;
       margin-top:4px;
     }
+
+    /* ✅ (تعديل 2) زر شراء اللعبة للاعبين */
+    .buyNowWrap{margin-top:12px;display:flex;justify-content:center}
+    .buyNowBtn{
+      width:min(92vw, 520px);
+      padding:14px 16px;
+      border:none;
+      border-radius:14px;
+      background:#fff;
+      color:#111;
+      font-size:18px;
+      font-weight:800;
+      cursor:pointer;
+      box-shadow:0 3px 0 rgba(0,0,0,.15);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .buyNowBtn:active{ transform: translateY(1px); box-shadow:0 2px 0 rgba(0,0,0,.15); }
 
     /* ✅ نافذة المشاركة */
     .shareBackdrop{
@@ -933,6 +982,14 @@
     let TIMER_REMAINING = 10;
     let TIMER_INTERVAL = null;
 
+    /* ✅ (تعديل 1) إغلاق شريط النقاط عند الضغط خارج */
+    if(!window.__scorePickerBound){
+      window.__scorePickerBound = true;
+      document.addEventListener("click", () => {
+        document.querySelectorAll(".scorePicker.show").forEach(p => p.classList.remove("show"));
+      });
+    }
+
     function beep(){
       try{
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -1209,7 +1266,12 @@
     }
 
     function renderWaiting(msg){
-      main.innerHTML = `<div class="muted">${escapeHtml(msg)}</div>`;
+      main.innerHTML = `
+        <div class="muted">${escapeHtml(msg)}</div>
+        <div class="buyNowWrap">
+          <button class="buyNowBtn" data-store-link type="button">اشتري اللعبة الان</button>
+        </div>
+      `;
     }
 
     function renderGame(room, me){
@@ -1221,6 +1283,10 @@
       const scores = room.scores || {};
       const scoreGreen = Number(scores.green || 0);
       const scoreOrange = Number(scores.orange || 0);
+
+      const pickerButtons = Array.from({length:11}, (_,i)=>(
+        `<button class="scorePickBtn" data-val="${i}" type="button">${i}</button>`
+      )).join("");
 
       main.innerHTML = `
         <div class="row" style="justify-content:space-between">
@@ -1235,9 +1301,10 @@
           ${
             isHost ? `
               <div class="scoreCtrl">
-                <button id="scoreOrangeUp" class="scoreArrowBtn" aria-label="زيادة نقاط البرتقالي">▲</button>
-                <button id="scoreOrangeVal" class="scoreBoxBtn" disabled>${scoreOrange}</button>
-                <button id="scoreOrangeDown" class="scoreArrowBtn" aria-label="تقليل نقاط البرتقالي">▼</button>
+                <button id="scoreOrangeVal" class="scoreBoxBtn clickable" type="button">${scoreOrange}</button>
+                <div id="scorePickerOrange" class="scorePicker" role="menu" aria-label="اختيار نقاط البرتقالي">
+                  ${pickerButtons.replaceAll('data-val="', 'data-team="orange" data-val="')}
+                </div>
               </div>
             ` : `
               <button class="scoreBoxBtn" disabled>${scoreOrange}</button>
@@ -1247,9 +1314,10 @@
           ${
             isHost ? `
               <div class="scoreCtrl">
-                <button id="scoreGreenUp" class="scoreArrowBtn" aria-label="زيادة نقاط الأخضر">▲</button>
-                <button id="scoreGreenVal" class="scoreBoxBtn" disabled>${scoreGreen}</button>
-                <button id="scoreGreenDown" class="scoreArrowBtn" aria-label="تقليل نقاط الأخضر">▼</button>
+                <button id="scoreGreenVal" class="scoreBoxBtn clickable" type="button">${scoreGreen}</button>
+                <div id="scorePickerGreen" class="scorePicker" role="menu" aria-label="اختيار نقاط الأخضر">
+                  ${pickerButtons.replaceAll('data-val="', 'data-team="green" data-val="')}
+                </div>
               </div>
             ` : `
               <button class="scoreBoxBtn" disabled>${scoreGreen}</button>
@@ -1258,7 +1326,7 @@
 
           <span class="teamLabel green">الفريق الأخضر</span>
         </div>
-        ${isHost ? `<div class="scoreHint">المقدم فقط: ▲ إضافة نقطة — ▼ تراجع (أقل شيء 0)</div>` : ``}
+        ${isHost ? `<div class="scoreHint">المقدم فقط: اضغط على مربع النتيجة ثم اختر رقمًا من 0 إلى 10</div>` : ``}
 
         <div class="mapOuter">
           <div id="mapScale" class="mapScale" style="--zoom:1">
@@ -1316,30 +1384,63 @@
           <div class="playerBtnWrap">
             <button id="buzzBtn" class="playerBigBtn"></button>
             <div class="smallNote">${started ? "اضغط للإجابة" : "بانتظار بدء اللعبة"}</div>
+
+            <div class="buyNowWrap">
+              <button class="buyNowBtn" data-store-link type="button">اشتري اللعبة الان</button>
+            </div>
           </div>
         ` : ""}
       `;
 
-      /* ✅ التحكم بالنقاط (أسهم) */
+      /* ✅ (تعديل 1) اختيار النقاط من شريط 0-10 */
       if(isHost){
-        const inc = async (team) => {
-          const r = ref(db, `rooms/${code}/scores/${team}`);
-          await runTransaction(r, (cur) => (Number(cur || 0) + 1));
-        };
-        const dec = async (team) => {
-          const r = ref(db, `rooms/${code}/scores/${team}`);
-          await runTransaction(r, (cur) => Math.max(0, Number(cur || 0) - 1));
+        const pickerOrange = document.getElementById("scorePickerOrange");
+        const pickerGreen  = document.getElementById("scorePickerGreen");
+        const valOrangeBtn = document.getElementById("scoreOrangeVal");
+        const valGreenBtn  = document.getElementById("scoreGreenVal");
+
+        const hideAll = () => {
+          pickerOrange?.classList.remove("show");
+          pickerGreen?.classList.remove("show");
         };
 
-        const ogUp = document.getElementById("scoreOrangeUp");
-        const ogDown = document.getElementById("scoreOrangeDown");
-        const grUp = document.getElementById("scoreGreenUp");
-        const grDown = document.getElementById("scoreGreenDown");
+        const togglePicker = (picker) => {
+          const shown = picker.classList.contains("show");
+          hideAll();
+          if(!shown) picker.classList.add("show");
+        };
 
-        if(ogUp) ogUp.addEventListener("click", () => inc("orange"));
-        if(ogDown) ogDown.addEventListener("click", () => dec("orange"));
-        if(grUp) grUp.addEventListener("click", () => inc("green"));
-        if(grDown) grDown.addEventListener("click", () => dec("green"));
+        const setScore = async (team, value) => {
+          const v = Math.max(0, Math.min(10, Number(value)));
+          await update(ref(db, `rooms/${code}/scores`), { [team]: v });
+        };
+
+        if(pickerOrange) pickerOrange.addEventListener("click", (e)=>e.stopPropagation());
+        if(pickerGreen)  pickerGreen.addEventListener("click", (e)=>e.stopPropagation());
+
+        if(valOrangeBtn && pickerOrange){
+          valOrangeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePicker(pickerOrange);
+          });
+        }
+        if(valGreenBtn && pickerGreen){
+          valGreenBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePicker(pickerGreen);
+          });
+        }
+
+        main.querySelectorAll(".scorePickBtn").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const team = btn.getAttribute("data-team");
+            const val  = btn.getAttribute("data-val");
+            if(!team) return;
+            await setScore(team, val);
+            hideAll();
+          });
+        });
       }
 
       const mapImg = document.getElementById("mapImg");
