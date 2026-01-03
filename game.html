@@ -25,6 +25,11 @@
       --hexOrange: rgba(255, 140, 0, .42);
       --hexPale:   rgba(255, 215, 80, .68);
       --hexBorder: rgba(0,0,0,.10);
+
+      /* ✅ ألوان المؤقت (تجنب الأخضر/البرتقالي/لون الشراء) */
+      --timerFill: #14b8a6;      /* تركوازي */
+      --timerFillLast5:#ff3b30;  /* أحمر واضح */
+      --timerStart:#0ea5e9;      /* أزرق لزر ابدأ */
     }
 
     body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
@@ -180,33 +185,163 @@
     }
     a{color:inherit}
 
-    /* ✅ Timer UI */
-    .timerSelect{
-      padding:12px 10px;
-      font-size:16px;
-      border-radius:10px;
-      border:0;
-      background:#fff;
-      color:#111;
-      min-width:120px;
+    /* ✅ (تعديل) مؤقت جديد (ساعة + تعبئة دائرية + آخر 5 ثواني) */
+    .timerWrap{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      justify-content:center;
+      z-index:6;
     }
-    .timerCircle{
-      width:56px;height:56px;
+
+    .timerClockBtn{
+      width:72px;height:72px;
       border-radius:50%;
-      padding:0;
+      border:none;
+      background:#fff;
+      position:relative;
+      cursor:pointer;
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      color:#fff;
+      user-select:none;
+      overflow:hidden;
+    }
+    .timerClockBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
+
+    /* التعبئة الدائرية (تتناقص مع الوقت باتجاه عقارب الساعة) */
+    .timerClockBtn::before{
+      content:"";
+      position:absolute;
+      inset:6px;
+      border-radius:50%;
+      background: conic-gradient(
+        var(--timerFill, #14b8a6) calc(var(--p, 1) * 1turn),
+        rgba(0,0,0,.08) 0
+      );
+      opacity:1;
+    }
+
+    /* تأثير وميض انتهاء الوقت (مثل الوضع الحالي) */
+    @keyframes timerFlashFill {
+      0%   { opacity: 1; }
+      50%  { opacity: .35; }
+      100% { opacity: 1; }
+    }
+    .timerClockBtn.timerFlashing::before{
+      animation: timerFlashFill .6s linear infinite;
+    }
+    .timerClockBtn.timerFlashing{
+      outline: 3px solid rgba(0,0,0,.06);
+      outline-offset: 2px;
+    }
+
+    .timerIcon{
+      position:relative;
+      z-index:2;
+      font-size:28px;
+      line-height:1;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-weight:bold;
-      user-select:none;
+      width:100%;
+      height:100%;
+      text-shadow:0 2px 10px rgba(0,0,0,.25);
     }
-    @keyframes timerFlash {
-      0%   { background: var(--red); color:#fff; }
-      50%  { background: var(--yellow); color:#000; }
-      100% { background: var(--red); color:#fff; }
+
+    .timerBurst{
+      position:absolute;
+      inset:0;
+      z-index:3;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      color:#fff;
+      text-shadow:0 3px 12px rgba(0,0,0,.35);
+      opacity:0;
+      pointer-events:none;
+      font-size:16px;
+      transform:scale(.6);
     }
-    .timerFlashing{
-      animation: timerFlash .6s linear infinite;
+    @keyframes timerPop {
+      0%   { opacity:0; transform:scale(.6); }
+      35%  { opacity:1; transform:scale(1.15); }
+      100% { opacity:0; transform:scale(2.0); }
+    }
+    .timerBurst.show{ animation: timerPop .75s ease-out forwards; }
+
+    .timerStartBtn{
+      min-width:140px;
+      height:46px;
+      border-radius:12px;
+      background:var(--timerStart);
+      color:#fff;
+      font-weight:900;
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .timerStartBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
+    .timerStartBtn.running{
+      opacity:.55; /* يبهت لونه عند التشغيل */
+    }
+
+    .timerPicker{
+      position:absolute;
+      top:calc(100% + 8px);
+      left:50%;
+      transform:translateX(-50%) translateY(-6px);
+      opacity:0;
+      pointer-events:none;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      width:min(220px, 86vw);
+      background:rgba(255,255,255,.97);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:12px;
+      padding:10px;
+      box-shadow:0 10px 22px rgba(0,0,0,.20);
+      transition: opacity .16s ease, transform .16s ease;
+      z-index:80;
+      text-align:center;
+    }
+    .timerPicker.show{
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+      pointer-events:auto;
+    }
+    .timerOptRow{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+    .timerOptBtn{
+      min-width:64px;
+      height:36px;
+      border:none;
+      border-radius:10px;
+      background:rgba(31,79,163,.08);
+      color:#111;
+      font-weight:900;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .timerOptBtn.active{
+      background:rgba(31,79,163,.22);
+      box-shadow: inset 0 0 0 2px rgba(31,79,163,.18);
+    }
+    .timerOptBtn:active{ transform: translateY(1px); }
+
+    /* ✅ نسخة اللاعبين: نفس الشكل لكن غير تفاعلي ويمكن تكبير بسيط */
+    .timerPlayerView{ pointer-events:none; user-select:none; }
+    .timerClockBtn.player{
+      width:78px;height:78px;
     }
 
     /* ✅ لوحة النتائج */
@@ -722,7 +857,7 @@
       { q: "من هي ابنة الرسول صلى الله عليه وسلم التي تزوجها عثمان بن عفان؟", a: "رقية" },
       { q: "ما هو الأجر المدفوع لقاء عمل معين وفي وقت محدد؟", a: "راتب" },
       { q: "شىء تفرزه الزهرة ؟", a: "رحيق" },
-      { q: "من الازهار ورد في القران الكريم ؟", a: "ريحان" },
+      { q: "من الازهار ورد في القران الكريم ?", a: "ريحان" },
       { q: "إذا دخل أحدكم المسجد فلا يجلس حتى يصلي؟", a: "ركعتين" },
       { q: "جبل عرفات هو جبل الـــ....؟", a: "الرحمة" },
       { q: "هدف تسعى الحكومات لتحقيقه لشعوبها؟", a: "رفاهية" },
@@ -1029,18 +1164,153 @@
       return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
     }
 
-    /* ✅ Timer state (محلي للمقدم حتى ما ينهار مع إعادة الرسم) */
-    let TIMER_RUNNING = false;
-    let TIMER_DONE = false;
-    let TIMER_SELECTED = 10;
-    let TIMER_REMAINING = 10;
-    let TIMER_INTERVAL = null;
+    /* ✅ Timer state (Firebase-synced لعرضه عند اللاعبين أيضاً) */
+    const TIMER_UI = {
+      tick: null,
+      lastSecond: null,
+      lastDoneStartTs: null,
+      latestTimer: null,
+      isHost: false
+    };
+
+    function normalizeTimer(t){
+      const sel = Number(t?.sel || 10);
+      const dur = Number(t?.dur || sel);
+      const running = !!t?.running;
+      const startTs = Number(t?.startTs || 0);
+      const done = !!t?.done;
+      return { sel, dur, running, startTs, done };
+    }
+
+    function computeTimerView(t){
+      const now = Date.now();
+      const sel = Number(t.sel || 10);
+      const dur = Number(t.dur || sel);
+      const running = !!t.running;
+      const startTs = Number(t.startTs || 0);
+      const doneFlag = !!t.done;
+
+      let remaining = sel;
+      if(running && startTs){
+        remaining = dur - Math.floor((now - startTs) / 1000);
+      }else{
+        remaining = sel;
+      }
+      if(!Number.isFinite(remaining)) remaining = sel;
+      remaining = Math.max(0, remaining);
+
+      const done = doneFlag || (running && remaining === 0);
+      const inLast5 = running && remaining > 0 && remaining <= 5;
+
+      const baseDur = (running ? dur : sel) || 1;
+      const progress = Math.max(0, Math.min(1, remaining / baseDur));
+
+      return { sel, dur, running, startTs, remaining, done, inLast5, progress };
+    }
+
+    function forceBurst(n){
+      const burst = document.getElementById("timerBurst");
+      if(!burst) return;
+      burst.textContent = String(n);
+      burst.classList.remove("show");
+      void burst.offsetWidth;
+      burst.classList.add("show");
+    }
+
+    function applyTimerDom(){
+      const clock = document.getElementById("timerClock");
+      if(!clock) return;
+
+      const t = normalizeTimer(TIMER_UI.latestTimer || {});
+      const view = computeTimerView(t);
+
+      const fill = view.inLast5 ? "var(--timerFillLast5)" : "var(--timerFill)";
+      clock.style.setProperty("--timerFill", fill);
+      clock.style.setProperty("--p", String(view.progress));
+
+      if(view.done){
+        clock.classList.add("timerFlashing");
+      }else{
+        clock.classList.remove("timerFlashing");
+      }
+
+      // لون الأيقونة: أبيض غالباً (لأن الخلفية ملونة)
+      clock.style.color = "#fff";
+
+      // آخر 5 ثواني: رقم يتكرر (صغير -> يكبر -> يختفي)
+      if(view.inLast5){
+        if(TIMER_UI.lastSecond !== view.remaining){
+          TIMER_UI.lastSecond = view.remaining;
+          forceBurst(view.remaining);
+        }
+      }else{
+        TIMER_UI.lastSecond = null;
+      }
+
+      // زر ابدأ/إيقاف (المقدم فقط)
+      const startBtn = document.getElementById("timerStartBtn");
+      if(startBtn && TIMER_UI.isHost){
+        if(view.running){
+          startBtn.textContent = "إيقاف المؤقت";
+          startBtn.classList.add("running");
+        }else{
+          startBtn.textContent = "ابدأ المؤقت";
+          startBtn.classList.remove("running");
+        }
+      }
+
+      // ✅ إنهاء تلقائي: عندما يصل للصفر يحفظ في Firebase (مرة واحدة)
+      if(TIMER_UI.isHost){
+        if(view.running && view.remaining === 0){
+          if(TIMER_UI.lastDoneStartTs !== view.startTs){
+            TIMER_UI.lastDoneStartTs = view.startTs;
+            update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
+          }
+        }
+      }
+    }
+
+    function ensureTimerTicker(){
+      if(TIMER_UI.tick) return;
+      TIMER_UI.tick = setInterval(() => {
+        applyTimerDom();
+      }, 200);
+    }
+
+    function initTimerDefaultsIfNeeded(room){
+      if(role !== "host") return;
+      if(!room) return;
+
+      const t = room.timer;
+      if(t && typeof t === "object") return;
+
+      // ✅ إنشاء مؤقت افتراضي مرة واحدة (بدون تكرار مزعج)
+      const key = `__timer_init_${code}`;
+      if(window[key]) return;
+      window[key] = true;
+
+      update(ref(db, `rooms/${code}/timer`), {
+        sel: 10,
+        dur: 10,
+        running: false,
+        startTs: 0,
+        done: false
+      });
+    }
 
     /* ✅ (تعديل 1) إغلاق شريط النقاط عند الضغط خارج */
     if(!window.__scorePickerBound){
       window.__scorePickerBound = true;
       document.addEventListener("click", () => {
         document.querySelectorAll(".scorePicker.show").forEach(p => p.classList.remove("show"));
+      });
+    }
+
+    /* ✅ إغلاق قائمة المؤقت عند الضغط خارج */
+    if(!window.__timerPickerBound){
+      window.__timerPickerBound = true;
+      document.addEventListener("click", () => {
+        document.querySelectorAll(".timerPicker.show").forEach(p => p.classList.remove("show"));
       });
     }
 
@@ -1061,34 +1331,6 @@
           ctx.close();
         }, 300);
       }catch(e){}
-    }
-
-    function stopTimer(){
-      if(TIMER_INTERVAL){
-        clearInterval(TIMER_INTERVAL);
-        TIMER_INTERVAL = null;
-      }
-      TIMER_RUNNING = false;
-    }
-
-    function applyTimerUI(){
-      const sel = document.getElementById("timerSelect");
-      const btn = document.getElementById("timerBtn");
-      if(!sel || !btn) return;
-
-      sel.value = String(TIMER_SELECTED);
-
-      if(TIMER_DONE){
-        btn.classList.add("timerFlashing");
-      }else{
-        btn.classList.remove("timerFlashing");
-      }
-
-      if(TIMER_RUNNING){
-        btn.textContent = String(TIMER_REMAINING);
-      }else{
-        btn.textContent = String(TIMER_SELECTED);
-      }
     }
 
     /* ✅ (إصلاح المشاركة) */
@@ -1337,12 +1579,18 @@
       const isHost = role === "host";
       const started = room.status === "started";
 
+      initTimerDefaultsIfNeeded(room);
+
       const scores = room.scores || {};
       const scoreGreen = Number(scores.green || 0);
       const scoreOrange = Number(scores.orange || 0);
 
       const pickerButtons = Array.from({length:11}, (_,i)=>(
         `<button class="scorePickBtn" data-val="${i}" type="button">${i}</button>`
+      )).join("");
+
+      const timerOptions = [10,15,20,25,30].map(v => (
+        `<button class="timerOptBtn" data-timer="${v}" type="button">${v} ث</button>`
       )).join("");
 
       main.innerHTML = `
@@ -1411,16 +1659,28 @@
             ${isHost ? `
               <button id="nextQ" class="btn btnYellow nextQBtn">تغيير السؤال</button>
 
-              <select id="timerSelect" class="timerSelect">
-                <option value="10">10 ث</option>
-                <option value="15">15 ث</option>
-                <option value="20">20 ث</option>
-                <option value="25">25 ث</option>
-                <option value="30">30 ث</option>
-              </select>
+              <!-- ✅ مؤقت المقدم: ساعة + قائمة اختيار + زر ابدأ/إيقاف -->
+              <div class="timerWrap" id="timerWrap">
+                <button id="timerClock" class="timerClockBtn" type="button" aria-label="المؤقت">
+                  <span class="timerIcon">⏱</span>
+                  <span id="timerBurst" class="timerBurst"></span>
+                </button>
 
-              <button id="timerBtn" class="btn btnOrange timerCircle">10</button>
-            ` : ""}
+                <button id="timerStartBtn" class="btn timerStartBtn" type="button">ابدأ المؤقت</button>
+
+                <div id="timerPicker" class="timerPicker" role="menu" aria-label="اختيار وقت المؤقت">
+                  <div class="timerOptRow">${timerOptions}</div>
+                </div>
+              </div>
+            ` : `
+              <!-- ✅ مؤقت اللاعبين: نفس الشكل لكن غير تفاعلي -->
+              <div class="timerWrap timerPlayerView" id="timerWrap">
+                <button id="timerClock" class="timerClockBtn player" type="button" tabindex="-1" aria-hidden="true">
+                  <span class="timerIcon">⏱</span>
+                  <span id="timerBurst" class="timerBurst"></span>
+                </button>
+              </div>
+            `}
           </div>
 
           ${isHost ? `
@@ -1498,6 +1758,91 @@
             hideAll();
           });
         });
+      }
+
+      /* ✅ مؤقت: ربط الواجهة بحالة Firebase (مقدم + لاعبين) */
+      TIMER_UI.latestTimer = room.timer || {};
+      TIMER_UI.isHost = isHost;
+      ensureTimerTicker();
+      applyTimerDom();
+
+      if(isHost){
+        const clock = document.getElementById("timerClock");
+        const picker = document.getElementById("timerPicker");
+        const startBtn = document.getElementById("timerStartBtn");
+
+        if(clock && picker){
+          clock.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const shown = picker.classList.contains("show");
+            document.querySelectorAll(".timerPicker.show").forEach(p => p.classList.remove("show"));
+            if(!shown) picker.classList.add("show");
+          });
+
+          picker.addEventListener("click", (e)=>e.stopPropagation());
+
+          // تفعيل زر الوقت المختار
+          const cur = normalizeTimer(room.timer || {});
+          const sel = Number(cur.sel || 10);
+          picker.querySelectorAll(".timerOptBtn").forEach(b=>{
+            const v = Number(b.getAttribute("data-timer"));
+            b.classList.toggle("active", v === sel);
+          });
+
+          // اختيار وقت جديد (يحفظ، ولا يتغير إلا إذا اختار من القائمة)
+          picker.querySelectorAll(".timerOptBtn").forEach(btn => {
+            btn.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              const v = Number(btn.getAttribute("data-timer"));
+              if(![10,15,20,25,30].includes(v)) return;
+
+              // ✅ فقط تحديث الاختيار (sel) حتى لا يخرّب عدّاد شغال
+              await update(ref(db, `rooms/${code}/timer`), {
+                sel: v,
+                // إذا المؤقت غير شغال وغير منتهي: نخليه جاهز على القيمة الجديدة
+                ...(normalizeTimer(room.timer || {}).running ? {} : { dur: v, done:false, startTs:0 })
+              });
+
+              picker.querySelectorAll(".timerOptBtn").forEach(b=>{
+                const vv = Number(b.getAttribute("data-timer"));
+                b.classList.toggle("active", vv === v);
+              });
+
+              // لا تختفي إلا إذا ضغطت خارج أو ضغطت على الساعة مرة ثانية (حسب طلبك)
+            });
+          });
+        }
+
+        if(startBtn){
+          startBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const t = normalizeTimer(TIMER_UI.latestTimer || {});
+            const sel = Number(t.sel || 10);
+
+            // ✅ إذا شغال: إيقاف + رجوع لوضع الاستعداد (يرجع يبدأ من جديد عند الضغط مرة أخرى)
+            if(t.running){
+              await update(ref(db, `rooms/${code}/timer`), {
+                running:false,
+                done:false,
+                startTs:0,
+                dur: sel
+              });
+              return;
+            }
+
+            // ✅ بدء جديد من الصفر حسب الاختيار الحالي
+            await update(ref(db, `rooms/${code}/timer`), {
+              sel,
+              dur: sel,
+              running:true,
+              done:false,
+              startTs: Date.now()
+            });
+
+            // صوت بسيط عند البدء (اختياري)
+            // beep();
+          });
+        }
       }
 
       const mapImg = document.getElementById("mapImg");
@@ -1690,66 +2035,6 @@
         });
       }
 
-      // ✅ Timer handlers (للمقدم فقط)
-      const timerSelect = document.getElementById("timerSelect");
-      const timerBtn = document.getElementById("timerBtn");
-      if(timerSelect && timerBtn){
-        timerSelect.addEventListener("change", () => {
-          TIMER_SELECTED = Number(timerSelect.value || 10);
-          if(!TIMER_RUNNING && !TIMER_DONE){
-            TIMER_REMAINING = TIMER_SELECTED;
-          }
-          applyTimerUI();
-        });
-
-        timerBtn.addEventListener("click", () => {
-          // إذا كان منتهي ويومّض: رجّعه لوضع الاستعداد
-          if(TIMER_DONE){
-            TIMER_DONE = false;
-            stopTimer();
-            TIMER_REMAINING = TIMER_SELECTED;
-            applyTimerUI();
-            return;
-          }
-
-          // إذا شغال: أوقفه وأرجعه
-          if(TIMER_RUNNING){
-            stopTimer();
-            TIMER_REMAINING = TIMER_SELECTED;
-            applyTimerUI();
-            return;
-          }
-
-          // ابدأ
-          TIMER_RUNNING = true;
-          TIMER_DONE = false;
-          TIMER_REMAINING = TIMER_SELECTED;
-          applyTimerUI();
-
-          TIMER_INTERVAL = setInterval(() => {
-            TIMER_REMAINING -= 1;
-
-            const btn = document.getElementById("timerBtn");
-            if(btn) btn.textContent = String(Math.max(0, TIMER_REMAINING));
-
-            if(TIMER_REMAINING <= 0){
-              stopTimer();
-              TIMER_DONE = true;
-
-              const b = document.getElementById("timerBtn");
-              if(b){
-                b.textContent = "0";
-                b.classList.add("timerFlashing");
-              }
-
-              beep();
-            }
-          }, 1000);
-        });
-
-        applyTimerUI();
-      }
-
       // ✅ عند ضغط المقدم على السداسي: يحدد الحرف الصحيح من MAPS لنفس الخريطة الحالية
       if(isHost){
         overlay.querySelectorAll(".cell").forEach(cell => {
@@ -1804,6 +2089,9 @@
       }
       const room = snap.val();
       gameNameEl.textContent = room?.name ? room.name : "";
+
+      // ✅ تحديث المؤقت الحي من Firebase (ليتزامن عند الجميع)
+      TIMER_UI.latestTimer = room.timer || {};
 
       if(role === "host"){
         if(!hostKey || hostKey !== room.presenterKey){
