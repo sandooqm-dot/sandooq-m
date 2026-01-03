@@ -57,12 +57,32 @@
       font-weight:800;
     }
 
+    /* ✅ (تعديل) عرض رمز اللعبة في الهيدر */
+    .roomCodeBadge{
+      display:none;
+      margin:6px auto 8px;
+      width:fit-content;
+      background:var(--yellow);
+      color:#000;
+      padding:6px 12px;
+      border-radius:14px;
+      font-weight:900;
+      font-size:15px;
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
+    }
+
     .wrap{width:95%;max-width:900px;margin:0 auto}
 
     .card{
       background:var(--card);color:var(--text);
       width:100%;margin:12px auto;padding:12px;border-radius:12px;
       box-sizing:border-box
+    }
+
+    /* ✅ (تعديل) رفع الخريطة والأزرار للأعلى في وضع اللعب فقط */
+    #main.inGame{
+      margin-top:8px;
+      padding-top:8px;
     }
 
     .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
@@ -176,6 +196,15 @@
       border:none;border-radius:18px;
       background:var(--red);
       cursor:pointer;
+
+      /* ✅ (تعديل) نص داخل الزر */
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:28px;
+      font-weight:900;
+      letter-spacing:.2px;
     }
     .disabled{opacity:.5;cursor:not-allowed}
 
@@ -211,15 +240,16 @@
     }
     .timerClockBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
 
-    /* التعبئة الدائرية (تتناقص مع الوقت باتجاه عقارب الساعة) */
+    /* ✅ (تعديل) التعبئة الدائرية: النقص مع عقارب الساعة ومن الأعلى */
     .timerClockBtn::before{
       content:"";
       position:absolute;
       inset:6px;
       border-radius:50%;
       background: conic-gradient(
-        var(--timerFill, #14b8a6) calc(var(--p, 1) * 1turn),
-        rgba(0,0,0,.08) 0
+        from -90deg,
+        rgba(0,0,0,.08) 0turn calc((1 - var(--p, 1)) * 1turn),
+        var(--timerFill, #14b8a6) calc((1 - var(--p, 1)) * 1turn) 1turn
       );
       opacity:1;
     }
@@ -249,6 +279,7 @@
       width:100%;
       height:100%;
       text-shadow:0 2px 10px rgba(0,0,0,.25);
+      transition: opacity .08s linear;
     }
 
     .timerBurst{
@@ -263,13 +294,13 @@
       text-shadow:0 3px 12px rgba(0,0,0,.35);
       opacity:0;
       pointer-events:none;
-      font-size:16px;
-      transform:scale(.6);
+      font-size:48px;  /* ✅ (تعديل) تكبير قوي للأرقام */
+      transform:scale(.45);
     }
     @keyframes timerPop {
-      0%   { opacity:0; transform:scale(.6); }
-      35%  { opacity:1; transform:scale(1.15); }
-      100% { opacity:0; transform:scale(2.0); }
+      0%   { opacity:0; transform:scale(.45); }
+      25%  { opacity:1; transform:scale(1.25); }
+      100% { opacity:0; transform:scale(2.8); }
     }
     .timerBurst.show{ animation: timerPop .75s ease-out forwards; }
 
@@ -541,6 +572,9 @@
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
     <div id="gameName" class="gameName"></div>
     <h1>سباق الحروف</h1>
+
+    <!-- ✅ (تعديل) رمز اللعبة في الهيدر -->
+    <div id="roomCodeBadge" class="roomCodeBadge"></div>
   </header>
 
   <div class="wrap">
@@ -783,7 +817,7 @@
       { q: "ماهو اكبر طائر في العالم", a: "نعامة" },
       { q: "هو نادي يقع في جنوب ايطاليا", a: "نابولي" },
       { q: "خلق منها ابليس ؟", a: "نار" },
-      { q: "نبي سميت سورة من القران بأسمه ؟", a: "نوح عليه السلام" },
+      { q: "نبي سميت سورة من القران بأسمه ? ", a: "نوح عليه السلام" },
       { q: "قال الرسول صلى الله عليه وسلم لايدخل الجنة…..؟", a: "نمام" },
       { q: "الملك الذى امر بحرق النبي ابراهيم عليه السلام؟", a: "النمرود" },
       { q: "هو السائل الزيتي الذي يشتق منه أنواع الوقود", a: "نفط" }
@@ -1071,6 +1105,7 @@
 
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
+    const roomCodeBadge = document.getElementById("roomCodeBadge");
 
     if(!role || !code){
       main.textContent = "بيانات الدخول غير مكتملة.";
@@ -1237,6 +1272,10 @@
       // لون الأيقونة: أبيض غالباً (لأن الخلفية ملونة)
       clock.style.color = "#fff";
 
+      // ✅ (تعديل) إخفاء أيقونة ⏱ خلال آخر 5 ثواني
+      const iconEl = clock.querySelector(".timerIcon");
+      if(iconEl) iconEl.style.opacity = view.inLast5 ? "0" : "1";
+
       // آخر 5 ثواني: رقم يتكرر (صغير -> يكبر -> يختفي)
       if(view.inLast5){
         if(TIMER_UI.lastSecond !== view.remaining){
@@ -1391,6 +1430,7 @@
     }, true);
 
     function renderHostLobby(room){
+      main.classList.remove("inGame"); /* ✅ */
       const players = room.players || {};
       const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
 
@@ -1562,6 +1602,7 @@
     }
 
     function renderWaiting(msg){
+      main.classList.remove("inGame"); /* ✅ */
       main.innerHTML = `
         <div class="waitingLayout">
           <div class="muted">${escapeHtml(msg)}</div>
@@ -1574,6 +1615,7 @@
     }
 
     function renderGame(room, me){
+      main.classList.add("inGame"); /* ✅ */
       gameNameEl.textContent = room?.name ? room.name : "";
 
       const isHost = role === "host";
@@ -1594,10 +1636,7 @@
       )).join("");
 
       main.innerHTML = `
-        <div class="row" style="justify-content:space-between">
-          <div style="font-size:14px;opacity:.9">رمز: <b>${escapeHtml(room.code)}</b></div>
-          <div></div>
-        </div>
+        <!-- ✅ (تعديل) حذف سطر "رمز: ####" من داخل الكرت (صار في الهيدر) -->
 
         <!-- ✅ لوحة النتائج -->
         <div class="scoreBar">
@@ -1642,7 +1681,7 @@
           </div>
         </div>
 
-        <div style="height:10px"></div>
+        <div style="height:6px"></div>
         <div class="row" style="justify-content:space-between">
           <div class="row">
             ${isHost ? `<button id="mapBtn" class="btn btnYellow">تغيير الخريطة</button>` : ""}
@@ -1651,7 +1690,7 @@
           </div>
         </div>
 
-        <div style="height:10px"></div>
+        <div style="height:6px"></div>
         <div class="below">
           <div class="buzzRow" style="flex:1;min-width:260px">
             <div id="buzzBox" class="buzzBox buzzEmpty">—</div>
@@ -1699,7 +1738,8 @@
 
         ${(!isHost) ? `
           <div class="playerBtnWrap">
-            <button id="buzzBtn" class="playerBigBtn"></button>
+            <!-- ✅ (تعديل) النص داخل الزر -->
+            <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
             <div class="smallNote">${started ? "اضغط للإجابة" : "بانتظار بدء اللعبة"}</div>
 
             <div class="buyNowWrap">
@@ -1839,7 +1879,6 @@
               startTs: Date.now()
             });
 
-            // صوت بسيط عند البدء (اختياري)
             // beep();
           });
         }
@@ -2085,10 +2124,17 @@
     onValue(roomRef, (snap) => {
       if(!snap.exists()){
         main.textContent = "اللعبة غير موجودة (رمز غير صحيح).";
+        if(roomCodeBadge) roomCodeBadge.style.display = "none";
         return;
       }
       const room = snap.val();
       gameNameEl.textContent = room?.name ? room.name : "";
+
+      /* ✅ (تعديل) تحديث رمز اللعبة في الهيدر */
+      if(roomCodeBadge){
+        roomCodeBadge.textContent = `رمز: ${room.code}`;
+        roomCodeBadge.style.display = "inline-block";
+      }
 
       // ✅ تحديث المؤقت الحي من Firebase (ليتزامن عند الجميع)
       TIMER_UI.latestTimer = room.timer || {};
