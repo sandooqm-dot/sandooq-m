@@ -5,15 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>سباق الحروف</title>
 
+  <!-- ✅ (تعديل) خط Baloo Bhaijaan لعنوان اللعبة -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan&display=swap" rel="stylesheet">
 
   <style>
     :root{
-      /* ✅ تغميق الخلفية قليلًا */
-      --bg:#173f88;
-
+      --bg:#1f4fa3;
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
@@ -27,55 +26,83 @@
       --hexPale:   rgba(255, 215, 80, .68);
       --hexBorder: rgba(0,0,0,.10);
 
-      --timerFill: #14b8a6;
-      --timerFillLast5:#ff3b30;
-      --timerStart:#0ea5e9;
+      /* ✅ ألوان المؤقت (تجنب الأخضر/البرتقالي/لون الشراء) */
+      --timerFill: #14b8a6;      /* تركوازي */
+      --timerFillLast5:#ff3b30;  /* أحمر واضح */
+      --timerStart:#0ea5e9;      /* أزرق لزر ابدأ */
     }
 
     body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
-    header{position:relative;padding:14px 14px 0}
 
+    /* ✅ (تعديل 1) زيادة مساحة أعلى الهيدر حتى لا يتداخل اسم اللعبة مع عنوان سباق الحروف */
+    header{
+      position:relative;
+      padding:14px 14px 0;
+      padding-top:104px; /* مساحة كافية للّوقو + صندوق الاسم */
+    }
+
+    /* ✅ (تعديل) تكبير اللوجو إلى 75*75 */
     .logo{position:absolute;left:14px;top:14px;width:75px;height:75px;object-fit:contain}
 
-    /* ✅ مربع اسم اللعبة: زجاجي شفاف + حد أقصى سطرين + بدون تقطيع (نحده بـ 4 كلمات من JS) */
+    /* ✅ (تعديل 1) صندوق اسم اللعبة: أضيق + أطول (٤ كلمات) + شفاف ولا يدخل على العنوان */
     .gameName{
       position:absolute;
       right:14px;
       top:14px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      gap:4px;
 
-      width:min(66vw, 320px);
-      padding:10px 14px;
-      border-radius:14px;
+      width:min(44vw, 210px);   /* أضيق من قبل */
+      min-height:70px;          /* أطول من تحت */
+      padding:10px 12px;
+      border-radius:16px;
 
-      background:rgba(255,255,255,.18);
-      border:1px solid rgba(255,255,255,.28);
-      box-shadow:0 8px 18px rgba(0,0,0,.18);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-
+      background:rgba(255,255,255,.22); /* شفاف */
+      border:1px solid rgba(255,255,255,.18);
       color:#fff;
-      text-shadow:0 2px 10px rgba(0,0,0,.25);
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
 
-      font-size:clamp(14px, 2.5vw, 18px);
+      font-size:16px;
       font-weight:900;
       line-height:1.25;
       text-align:center;
 
       overflow:hidden;
       box-sizing:border-box;
-
-      display:-webkit-box;
-      -webkit-box-orient:vertical;
-      -webkit-line-clamp:2;
     }
     .gameName:empty{display:none;}
+    .gnLine{
+      display:block;
+      width:100%;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
 
+    /* ✅ (تعديل) عنوان اللعبة بخط Baloo Bhaijaan */
     h1{
-      margin:18px 0 10px;
+      margin:0 0 10px; /* ✅ لا يطلع فوق ويقترب من صندوق الاسم */
       color:var(--yellow);
       font-size:28px;
       font-family:'Baloo Bhaijaan', Arial, sans-serif;
       font-weight:800;
+    }
+
+    /* ✅ (تعديل) عرض رمز اللعبة في الهيدر */
+    .roomCodeBadge{
+      display:none;
+      margin:6px auto 8px;
+      width:fit-content;
+      background:var(--yellow);
+      color:#000;
+      padding:6px 12px;
+      border-radius:14px;
+      font-weight:900;
+      font-size:15px;
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
     }
 
     .wrap{width:95%;max-width:900px;margin:0 auto}
@@ -86,16 +113,10 @@
       box-sizing:border-box
     }
 
+    /* ✅ (تعديل) رفع الخريطة والأزرار للأعلى في وضع اللعب فقط */
     #main.inGame{
       margin-top:8px;
       padding-top:8px;
-    }
-
-    /* ✅ صفحة الانتظار: بطاقة أصغر */
-    #main.waitingCard{
-      max-width:520px;
-      margin:12px auto;
-      padding:16px 14px;
     }
 
     .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
@@ -104,6 +125,9 @@
     .btnGreen{background:var(--green);color:#fff}
     .btnRed{background:var(--red);color:#fff}
     .btnOrange{background:var(--orange);color:#fff}
+
+    .codeBox{font-size:18px}
+    .codeNum{font-size:28px;font-weight:bold;letter-spacing:2px}
 
     .teams{display:flex;gap:10px;flex-wrap:wrap}
     .teamCol{flex:1;min-width:240px;border-radius:12px;padding:10px;color:#fff}
@@ -175,25 +199,24 @@
       border-radius:12px;padding:12px;background:#fff;color:#111;text-align:right
     }
     .qTitle{font-weight:bold;margin-bottom:8px}
+
+    /* ✅ (تعديل) تكبير خط السؤال */
     .qText{line-height:1.6;font-size:22px}
 
-    /* ✅ صندوق الجواب: يصغر حسب طول الجواب + التفاف أسطر */
+    /* ✅ (تعديل 2) مربع الجواب: أعرض من الجانبين + بالمنتصف */
     .qAns{
       line-height:1.6;
-      margin:12px auto 0;
+      margin:14px auto 0;              /* توسيط */
+      width:min(88%, 380px);           /* أعرض من اليمين واليسار */
       background:var(--green);
       color:#fff;
-      padding:10px 14px;
-      border-radius:12px;
+      padding:14px 18px;
+      border-radius:14px;
       text-align:center;
       font-size:22px;
       font-weight:900;
       opacity:1;
-      display:none;
-      width:max-content;
-      max-width:100%;
-      white-space:normal;
-      word-break:keep-all;
+      display:none; /* نخفيه إذا ما فيه جواب */
       box-sizing:border-box;
     }
 
@@ -209,6 +232,8 @@
       border:none;border-radius:18px;
       background:var(--red);
       cursor:pointer;
+
+      /* ✅ (تعديل) نص داخل الزر */
       display:flex;
       align-items:center;
       justify-content:center;
@@ -225,7 +250,7 @@
     }
     a{color:inherit}
 
-    /* TIMER */
+    /* ✅ (تعديل) مؤقت جديد (ساعة + تعبئة دائرية + آخر 5 ثواني) */
     .timerWrap{
       position:relative;
       display:flex;
@@ -251,7 +276,7 @@
     }
     .timerClockBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
 
-    /* ✅ بداية التعبئة من أعلى الساعة 12 */
+    /* ✅ (تعديل) التعبئة الدائرية: النقص مع عقارب الساعة ومن الأعلى */
     .timerClockBtn::before{
       content:"";
       position:absolute;
@@ -292,7 +317,6 @@
       transition: opacity .08s linear;
     }
 
-    /* ✅ أرقام آخر 5 ثواني: أحمر واضح */
     .timerBurst{
       position:absolute;
       inset:0;
@@ -301,7 +325,7 @@
       align-items:center;
       justify-content:center;
       font-weight:900;
-      color:var(--timerFillLast5);
+      color:#fff;
       text-shadow:0 3px 12px rgba(0,0,0,.35);
       opacity:0;
       pointer-events:none;
@@ -327,7 +351,9 @@
       touch-action: manipulation;
     }
     .timerStartBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
-    .timerStartBtn.running{ opacity:.55; }
+    .timerStartBtn.running{
+      opacity:.55;
+    }
 
     .timerPicker{
       position:absolute;
@@ -379,9 +405,10 @@
     .timerOptBtn:active{ transform: translateY(1px); }
 
     .timerPlayerView{ pointer-events:none; user-select:none; }
-    .timerClockBtn.player{ width:78px;height:78px; }
+    .timerClockBtn.player{
+      width:78px;height:78px;
+    }
 
-    /* SCORE */
     .scoreBar{
       width:100%;
       display:flex;
@@ -467,9 +494,12 @@
     }
     .scorePickBtn:active{ transform: translateY(1px); }
 
-    .scoreHint{ font-size:12px; opacity:.85; margin-top:4px; }
+    .scoreHint{
+      font-size:12px;
+      opacity:.85;
+      margin-top:4px;
+    }
 
-    /* BUY */
     .buyNowWrap{margin-top:12px;display:flex;justify-content:center}
     .buyNowBtn{
       width:min(92vw, 520px);
@@ -484,38 +514,19 @@
       box-shadow:0 3px 0 rgba(0,0,0,.15);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
     }
     .buyNowBtn:active{ transform: translateY(1px); box-shadow:0 2px 0 rgba(0,0,0,.15); }
 
-    .cartIcon{
-      width:20px;height:20px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      opacity:.95;
-    }
-    .cartIcon svg{width:20px;height:20px;display:block;fill:#fff}
-
-    /* ✅ صفحة الانتظار: تكبير "بانتظار..." + رفع زر الشراء */
     .waitingLayout{
       display:flex;
       flex-direction:column;
-      align-items:center;
-      gap:14px;
-      padding:4px 0;
+      min-height:60vh;
     }
-    .waitingMsg{
-      font-size:22px;
-      font-weight:900;
-      color:#111;
+    .waitingLayout .buyNowWrap{
+      margin-top:auto;
+      padding-top:12px;
     }
 
-    /* SHARE */
     .shareBackdrop{
       position:fixed;
       inset:0;
@@ -589,7 +600,7 @@
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
     <div id="gameName" class="gameName"></div>
     <h1>سباق الحروف</h1>
-    <!-- ✅ تم حذف بادج "رمز: ####" من الشاشات -->
+    <div id="roomCodeBadge" class="roomCodeBadge"></div>
   </header>
 
   <div class="wrap">
@@ -1087,17 +1098,30 @@
 
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
+    const roomCodeBadge = document.getElementById("roomCodeBadge");
 
-    /* ✅ اسم اللعبة: 4 كلمات كحد أقصى (بدون قص أحرف) */
     function setGameName(raw){
       if(!gameNameEl) return;
       const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
       if(!s0){
-        gameNameEl.textContent = "";
+        gameNameEl.innerHTML = "";
         return;
       }
-      const words = s0.split(" ").filter(Boolean).slice(0, 4);
-      gameNameEl.textContent = words.join(" ");
+
+      const MAX_CHARS = 32;
+      let s = s0;
+      if(s.length > MAX_CHARS){
+        s = s.slice(0, MAX_CHARS - 1).trim() + "…";
+      }
+
+      const words = s.split(" ").filter(Boolean).slice(0, 4);
+
+      const top = words.slice(0, 2).join(" ");
+      const bottom = words.slice(2, 4).join(" ");
+
+      gameNameEl.innerHTML =
+        `<span class="gnLine">${escapeHtml(top)}</span>` +
+        `<span class="gnLine">${escapeHtml(bottom)}</span>`;
     }
 
     if(!role || !code){
@@ -1275,13 +1299,9 @@
         TIMER_UI.lastSecond = null;
       }
 
-      /* ✅ زر المؤقت: لا يرجع تلقائيًا إلى "ابدأ" عند الانتهاء */
       const startBtn = document.getElementById("timerStartBtn");
       if(startBtn && TIMER_UI.isHost){
         if(view.running){
-          startBtn.textContent = "إيقاف المؤقت";
-          startBtn.classList.add("running");
-        }else if(view.done){
           startBtn.textContent = "إيقاف المؤقت";
           startBtn.classList.add("running");
         }else{
@@ -1341,6 +1361,25 @@
       });
     }
 
+    function beep(){
+      try{
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return;
+        const ctx = new AC();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.value = 0.12;
+        o.connect(g); g.connect(ctx.destination);
+        o.start();
+        setTimeout(() => {
+          o.stop();
+          ctx.close();
+        }, 300);
+      }catch(e){}
+    }
+
     function buildJoinUrl(roomCode){
       const u = new URL("join.html", location.href);
       u.searchParams.set("code", roomCode);
@@ -1395,20 +1434,8 @@
       }
     }, true);
 
-    function cartSvg(){
-      return `
-        <span class="cartIcon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zM6.2 6l.94 2h10.73c.75 0 1.31.69 1.15 1.42l-1.2 5.58c-.13.6-.66 1-1.27 1H8.1c-.6 0-1.13-.4-1.27-1L4.1 3H2V1h3.6c.48 0 .9.34 1 .82L6.2 6z"/>
-          </svg>
-        </span>
-      `;
-    }
-
     function renderHostLobby(room){
       main.classList.remove("inGame");
-      main.classList.remove("waitingCard");
-
       const players = room.players || {};
       const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
 
@@ -1416,6 +1443,12 @@
       const orange = list.filter(p => p.team === "orange");
 
       main.innerHTML = `
+        <div class="codeBox">رمز اللعبة</div>
+        <div class="codeNum">${escapeHtml(room.code)}</div>
+        <div class="smallNote">شارك الرمز مع اللاعبين للدخول</div>
+
+        <div style="height:12px"></div>
+
         <div class="teams">
           <div class="teamCol teamGreen">
             <div class="teamTitle">الفريق الأخضر</div>
@@ -1457,12 +1490,12 @@
             </div>
 
             <div id="shareCodePanel" class="sharePanel">
-              <div class="shareTitle" style="margin-bottom:6px">رمز الغرفة</div>
+              <div class="codeBox" style="text-align:center">رمز الغرفة</div>
               <div class="shareCodeBig">${escapeHtml(room.code)}</div>
             </div>
 
             <div id="shareLinkPanel" class="sharePanel">
-              <div class="shareTitle" style="margin-bottom:6px">رابط الدخول</div>
+              <div class="codeBox" style="text-align:center">رابط الدخول</div>
               <div class="shareSmall" id="joinUrlTxt2"></div>
               <div class="row" style="justify-content:center;margin-top:10px">
                 <button id="copyJoinBtn2" class="btn btnYellow">نسخ الرابط</button>
@@ -1557,14 +1590,14 @@
       if(copyJoinBtn1){
         copyJoinBtn1.addEventListener("click", async () => {
           const ok = await copyText(joinUrl);
-          copyJoinBtn1.textContent = ok ? "تم النسخ" : "فشل النسخ";
+          copyJoinBtn1.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
           setTimeout(()=> copyJoinBtn1.textContent = "نسخ الرابط", 1200);
         });
       }
       if(copyJoinBtn2){
         copyJoinBtn2.addEventListener("click", async () => {
           const ok = await copyText(joinUrl);
-          copyJoinBtn2.textContent = ok ? "تم النسخ" : "فشل النسخ";
+          copyJoinBtn2.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
           setTimeout(()=> copyJoinBtn2.textContent = "نسخ الرابط", 1200);
         });
       }
@@ -1572,17 +1605,12 @@
 
     function renderWaiting(msg){
       main.classList.remove("inGame");
-      main.classList.add("waitingCard");
-
       main.innerHTML = `
         <div class="waitingLayout">
-          <div class="waitingMsg">${escapeHtml(msg)}</div>
+          <div class="muted">${escapeHtml(msg)}</div>
 
-          <div class="buyNowWrap" style="margin-top:6px">
-            <button class="buyNowBtn" data-store-link type="button">
-              <span>لشراء اللعبة اضغط هنا</span>
-              ${cartSvg()}
-            </button>
+          <div class="buyNowWrap">
+            <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
           </div>
         </div>
       `;
@@ -1590,7 +1618,6 @@
 
     function renderGame(room, me){
       main.classList.add("inGame");
-      main.classList.remove("waitingCard");
       setGameName(room?.name);
 
       const isHost = role === "host";
@@ -1709,13 +1736,12 @@
         ${(!isHost) ? `
           <div class="playerBtnWrap">
             <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
-            <div class="smallNote">${started ? "اضغط للإجابة" : "بانتظار بدء اللعبة"}</div>
+
+            <!-- ✅ (تعديل 3) حذف عبارة "اضغط للإجابة" بعد بدء اللعبة -->
+            ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
 
             <div class="buyNowWrap">
-              <button class="buyNowBtn" data-store-link type="button">
-                <span>لشراء اللعبة اضغط هنا</span>
-                ${cartSvg()}
-              </button>
+              <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
             </div>
           </div>
         ` : ""}
@@ -1823,19 +1849,6 @@
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
-            /* ✅ إذا كان منتهي: "إعادة ضبط" (يرجع لوضع ابدأ) */
-            if(!t.running && t.done){
-              await update(ref(db, `rooms/${code}/timer`), {
-                running:false,
-                done:false,
-                startTs:0,
-                dur: sel,
-                sel
-              });
-              return;
-            }
-
-            /* إذا شغال: إيقاف وإعادة تجهيز (مثل قبل) */
             if(t.running){
               await update(ref(db, `rooms/${code}/timer`), {
                 running:false,
@@ -1846,7 +1859,6 @@
               return;
             }
 
-            /* بدء جديد */
             await update(ref(db, `rooms/${code}/timer`), {
               sel,
               dur: sel,
@@ -1995,7 +2007,7 @@
             const item = list[idx];
             qText.textContent = item?.q ?? "—";
             qAns.textContent  = item?.a ?? "";
-            qAns.style.display = (qAns.textContent.trim() ? "inline-block" : "none");
+            qAns.style.display = (qAns.textContent.trim() ? "block" : "none");
           }
         }else{
           qText.textContent = "اختر حرفًا من الخريطة";
@@ -2090,11 +2102,17 @@
     onValue(roomRef, (snap) => {
       if(!snap.exists()){
         main.textContent = "اللعبة غير موجودة (رمز غير صحيح).";
+        if(roomCodeBadge) roomCodeBadge.style.display = "none";
         setGameName("");
         return;
       }
       const room = snap.val();
       setGameName(room?.name);
+
+      if(roomCodeBadge){
+        roomCodeBadge.textContent = `رمز: ${room.code}`;
+        roomCodeBadge.style.display = "inline-block";
+      }
 
       TIMER_UI.latestTimer = room.timer || {};
 
