@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>سباق الحروف</title>
 
-  <!-- ✅ (تعديل) خط Baloo Bhaijaan لعنوان اللعبة -->
+  <!-- ✅ خط Baloo Bhaijaan لعنوان اللعبة -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan&display=swap" rel="stylesheet">
@@ -34,44 +34,57 @@
 
     body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
 
-    /* ✅ (تعديل) مساحة أعلى الهيدر (سيتم ضبطها ديناميكيًا أيضًا) */
+    /* ✅ هيدر جديد: اللوجو + العنوان + اسم اللعبة بنفس السطر بدون تداخل */
     header{
       position:relative;
       padding:14px 14px 0;
-      padding-top:104px; /* حد أدنى */
+    }
+    .topBar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      direction:ltr; /* لضمان اللوجو يسار واسم اللعبة يمين */
     }
 
-    /* ✅ (تعديل) تكبير اللوجو إلى 75*75 */
-    .logo{position:absolute;left:14px;top:14px;width:75px;height:75px;object-fit:contain}
+    /* ✅ اللوجو بمكانه الجديد */
+    .logo{
+      position:static;
+      width:60px;
+      height:60px;
+      object-fit:contain;
+      flex:0 0 auto;
+    }
 
-    /* ✅ (تعديل) صندوق اسم اللعبة: أضيق + أطول (٤ كلمات) + شفاف ولا يدخل على العنوان */
+    /* ✅ مربع اسم اللعبة: أصغر + على نفس مستوى العنوان */
     .gameName{
-      position:absolute;
-      right:14px;
-      top:14px;
+      position:static;
       display:flex;
       flex-direction:column;
       justify-content:center;
       align-items:center;
-      gap:4px;
+      gap:3px;
 
-      width:min(44vw, 210px);
-      min-height:70px;
-      padding:10px 12px;
-      border-radius:16px;
+      width:min(36vw, 170px);  /* أصغر من قبل */
+      min-height:54px;         /* يكفي سطرين بدون تزاحم */
+      padding:8px 10px;
+      border-radius:14px;
 
       background:rgba(255,255,255,.22);
       border:1px solid rgba(255,255,255,.18);
       color:#fff;
       box-shadow:0 2px 0 rgba(0,0,0,.12);
 
-      font-size:16px;
+      font-size:15px;
       font-weight:900;
-      line-height:1.25;
+      line-height:1.2;
       text-align:center;
 
       overflow:hidden;
       box-sizing:border-box;
+
+      direction:rtl;
+      flex:0 0 auto;
     }
     .gameName:empty{display:none;}
     .gnLine{
@@ -82,28 +95,22 @@
       text-overflow:ellipsis;
     }
 
-    /* ✅ (تعديل) عنوان اللعبة بخط Baloo Bhaijaan */
+    /* ✅ عنوان اللعبة بالوسط */
     h1{
-      margin:0 0 10px;
+      margin:0;
       color:var(--yellow);
       font-size:28px;
       font-family:'Baloo Bhaijaan', Arial, sans-serif;
       font-weight:800;
+      text-align:center;
+      direction:rtl;
+
+      flex:1 1 auto;
+      min-width:0;
     }
 
-    /* ✅ (تعديل 2) إخفاء شارة الرمز نهائيًا */
-    .roomCodeBadge{
-      display:none !important;
-      margin:6px auto 8px;
-      width:fit-content;
-      background:var(--yellow);
-      color:#000;
-      padding:6px 12px;
-      border-radius:14px;
-      font-weight:900;
-      font-size:15px;
-      box-shadow:0 2px 0 rgba(0,0,0,.12);
-    }
+    /* ✅ شارة الرمز مخفية نهائياً */
+    .roomCodeBadge{ display:none !important; }
 
     .wrap{width:95%;max-width:900px;margin:0 auto}
 
@@ -113,7 +120,7 @@
       box-sizing:border-box
     }
 
-    /* ✅ (تعديل) رفع الخريطة والأزرار للأعلى في وضع اللعب فقط */
+    /* ✅ رفع الخريطة والأزرار للأعلى في وضع اللعب فقط */
     #main.inGame{
       margin-top:8px;
       padding-top:8px;
@@ -200,10 +207,10 @@
     }
     .qTitle{font-weight:bold;margin-bottom:8px}
 
-    /* ✅ (تعديل) تكبير خط السؤال */
+    /* ✅ تكبير خط السؤال */
     .qText{line-height:1.6;font-size:22px}
 
-    /* ✅ (تعديل 2) مربع الجواب: أعرض من الجانبين + بالمنتصف */
+    /* ✅ مربع الجواب: أعرض من الجانبين + بالمنتصف */
     .qAns{
       line-height:1.6;
       margin:14px auto 0;
@@ -249,7 +256,7 @@
     }
     a{color:inherit}
 
-    /* ✅ (تعديل) مؤقت جديد */
+    /* ✅ مؤقت جديد */
     .timerWrap{
       position:relative;
       display:flex;
@@ -275,7 +282,6 @@
     }
     .timerClockBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
 
-    /* ✅ التعبئة الدائرية */
     .timerClockBtn::before{
       content:"";
       position:absolute;
@@ -404,7 +410,9 @@
     .timerOptBtn:active{ transform: translateY(1px); }
 
     .timerPlayerView{ pointer-events:none; user-select:none; }
-    .timerClockBtn.player{ width:78px;height:78px; }
+    .timerClockBtn.player{
+      width:78px;height:78px;
+    }
 
     .scoreBar{
       width:100%;
@@ -514,14 +522,14 @@
     }
     .buyNowBtn:active{ transform: translateY(1px); box-shadow:0 2px 0 rgba(0,0,0,.15); }
 
-    /* ✅ (تعديل 1) تصغير صفحة الانتظار: إزالة الفراغ الكبير */
+    /* ✅ تصغير صفحة الانتظار (بدون مساحة بيضاء كبيرة) */
     .waitingLayout{
       display:flex;
       flex-direction:column;
-      min-height:unset;
+      gap:12px;
     }
     .waitingLayout .buyNowWrap{
-      margin-top:12px;
+      margin-top:0;
       padding-top:0;
     }
 
@@ -595,9 +603,13 @@
 </head>
 <body>
   <header>
-    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
-    <div id="gameName" class="gameName"></div>
-    <h1>سباق الحروف</h1>
+    <div class="topBar">
+      <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
+      <h1>سباق الحروف</h1>
+      <div id="gameName" class="gameName"></div>
+    </div>
+
+    <!-- موجود لكن مخفي نهائياً -->
     <div id="roomCodeBadge" class="roomCodeBadge"></div>
   </header>
 
@@ -1097,46 +1109,12 @@
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
     const roomCodeBadge = document.getElementById("roomCodeBadge");
-    const headerEl = document.querySelector("header");
-
-    function teamColor(team){
-      return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
-    }
-
-    function escapeHtml(s){
-      return String(s ?? "").replace(/[&<>"']/g, c => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-      }[c]));
-    }
-
-    /* ✅ (تعديل 3) ضبط padding-top للهيدر تلقائيًا لمنع تداخل المربع الزجاجي مع العنوان */
-    function adjustHeaderTopPadding(){
-      if(!headerEl) return;
-      const hr = headerEl.getBoundingClientRect();
-      let needed = 0;
-
-      const logo = document.querySelector(".logo");
-      if(logo){
-        const r = logo.getBoundingClientRect();
-        needed = Math.max(needed, r.bottom - hr.top);
-      }
-      if(gameNameEl && gameNameEl.innerHTML.trim()){
-        const r = gameNameEl.getBoundingClientRect();
-        needed = Math.max(needed, r.bottom - hr.top);
-      }
-
-      const minPad = 104;
-      const pad = Math.max(minPad, Math.ceil(needed + 14));
-      headerEl.style.paddingTop = pad + "px";
-    }
-    window.addEventListener("resize", adjustHeaderTopPadding);
 
     function setGameName(raw){
       if(!gameNameEl) return;
       const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
       if(!s0){
         gameNameEl.innerHTML = "";
-        adjustHeaderTopPadding();
         return;
       }
 
@@ -1154,8 +1132,6 @@
       gameNameEl.innerHTML =
         `<span class="gnLine">${escapeHtml(top)}</span>` +
         `<span class="gnLine">${escapeHtml(bottom)}</span>`;
-
-      adjustHeaderTopPadding();
     }
 
     if(!role || !code){
@@ -1164,6 +1140,16 @@
     }
 
     const roomRef = ref(db, `rooms/${code}`);
+
+    function teamColor(team){
+      return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
+    }
+
+    function escapeHtml(s){
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[c]));
+    }
 
     function cellKey(row,col){ return `${row}-${col}`; }
 
@@ -1323,9 +1309,14 @@
         TIMER_UI.lastSecond = null;
       }
 
+      /* ✅ تعديل سلوك زر المؤقت للمقدم:
+         - أثناء التشغيل: "إيقاف المؤقت"
+         - بعد الانتهاء (done): يبقى "إيقاف المؤقت" حتى تضغطه لإعادة التصفير
+         - بعد التصفير: يرجع "ابدأ المؤقت"
+      */
       const startBtn = document.getElementById("timerStartBtn");
       if(startBtn && TIMER_UI.isHost){
-        if(view.running){
+        if(view.running || view.done){
           startBtn.textContent = "إيقاف المؤقت";
           startBtn.classList.add("running");
         }else{
@@ -1334,12 +1325,11 @@
         }
       }
 
-      /* ✅ (تعديل 4) عند الانتهاء: لا نطفّي running حتى يبقى الزر "إيقاف المؤقت" */
       if(TIMER_UI.isHost){
         if(view.running && view.remaining === 0){
           if(TIMER_UI.lastDoneStartTs !== view.startTs){
             TIMER_UI.lastDoneStartTs = view.startTs;
-            update(ref(db, `rooms/${code}/timer`), { done:true });
+            update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
           }
         }
       }
@@ -1384,25 +1374,6 @@
       document.addEventListener("click", () => {
         document.querySelectorAll(".timerPicker.show").forEach(p => p.classList.remove("show"));
       });
-    }
-
-    function beep(){
-      try{
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if(!AC) return;
-        const ctx = new AC();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = "sine";
-        o.frequency.value = 880;
-        g.gain.value = 0.12;
-        o.connect(g); g.connect(ctx.destination);
-        o.start();
-        setTimeout(() => {
-          o.stop();
-          ctx.close();
-        }, 300);
-      }catch(e){}
     }
 
     function buildJoinUrl(roomCode){
@@ -1467,9 +1438,10 @@
       const green = list.filter(p => p.team === "green");
       const orange = list.filter(p => p.team === "orange");
 
-      /* ✅ (تعديل 2) حذف صندوق الرمز ومحتواه من اللوبي */
       main.innerHTML = `
-        <div class="smallNote">يمكنك مشاركة الرمز/الرابط/الباركود من زر (مشاركة اللعبة للاعبين)</div>
+        <div class="codeBox">رمز اللعبة</div>
+        <div class="codeNum">${escapeHtml(room.code)}</div>
+        <div class="smallNote">شارك الرمز مع اللاعبين للدخول</div>
 
         <div style="height:12px"></div>
 
@@ -1760,8 +1732,6 @@
         ${(!isHost) ? `
           <div class="playerBtnWrap">
             <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
-
-            <!-- ✅ حذف عبارة "اضغط للإجابة" بعد بدء اللعبة -->
             ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
 
             <div class="buyNowWrap">
@@ -1873,6 +1843,7 @@
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
+            /* ✅ إذا كان شغال: يوقف ويصفّر */
             if(t.running){
               await update(ref(db, `rooms/${code}/timer`), {
                 running:false,
@@ -1883,6 +1854,18 @@
               return;
             }
 
+            /* ✅ إذا انتهى (done): ضغطه يصفّر ويرجع "ابدأ المؤقت" */
+            if(t.done){
+              await update(ref(db, `rooms/${code}/timer`), {
+                running:false,
+                done:false,
+                startTs:0,
+                dur: sel
+              });
+              return;
+            }
+
+            /* ✅ إذا غير شغال وغير منتهي: يبدأ */
             await update(ref(db, `rooms/${code}/timer`), {
               sel,
               dur: sel,
@@ -2133,7 +2116,7 @@
       const room = snap.val();
       setGameName(room?.name);
 
-      /* ✅ (تعديل 2) عدم إظهار أي شارة للرمز */
+      /* ✅ لا نعرض شارة الرمز نهائياً */
       if(roomCodeBadge) roomCodeBadge.style.display = "none";
 
       TIMER_UI.latestTimer = room.timer || {};
