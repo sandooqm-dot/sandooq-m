@@ -264,32 +264,6 @@
     }
     .timerClockBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
 
-    .timerClockBtn::before{
-      content:"";
-      position:absolute;
-      inset:6px;
-      border-radius:50%;
-      background: conic-gradient(
-        from 0deg,
-        rgba(0,0,0,.08) 0turn calc((1 - var(--p, 1)) * 1turn),
-        var(--timerFill, #14b8a6) calc((1 - var(--p, 1)) * 1turn) 1turn
-      );
-      opacity:1;
-    }
-
-    @keyframes timerFlashFill {
-      0%   { opacity: 1; }
-      50%  { opacity: .35; }
-      100% { opacity: 1; }
-    }
-    .timerClockBtn.timerFlashing::before{
-      animation: timerFlashFill .6s linear infinite;
-    }
-    .timerClockBtn.timerFlashing{
-      outline: 3px solid rgba(0,0,0,.06);
-      outline-offset: 2px;
-    }
-
     .timerIcon{
       position:relative;
       z-index:2;
@@ -312,7 +286,7 @@
       align-items:center;
       justify-content:center;
       font-weight:900;
-      color:var(--timerFillLast5); /* ✅ أرقام حمراء واضحة */
+      color:var(--timerFillLast5);
       text-shadow:0 3px 12px rgba(0,0,0,.35);
       opacity:0;
       pointer-events:none;
@@ -338,9 +312,7 @@
       touch-action: manipulation;
     }
     .timerStartBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
-    .timerStartBtn.running{
-      opacity:.55;
-    }
+    .timerStartBtn.running{ opacity:.55; }
 
     .timerPicker{
       position:absolute;
@@ -367,12 +339,7 @@
       transform:translateX(-50%) translateY(0);
       pointer-events:auto;
     }
-    .timerOptRow{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      justify-content:center;
-    }
+    .timerOptRow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .timerOptBtn{
       min-width:64px;
       height:36px;
@@ -482,11 +449,7 @@
     }
     .scorePickBtn:active{ transform: translateY(1px); }
 
-    .scoreHint{
-      font-size:12px;
-      opacity:.85;
-      margin-top:4px;
-    }
+    .scoreHint{font-size:12px;opacity:.85;margin-top:4px}
 
     /* ✅ زر شراء اللعبة + أيقونة سلة */
     .buyNowWrap{margin-top:10px;display:flex;justify-content:center}
@@ -510,7 +473,6 @@
       gap:8px;
     }
     .buyNowBtn:active{ transform: translateY(1px); box-shadow:0 2px 0 rgba(0,0,0,.15); }
-    .cartIcon{font-size:20px;line-height:1}
 
     /* ✅ صفحة الانتظار: كرت أصغر + تكبير نص الانتظار */
     .waitingLayout{
@@ -558,11 +520,7 @@
       cursor:pointer;
       line-height:1;
     }
-    .shareTitle{
-      font-weight:bold;
-      margin:0 0 10px;
-      text-align:center;
-    }
+    .shareTitle{font-weight:bold;margin:0 0 10px;text-align:center}
     .shareChoices{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 8px}
     .sharePanel{
       display:none;
@@ -588,6 +546,7 @@
     }
   </style>
 </head>
+
 <body>
   <header>
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
@@ -652,6 +611,9 @@
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
 
+    // ✅ تعريف آمن حتى لو ما فيه عنصر أصلاً
+    const roomCodeBadge = document.getElementById("roomCodeBadge"); // (غالباً null)
+
     function escapeHtml(s){
       return String(s ?? "").replace(/[&<>"']/g, c => ({
         "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -666,16 +628,26 @@
         gameNameEl.innerHTML = "";
         return;
       }
-
-      // 4 كلمات فقط (بدون تقطيع كلمة)
       const words = s0.split(" ").filter(Boolean).slice(0, 4);
-
       const top = words.slice(0, 2).join(" ");
       const bottom = words.slice(2, 4).join(" ");
-
       gameNameEl.innerHTML =
         `<span class="gnLine">${escapeHtml(top)}</span>` +
         `<span class="gnLine">${escapeHtml(bottom)}</span>`;
+    }
+
+    function makeGameNameGlassy(){
+      if(!gameNameEl) return;
+      // CSS أصلاً زجاجي، لكن نخليه مضمون
+      gameNameEl.style.background = "rgba(255,255,255,.18)";
+      gameNameEl.style.border = "1px solid rgba(255,255,255,.28)";
+      gameNameEl.style.backdropFilter = "blur(10px)";
+      gameNameEl.style.webkitBackdropFilter = "blur(10px)";
+      gameNameEl.style.color = "#fff";
+    }
+
+    function hideRoomBadge(){
+      if(roomCodeBadge) roomCodeBadge.style.display = "none";
     }
 
     if(!role || !code){
@@ -688,11 +660,10 @@
     function teamColor(team){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
     }
-
     function cellKey(row,col){ return `${row}-${col}`; }
 
     const BBOX_CACHE = {};
-        function detectHexBBox(img){
+    function detectHexBBox(img){
       const nw = img.naturalWidth, nh = img.naturalHeight;
       const maxW = 700;
       const scale = Math.min(1, maxW / nw);
@@ -814,7 +785,7 @@
       { q: "هو سواد الليل وضلمته", a: "دجى" },
       { q: "هو ماء لم يخرج من الارض ولم ينزل من السماء", a: "دموع" },
       { q: "هو المخادع أو المحتال في أقواله وافعاله", a: "دجال" },
-      { q: "هو الاحتيال والخداع وتدبير الشر بمهارة", a: "هدير" },
+      { q: "هو الاحتيال والخداع وتدبير الشر بمهارة", a: "دهاء" },
       { q: "هي صفه تمزج بين الفطنة والذكاء وإدراك الامور", a: "دهاء" },
       { q: "ماهي عاصمة دولة تنزانيا", a: "دار السلام" },
       { q: "من مدن جمهورية مصر العرب", a: "دمياط" },
@@ -948,17 +919,26 @@
       const t = normalizeTimer(TIMER_UI.latestTimer || {});
       const view = computeTimerView(t);
 
-      const fill = view.inLast5 ? "var(--timerFillLast5)" : "var(--timerFill)";
-      clock.style.setProperty("--timerFill", fill);
-      clock.style.setProperty("--p", String(view.progress));
-
-      if(view.done){
-        clock.classList.add("timerFlashing");
-      }else{
-        clock.classList.remove("timerFlashing");
+      // طبقة تعبئة تبدأ من الأعلى (12)
+      let layer = clock.querySelector(".timerFillLayer");
+      if(!layer){
+        layer = document.createElement("span");
+        layer.className = "timerFillLayer";
+        layer.style.position = "absolute";
+        layer.style.inset = "6px";
+        layer.style.borderRadius = "50%";
+        layer.style.zIndex = "1";
+        layer.style.pointerEvents = "none";
+        clock.insertBefore(layer, clock.firstChild);
       }
 
-      clock.style.color = "#fff";
+      const fill = view.inLast5 ? "var(--timerFillLast5)" : "var(--timerFill)";
+      const p = Math.max(0, Math.min(1, view.progress));
+
+      layer.style.background = `conic-gradient(from -90deg,
+        ${fill} 0turn ${p}turn,
+        rgba(0,0,0,.08) ${p}turn 1turn
+      )`;
 
       const iconEl = clock.querySelector(".timerIcon");
       if(iconEl) iconEl.style.opacity = view.inLast5 ? "0" : "1";
@@ -974,7 +954,7 @@
 
       const startBtn = document.getElementById("timerStartBtn");
       if(startBtn && TIMER_UI.isHost){
-        /* ✅ المطلوب: عند الانتهاء لا يرجع تلقائياً إلى "ابدأ" */
+        // ✅ المطلوب: بعد الانتهاء يبقى "إيقاف المؤقت"
         if(view.running){
           startBtn.textContent = "إيقاف المؤقت";
           startBtn.classList.add("running");
@@ -999,15 +979,12 @@
 
     function ensureTimerTicker(){
       if(TIMER_UI.tick) return;
-      TIMER_UI.tick = setInterval(() => {
-        applyTimerDom();
-      }, 200);
+      TIMER_UI.tick = setInterval(() => applyTimerDom(), 200);
     }
 
     function initTimerDefaultsIfNeeded(room){
       if(role !== "host") return;
       if(!room) return;
-
       const t = room.timer;
       if(t && typeof t === "object") return;
 
@@ -1030,31 +1007,11 @@
         document.querySelectorAll(".scorePicker.show").forEach(p => p.classList.remove("show"));
       });
     }
-
     if(!window.__timerPickerBound){
       window.__timerPickerBound = true;
       document.addEventListener("click", () => {
         document.querySelectorAll(".timerPicker.show").forEach(p => p.classList.remove("show"));
       });
-    }
-
-    function beep(){
-      try{
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if(!AC) return;
-        const ctx = new AC();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = "sine";
-        o.frequency.value = 880;
-        g.gain.value = 0.12;
-        o.connect(g); g.connect(ctx.destination);
-        o.start();
-        setTimeout(() => {
-          o.stop();
-          ctx.close();
-        }, 300);
-      }catch(e){}
     }
 
     function buildJoinUrl(roomCode){
@@ -1102,14 +1059,32 @@
         e.preventDefault();
         openStoreUrl();
       }
-      const a = e.target?.closest?.("a[href]");
-      if(a){
-        const href = (a.getAttribute("href") || "").trim();
-        if(href.includes("sandooq-m.com") && !/^https?:\/\//i.test(href)){
-          a.setAttribute("href", "https://" + href.replace(/^\/+/, ""));
-        }
-      }
     }, true);
+
+    function renderWaiting(msg){
+      main.classList.remove("inGame");
+      main.innerHTML = `
+        <div class="waitingLayout">
+          <div style="
+            width:min(92vw, 520px);
+            margin: 0 auto;
+            background:#fff;
+            border-radius:14px;
+            padding:14px 12px;
+            box-shadow:0 2px 0 rgba(0,0,0,.10);
+          ">
+            <div class="waitingMsg">${escapeHtml(msg)}</div>
+          </div>
+
+          <div class="buyNowWrap" style="margin-top:18px;padding-bottom:10px;">
+            <button class="buyNowBtn" data-store-link type="button">
+              <span aria-hidden="true" style="font-size:20px;line-height:1;">🛒</span>
+              <span>لشراء اللعبة اضغط هنا</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
 
     function renderHostLobby(room){
       main.classList.remove("inGame");
@@ -1120,7 +1095,6 @@
       const green = list.filter(p => p.team === "green");
       const orange = list.filter(p => p.team === "orange");
 
-      /* ✅ حذف عرض الرمز من صفحة اللوبي بالكامل (الرمز فقط داخل نافذة المشاركة) */
       main.innerHTML = `
         <div class="teams">
           <div class="teamCol teamGreen">
@@ -1207,6 +1181,7 @@
         });
       });
 
+      // مشاركة
       const shareBackdrop = document.getElementById("shareBackdrop");
       const shareBtn = document.getElementById("shareBtn");
       const shareClose = document.getElementById("shareClose");
@@ -1230,7 +1205,6 @@
         shareCodePanel.style.display = (which === "code") ? "block" : "none";
         shareLinkPanel.style.display = (which === "link") ? "block" : "none";
       }
-
       function openShare(){
         shareBackdrop.style.display = "flex";
         showPanel("code");
@@ -1250,11 +1224,7 @@
         qrImg.src = qrUrl;
         joinUrlTxt.textContent = joinUrl;
       });
-
-      shareCodeBtn.addEventListener("click", () => {
-        showPanel("code");
-      });
-
+      shareCodeBtn.addEventListener("click", () => showPanel("code"));
       shareLinkBtn.addEventListener("click", () => {
         showPanel("link");
         joinUrlTxt2.textContent = joinUrl;
@@ -1275,93 +1245,11 @@
         });
       }
     }
-        /* ✅ تغميق الخلفية + تفعيل شكل زجاجي لاسم اللعبة (بدون لمس الـ CSS السابق) */
-    try{
-      document.documentElement.style.setProperty("--bg", "#173f8f"); /* أغمق شوي */
-    }catch(e){}
-
-    /* ✅ (تعديل) تنسيق اسم اللعبة: زجاجي + 4 كلمات (2 فوق + 2 تحت) */
-    function setGameName(raw){
-      if(!gameNameEl) return;
-      const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
-      if(!s0){
-        gameNameEl.innerHTML = "";
-        gameNameEl.style.display = "none";
-        return;
-      }
-      gameNameEl.style.display = "flex";
-
-      // حد أقصى 4 كلمات (بدون تقطيع كلمة)
-      const words0 = s0.split(" ").filter(Boolean);
-      const words = words0.slice(0, 4);
-
-      const top = words.slice(0, 2).join(" ");
-      const bottom = words.slice(2, 4).join(" ");
-
-      gameNameEl.innerHTML =
-        `<span class="gnLine">${escapeHtml(top)}</span>` +
-        `<span class="gnLine">${escapeHtml(bottom)}</span>`;
-
-      /* ✅ زجاجي شفاف */
-      gameNameEl.style.background = "rgba(255,255,255,.18)";
-      gameNameEl.style.color = "#fff";
-      gameNameEl.style.border = "1px solid rgba(255,255,255,.22)";
-      gameNameEl.style.backdropFilter = "blur(8px)";
-      gameNameEl.style.webkitBackdropFilter = "blur(8px)";
-      gameNameEl.style.boxShadow = "0 2px 0 rgba(0,0,0,.10)";
-    }
-
-    /* ✅ (تعديل) أرقام آخر 5 ثواني: أحمر واضح */
-    function forceBurst(n){
-      const burst = document.getElementById("timerBurst");
-      if(!burst) return;
-      burst.textContent = String(n);
-      burst.style.color = "var(--timerFillLast5)";  /* أحمر واضح */
-      burst.classList.remove("show");
-      void burst.offsetWidth;
-      burst.classList.add("show");
-    }
-
-    function renderWaiting(msg){
-      main.classList.remove("inGame");
-
-      /* ✅ (تعديل) تصغير/ملائمة مربع الانتظار + تكبير النص + رفع زر الشراء + إضافة أيقونة سلة يسار النص */
-      main.innerHTML = `
-        <div class="waitingLayout" style="min-height:auto;">
-          <div style="
-            width:min(92vw, 520px);
-            margin: 0 auto;
-            background:#fff;
-            border-radius:14px;
-            padding:14px 12px;
-            box-shadow:0 2px 0 rgba(0,0,0,.10);
-          ">
-            <div style="
-              font-size:22px;
-              font-weight:900;
-              color:#111;
-              line-height:1.6;
-            ">${escapeHtml(msg)}</div>
-          </div>
-
-          <div class="buyNowWrap" style="margin-top:18px;padding-bottom:10px;">
-            <button class="buyNowBtn" data-store-link type="button" style="
-              display:flex;
-              align-items:center;
-              justify-content:center;
-              gap:10px;
-            ">
-              <span aria-hidden="true" style="font-size:20px;line-height:1;">🛒</span>
-              <span>لشراء اللعبة اضغط هنا</span>
-            </button>
-          </div>
-        </div>
-      `;
-    }
 
     function renderGame(room, me){
       main.classList.add("inGame");
       setGameName(room?.name);
+      makeGameNameGlassy();
 
       const isHost = role === "host";
       const started = room.status === "started";
@@ -1481,12 +1369,7 @@
             <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
 
             <div class="buyNowWrap" style="margin-top:10px;">
-              <button class="buyNowBtn" data-store-link type="button" style="
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                gap:10px;
-              ">
+              <button class="buyNowBtn" data-store-link type="button">
                 <span aria-hidden="true" style="font-size:20px;line-height:1;">🛒</span>
                 <span>لشراء اللعبة اضغط هنا</span>
               </button>
@@ -1495,22 +1378,7 @@
         ` : ""}
       `;
 
-      /* ✅ (تعديل) تصغير صندوق الجواب الأخضر ليكون ملائم لطول الجواب + التفاف عدة أسطر */
-      if(isHost){
-        const qAns = document.getElementById("qAns");
-        if(qAns){
-          qAns.style.display = "none";
-          qAns.style.width = "fit-content";
-          qAns.style.maxWidth = "92%";
-          qAns.style.margin = "12px auto 0";
-          qAns.style.padding = "10px 14px";
-          qAns.style.borderRadius = "14px";
-          qAns.style.whiteSpace = "normal";
-          qAns.style.wordBreak = "keep-all";
-        }
-      }
-
-      /* ✅ (تعديل 1) اختيار النقاط من شريط 0-10 */
+      // نقاط 0-10
       if(isHost){
         const pickerOrange = document.getElementById("scorePickerOrange");
         const pickerGreen  = document.getElementById("scorePickerGreen");
@@ -1561,6 +1429,7 @@
         });
       }
 
+      // المؤقت
       TIMER_UI.latestTimer = room.timer || {};
       TIMER_UI.isHost = isHost;
       ensureTimerTicker();
@@ -1578,7 +1447,6 @@
             document.querySelectorAll(".timerPicker.show").forEach(p => p.classList.remove("show"));
             if(!shown) picker.classList.add("show");
           });
-
           picker.addEventListener("click", (e)=>e.stopPropagation());
 
           const cur = normalizeTimer(room.timer || {});
@@ -1607,51 +1475,40 @@
           });
         }
 
+        // ✅ سلوك زر المؤقت: بعد الانتهاء يبقى "إيقاف"، والضغط عليه يصفّر ثم يصير "ابدأ"
         if(startBtn){
           startBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
-            /* ✅ (تعديل) زر المؤقت:
-               - إذا شغال: يوقف ويصير جاهز
-               - إذا انتهى (done): يبقى مكتوب "إيقاف المؤقت" حتى تضغطه ويبدأ من جديد
-            */
             if(t.running){
               await update(ref(db, `rooms/${code}/timer`), {
-                running:false,
-                done:false,
-                startTs:0,
-                dur: sel
+                sel, dur: sel, running:false, done:false, startTs:0
               });
               return;
             }
-
+            if(t.done){
+              await update(ref(db, `rooms/${code}/timer`), {
+                sel, dur: sel, running:false, done:false, startTs:0
+              });
+              return;
+            }
             await update(ref(db, `rooms/${code}/timer`), {
-              sel,
-              dur: sel,
-              running:true,
-              done:false,
-              startTs: Date.now()
+              sel, dur: sel, running:true, done:false, startTs: Date.now()
             });
           });
         }
       }
-            }
 
+      // ===== الخريطة =====
       const mapImg = document.getElementById("mapImg");
       const overlay = document.getElementById("overlay");
       const mapScale = document.getElementById("mapScale");
       const zoom = document.getElementById("zoom");
 
       const activeMap = Number(room.activeMap || 0);
-
-      const src = ([
-        "maps/map1.jpeg",
-        "maps/map2.jpeg",
-        "maps/map3.jpeg"
-      ][activeMap] || "maps/map1.jpeg");
-
+      const src = (["maps/map1.jpeg","maps/map2.jpeg","maps/map3.jpeg"][activeMap] || "maps/map1.jpeg");
       mapImg.src = src;
 
       overlay.innerHTML = "";
@@ -1729,7 +1586,6 @@
         if(!BBOX_CACHE[src]) BBOX_CACHE[src] = detectHexBBox(mapImg);
         requestAnimationFrame(placeHexes);
       }
-
       if(mapImg.complete) onMapReady();
       else mapImg.addEventListener("load", onMapReady, { once:true });
 
@@ -1747,9 +1603,9 @@
         setStateClass(cell, st);
       });
 
+      // buzzer
       const buzzBox = document.getElementById("buzzBox");
       const buzzer = room.buzzer;
-
       if(buzzer && buzzer.name){
         buzzBox.classList.remove("buzzEmpty");
         buzzBox.style.background = teamColor(buzzer.team);
@@ -1760,6 +1616,7 @@
         buzzBox.textContent = "—";
       }
 
+      // السؤال/الجواب للمقدم
       if(isHost){
         const qText = document.getElementById("qText");
         const qAns  = document.getElementById("qAns");
@@ -1776,7 +1633,6 @@
             const item = list[idx];
             qText.textContent = item?.q ?? "—";
             qAns.textContent  = item?.a ?? "";
-
             qAns.style.display = (qAns.textContent.trim() ? "block" : "none");
           }
         }else{
@@ -1792,6 +1648,7 @@
         applyZoomFix();
       });
 
+      // أزرار المقدم
       const mapBtn = document.getElementById("mapBtn");
       if(mapBtn){
         mapBtn.addEventListener("click", async () => {
@@ -1823,6 +1680,7 @@
         });
       }
 
+      // اختيار حرف من الخريطة
       if(isHost){
         overlay.querySelectorAll(".cell").forEach(cell => {
           cell.addEventListener("click", async (e) => {
@@ -1848,6 +1706,7 @@
         });
       }
 
+      // زر اللاعب
       const buzzBtn = document.getElementById("buzzBtn");
       if(buzzBtn){
         const disabled = (!started) || room.freeze || !me || !me.name;
@@ -1869,293 +1728,7 @@
       }
     }
 
-    /* ✅ (تعديل مهم) إعادة تعريف applyTimerDom عشان:
-       - زر المؤقت بعد الانتهاء يبقى "إيقاف المؤقت" (ما يرجع تلقائياً "ابدأ")
-       - آخر 5 ثواني: أرقام حمراء واضحة (تم في forceBurst)
-    */
-    function applyTimerDom(){
-      const clock = document.getElementById("timerClock");
-      if(!clock) return;
-
-      const t = normalizeTimer(TIMER_UI.latestTimer || {});
-      const view = computeTimerView(t);
-
-      const fill = view.inLast5 ? "var(--timerFillLast5)" : "var(--timerFill)";
-      clock.style.setProperty("--timerFill", fill);
-      clock.style.setProperty("--p", String(view.progress));
-
-      if(view.done){
-        clock.classList.add("timerFlashing");
-      }else{
-        clock.classList.remove("timerFlashing");
-      }
-
-      clock.style.color = "#fff";
-
-      const iconEl = clock.querySelector(".timerIcon");
-      if(iconEl) iconEl.style.opacity = view.inLast5 ? "0" : "1";
-
-      if(view.inLast5){
-        if(TIMER_UI.lastSecond !== view.remaining){
-          TIMER_UI.lastSecond = view.remaining;
-          forceBurst(view.remaining);
-        }
-      }else{
-        TIMER_UI.lastSecond = null;
-      }
-
-      const startBtn = document.getElementById("timerStartBtn");
-      if(startBtn && TIMER_UI.isHost){
-        if(view.running){
-          startBtn.textContent = "إيقاف المؤقت";
-          startBtn.classList.add("running");
-        }else if(view.done){
-          startBtn.textContent = "إيقاف المؤقت"; /* ✅ يبقى هكذا بعد الانتهاء */
-          startBtn.classList.remove("running");
-          startBtn.style.opacity = "1";
-        }else{
-          startBtn.textContent = "ابدأ المؤقت";
-          startBtn.classList.remove("running");
-        }
-      }
-
-      if(TIMER_UI.isHost){
-        if(view.running && view.remaining === 0){
-          if(TIMER_UI.lastDoneStartTs !== view.startTs){
-            TIMER_UI.lastDoneStartTs = view.startTs;
-            update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
-          }
-        }
-      }
-    }
-        /* ✅ (تعديل) آخر 5 ثواني: الرقم يكون أحمر واضح */
-    function forceBurst(n){
-      const burst = document.getElementById("timerBurst");
-      if(!burst) return;
-      burst.textContent = String(n);
-      burst.style.color = "var(--timerFillLast5)"; /* أحمر */
-      burst.classList.remove("show");
-      void burst.offsetWidth;
-      burst.classList.add("show");
-    }
-
-    /* ✅ (تعديل) تحسين تعبئة المؤقت: تبدأ من الأعلى (12) وتنقص مع عقارب الساعة */
-    function applyTimerDom(){
-      const clock = document.getElementById("timerClock");
-      if(!clock) return;
-
-      const t = normalizeTimer(TIMER_UI.latestTimer || {});
-      const view = computeTimerView(t);
-
-      const fill = view.inLast5 ? "var(--timerFillLast5)" : "var(--timerFill)";
-      const p = Math.max(0, Math.min(1, view.progress));
-
-      // طبقة تعبئة نتحكم فيها بالـ JS (أفضل من الاعتماد على ::before)
-      let layer = clock.querySelector(".timerFillLayer");
-      if(!layer){
-        layer = document.createElement("span");
-        layer.className = "timerFillLayer";
-        layer.style.position = "absolute";
-        layer.style.inset = "6px";
-        layer.style.borderRadius = "50%";
-        layer.style.zIndex = "1";
-        layer.style.pointerEvents = "none";
-        clock.insertBefore(layer, clock.firstChild);
-      }
-
-      layer.style.background = `conic-gradient(from -90deg,
-        ${fill} 0turn ${p}turn,
-        rgba(0,0,0,.08) ${p}turn 1turn
-      )`;
-
-      if(view.done){
-        clock.classList.add("timerFlashing");
-        layer.style.animation = "timerFlashFill .6s linear infinite";
-      }else{
-        clock.classList.remove("timerFlashing");
-        layer.style.animation = "none";
-      }
-
-      clock.style.color = "#fff";
-
-      const iconEl = clock.querySelector(".timerIcon");
-      if(iconEl) iconEl.style.opacity = view.inLast5 ? "0" : "1";
-
-      if(view.inLast5){
-        if(TIMER_UI.lastSecond !== view.remaining){
-          TIMER_UI.lastSecond = view.remaining;
-          forceBurst(view.remaining);
-        }
-      }else{
-        TIMER_UI.lastSecond = null;
-      }
-
-      // ✅ زر ابدأ/إيقاف (يبقى "إيقاف" بعد الانتهاء)
-      const startBtn = document.getElementById("timerStartBtn");
-      if(startBtn && TIMER_UI.isHost){
-        if(view.running){
-          startBtn.textContent = "إيقاف المؤقت";
-          startBtn.classList.add("running");
-        }else if(view.done){
-          startBtn.textContent = "إيقاف المؤقت";
-          startBtn.classList.remove("running");
-          startBtn.style.opacity = "1";
-        }else{
-          startBtn.textContent = "ابدأ المؤقت";
-          startBtn.classList.remove("running");
-        }
-      }
-
-      // ✅ إنهاء تلقائي وحفظ done
-      if(TIMER_UI.isHost){
-        if(view.running && view.remaining === 0){
-          if(TIMER_UI.lastDoneStartTs !== view.startTs){
-            TIMER_UI.lastDoneStartTs = view.startTs;
-            update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
-          }
-        }
-      }
-    }
-
-    /* ✅ (تعديل) تغميق الخلفية شوي + صندوق اسم اللعبة زجاجي */
-    function applyThemeTweaks(){
-      try{
-        document.documentElement.style.setProperty("--bg", "#173a86"); /* أغمق شوي */
-      }catch(e){}
-    }
-    function makeGameNameGlassy(){
-      if(!gameNameEl) return;
-      gameNameEl.style.background = "rgba(255,255,255,.18)";
-      gameNameEl.style.border = "1px solid rgba(255,255,255,.28)";
-      gameNameEl.style.backdropFilter = "blur(10px)";
-      gameNameEl.style.webkitBackdropFilter = "blur(10px)";
-      gameNameEl.style.color = "#fff";
-      gameNameEl.style.boxShadow = "0 6px 18px rgba(0,0,0,.18)";
-    }
-
-    /* ✅ (تعديل) إخفاء (رمز: ####) من كل الصفحات — الرمز يبقى داخل نافذة المشاركة فقط */
-    function hideRoomBadge(){
-      if(roomCodeBadge) roomCodeBadge.style.display = "none";
-    }
-
-    /* ✅ (تعديل) صفحة الانتظار: تكبير النص + تصغير المساحة + رفع زر الشراء + سلة يسار النص */
-    function patchWaitingUI(){
-      const layout = document.querySelector(".waitingLayout");
-      if(layout){
-        layout.style.minHeight = "44vh";
-        layout.style.justifyContent = "center";
-        layout.style.gap = "10px";
-      }
-
-      const msg = document.querySelector(".waitingLayout .muted");
-      if(msg){
-        msg.style.fontSize = "22px";
-        msg.style.fontWeight = "900";
-        msg.style.color = "#111";
-        msg.style.lineHeight = "1.7";
-        msg.style.margin = "8px auto 0";
-      }
-
-      const buyWrap = document.querySelector(".waitingLayout .buyNowWrap");
-      if(buyWrap){
-        buyWrap.style.marginTop = "18px";
-        buyWrap.style.paddingTop = "0";
-      }
-
-      const buyBtn = document.querySelector(".waitingLayout .buyNowBtn");
-      if(buyBtn){
-        buyBtn.innerHTML = `🛒 لشراء اللعبة اضغط هنا`;
-      }
-    }
-
-    /* ✅ (تعديل) حذف العبارة الصغيرة تحت زر اللاعب الأحمر (مكررة) */
-    function removePlayerSmallNote(){
-      const note = document.querySelector(".playerBtnWrap .smallNote");
-      if(note) note.remove();
-    }
-
-    /* ✅ (تعديل) تصغير صندوق الجواب الأخضر ليكون ملائم لطول الجواب مع التفاف */
-    function patchAnswerBox(){
-      const qAns = document.getElementById("qAns");
-      if(!qAns) return;
-      qAns.style.width = "fit-content";
-      qAns.style.maxWidth = "100%";
-      qAns.style.marginLeft = "auto";
-      qAns.style.marginRight = "auto";
-      qAns.style.padding = "10px 14px";
-      qAns.style.whiteSpace = "normal";
-      qAns.style.lineHeight = "1.7";
-      qAns.style.borderRadius = "14px";
-      qAns.style.wordBreak = "normal";
-      qAns.style.overflowWrap = "break-word";
-    }
-
-    /* ✅ (تعديل) إزالة الرمز الكبير داخل نافذة المشاركة (يبقى الرمز موجود لكن بشكل صغير) */
-    function patchShareCodeBig(room){
-      const big = document.querySelector(".shareCodeBig");
-      if(big){
-        big.textContent = `رمز الغرفة: ${room.code}`;
-        big.style.fontSize = "18px";
-        big.style.letterSpacing = "1px";
-        big.style.marginTop = "10px";
-      }
-    }
-
-    /* ✅ (تعديل) زر المؤقت: بعد الانتهاء يبقى "إيقاف" وأول ضغطة بعد الانتهاء = تصفير فقط */
-    function patchTimerStartButton(){
-      const oldBtn = document.getElementById("timerStartBtn");
-      if(!oldBtn) return;
-
-      const newBtn = oldBtn.cloneNode(true);
-      oldBtn.replaceWith(newBtn);
-
-      newBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const t = normalizeTimer(TIMER_UI.latestTimer || {});
-        const sel = Number(t.sel || 10);
-
-        // إذا شغال: إيقاف + تصفير
-        if(t.running){
-          await update(ref(db, `rooms/${code}/timer`), {
-            sel,
-            dur: sel,
-            running:false,
-            done:false,
-            startTs:0
-          });
-          return;
-        }
-
-        // ✅ إذا منتهي: أول ضغطة تصفير فقط (يصير الزر بعدها "ابدأ المؤقت")
-        if(t.done){
-          await update(ref(db, `rooms/${code}/timer`), {
-            sel,
-            dur: sel,
-            running:false,
-            done:false,
-            startTs:0
-          });
-          return;
-        }
-
-        // بدء جديد
-        await update(ref(db, `rooms/${code}/timer`), {
-          sel,
-          dur: sel,
-          running:true,
-          done:false,
-          startTs: Date.now()
-        });
-      });
-    }
-
-    applyThemeTweaks();
-    makeGameNameGlassy();
-    hideRoomBadge();
-
     onValue(roomRef, (snap) => {
-      console.log("✅ onValue fired");
-console.log("exists?", snap.exists());
       hideRoomBadge();
 
       if(!snap.exists()){
@@ -2163,17 +1736,12 @@ console.log("exists?", snap.exists());
         setGameName("");
         return;
       }
-      const room = snap.val();
 
-      // ✅ اسم اللعبة + زجاجي
+      const room = snap.val();
       setGameName(room?.name);
       makeGameNameGlassy();
 
-      // ✅ المؤقت متزامن
       TIMER_UI.latestTimer = room.timer || {};
-
-      // ✅ (مهم) لا نظهر (رمز: ####) في الهيدر
-      hideRoomBadge();
 
       if(role === "host"){
         if(!hostKey || hostKey !== room.presenterKey){
@@ -2182,15 +1750,9 @@ console.log("exists?", snap.exists());
         }
         if(room.status === "lobby"){
           renderHostLobby(room);
-          hideRoomBadge();
-          patchShareCodeBig(room);     // يشيل الرمز الكبير داخل نافذة المشاركة
           return;
         }
-
         renderGame(room, null);
-        hideRoomBadge();
-        patchAnswerBox();
-        patchTimerStartButton();       // سلوك الزر بعد الانتهاء
         return;
       }
 
@@ -2204,14 +1766,10 @@ console.log("exists?", snap.exists());
 
       if(room.status === "lobby"){
         renderWaiting("بانتظار بدء اللعبة من المقدم...");
-        hideRoomBadge();
-        patchWaitingUI();              // تكبير النص + رفع زر الشراء + 🛒
         return;
       }
 
       renderGame(room, me);
-      hideRoomBadge();
-      removePlayerSmallNote();         // يحذف النص المكرر تحت الزر الأحمر
     });
   </script>
 </body>
