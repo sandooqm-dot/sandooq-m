@@ -2154,6 +2154,8 @@
     hideRoomBadge();
 
     onValue(roomRef, (snap) => {
+      console.log("✅ onValue fired");
+console.log("exists?", snap.exists());
       hideRoomBadge();
 
       if(!snap.exists()){
