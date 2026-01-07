@@ -30,6 +30,10 @@
       --timerFill: #14b8a6;      /* تركوازي */
       --timerFillLast5:#ff3b30;  /* أحمر واضح */
       --timerStart:#0ea5e9;      /* أزرق لزر ابدأ */
+
+      /* ✅ ألوان إضافية مطلوبة */
+      --purple:#8b5cf6;
+      --blue:#0ea5e9;
     }
 
     body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
@@ -46,6 +50,9 @@
       gap:10px;
       width:100%;
       box-sizing:border-box;
+
+      /* ✅ (مطلوب) لوجو يسار + مربع الاسم يمين + على خط واحد */
+      direction:ltr;
     }
 
     /* ✅ (تعديل) اللوجو داخل صف الهيدر (يسار) */
@@ -69,30 +76,35 @@
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
+
+      /* ✅ حتى لو الهيدر LTR، يبقى النص عربي */
+      direction:rtl;
     }
 
-    /* ✅ (تعديل) مربع اسم اللعبة داخل صف الهيدر (يمين) + أضيق + سطرين */
+    /* ✅ (مطلوب) تصغير مربع اسم اللعبة (الصندوق الزجاجي) بدون تداخل */
     .gameName{
       position:static;
       flex:0 0 auto;
 
-      width:min(34vw, 170px);
-      min-height:48px;
-      padding:8px 10px;
-      border-radius:14px;
+      width:min(28vw, 145px);
+      min-height:40px;
+      padding:6px 8px;
+      border-radius:12px;
 
       background:rgba(255,255,255,.22);
       border:1px solid rgba(255,255,255,.18);
       color:#fff;
       box-shadow:0 2px 0 rgba(0,0,0,.12);
 
-      font-size:15px;
+      font-size:14px;
       font-weight:900;
       line-height:1.25;
       text-align:center;
 
       overflow:hidden;
       box-sizing:border-box;
+
+      direction:rtl;
     }
     .gameName:empty{display:none;}
 
@@ -103,20 +115,6 @@
       overflow:hidden;
       word-break:break-word;
       white-space:normal;
-    }
-
-    /* ✅ (تعديل) عرض رمز اللعبة في الهيدر */
-    .roomCodeBadge{
-      display:none;
-      margin:8px auto 8px;
-      width:fit-content;
-      background:var(--yellow);
-      color:#000;
-      padding:6px 12px;
-      border-radius:14px;
-      font-weight:900;
-      font-size:15px;
-      box-shadow:0 2px 0 rgba(0,0,0,.12);
     }
 
     .wrap{width:95%;max-width:900px;margin:0 auto}
@@ -139,6 +137,10 @@
     .btnGreen{background:var(--green);color:#fff}
     .btnRed{background:var(--red);color:#fff}
     .btnOrange{background:var(--orange);color:#fff}
+
+    /* ✅ (مطلوب) ألوان أزرار جديدة */
+    .btnBlue{background:var(--blue);color:#fff}
+    .btnPurple{background:var(--purple);color:#fff}
 
     .codeBox{font-size:18px}
     .codeNum{font-size:28px;font-weight:bold;letter-spacing:2px}
@@ -606,7 +608,18 @@
       word-break:break-all;
     }
 
-    /* ✅ (جديد) نافذة أسئلة المقدم (مودال + أكورديون) */
+    /* ✅ (مطلوب) ترتيب إضافي لأزرار المقدم حسب الصورة */
+    .hostToolsRow2{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      align-items:center;
+      margin:10px 0 6px;
+    }
+    .hostToolsRow2 .timerWrap{ margin-inline:auto; }
+
+    /* ✅ (جديد/مطلوب) نافذة أسئلة المقدم (مودال) */
     .cqBackdrop{
       position:fixed;
       inset:0;
@@ -630,16 +643,30 @@
       position:relative;
       box-sizing:border-box;
     }
-    .cqClose{
+
+    /* ✅ (مطلوب) زر إغلاق أحمر X أعلى يسار */
+    .cqCloseRed{
       position:absolute;
       left:10px;
       top:10px;
+      width:36px;
+      height:36px;
       border:none;
-      background:transparent;
+      border-radius:10px;
+      background:var(--red);
+      color:#fff;
       font-size:22px;
+      font-weight:900;
       cursor:pointer;
       line-height:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
+    .cqCloseRed:active{ transform: translateY(1px); }
+
     .cqTitle{
       font-weight:900;
       margin:0 0 10px;
@@ -651,6 +678,7 @@
       text-align:center;
       margin:0 0 12px;
     }
+
     .cqItem{
       border:1px solid rgba(0,0,0,.10);
       border-radius:12px;
@@ -665,11 +693,24 @@
       outline:none;
     }
     .cqItem summary::-webkit-details-marker{ display:none; }
-    .cqFields{
+
+    /* ✅ (مطلوب) صفحة داخل الصفحة عند فتح الحرف */
+    .cqLetterBody{
       margin-top:10px;
       display:flex;
       flex-direction:column;
-      gap:8px;
+      gap:10px;
+    }
+    .cqPair{
+      border:1px solid rgba(0,0,0,.10);
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+    }
+    .cqLbl{
+      font-weight:900;
+      margin:0 0 6px;
+      text-align:right;
     }
     .cqTA{
       width:100%;
@@ -682,13 +723,41 @@
       resize:none;
       outline:none;
       background:#fff;
+      margin:0 0 10px;
     }
-    .cqActions{
+    .cqTA:last-child{ margin-bottom:0; }
+
+    /* ✅ (مطلوب) زر بنفسجي + لإضافة سؤال/جواب جديد */
+    .cqAddBtn{
+      width:54px;
+      height:46px;
+      border:none;
+      border-radius:12px;
+      background:var(--purple);
+      color:#fff;
+      font-size:26px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .cqAddBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
+    .cqAddWrap{
       display:flex;
-      gap:10px;
-      flex-wrap:wrap;
       justify-content:center;
-      margin-top:12px;
+      margin-top:2px;
+    }
+
+    /* ✅ (مطلوب) زر حفظ أصفر ثابت أسفل منتصف صفحة الحرف */
+    .cqSaveFixed{
+      position:sticky;
+      bottom:10px;
+      margin:10px auto 0;
+      width:min(240px, 72%);
+      border-radius:12px;
+      font-weight:900;
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
     }
     .cqSavedMsg{
       font-size:12px;
@@ -705,7 +774,6 @@
       <h1>سباق الحروف</h1>
       <div id="gameName" class="gameName"></div>
     </div>
-    <div id="roomCodeBadge" class="roomCodeBadge"></div>
   </header>
 
   <div class="wrap">
@@ -1203,7 +1271,6 @@
 
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
-    const roomCodeBadge = document.getElementById("roomCodeBadge");
 
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
@@ -1400,9 +1467,10 @@
         TIMER_UI.lastSecond = null;
       }
 
+      /* ✅ (مطلوب) عند انتهاء المؤقت يبقى الزر "إيقاف المؤقت" حتى يتم تصفيره */
       const startBtn = document.getElementById("timerStartBtn");
       if(startBtn && TIMER_UI.isHost){
-        if(view.running){
+        if(view.running || view.done){
           startBtn.textContent = "إيقاف المؤقت";
           startBtn.classList.add("running");
         }else{
@@ -1535,11 +1603,10 @@
       }
     }, true);
 
-    /* ✅ (جديد) إدارة أسئلة المقدم + وضع الأسئلة */
+    /* ✅ (مطلوب) إدارة أسئلة المقدم (حروف -> فتح الحرف -> أسئلة متعددة + زر + + حفظ أصفر ثابت) */
     const CUSTOM_Q_UI = {
       ready: false,
-      dirty: false,
-      lastCode: null,
+      roomLatest: null,
       els: {}
     };
 
@@ -1547,6 +1614,91 @@
       if(!ta) return;
       ta.style.height = "auto";
       ta.style.height = Math.min(240, ta.scrollHeight) + "px";
+    }
+
+    function getCustomList(room, letter){
+      const cq = room?.customQuestions || {};
+      const v = cq?.[letter];
+      if(Array.isArray(v)) return v.filter(x => x && (x.q || x.a));
+      if(v && typeof v === "object") return [v].filter(x => x && (x.q || x.a));
+      return [];
+    }
+
+    function createPairEl(qVal="", aVal=""){
+      const wrap = document.createElement("div");
+      wrap.className = "cqPair";
+      wrap.innerHTML = `
+        <div class="cqLbl">السؤال</div>
+        <textarea class="cqTA cqQ" rows="1" placeholder="اكتب هنا السؤال"></textarea>
+        <div class="cqLbl">الجواب</div>
+        <textarea class="cqTA cqA" rows="1" placeholder="اكتب هنا الجواب"></textarea>
+      `;
+      const q = wrap.querySelector(".cqQ");
+      const a = wrap.querySelector(".cqA");
+      q.value = qVal || "";
+      a.value = aVal || "";
+      requestAnimationFrame(()=>{ autosizeTA(q); autosizeTA(a); });
+
+      [q,a].forEach(ta=>{
+        ta.addEventListener("input", ()=> autosizeTA(ta));
+      });
+
+      return wrap;
+    }
+
+    function buildLetterEditor(item, letter, room){
+      const body = item.querySelector(".cqLetterBody");
+      if(!body) return;
+
+      // امسح القديم وأعد البناء
+      body.innerHTML = "";
+
+      const pairsWrap = document.createElement("div");
+      pairsWrap.className = "cqPairs";
+
+      const existing = getCustomList(room, letter);
+      if(existing.length){
+        existing.forEach(obj => pairsWrap.appendChild(createPairEl(String(obj.q||""), String(obj.a||""))));
+      }else{
+        pairsWrap.appendChild(createPairEl("", ""));
+      }
+
+      const addWrap = document.createElement("div");
+      addWrap.className = "cqAddWrap";
+      addWrap.innerHTML = `<button class="cqAddBtn" type="button" aria-label="إضافة سؤال">+</button>`;
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btnYellow cqSaveFixed";
+      saveBtn.type = "button";
+      saveBtn.textContent = "حفظ";
+
+      const savedMsg = document.createElement("div");
+      savedMsg.className = "cqSavedMsg";
+
+      body.appendChild(pairsWrap);
+      body.appendChild(addWrap);
+      body.appendChild(saveBtn);
+      body.appendChild(savedMsg);
+
+      addWrap.querySelector(".cqAddBtn").addEventListener("click", () => {
+        pairsWrap.appendChild(createPairEl("", ""));
+        // اجعل زر + يظهر فوق زر الحفظ تلقائياً (بسبب ترتيب العناصر)
+      });
+
+      saveBtn.addEventListener("click", async () => {
+        const out = [];
+        pairsWrap.querySelectorAll(".cqPair").forEach(p => {
+          const q = (p.querySelector(".cqQ")?.value || "").trim();
+          const a = (p.querySelector(".cqA")?.value || "").trim();
+          if(q || a) out.push({ q, a });
+        });
+
+        await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
+        await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
+
+        savedMsg.textContent = "تم الحفظ ✅";
+        setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+      });
     }
 
     function ensureCustomQuestionsModal(){
@@ -1557,77 +1709,46 @@
       backdrop.className = "cqBackdrop";
       backdrop.innerHTML = `
         <div class="cqModal" role="dialog" aria-modal="true" aria-label="أسئلة المقدم">
-          <button id="cqClose" class="cqClose" aria-label="إغلاق">×</button>
+          <button id="cqClose" class="cqCloseRed" aria-label="إغلاق">X</button>
           <div class="cqTitle">أسئلة خاصة للمقدم</div>
-          <div class="cqHint">اختر الحرف ثم اكتب السؤال والجواب. الحقول تتمدّد تلقائيًا إذا طال النص.</div>
-
+          <div class="cqHint">اضغط على الحرف لفتح صفحة أسئلته. يمكنك إضافة أكثر من سؤال وجواب لنفس الحرف.</div>
           <div id="cqList"></div>
-
-          <div class="cqActions">
-            <button id="cqSave" class="btn btnGreen" type="button">حفظ الأسئلة</button>
-            <button id="cqClose2" class="btn btnYellow" type="button">إغلاق</button>
-          </div>
-          <div id="cqSavedMsg" class="cqSavedMsg"></div>
         </div>
       `;
       document.body.appendChild(backdrop);
 
-      const modal = backdrop.querySelector(".cqModal");
       const cqList = backdrop.querySelector("#cqList");
-      const closeBtn = backdrop.querySelector("#cqClose");
-      const closeBtn2 = backdrop.querySelector("#cqClose2");
-      const saveBtn = backdrop.querySelector("#cqSave");
-      const savedMsg = backdrop.querySelector("#cqSavedMsg");
-
       cqList.innerHTML = GAME_LETTERS.map(L => `
         <details class="cqItem" data-letter="${escapeHtml(L)}">
           <summary>حرف ${escapeHtml(L)}</summary>
-          <div class="cqFields">
-            <textarea class="cqTA cqQ" rows="1" placeholder="اكتب هنا السؤال"></textarea>
-            <textarea class="cqTA cqA" rows="1" placeholder="اكتب هنا الجواب"></textarea>
-          </div>
+          <div class="cqLetterBody"></div>
         </details>
       `).join("");
 
-      cqList.querySelectorAll("textarea").forEach(ta => {
-        ta.addEventListener("input", () => {
-          CUSTOM_Q_UI.dirty = true;
-          autosizeTA(ta);
-        });
-        requestAnimationFrame(()=> autosizeTA(ta));
-      });
-
       function close(){
         backdrop.style.display = "none";
-        savedMsg.textContent = "";
-        CUSTOM_Q_UI.dirty = false;
+        // اغلق كل الحروف
+        cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
       }
 
-      closeBtn.addEventListener("click", close);
-      closeBtn2.addEventListener("click", close);
+      backdrop.querySelector("#cqClose").addEventListener("click", close);
       backdrop.addEventListener("click", (e) => {
         if(e.target === backdrop) close();
       });
 
-      saveBtn.addEventListener("click", async () => {
-        const out = {};
-        cqList.querySelectorAll(".cqItem").forEach(item => {
-          const letter = item.getAttribute("data-letter");
-          const q = item.querySelector(".cqQ")?.value?.trim() || "";
-          const a = item.querySelector(".cqA")?.value?.trim() || "";
-          if(q || a){
-            out[letter] = [{ q, a }];
-          }
-        });
+      // عند فتح حرف: اغلق الباقي وابدأ بناء صفحة الحرف
+      cqList.querySelectorAll(".cqItem").forEach(det => {
+        det.addEventListener("toggle", () => {
+          if(!det.open) return;
 
-        await update(ref(db, `rooms/${code}`), {
-          customQuestions: out,
-          customQuestionsUpdatedAt: Date.now()
-        });
+          // اغلق باقي الحروف
+          cqList.querySelectorAll(".cqItem").forEach(o => {
+            if(o !== det) o.removeAttribute("open");
+          });
 
-        CUSTOM_Q_UI.dirty = false;
-        savedMsg.textContent = "تم الحفظ ✅";
-        setTimeout(()=> { if(savedMsg) savedMsg.textContent = ""; }, 1400);
+          const letter = det.getAttribute("data-letter");
+          buildLetterEditor(det, letter, CUSTOM_Q_UI.roomLatest || {});
+        });
       });
 
       CUSTOM_Q_UI.ready = true;
@@ -1636,23 +1757,11 @@
 
     function openCustomQuestionsModal(room){
       ensureCustomQuestionsModal();
+      CUSTOM_Q_UI.roomLatest = room || {};
       const { backdrop, cqList } = CUSTOM_Q_UI.els;
 
-      // املأ من الداتا الحالية (طالما مو "dirty")
-      if(!CUSTOM_Q_UI.dirty){
-        const cq = room?.customQuestions || {};
-        cqList.querySelectorAll(".cqItem").forEach(item => {
-          const letter = item.getAttribute("data-letter");
-          const arr = cq?.[letter];
-          const obj = Array.isArray(arr) ? (arr[0] || {}) : (arr || {});
-          const q = String(obj?.q || "");
-          const a = String(obj?.a || "");
-          const tq = item.querySelector(".cqQ");
-          const ta = item.querySelector(".cqA");
-          if(tq) { tq.value = q; autosizeTA(tq); }
-          if(ta) { ta.value = a; autosizeTA(ta); }
-        });
-      }
+      // اغلق كل الحروف عند الفتح
+      cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
 
       backdrop.style.display = "flex";
     }
@@ -1660,14 +1769,6 @@
     function getQuestionMode(room){
       const m = String(room?.questionMode || "default");
       return (m === "custom") ? "custom" : "default";
-    }
-
-    function getCustomList(room, letter){
-      const cq = room?.customQuestions || {};
-      const v = cq?.[letter];
-      if(Array.isArray(v)) return v.filter(x => x && (x.q || x.a));
-      if(v && typeof v === "object") return [v].filter(x => x && (x.q || x.a));
-      return [];
     }
 
     function renderHostLobby(room){
@@ -1875,7 +1976,6 @@
 
       const qMode = getQuestionMode(room);
       const modeBtnText = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة اللعبة";
-      const modeBtnClass = (qMode === "custom") ? "btnGreen" : "btnYellow";
 
       main.innerHTML = `
         <div class="scoreBar">
@@ -1927,19 +2027,21 @@
             <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
             ${isHost ? `<button id="freezeBtn" class="btn ${room.freeze ? "btnRed" : "btnGreen"}">${room.freeze ? "مجمّد" : "مفعل"}</button>` : ""}
 
-            ${isHost ? `<button id="customQBtn" class="btn btnOrange" type="button">إضافة أسئلة</button>` : ""}
-            ${isHost ? `<button id="qModeBtn" class="btn ${modeBtnClass}" type="button">${modeBtnText}</button>` : ""}
+            <!-- ✅ (مطلوب) لون إضافة أسئلة أزرق -->
+            ${isHost ? `<button id="customQBtn" class="btn btnBlue" type="button">إضافة أسئلة</button>` : ""}
           </div>
         </div>
 
-        <div style="height:6px"></div>
-        <div class="below">
-          <div class="buzzRow" style="flex:1;min-width:260px">
-            <div id="buzzBox" class="buzzBox buzzEmpty">—</div>
+        <!-- ✅ (مطلوب) نقل زر أسئلة خاصة + نقل المؤقت لمكانهما حسب الصورة -->
+        <div class="hostToolsRow2">
+          ${
+            isHost
+              ? `<button id="qModeBtn" class="btn btnPurple" type="button">${modeBtnText}</button>`
+              : `<span style="width:1px;height:1px;opacity:0;pointer-events:none;"></span>`
+          }
 
-            ${isHost ? `
-              <button id="nextQ" class="btn btnYellow nextQBtn">تغيير السؤال</button>
-
+          ${
+            isHost ? `
               <div class="timerWrap" id="timerWrap">
                 <button id="timerClock" class="timerClockBtn" type="button" aria-label="المؤقت">
                   <span class="timerIcon">⏱</span>
@@ -1959,7 +2061,20 @@
                   <span id="timerBurst" class="timerBurst"></span>
                 </button>
               </div>
-            `}
+            `
+          }
+
+          <span style="width:1px;height:1px;opacity:0;pointer-events:none;"></span>
+        </div>
+
+        <div style="height:6px"></div>
+        <div class="below">
+          <div class="buzzRow" style="flex:1;min-width:260px">
+            <div id="buzzBox" class="buzzBox buzzEmpty">—</div>
+
+            ${isHost ? `
+              <button id="nextQ" class="btn btnYellow nextQBtn">تغيير السؤال</button>
+            ` : ``}
           </div>
 
           ${isHost ? `
@@ -2090,7 +2205,8 @@
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
-            if(t.running){
+            /* ✅ (مطلوب) إذا كان المؤقت انتهى (done) أو يعمل (running) => زر "إيقاف" يصفر ويرجع "ابدأ" */
+            if(t.running || t.done){
               await update(ref(db, `rooms/${code}/timer`), {
                 running:false,
                 done:false,
@@ -2111,7 +2227,7 @@
         }
       }
 
-      /* ✅ (جديد) أزرار أسئلة المقدم + تبديل الوضع */
+      /* ✅ (مطلوب) فتح نافذة إضافة الأسئلة + زر أسئلة خاصة البنفسجي */
       if(isHost){
         const customQBtn = document.getElementById("customQBtn");
         if(customQBtn){
@@ -2264,8 +2380,6 @@
               qText.textContent = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
               qAns.textContent  = "";
               qAns.style.display = "none";
-              // لا نكمل
-              // (يبقى المستخدم يضيف أسئلة خاصة ثم يعيد اختيار الحرف/تغيير السؤال)
             }else{
               const idx = Number(cur.qIndex || 0) % list.length;
               const item = list[idx];
@@ -2383,17 +2497,11 @@
     onValue(roomRef, (snap) => {
       if(!snap.exists()){
         main.textContent = "اللعبة غير موجودة (رمز غير صحيح).";
-        if(roomCodeBadge) roomCodeBadge.style.display = "none";
         setGameName("");
         return;
       }
       const room = snap.val();
       setGameName(room?.name);
-
-      if(roomCodeBadge){
-        roomCodeBadge.textContent = `رمز: ${room.code}`;
-        roomCodeBadge.style.display = "inline-block";
-      }
 
       TIMER_UI.latestTimer = room.timer || {};
 
