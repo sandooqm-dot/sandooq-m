@@ -26,17 +26,13 @@
       --hexPale:   rgba(255, 215, 80, .68);
       --hexBorder: rgba(0,0,0,.10);
 
-      /* ✅ ألوان إضافية مطلوبة */
+      /* ✅ ألوان إضافية */
       --purple:#8b5cf6;
       --blue:#0ea5e9;
 
-      /* ✅ تصميم واجهة المقدم الجديدة */
+      /* ✅ ألوان UI جديدة */
+      --navy:#0f2f66;
       --timerBlue:#2f5fb7;
-      --navy:#0b1a3a;
-
-      --panelBg: rgba(255,255,255,.16);
-      --panelBorder: rgba(255,255,255,.18);
-      --panelShadow: 0 10px 22px rgba(0,0,0,.18);
     }
 
     body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
@@ -81,23 +77,29 @@
     .gameName{
       position:static;
       flex:0 0 auto;
+
       width:min(28vw, 145px);
       min-height:40px;
       padding:6px 8px;
       border-radius:12px;
+
       background:rgba(255,255,255,.22);
       border:1px solid rgba(255,255,255,.18);
       color:#fff;
       box-shadow:0 2px 0 rgba(0,0,0,.12);
+
       font-size:14px;
       font-weight:900;
       line-height:1.25;
       text-align:center;
+
       overflow:hidden;
       box-sizing:border-box;
+
       direction:rtl;
     }
     .gameName:empty{display:none;}
+
     .gnText{
       display:-webkit-box;
       -webkit-box-orient:vertical;
@@ -115,14 +117,13 @@
       box-sizing:border-box
     }
 
-    /* ✅ (تعديل) رفع الخريطة والأزرار للأعلى في وضع اللعب فقط */
     #main.inGame{
       margin-top:8px;
       padding-top:8px;
     }
 
     .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
-    .btn{padding:12px 14px;font-size:16px;border:none;border-radius:14px;cursor:pointer;font-weight:900}
+    .btn{padding:12px 14px;font-size:16px;border:none;border-radius:12px;cursor:pointer}
     .btnYellow{background:var(--yellow);color:#000}
     .btnGreen{background:var(--green);color:#fff}
     .btnRed{background:var(--red);color:#fff}
@@ -143,17 +144,6 @@
       padding:8px;border-radius:10px;margin:6px 0;cursor:pointer
     }
 
-    /* ✅ Panels (Borders + Shadow) */
-    .panel{
-      background:var(--panelBg);
-      border:1px solid var(--panelBorder);
-      box-shadow:var(--panelShadow);
-      border-radius:16px;
-      padding:10px;
-      box-sizing:border-box;
-    }
-    .panelTight{ padding:8px; }
-
     /* MAP */
     .mapOuter{width:100%;display:flex;justify-content:center}
     .mapScale{
@@ -164,10 +154,9 @@
     .mapBox{
       position:relative;
       width:100%;
-      border-radius:14px;
+      border-radius:12px;
       overflow:hidden;
       background:transparent;
-      box-shadow: 0 8px 18px rgba(0,0,0,.18);
     }
     .mapBox img{
       width:100%;
@@ -190,6 +179,7 @@
       stroke: var(--hexBorder);
       stroke-width: 1;
     }
+
     .overlaySvg .state0{ fill: rgba(0,0,0,0.001); }
     .overlaySvg .state1{ fill: var(--hexPale); }
     .overlaySvg .state2{ fill: var(--hexGreen); }
@@ -202,218 +192,182 @@
     }
     .overlaySvg .state1.pulse { animation: palePulse 0.9s ease-in-out infinite; }
 
-    /* ✅ (مطلوب) صف الأيقونات تحت الخريطة */
-    .underMapRow{
+    /* ✅ صف الأدوات تحت الخريطة (أيقونات + زوم) */
+    .mapToolsRow{
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:10px;
-      margin-top:10px;
+      margin:8px 0 6px;
     }
     .iconBtn{
-      width:48px;height:48px;
+      width:46px;height:46px;
       border:none;
-      border-radius:14px;
-      background:#fff;
-      color:#111;
-      font-size:24px;
-      font-weight:900;
+      border-radius:50%;
+      background:rgba(0,0,0,.70);
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       cursor:pointer;
-      box-shadow:0 6px 16px rgba(0,0,0,.18);
+      box-shadow:0 2px 0 rgba(0,0,0,.15);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      display:flex;align-items:center;justify-content:center;
       flex:0 0 auto;
     }
-    .iconBtn:active{ transform: translateY(1px); box-shadow:0 4px 12px rgba(0,0,0,.16); }
-    .zoomWrap{
+    .iconBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.15); }
+    .iconBtn svg{ width:26px;height:26px; fill:#fff; }
+    .zoomSlider{
       flex:1 1 auto;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      min-width:0;
+      min-width:160px;
     }
-    #zoom{
-      width:min(320px, 58vw);
-      accent-color: var(--navy);
+    input[type="range"]{
+      width:100%;
+      accent-color: var(--yellow);
     }
 
-    /* ✅ (مطلوب) صف التحكم الرئيسي حول المؤقت */
-    .hostControls{
-      margin-top:10px;
+    /* ✅ صف التحكمات حول المؤقت */
+    .controlWrap{
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      padding:10px;
+      box-shadow:0 8px 18px rgba(0,0,0,.10);
     }
-    .controlGrid{
+    .controlRow{
       display:flex;
+      gap:12px;
       align-items:center;
       justify-content:space-between;
-      gap:12px;
     }
-    .controlCol{
-      width:33%;
+    .sideCol{
+      width:min(38%, 190px);
       display:flex;
       flex-direction:column;
       gap:10px;
     }
-    .controlCol .btn{
+    .sideCol .btn{
       width:100%;
-      height:50px;
-      border-radius:18px;
-      font-size:16px;
+      height:46px;
+      border-radius:14px;
+      font-weight:900;
+      box-shadow:0 2px 0 rgba(0,0,0,.12);
     }
+    .sideCol .btn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
 
-    /* ✅ (مطلوب) المؤقت دائرة UI رئيسية */
-    .timerCircleBtn{
-      width:128px;height:128px;
-      border-radius:50%;
-      border:3px solid rgba(255,255,255,.90);
-      background: var(--timerBlue);
-      box-shadow:0 14px 28px rgba(0,0,0,.22);
-      cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
+    /* ✅ المؤقت (بدون كلمة "المؤقت" - فقط رقم) */
+    .timerWrap{
       display:flex;
-      flex-direction:column;
       align-items:center;
       justify-content:center;
-      gap:4px;
-      color:#fff;
-      user-select:none;
       flex:0 0 auto;
-      padding:0;
     }
-    .timerCircleBtn:active{ transform: translateY(1px); }
-
-    .timerLabel{
-      font-size:22px;
-      font-weight:900;
-      line-height:1;
-      opacity:.98;
-      pointer-events:auto;
-    }
-    .timerNum{
-      font-size:46px;
-      font-weight:900;
-      line-height:1;
-      margin-top:2px;
-      color:#fff;
-      text-shadow:0 3px 14px rgba(0,0,0,.30);
-    }
-
-    @keyframes pop {
-      0% { transform: scale(.86); }
-      40%{ transform: scale(1.18); }
-      100%{ transform: scale(1); }
-    }
-    .timerNum.pop{ animation: pop .22s ease-out; }
-
-    @keyframes doneFlash {
-      0%   { background: #ff2d2d; }
-      50%  { background: #ffffff; color:#111; }
-      100% { background: #ff2d2d; }
-    }
-    .timerCircleBtn.doneFlashing{
-      animation: doneFlash .6s linear infinite;
-      border-color: rgba(0,0,0,.10);
-    }
-    .timerCircleBtn.doneFlashing .timerLabel,
-    .timerCircleBtn.doneFlashing .timerNum{
-      color: inherit;
-      text-shadow:none;
-    }
-
-    /* ✅ (مطلوب) قائمة اختيار وقت المؤقت */
-    .timerPicker{
-      margin-top:10px;
-      display:none;
-      justify-content:center;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-    .timerPicker.show{ display:flex; }
-    .timerOptBtn{
-      min-width:78px;
-      height:40px;
-      border:none;
-      border-radius:14px;
-      background:rgba(255,255,255,.18);
-      color:#fff;
-      font-weight:900;
+    .timerClockBtn{
+      width:118px;height:118px;
+      border-radius:50%;
+      border:2px solid rgba(255,255,255,.85);
+      background:var(--timerBlue);
+      box-shadow:0 10px 20px rgba(0,0,0,.18);
       cursor:pointer;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+      position:relative;
+      overflow:hidden;
+      user-select:none;
     }
-    .timerOptBtn.active{
-      background:rgba(255,255,255,.32);
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,.24);
-    }
-    .timerOptBtn:active{ transform: translateY(1px); }
+    .timerClockBtn:active{ transform: translateY(1px); box-shadow:0 8px 18px rgba(0,0,0,.18); }
 
-    /* ✅ (مطلوب) شريط اسم أول لاعب */
-    .firstPlayerBar{
+    .timerNumber{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      color:#fff;
+      font-size:52px;
+      text-shadow:0 4px 14px rgba(0,0,0,.25);
+    }
+    .timerNumber.last5{ color:#ff3b30; }
+
+    @keyframes numPop {
+      0%   { transform:scale(.85); }
+      60%  { transform:scale(1.25); }
+      100% { transform:scale(1); }
+    }
+    .timerNumber.pop{ animation:numPop .22s ease-out; }
+
+    @keyframes timerFlash {
+      0%   { box-shadow:0 0 0 0 rgba(255,59,48,.0), 0 10px 20px rgba(0,0,0,.18); }
+      50%  { box-shadow:0 0 0 8px rgba(255,255,255,.35), 0 10px 20px rgba(0,0,0,.18); }
+      100% { box-shadow:0 0 0 0 rgba(255,59,48,.0), 0 10px 20px rgba(0,0,0,.18); }
+    }
+    .timerClockBtn.doneFlashing{
+      animation: timerFlash .55s linear infinite;
+      background: #ff3b30;
+    }
+
+    .timerPlayerView{ pointer-events:none; user-select:none; }
+
+    /* ✅ شريط اسم اللاعب الذي يضغط أولاً */
+    .firstPressBar{
       margin-top:10px;
       width:100%;
+      border-radius:14px;
+      padding:12px 10px;
       background:#fff;
-      color:var(--navy);
-      border:2px solid rgba(11,26,58,.55);
-      border-radius:18px;
-      padding:14px 12px;
-      font-size:18px;
+      color:rgba(0,0,0,.55);
+      border:2px solid rgba(15,47,102,.55);
       font-weight:900;
       box-sizing:border-box;
-      box-shadow:0 10px 22px rgba(0,0,0,.18);
-      text-align:center;
+      box-shadow:0 6px 14px rgba(0,0,0,.10);
     }
-    .firstPlayerBar.isGreen{
-      background: rgba(26,163,74,.95);
-      border-color: rgba(26,163,74,.55);
-      color:#fff;
-    }
-    .firstPlayerBar.isOrange{
-      background: rgba(242,140,0,.95);
-      border-color: rgba(242,140,0,.55);
+    .firstPressBar.filled{
+      border-color: rgba(0,0,0,.08);
       color:#fff;
     }
 
-    /* ✅ (مطلوب) بطاقة السؤال الكبيرة أسفل */
+    /* ✅ بطاقة السؤال (للمقدم) */
     .questionCard{
-      margin-top:12px;
-      width:100%;
-      background: var(--timerBlue);
-      border:3px solid rgba(11,26,58,.85);
-      border-radius:20px;
+      margin-top:10px;
+      border-radius:16px;
+      background:var(--timerBlue);
+      border:4px solid rgba(0,0,0,.75);
+      box-shadow:0 10px 22px rgba(0,0,0,.18);
       padding:18px 14px;
-      box-sizing:border-box;
-      box-shadow:0 14px 28px rgba(0,0,0,.22);
       color:#fff;
       text-align:center;
     }
-    .qBigText{
+    .questionBig{
       font-size:44px;
       font-weight:900;
-      line-height:1.25;
+      line-height:1.2;
+      margin:0;
       letter-spacing:.2px;
     }
-    .ansPill{
-      margin:18px auto 0;
-      width:min(86%, 420px);
+    /* ✅ (تعديل) تصغير خط السؤال قليلاً */
+    .qText{
+      line-height:1.6;
+      font-size:20px;
+      margin-top:10px;
+    }
+    .answerPill{
+      margin:14px auto 0;
+      width:min(88%, 380px);
       background:#fff;
       color:#111;
-      border-radius:18px;
-      padding:14px 16px;
-      font-size:22px;
+      padding:12px 18px;
+      border-radius:999px;
+      text-align:center;
+      font-size:18px;
       font-weight:900;
+      display:none;
       box-sizing:border-box;
-      box-shadow:0 8px 18px rgba(0,0,0,.18);
-    }
-    .ansPill.hiddenLike{
-      opacity:.78;
+      border:2px solid rgba(0,0,0,.12);
     }
 
     .smallNote{font-size:12px;opacity:.85;margin-top:8px}
-    .muted{color:var(--muted)}
 
-    /* لاعب */
     .playerBtnWrap{margin-top:14px}
     .playerBigBtn{
       width:min(92vw, 520px);
@@ -421,6 +375,7 @@
       border:none;border-radius:18px;
       background:var(--red);
       cursor:pointer;
+
       display:flex;
       align-items:center;
       justify-content:center;
@@ -433,12 +388,101 @@
 
     .footerBtn{
       width:100%;max-width:520px;margin:10px auto 18px;
-      padding:14px;border:none;border-radius:12px;background:var(--yellow);cursor:pointer;color:#000;font-size:18px;
-      font-weight:900;
+      padding:14px;border:none;border-radius:12px;background:var(--yellow);cursor:pointer;color:#000;font-size:18px
     }
     a{color:inherit}
 
-    /* شراء */
+    .scoreBar{
+      width:100%;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:12px;
+      margin:10px 0 8px;
+      flex-wrap:wrap;
+    }
+    .teamLabel{
+      font-weight:bold;
+      font-size:14px;
+      color:#fff;
+      padding:6px 10px;
+      border-radius:10px;
+      white-space:nowrap;
+    }
+    .teamLabel.green{ background: rgba(26,163,74,.95); }
+    .teamLabel.orange{ background: rgba(242,140,0,.95); }
+
+    .scoreBoxBtn{
+      min-width:64px;
+      height:44px;
+      border-radius:12px;
+      border:none;
+      background:#fff;
+      color:#111;
+      font-size:22px;
+      font-weight:bold;
+      cursor:default;
+    }
+
+    .scoreCtrl{
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      align-items:center;
+      z-index:5;
+    }
+    .scoreBoxBtn.clickable{
+      cursor:pointer;
+      box-shadow: 0 2px 0 rgba(0,0,0,.12);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .scoreBoxBtn.clickable:active{ transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+
+    .scorePicker{
+      position:absolute;
+      top:calc(100% + 6px);
+      left:50%;
+      transform:translateX(-50%) translateY(-6px);
+      opacity:0;
+      pointer-events:none;
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      justify-content:center;
+      width:min(280px, 86vw);
+      background:rgba(255,255,255,.96);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:12px;
+      padding:10px;
+      box-shadow:0 10px 22px rgba(0,0,0,.20);
+      transition: opacity .16s ease, transform .16s ease;
+      z-index:50;
+    }
+    .scorePicker.show{
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+      pointer-events:auto;
+    }
+    .scorePickBtn{
+      width:38px;height:34px;
+      border:none;border-radius:10px;
+      background:rgba(31,79,163,.08);
+      color:#111;
+      font-weight:bold;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .scorePickBtn:active{ transform: translateY(1px); }
+
+    .scoreHint{
+      font-size:12px;
+      opacity:.85;
+      margin-top:4px;
+    }
+
     .buyNowWrap{margin-top:12px;display:flex;justify-content:center}
     .buyNowBtn{
       width:min(92vw, 520px);
@@ -456,7 +500,16 @@
     }
     .buyNowBtn:active{ transform: translateY(1px); box-shadow:0 2px 0 rgba(0,0,0,.15); }
 
-    /* ✅ مودال مشاركة + مودال أسئلة المقدم (كما هو عندك) */
+    .waitingLayout{
+      display:flex;
+      flex-direction:column;
+      min-height:60vh;
+    }
+    .waitingLayout .buyNowWrap{
+      margin-top:auto;
+      padding-top:12px;
+    }
+
     .shareBackdrop{
       position:fixed;
       inset:0;
@@ -524,17 +577,7 @@
       word-break:break-all;
     }
 
-    .waitingLayout{
-      display:flex;
-      flex-direction:column;
-      min-height:60vh;
-    }
-    .waitingLayout .buyNowWrap{
-      margin-top:auto;
-      padding-top:12px;
-    }
-
-    /* ✅ (مطلوب) نافذة أسئلة المقدم (مودال) */
+    /* ✅ (مطلوب سابقاً) نافذة أسئلة المقدم */
     .cqBackdrop{
       position:fixed;
       inset:0;
@@ -579,6 +622,7 @@
       touch-action: manipulation;
     }
     .cqCloseRed:active{ transform: translateY(1px); }
+
     .cqTitle{
       font-weight:900;
       margin:0 0 10px;
@@ -590,6 +634,7 @@
       text-align:center;
       margin:0 0 12px;
     }
+
     .cqItem{
       border:1px solid rgba(0,0,0,.10);
       border-radius:12px;
@@ -636,6 +681,7 @@
       margin:0 0 10px;
     }
     .cqTA:last-child{ margin-bottom:0; }
+
     .cqAddBtn{
       width:54px;
       height:46px;
@@ -656,6 +702,7 @@
       justify-content:center;
       margin-top:2px;
     }
+
     .cqSaveFixed{
       position:sticky;
       bottom:10px;
@@ -671,6 +718,103 @@
       text-align:center;
       margin-top:8px;
     }
+
+    /* ✅ (جديد) صفحة الإعدادات مثل الصورة */
+    .settingsBackdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.35);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:10050;
+      padding:14px;
+      box-sizing:border-box;
+    }
+    .settingsPanel{
+      width:min(78vw, 360px);
+      height:min(72vh, 560px);
+      background: var(--yellow);
+      border-radius:26px;
+      border:8px solid rgba(0,0,0,.85);
+      box-shadow:0 16px 30px rgba(0,0,0,.25);
+      padding:18px 14px;
+      box-sizing:border-box;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+    }
+    .settingsBtn{
+      width:100%;
+      height:64px;
+      border-radius:22px;
+      border:4px solid rgba(0,0,0,.85);
+      background:#fff;
+      color:#111;
+      font-weight:900;
+      font-size:32px;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      box-shadow:0 6px 0 rgba(0,0,0,.18);
+    }
+    .settingsBtn:active{ transform: translateY(1px); box-shadow:0 5px 0 rgba(0,0,0,.18); }
+
+    .settingsView{
+      display:none;
+      width:100%;
+      height:100%;
+      overflow:auto;
+      background:#fff;
+      border-radius:18px;
+      border:3px solid rgba(0,0,0,.25);
+      padding:14px;
+      box-sizing:border-box;
+      color:#111;
+      text-align:right;
+    }
+    .settingsView h3{
+      margin:0 0 10px;
+      text-align:center;
+    }
+    .settingsBackMini{
+      width:100%;
+      height:52px;
+      border-radius:18px;
+      border:3px solid rgba(0,0,0,.65);
+      background:#fff;
+      font-weight:900;
+      cursor:pointer;
+      margin-top:10px;
+    }
+
+    .timerMiniPicker{
+      display:none;
+      width:100%;
+      border-radius:18px;
+      border:3px solid rgba(0,0,0,.65);
+      background:#fff;
+      padding:10px;
+      box-sizing:border-box;
+    }
+    .timerMiniList{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .timerMiniItem{
+      height:52px;
+      border-radius:16px;
+      border:3px solid rgba(0,0,0,.25);
+      background:#fff;
+      font-weight:900;
+      font-size:22px;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .timerMiniItem:active{ transform: translateY(1px); }
+
   </style>
 </head>
 <body>
@@ -1188,13 +1332,11 @@
         gameNameEl.innerHTML = "";
         return;
       }
-
       const MAX_CHARS = 80;
       let s = s0;
       if(s.length > MAX_CHARS){
         s = s.slice(0, MAX_CHARS - 1).trim() + "…";
       }
-
       gameNameEl.innerHTML = `<span class="gnText">${escapeHtml(s)}</span>`;
     }
 
@@ -1204,6 +1346,10 @@
     }
 
     const roomRef = ref(db, `rooms/${code}`);
+
+    function teamColor(team){
+      return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
+    }
 
     function escapeHtml(s){
       return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -1286,13 +1432,9 @@
       return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
     }
 
-    /* =======================
-       ✅ المؤقت (UI الجديد)
-    ======================= */
     const TIMER_UI = {
       tick: null,
       lastSecond: null,
-      lastDoneStartTs: null,
       latestTimer: null,
       isHost: false
     };
@@ -1325,22 +1467,24 @@
 
       const done = doneFlag || (running && remaining === 0);
       const inLast5 = running && remaining > 0 && remaining <= 5;
-
       return { sel, dur, running, startTs, remaining, done, inLast5 };
     }
 
     function applyTimerDom(){
       const clock = document.getElementById("timerClock");
-      const numEl = document.getElementById("timerNum");
+      const numEl = document.getElementById("timerNumber");
       if(!clock || !numEl) return;
 
       const t = normalizeTimer(TIMER_UI.latestTimer || {});
       const view = computeTimerView(t);
 
-      numEl.textContent = String(view.remaining);
+      // رقم دائم داخل الدائرة
+      const displayNum = (view.running ? view.remaining : view.sel);
+      numEl.textContent = String(displayNum);
 
+      // آخر 5 ثواني: الرقم أحمر + Pop
+      numEl.classList.toggle("last5", !!view.inLast5);
       if(view.inLast5){
-        numEl.style.color = "#ff2d2d";
         if(TIMER_UI.lastSecond !== view.remaining){
           TIMER_UI.lastSecond = view.remaining;
           numEl.classList.remove("pop");
@@ -1349,23 +1493,19 @@
         }
       }else{
         TIMER_UI.lastSecond = null;
-        numEl.style.color = "#fff";
-        numEl.classList.remove("pop");
       }
 
+      // عند الانتهاء: وميض أحمر/أبيض
       if(view.done){
         clock.classList.add("doneFlashing");
       }else{
         clock.classList.remove("doneFlashing");
       }
 
-      // ✅ عند انتهاء المؤقت: سجل done=true وأوقف running
+      // تثبيت done في قاعدة البيانات للمقدم
       if(TIMER_UI.isHost){
         if(view.running && view.remaining === 0){
-          if(TIMER_UI.lastDoneStartTs !== view.startTs){
-            TIMER_UI.lastDoneStartTs = view.startTs;
-            update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
-          }
+          update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
         }
       }
     }
@@ -1378,6 +1518,7 @@
     function initTimerDefaultsIfNeeded(room){
       if(role !== "host") return;
       if(!room) return;
+
       const t = room.timer;
       if(t && typeof t === "object") return;
 
@@ -1394,9 +1535,32 @@
       });
     }
 
-    /* =======================
-       ✅ أصوات/روابط/نسخ
-    ======================= */
+    if(!window.__scorePickerBound){
+      window.__scorePickerBound = true;
+      document.addEventListener("click", () => {
+        document.querySelectorAll(".scorePicker.show").forEach(p => p.classList.remove("show"));
+      });
+    }
+
+    function beep(){
+      try{
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return;
+        const ctx = new AC();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.value = 0.12;
+        o.connect(g); g.connect(ctx.destination);
+        o.start();
+        setTimeout(() => {
+          o.stop();
+          ctx.close();
+        }, 300);
+      }catch(e){}
+    }
+
     function buildJoinUrl(roomCode){
       const u = new URL("join.html", location.href);
       u.searchParams.set("code", roomCode);
@@ -1442,11 +1606,16 @@
         e.preventDefault();
         openStoreUrl();
       }
+      const a = e.target?.closest?.("a[href]");
+      if(a){
+        const href = (a.getAttribute("href") || "").trim();
+        if(href.includes("sandooq-m.com") && !/^https?:\/\//i.test(href)){
+          a.setAttribute("href", "https://" + href.replace(/^\/+/, ""));
+        }
+      }
     }, true);
 
-    /* =======================
-       ✅ أسئلة المقدم (كما هو)
-    ======================= */
+    /* ✅ إدارة أسئلة المقدم */
     const CUSTOM_Q_UI = {
       ready: false,
       roomLatest: null,
@@ -1492,7 +1661,6 @@
     function buildLetterEditor(item, letter, room){
       const body = item.querySelector(".cqLetterBody");
       if(!body) return;
-
       body.innerHTML = "";
 
       const pairsWrap = document.createElement("div");
@@ -1604,8 +1772,134 @@
       return (m === "custom") ? "custom" : "default";
     }
 
-    function teamCssClass(team){
-      return team === "green" ? "isGreen" : "isOrange";
+    /* ✅ (جديد) إعدادات المقدم مثل الصورة */
+    const SETTINGS_UI = {
+      ready:false,
+      els:{},
+      roomLatest:null
+    };
+
+    function ensureSettingsModal(){
+      if(SETTINGS_UI.ready) return;
+
+      const bd = document.createElement("div");
+      bd.id = "settingsBackdrop";
+      bd.className = "settingsBackdrop";
+      bd.innerHTML = `
+        <div class="settingsPanel" role="dialog" aria-modal="true" aria-label="الإعدادات">
+          <div id="settingsMenu">
+            <button id="sHelp" class="settingsBtn" type="button">التعليمات</button>
+            <button id="sTimer" class="settingsBtn" type="button">تعديل المؤقت</button>
+            <button id="sAddQ" class="settingsBtn" type="button">اضافة الاسئلة</button>
+            <button id="sMore" class="settingsBtn" type="button">العابنا الاخرى</button>
+
+            <div id="timerMiniPicker" class="timerMiniPicker" aria-label="اختيار وقت المؤقت">
+              <div class="timerMiniList">
+                <button class="timerMiniItem" data-t="10" type="button">١٠</button>
+                <button class="timerMiniItem" data-t="15" type="button">١٥</button>
+                <button class="timerMiniItem" data-t="20" type="button">٢٠</button>
+                <button class="timerMiniItem" data-t="25" type="button">٢٥</button>
+                <button class="timerMiniItem" data-t="30" type="button">٣٠</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="helpView" class="settingsView">
+            <h3>تعليمات اللعبة</h3>
+            <div style="line-height:1.75;font-weight:700">
+              <p><b>فكرة اللعبة:</b> يختار المقدم حرفًا من الخريطة، ثم يظهر سؤال لهذا الحرف. أول لاعب يضغط زر الإجابة يظهر اسمه في الشريط.</p>
+
+              <p><b>طريقة اللعب باختصار:</b></p>
+              <ul>
+                <li>المقدم يضغط على خلية حرف في الخريطة لاختيار الحرف.</li>
+                <li>يظهر السؤال داخل بطاقة السؤال.</li>
+                <li>اللاعبون يضغطون زر "اضغط هنا للإجابة". أول لاعب يضغط يظهر اسمه.</li>
+                <li>المقدم يقرر النقاط ويحدّث النتيجة من مربعات النقاط.</li>
+              </ul>
+
+              <p><b>شرح الأزرار للمقدم:</b></p>
+              <ul>
+                <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
+                <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
+                <li><b>تفريغ اللوحة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للأبيض.</li>
+                <li><b>أسئلة عامة / أسئلة خاصة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم.</li>
+                <li><b>المؤقت:</b> اضغط على دائرة المؤقت لبدء العد. اضغط مرة ثانية لتصفير المؤقت.</li>
+                <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
+                <li><b>تغيير الخريطة:</b> للتنقل بين الخرائط الثلاث.</li>
+              </ul>
+            </div>
+            <button id="helpBack" class="settingsBackMini" type="button">رجوع</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(bd);
+
+      function closeSettings(){
+        bd.style.display = "none";
+        bd.querySelector("#helpView").style.display = "none";
+        bd.querySelector("#settingsMenu").style.display = "block";
+        const tm = bd.querySelector("#timerMiniPicker");
+        if(tm) tm.style.display = "none";
+      }
+
+      bd.addEventListener("click", (e) => {
+        if(e.target === bd) closeSettings();
+      });
+
+      bd.querySelector("#helpBack").addEventListener("click", () => {
+        bd.querySelector("#helpView").style.display = "none";
+        bd.querySelector("#settingsMenu").style.display = "block";
+      });
+
+      bd.querySelector("#sHelp").addEventListener("click", () => {
+        bd.querySelector("#settingsMenu").style.display = "none";
+        bd.querySelector("#helpView").style.display = "block";
+      });
+
+      bd.querySelector("#sMore").addEventListener("click", () => {
+        closeSettings();
+        openStoreUrl();
+      });
+
+      bd.querySelector("#sAddQ").addEventListener("click", () => {
+        const room = SETTINGS_UI.roomLatest || {};
+        closeSettings();
+        openCustomQuestionsModal(room);
+      });
+
+      bd.querySelector("#sTimer").addEventListener("click", () => {
+        const tm = bd.querySelector("#timerMiniPicker");
+        if(!tm) return;
+        tm.style.display = (tm.style.display === "block") ? "none" : "block";
+      });
+
+      bd.querySelectorAll(".timerMiniItem").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const v = Number(btn.getAttribute("data-t"));
+          if(![10,15,20,25,30].includes(v)) return;
+
+          // عند اختيار الرقم: يتغير المؤقت ويختفي البوب-أب
+          await update(ref(db, `rooms/${code}/timer`), {
+            sel: v,
+            dur: v,
+            running: false,
+            done: false,
+            startTs: 0
+          });
+
+          const tm = bd.querySelector("#timerMiniPicker");
+          if(tm) tm.style.display = "none";
+        });
+      });
+
+      SETTINGS_UI.ready = true;
+      SETTINGS_UI.els = { backdrop: bd, closeSettings };
+    }
+
+    function openSettings(room){
+      ensureSettingsModal();
+      SETTINGS_UI.roomLatest = room || {};
+      SETTINGS_UI.els.backdrop.style.display = "flex";
     }
 
     function renderHostLobby(room){
@@ -1752,7 +2046,10 @@
         joinUrlTxt.textContent = joinUrl;
       });
 
-      shareCodeBtn.addEventListener("click", () => showPanel("code"));
+      shareCodeBtn.addEventListener("click", () => {
+        showPanel("code");
+      });
+
       shareLinkBtn.addEventListener("click", () => {
         showPanel("link");
         joinUrlTxt2.textContent = joinUrl;
@@ -1779,6 +2076,7 @@
       main.innerHTML = `
         <div class="waitingLayout">
           <div class="muted">${escapeHtml(msg)}</div>
+
           <div class="buyNowWrap">
             <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
           </div>
@@ -1795,146 +2093,116 @@
 
       initTimerDefaultsIfNeeded(room);
 
-      TIMER_UI.latestTimer = room.timer || {};
-      TIMER_UI.isHost = isHost;
-      ensureTimerTicker();
+      const scores = room.scores || {};
+      const scoreGreen = Number(scores.green || 0);
+      const scoreOrange = Number(scores.orange || 0);
+
+      const pickerButtons = Array.from({length:11}, (_,i)=>(
+        `<button class="scorePickBtn" data-val="${i}" type="button">${i}</button>`
+      )).join("");
 
       const qMode = getQuestionMode(room);
-      // ✅ زر واحد يتبدّل: أسئلة عامة ↔ أسئلة خاصة
-      const qModeBtnText = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
+      const modeBtnText = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
 
-      const activeMap = Number(room.activeMap || 0);
-      const src = ([
-        "maps/map1.jpeg",
-        "maps/map2.jpeg",
-        "maps/map3.jpeg"
-      ][activeMap] || "maps/map1.jpeg");
+      const SHUFFLE_ICON = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M16 3h5v5h-2V6.41l-3.29 3.3-1.42-1.42L17.59 5H16V3z"></path>
+          <path d="M4 7h4.59l9.7 9.7-1.42 1.42L7.76 9H4V7z"></path>
+          <path d="M4 15h4.59l2.12 2.12-1.42 1.42L7.76 17H4v-2z"></path>
+          <path d="M16 16h1.59l-2.3-2.29 1.42-1.42L19 14.59V13h2v5h-5v-2z"></path>
+        </svg>
+      `;
 
-      const buzzer = room.buzzer;
+      main.innerHTML = `
+        <div class="scoreBar">
+          <span class="teamLabel orange">الفريق البرتقالي</span>
 
-      // ✅ محتوى السؤال/الجواب للمقدم
-      let qTextStr = "السؤال يكون هنا";
-      let aTextStr = "الجواب يكون هنا";
-      let hasRealAnswer = false;
-
-      if(isHost){
-        const cur = room.current || {};
-        if(cur.letter){
-          const mode = getQuestionMode(room);
-          if(mode === "custom"){
-            const list = getCustomList(room, cur.letter);
-            if(list.length){
-              const idx = Number(cur.qIndex || 0) % list.length;
-              qTextStr = list[idx]?.q ?? "—";
-              aTextStr = list[idx]?.a ?? "";
-              hasRealAnswer = !!String(aTextStr).trim();
-              if(!hasRealAnswer) aTextStr = "الجواب يكون هنا";
-            }else{
-              qTextStr = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
-              aTextStr = "الجواب يكون هنا";
-              hasRealAnswer = false;
-            }
-          }else{
-            const list = QUESTIONS[cur.letter] || [];
-            if(list.length){
-              const idx = Number(cur.qIndex || 0) % list.length;
-              qTextStr = list[idx]?.q ?? "—";
-              aTextStr = list[idx]?.a ?? "";
-              hasRealAnswer = !!String(aTextStr).trim();
-              if(!hasRealAnswer) aTextStr = "الجواب يكون هنا";
-            }else{
-              qTextStr = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
-              aTextStr = "الجواب يكون هنا";
-              hasRealAnswer = false;
-            }
+          ${
+            isHost ? `
+              <div class="scoreCtrl">
+                <button id="scoreOrangeVal" class="scoreBoxBtn clickable" type="button">${scoreOrange}</button>
+                <div id="scorePickerOrange" class="scorePicker" role="menu" aria-label="اختيار نقاط البرتقالي">
+                  ${pickerButtons.replaceAll('data-val="', 'data-team="orange" data-val="')}
+                </div>
+              </div>
+            ` : `
+              <button class="scoreBoxBtn" disabled>${scoreOrange}</button>
+            `
           }
-        }
-      }
 
-      // ✅ تصميم المقدم حسب الصورة
-      if(isHost){
-        main.innerHTML = `
-          <div class="panel panelTight">
-            <div class="mapOuter">
-              <div id="mapScale" class="mapScale" style="--zoom:1">
-                <div id="mapBox" class="mapBox">
-                  <img id="mapImg" src="${escapeHtml(src)}" alt="">
-                  <svg id="overlay" class="overlaySvg"></svg>
+          ${
+            isHost ? `
+              <div class="scoreCtrl">
+                <button id="scoreGreenVal" class="scoreBoxBtn clickable" type="button">${scoreGreen}</button>
+                <div id="scorePickerGreen" class="scorePicker" role="menu" aria-label="اختيار نقاط الأخضر">
+                  ${pickerButtons.replaceAll('data-val="', 'data-team="green" data-val="')}
                 </div>
               </div>
-            </div>
+            ` : `
+              <button class="scoreBoxBtn" disabled>${scoreGreen}</button>
+            `
+          }
 
-            <div class="underMapRow">
-              <button id="settingsBtn" class="iconBtn" type="button" aria-label="الإعدادات">⚙️</button>
+          <span class="teamLabel green">الفريق الأخضر</span>
+        </div>
+        ${isHost ? `<div class="scoreHint">المقدم فقط: اضغط على مربع النتيجة ثم اختر رقمًا من 0 إلى 10</div>` : ``}
 
-              <div class="zoomWrap">
-                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
-              </div>
-
-              <button id="mapBtn" class="iconBtn" type="button" aria-label="تغيير الخريطة">↻</button>
+        <div class="mapOuter">
+          <div id="mapScale" class="mapScale" style="--zoom:1">
+            <div id="mapBox" class="mapBox">
+              <img id="mapImg" src="" alt="">
+              <svg id="overlay" class="overlaySvg"></svg>
             </div>
           </div>
+        </div>
 
-          <div class="panel hostControls">
-            <div class="controlGrid">
-              <div class="controlCol">
-                <button id="qModeBtn" class="btn btnYellow" type="button">${escapeHtml(qModeBtnText)}</button>
-                <button id="clearBoardBtn" class="btn btnYellow" type="button">تفريغ اللوحة</button>
-              </div>
+        <!-- ✅ (تبديل مكان) زر تغيير الخريطة يسار + الإعدادات يمين -->
+        <div class="mapToolsRow">
+          ${isHost ? `<button id="mapBtn" class="iconBtn" type="button" aria-label="تغيير الخريطة">${SHUFFLE_ICON}</button>` : `<span style="width:46px"></span>`}
+          <div class="zoomSlider">
+            <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
+          </div>
+          ${isHost ? `<button id="settingsBtn" class="iconBtn" type="button" aria-label="الإعدادات">⚙️</button>` : `<span style="width:46px"></span>`}
+        </div>
 
-              <button id="timerClock" class="timerCircleBtn" type="button" aria-label="المؤقت">
-                <div id="timerLabel" class="timerLabel">المؤقت</div>
-                <div id="timerNum" class="timerNum">10</div>
+        <div class="controlWrap">
+          <div class="controlRow">
+            <!-- ✅ (تبديل) تجميد الأزرار صار يسار بدل أسئلة عامة -->
+            <div class="sideCol">
+              ${isHost ? `<button id="freezeBtn" class="btn ${room.freeze ? "btnRed" : "btnYellow"}" type="button">${room.freeze ? "تجميد الأزرار" : "تجميد الأزرار"}</button>` : ``}
+              ${isHost ? `<button id="nextQ" class="btn btnYellow" type="button">تغيير السؤال</button>` : ``}
+            </div>
+
+            <div class="timerWrap ${isHost ? "" : "timerPlayerView"}" id="timerWrap">
+              <button id="timerClock" class="timerClockBtn ${isHost ? "" : "player"}" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"} aria-label="المؤقت">
+                <span id="timerNumber" class="timerNumber">10</span>
               </button>
-
-              <div class="controlCol">
-                <button id="freezeBtn" class="btn btnYellow" type="button">${room.freeze ? "فك التجميد" : "تجميد الأزرار"}</button>
-                <button id="nextQ" class="btn btnYellow" type="button">تغيير السؤال</button>
-              </div>
             </div>
 
-            <div id="timerPicker" class="timerPicker" aria-label="اختيار وقت المؤقت">
-              ${[10,15,20,25,30].map(v => `<button class="timerOptBtn" data-timer="${v}" type="button">${v} ث</button>`).join("")}
+            <!-- ✅ (تبديل) أسئلة عامة صار يمين بدل تجميد + تفريغ اللوحة صار يمين بدل تغيير السؤال -->
+            <div class="sideCol">
+              ${isHost ? `<button id="qModeBtn" class="btn btnYellow" type="button">${modeBtnText}</button>` : ``}
+              ${isHost ? `<button id="clearBoardBtn" class="btn btnYellow" type="button">تفريغ اللوحة</button>` : ``}
             </div>
           </div>
 
-          <div id="firstPlayerBar" class="firstPlayerBar">اسم اللاعب الذي يضغط أولاً</div>
+          <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
 
-          <div class="questionCard">
-            <div id="qText" class="qBigText">${escapeHtml(qTextStr)}</div>
-            <div id="qAns" class="ansPill ${hasRealAnswer ? "" : "hiddenLike"}">${escapeHtml(aTextStr)}</div>
-          </div>
-        `;
-      } else {
-        // ✅ صفحة اللاعب: بدون تغيير كبير (زر الضغط + شراء)
-        main.innerHTML = `
-          <div class="panel panelTight">
-            <div class="mapOuter">
-              <div id="mapScale" class="mapScale" style="--zoom:1">
-                <div id="mapBox" class="mapBox">
-                  <img id="mapImg" src="${escapeHtml(src)}" alt="">
-                  <svg id="overlay" class="overlaySvg"></svg>
-                </div>
-              </div>
+          ${isHost ? `
+            <div class="questionCard">
+              <div class="questionBig">السؤال</div>
+              <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
+              <div id="qAns" class="answerPill"></div>
             </div>
-
-            <div class="underMapRow">
-              <div style="width:48px;height:48px;opacity:0;pointer-events:none;"></div>
-              <div class="zoomWrap">
-                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
-              </div>
-              <div style="width:48px;height:48px;opacity:0;pointer-events:none;"></div>
+          ` : `
+            <div style="margin-top:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;color:#fff">
+              <div style="font-weight:900;margin-bottom:6px">الحالة</div>
+              <div style="font-weight:800">${started ? "جاهز" : "بانتظار المقدم"}</div>
             </div>
-          </div>
+          `}
+        </div>
 
-          <div style="margin-top:12px" class="panel">
-            <button id="timerClock" class="timerCircleBtn" type="button" tabindex="-1" aria-hidden="true" style="cursor:default">
-              <div class="timerLabel">المؤقت</div>
-              <div id="timerNum" class="timerNum">10</div>
-            </button>
-            <div class="smallNote">بانتظار المقدم</div>
-          </div>
-
+        ${(!isHost) ? `
           <div class="playerBtnWrap">
             <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
             ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
@@ -1943,33 +2211,130 @@
               <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
             </div>
           </div>
-        `;
+        ` : ""}
+      `;
+
+      if(isHost){
+        const pickerOrange = document.getElementById("scorePickerOrange");
+        const pickerGreen  = document.getElementById("scorePickerGreen");
+        const valOrangeBtn = document.getElementById("scoreOrangeVal");
+        const valGreenBtn  = document.getElementById("scoreGreenVal");
+
+        const hideAll = () => {
+          pickerOrange?.classList.remove("show");
+          pickerGreen?.classList.remove("show");
+        };
+
+        const togglePicker = (picker) => {
+          const shown = picker.classList.contains("show");
+          hideAll();
+          if(!shown) picker.classList.add("show");
+        };
+
+        const setScore = async (team, value) => {
+          const v = Math.max(0, Math.min(10, Number(value)));
+          await update(ref(db, `rooms/${code}/scores`), { [team]: v });
+        };
+
+        if(pickerOrange) pickerOrange.addEventListener("click", (e)=>e.stopPropagation());
+        if(pickerGreen)  pickerGreen.addEventListener("click", (e)=>e.stopPropagation());
+
+        if(valOrangeBtn && pickerOrange){
+          valOrangeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePicker(pickerOrange);
+          });
+        }
+        if(valGreenBtn && pickerGreen){
+          valGreenBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePicker(pickerGreen);
+          });
+        }
+
+        main.querySelectorAll(".scorePickBtn").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const team = btn.getAttribute("data-team");
+            const val  = btn.getAttribute("data-val");
+            if(!team) return;
+            await setScore(team, val);
+            hideAll();
+          });
+        });
       }
 
-      // ✅ تحديث شريط أول لاعب
+      // ✅ المؤقت: يبدأ مباشرة بالنقر على الدائرة، والنقر مرة أخرى يصفر (وأيضاً عند انتهاء الوقت)
+      TIMER_UI.latestTimer = room.timer || {};
+      TIMER_UI.isHost = isHost;
+      ensureTimerTicker();
+      applyTimerDom();
+
       if(isHost){
-        const bar = document.getElementById("firstPlayerBar");
-        if(bar){
-          bar.classList.remove("isGreen","isOrange");
-          if(buzzer && buzzer.name){
-            bar.textContent = buzzer.name;
-            bar.classList.add(buzzer.team === "green" ? "isGreen" : "isOrange");
-          }else{
-            bar.textContent = "اسم اللاعب الذي يضغط أولاً";
-          }
+        const clock = document.getElementById("timerClock");
+        if(clock){
+          clock.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const t = normalizeTimer(TIMER_UI.latestTimer || {});
+            const sel = Number(t.sel || 10);
+
+            // إذا يعمل أو انتهى => تصفير
+            if(t.running || t.done){
+              await update(ref(db, `rooms/${code}/timer`), {
+                running:false,
+                done:false,
+                startTs:0,
+                dur: sel
+              });
+              return;
+            }
+
+            // ابدأ
+            await update(ref(db, `rooms/${code}/timer`), {
+              sel,
+              dur: sel,
+              running:true,
+              done:false,
+              startTs: Date.now()
+            });
+          });
         }
       }
 
-      // ✅ إعداد المؤقت فوراً
-      applyTimerDom();
+      // ✅ زر الإعدادات (يفتح صفحة مثل الصورة)
+      if(isHost){
+        const settingsBtn = document.getElementById("settingsBtn");
+        if(settingsBtn){
+          settingsBtn.addEventListener("click", () => openSettings(room));
+        }
+      }
 
-      /* =======================
-         MAP/OVERLAY + ZOOM FIX
-      ======================= */
+      // ✅ زر أسئلة عامة/خاصة
+      if(isHost){
+        const qModeBtn = document.getElementById("qModeBtn");
+        if(qModeBtn){
+          qModeBtn.addEventListener("click", async () => {
+            const cur = getQuestionMode(room);
+            const next = (cur === "custom") ? "default" : "custom";
+            await update(ref(db, `rooms/${code}`), { questionMode: next });
+          });
+        }
+      }
+
       const mapImg = document.getElementById("mapImg");
       const overlay = document.getElementById("overlay");
       const mapScale = document.getElementById("mapScale");
       const zoom = document.getElementById("zoom");
+
+      const activeMap = Number(room.activeMap || 0);
+
+      const src = ([
+        "maps/map1.jpeg",
+        "maps/map2.jpeg",
+        "maps/map3.jpeg"
+      ][activeMap] || "maps/map1.jpeg");
+
+      mapImg.src = src;
 
       overlay.innerHTML = "";
       overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -2001,7 +2366,6 @@
         const z = Number(zoom.value || 1);
         mapScale.style.setProperty("--zoom", z);
 
-        // ✅ يمنع الزوم يغطي اللي تحت الخريطة
         const baseH = mapBox.offsetHeight || 0;
         const extra = Math.max(0, baseH * (z - 1));
         mapOuter.style.marginBottom = `${extra}px`;
@@ -2015,7 +2379,7 @@
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
         overlay.setAttribute("preserveAspectRatio", "none");
 
-        const bbox = BBOX_CACHE[mapImg.src];
+        const bbox = BBOX_CACHE[src];
         if(!bbox) return;
 
         const x0 = bbox.x0 * W;
@@ -2044,7 +2408,7 @@
       }
 
       function onMapReady(){
-        if(!BBOX_CACHE[mapImg.src]) BBOX_CACHE[mapImg.src] = detectHexBBox(mapImg);
+        if(!BBOX_CACHE[src]) BBOX_CACHE[src] = detectHexBBox(mapImg);
         requestAnimationFrame(placeHexes);
       }
 
@@ -2065,165 +2429,115 @@
         setStateClass(cell, st);
       });
 
+      // ✅ شريط أول لاعب يضغط
+      const firstPressBar = document.getElementById("firstPressBar");
+      const buzzer = room.buzzer;
+      if(buzzer && buzzer.name && firstPressBar){
+        firstPressBar.classList.add("filled");
+        firstPressBar.style.background = teamColor(buzzer.team);
+        firstPressBar.textContent = buzzer.name;
+      }else if(firstPressBar){
+        firstPressBar.classList.remove("filled");
+        firstPressBar.style.background = "#fff";
+        firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
+      }
+
+      if(isHost){
+        const qText = document.getElementById("qText");
+        const qAns  = document.getElementById("qAns");
+        const cur = room.current || {};
+
+        if(cur.letter){
+          const mode = getQuestionMode(room);
+
+          let list = [];
+          if(mode === "custom"){
+            list = getCustomList(room, cur.letter);
+            if(!list.length){
+              qText.textContent = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
+              qAns.textContent  = "";
+              qAns.style.display = "none";
+            }else{
+              const idx = Number(cur.qIndex || 0) % list.length;
+              const item = list[idx];
+              qText.textContent = item?.q ?? "—";
+              qAns.textContent  = item?.a ?? "";
+              qAns.style.display = (qAns.textContent.trim() ? "block" : "none");
+            }
+          }else{
+            list = QUESTIONS[cur.letter] || [];
+            if(!list.length){
+              qText.textContent = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
+              qAns.textContent  = "";
+              qAns.style.display = "none";
+            }else{
+              const idx = Number(cur.qIndex || 0) % list.length;
+              const item = list[idx];
+              qText.textContent = item?.q ?? "—";
+              qAns.textContent  = item?.a ?? "";
+              qAns.style.display = (qAns.textContent.trim() ? "block" : "none");
+            }
+          }
+        }else{
+          qText.textContent = "اختر حرفًا من الخريطة";
+          qAns.textContent  = "";
+          qAns.style.display = "none";
+        }
+      }
+
       zoom.addEventListener("input", () => {
         const z = Number(zoom.value || 1);
         localStorage.setItem(ZOOM_KEY, String(z));
         applyZoomFix();
       });
 
-      /* =======================
-         ✅ أزرار المقدم حسب الصورة
-      ======================= */
+      const mapBtn = document.getElementById("mapBtn");
+      if(mapBtn){
+        mapBtn.addEventListener("click", async () => {
+          const next = (activeMap + 1) % 3;
+          await update(roomRef, {
+            activeMap: next,
+            buzzer: null,
+            current: { letter: null, qIndex: 0, row: null, col: null, map: next }
+          });
+        });
+      }
+
+      const freezeBtn = document.getElementById("freezeBtn");
+      if(freezeBtn){
+        freezeBtn.addEventListener("click", async () => {
+          await update(roomRef, { freeze: !room.freeze, buzzer: null });
+        });
+      }
+
+      const nextQ = document.getElementById("nextQ");
+      if(nextQ){
+        nextQ.addEventListener("click", async () => {
+          const cur = room.current || {};
+          if(!cur.letter) return;
+
+          const mode = getQuestionMode(room);
+          const list = (mode === "custom") ? getCustomList(room, cur.letter) : (QUESTIONS[cur.letter] || []);
+          if(!list.length) return;
+
+          const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
+          await update(roomRef, { current: { ...cur, qIndex: nextIndex } });
+        });
+      }
+
+      // ✅ تفريغ اللوحة (للمقدم فقط): يمسح ألوان الخلايا للخريطة الحالية
+      const clearBoardBtn = document.getElementById("clearBoardBtn");
+      if(clearBoardBtn){
+        clearBoardBtn.addEventListener("click", async () => {
+          const updates = {};
+          // حذف عقدة الخريطة الحالية = ترجع كلها 0 (أبيض)
+          updates[`rooms/${code}/mapStates/${activeMap}`] = null;
+          updates[`rooms/${code}/buzzer`] = null;
+          await update(ref(db), updates);
+        });
+      }
+
       if(isHost){
-        // ✅ زر الإعدادات (⚙️) => فتح أسئلة المقدم
-        const settingsBtn = document.getElementById("settingsBtn");
-        if(settingsBtn){
-          settingsBtn.addEventListener("click", () => openCustomQuestionsModal(room));
-        }
-
-        // ✅ زر تغيير الخريطة (↻)
-        const mapBtn = document.getElementById("mapBtn");
-        if(mapBtn){
-          mapBtn.addEventListener("click", async () => {
-            const next = (activeMap + 1) % 3;
-            await update(roomRef, {
-              activeMap: next,
-              buzzer: null,
-              current: { letter: null, qIndex: 0, row: null, col: null, map: next }
-            });
-          });
-        }
-
-        // ✅ زر تجميد الأزرار
-        const freezeBtn = document.getElementById("freezeBtn");
-        if(freezeBtn){
-          freezeBtn.addEventListener("click", async () => {
-            await update(roomRef, { freeze: !room.freeze, buzzer: null });
-          });
-        }
-
-        // ✅ زر تغيير السؤال
-        const nextQ = document.getElementById("nextQ");
-        if(nextQ){
-          nextQ.addEventListener("click", async () => {
-            const cur = room.current || {};
-            if(!cur.letter) return;
-
-            const mode = getQuestionMode(room);
-            const list = (mode === "custom") ? getCustomList(room, cur.letter) : (QUESTIONS[cur.letter] || []);
-            if(!list.length) return;
-
-            const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
-            await update(roomRef, { current: { ...cur, qIndex: nextIndex } });
-          });
-        }
-
-        // ✅ زر تفريغ اللوحة (يمسح ألوان خلايا الخريطة الحالية)
-        const clearBoardBtn = document.getElementById("clearBoardBtn");
-        if(clearBoardBtn){
-          clearBoardBtn.addEventListener("click", async () => {
-            const updates = {};
-            updates[`rooms/${code}/mapStates/${String(activeMap)}`] = {}; // تصفير حالات الخلايا
-            updates[`rooms/${code}/buzzer`] = null;
-            await update(ref(db), updates);
-          });
-        }
-
-        // ✅ زر أسئلة عامة/خاصة (تبديل مصدر الأسئلة)
-        const qModeBtn = document.getElementById("qModeBtn");
-        if(qModeBtn){
-          qModeBtn.addEventListener("click", async () => {
-            const cur = getQuestionMode(room);
-            const next = (cur === "custom") ? "default" : "custom";
-            await update(ref(db, `rooms/${code}`), { questionMode: next });
-          });
-        }
-
-        // ✅ المؤقت: رقم (اضغط لتشغيل/إيقاف) + كلمة "المؤقت" تفتح اختيار الوقت
-        const timerClock = document.getElementById("timerClock");
-        const timerLabel = document.getElementById("timerLabel");
-        const timerPicker = document.getElementById("timerPicker");
-
-        // فعّل الأزرار النشطة بالاختيار الحالي
-        if(timerPicker){
-          const curT = normalizeTimer(room.timer || {});
-          const sel = Number(curT.sel || 10);
-          timerPicker.querySelectorAll(".timerOptBtn").forEach(b=>{
-            const v = Number(b.getAttribute("data-timer"));
-            b.classList.toggle("active", v === sel);
-          });
-        }
-
-        // ضغط على (المؤقت) => يفتح اختيار الوقت
-        if(timerLabel && timerPicker){
-          timerLabel.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const shown = timerPicker.classList.contains("show");
-            timerPicker.classList.toggle("show", !shown);
-          });
-        }
-
-        // ضغط على الدائرة => تشغيل/إيقاف/تصفير
-        if(timerClock){
-          timerClock.addEventListener("click", async (e) => {
-            // لو ضغط على نص "المؤقت" لا تشغّل/توقف (لأننا فتحنا القائمة)
-            if(e.target && e.target.id === "timerLabel") return;
-
-            const t = normalizeTimer(TIMER_UI.latestTimer || {});
-            const sel = Number(t.sel || 10);
-
-            // إذا شغال أو منتهي => تصفير (إيقاف + done=false)
-            if(t.running || t.done){
-              await update(ref(db, `rooms/${code}/timer`), {
-                running:false,
-                done:false,
-                startTs:0,
-                dur: sel
-              });
-              return;
-            }
-
-            // ابدأ
-            await update(ref(db, `rooms/${code}/timer`), {
-              sel,
-              dur: sel,
-              running:true,
-              done:false,
-              startTs: Date.now()
-            });
-          });
-        }
-
-        // اختيار وقت المؤقت
-        if(timerPicker){
-          timerPicker.querySelectorAll(".timerOptBtn").forEach(btn => {
-            btn.addEventListener("click", async (e) => {
-              e.stopPropagation();
-              const v = Number(btn.getAttribute("data-timer"));
-              if(![10,15,20,25,30].includes(v)) return;
-
-              const curT = normalizeTimer(room.timer || {});
-              // لو المؤقت شغال لا نغيّر dur
-              await update(ref(db, `rooms/${code}/timer`), {
-                sel: v,
-                ...(curT.running ? {} : { dur: v, done:false, startTs:0 })
-              });
-
-              timerPicker.querySelectorAll(".timerOptBtn").forEach(b=>{
-                const vv = Number(b.getAttribute("data-timer"));
-                b.classList.toggle("active", vv === v);
-              });
-            });
-          });
-
-          // اغلاق القائمة لو ضغطت خارجها
-          document.addEventListener("click", (ev) => {
-            const inside = ev.target?.closest?.("#timerPicker") || ev.target?.closest?.("#timerLabel");
-            if(!inside) timerPicker.classList.remove("show");
-          });
-        }
-
-        // ✅ تلوين الخلايا + اختيار الحرف + تصفير البازر عند الضغط
         overlay.querySelectorAll(".cell").forEach(cell => {
           cell.addEventListener("click", async (e) => {
             e.preventDefault();
@@ -2239,7 +2553,7 @@
             const letter = MAPS[activeMap][r][c];
 
             const updates = {};
-            updates[`rooms/${code}/mapStates/${String(activeMap)}/${k}`] = next;
+            updates[`rooms/${code}/mapStates/${activeMap}/${k}`] = next;
             updates[`rooms/${code}/buzzer`] = null;
             updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: r, col: c, map: activeMap };
 
@@ -2248,9 +2562,6 @@
         });
       }
 
-      /* =======================
-         ✅ لاعب: زر الضغط
-      ======================= */
       const buzzBtn = document.getElementById("buzzBtn");
       if(buzzBtn){
         const disabled = (!started) || room.freeze || !me || !me.name;
@@ -2313,7 +2624,9 @@
       renderGame(room, me);
     });
 
+    // جهز المودالات مرة واحدة
     ensureCustomQuestionsModal();
+    ensureSettingsModal();
   </script>
 </body>
 </html>
