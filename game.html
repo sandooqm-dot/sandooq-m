@@ -10,18 +10,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan&display=swap" rel="stylesheet">
 
-  <style>
-    /* ✅ (مطلوب) تطبيق خط AA-GALAXY Bold على جميع نصوص اللعبة */
-    @font-face{
-      font-family: 'AA-GALAXY Bold';
-      src:
-        url('AA-GALAXY-Bold.woff2') format('woff2'),
-        url('AA-GALAXY-Bold.woff') format('woff'),
-        url('AA-GALAXY-Bold.ttf') format('truetype');
-      font-weight: 700;
-      font-style: normal;
-      font-display: swap;
-    }
+  @font-face{
+  font-family: 'AA-GALAXY Bold';
+  src: url('./AA-GALAXY.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* إجبار كل النصوص تستخدم خط AA-GALAXY */
+*{
+  font-family: 'AA-GALAXY Bold', Arial, sans-serif !important;
+}
 
     :root{
       --bg:#1f4fa3;
