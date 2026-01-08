@@ -35,6 +35,19 @@
       --timerBlue:#2f5fb7;
     }
 
+    /* ✅✅ (التعديل الوحيد المطلوب) إضافة الخط وتطبيقه على جميع النصوص */
+    @font-face{
+      font-family: 'AA-GALAXY Bold';
+      src: url('./AA-GALAXY.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    *{
+      font-family: 'AA-GALAXY Bold', Arial, sans-serif !important;
+    }
+    /* ✅✅ نهاية التعديل الوحيد */
+
     body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
 
     /* ✅ (تعديل) هيدر صف واحد بدون فراغ علوي */
