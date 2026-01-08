@@ -11,55 +11,72 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan&display=swap" rel="stylesheet">
 
   <style>
-@font-face{
-  font-family: 'AA-GALAXY Bold';
-  src: url('./AA-GALAXY.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+    :root{
+      --bg:#1f4fa3;
+      --yellow:#f4c400;
+      --card:#ffffff;
+      --text:#111;
+      --muted:#666;
+      --green:#1aa34a;
+      --orange:#f28c00;
+      --red:#c01818;
 
-/* إجبار كل النصوص تستخدم خط AA-GALAXY */
-*{
-  font-family: 'AA-GALAXY Bold', Arial, sans-serif !important;
-}
+      --hexGreen:  rgba(0, 140, 70, .42);
+      --hexOrange: rgba(255, 140, 0, .42);
+      --hexPale:   rgba(255, 215, 80, .68);
+      --hexBorder: rgba(0,0,0,.10);
 
-.headerRow{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  width:100%;
-  box-sizing:border-box;
-  direction:ltr;
-}
+      /* ✅ ألوان إضافية */
+      --purple:#8b5cf6;
+      --blue:#0ea5e9;
 
-.logo{
-  position:static;
-  width:64px;height:64px;
-  object-fit:contain;
-  flex:0 0 auto;
-}
+      /* ✅ ألوان UI جديدة */
+      --navy:#0f2f66;
+      --timerBlue:#2f5fb7;
+    }
 
-h1{
-  margin:0;
-  color:var(--yellow);
-  font-size:28px;
-  font-family:'AA-GALAXY Bold', Arial, sans-serif;
-  font-weight:800;
-  flex:1 1 auto;
-  text-align:center;
-  line-height:1.2;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  direction:rtl;
+    body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
 
-  /* ✅ (مطلوب) إزاحة بسيطة لليمين */
-  position:relative;
-  transform: translateX(10px);
-}
-</style>
+    /* ✅ (تعديل) هيدر صف واحد بدون فراغ علوي */
+    header{
+      position:relative;
+      padding:14px 14px 0;
+    }
+    .headerRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      width:100%;
+      box-sizing:border-box;
+      direction:ltr;
+    }
+
+    .logo{
+      position:static;
+      width:64px;height:64px;
+      object-fit:contain;
+      flex:0 0 auto;
+    }
+
+    h1{
+      margin:0;
+      color:var(--yellow);
+      font-size:28px;
+      font-family:'Baloo Bhaijaan', Arial, sans-serif;
+      font-weight:800;
+      flex:1 1 auto;
+      text-align:center;
+      line-height:1.2;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      direction:rtl;
+
+      /* ✅ (مطلوب) إزاحة بسيطة لليمين */
+      position:relative;
+      transform: translateX(10px);
+    }
 
     .gameName{
       position:static;
