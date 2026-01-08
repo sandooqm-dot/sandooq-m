@@ -11,6 +11,128 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan&display=swap" rel="stylesheet">
 
   <style>
+    /* =========================
+   🎨 THEME (ألوان متناسقة مع AA-GALAXY)
+   الصق هذا المقطع قبل </style>
+   ========================= */
+
+/* نعيد تعريف الألوان هنا (يستبدل القديم تلقائيًا لأنّه آخر شيء) */
+:root{
+  --bg:#163B84;          /* خلفية رئيسية */
+  --bg2:#0F2F66;         /* تدرّج خفيف للخلفية */
+  --yellow:#F4C400;      /* أصفر العلامة */
+  --card:#F7FAFF;        /* أبيض مائل للأزرق (أجمل مع الخط) */
+  --text:#0B1220;
+  --muted:#5B6474;
+
+  --green:#1aa34a;
+  --orange:#f28c00;
+  --red:#c01818;
+
+  --hexGreen:  rgba(0, 140, 70, .42);
+  --hexOrange: rgba(255, 140, 0, .42);
+  --hexPale:   rgba(255, 215, 80, .68);
+  --hexBorder: rgba(13,39,91,.18);
+
+  --purple:#7C5CFF;
+  --blue:#0ea5e9;
+
+  --navy:#0F2F66;        /* كحلي موحّد */
+  --timerBlue:#2B57B5;   /* أزرق المؤقت/بطاقة السؤال */
+
+  --panel:rgba(255,255,255,.08);
+  --panelBorder:rgba(255,255,255,.14);
+
+  --softShadow:0 8px 18px rgba(0,0,0,.12);
+  --hardShadow:0 10px 22px rgba(0,0,0,.18);
+
+  --outline:rgba(15,47,102,.22);
+  --blackOutline:rgba(0,0,0,.32);
+}
+
+/* خلفية أجمل ومتناسقة */
+body{
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+}
+
+/* الكروت/الصناديق: إطار وظل موحّد */
+.card{
+  background: var(--card);
+  border: 1px solid var(--outline);
+  box-shadow: var(--softShadow);
+}
+
+/* صندوق اسم اللعبة: أهدأ */
+.gameName{
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.20);
+  box-shadow: 0 2px 0 rgba(0,0,0,.10);
+}
+
+/* شريط أدوات الخريطة: أزرار كحلي بدل الأسود الثقيل */
+.iconBtn{
+  background: rgba(15,47,102,.78);
+  border: 2px solid rgba(255,255,255,.12);
+  box-shadow: 0 6px 14px rgba(0,0,0,.18);
+}
+.iconBtn svg{ fill:#fff; }
+
+/* صندوق التحكمات */
+.controlWrap{
+  background: var(--panel);
+  border: 1px solid var(--panelBorder);
+  box-shadow: var(--softShadow);
+}
+
+/* أزرار المقدم الأربعة: إطار أخف وأشيك */
+.sideCol .btn{
+  border: 2px solid var(--blackOutline);
+  box-shadow: 0 3px 0 rgba(0,0,0,.12);
+}
+
+/* المؤقت: حلقة كحلي بدل أسود قوي */
+.timerClockBtn{
+  border: 2px solid rgba(255,255,255,.90);
+  background: var(--timerBlue);
+  box-shadow: var(--hardShadow);
+}
+.timerRing circle{
+  stroke: rgba(15,47,102,.92);
+}
+
+/* بطاقة السؤال: إطار كحلي بدل الأسود الثقيل */
+.questionCard{
+  background: var(--timerBlue);
+  border: 3px solid rgba(15,47,102,.95);
+  box-shadow: var(--hardShadow);
+}
+
+/* شريط أول لاعب: إطار كحلي أوضح */
+.firstPressBar{
+  border: 2px solid rgba(15,47,102,.55);
+  box-shadow: var(--softShadow);
+}
+
+/* مربعات النقاط */
+.scoreBoxBtn{
+  border: 1px solid rgba(15,47,102,.18);
+  box-shadow: 0 2px 0 rgba(0,0,0,.10);
+}
+
+/* نافذة الإعدادات: إطار كحلي بدل أسود كثيف */
+.settingsPanel{
+  border: 8px solid rgba(15,47,102,.95);
+}
+.settingsBtn{
+  border: 4px solid rgba(15,47,102,.95);
+  box-shadow: 0 6px 0 rgba(0,0,0,.16);
+}
+
+/* زر الشراء البنفسجي: نغمة أهدأ */
+.buyNowBtn{
+  background: var(--purple);
+  box-shadow: 0 3px 0 rgba(0,0,0,.14);
+}
     :root{
       --bg:#1f4fa3;
       --yellow:#f4c400;
