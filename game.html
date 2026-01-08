@@ -10,10 +10,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan&display=swap" rel="stylesheet">
 
-  @font-face{
+  <style>
+@font-face{
   font-family: 'AA-GALAXY Bold';
   src: url('./AA-GALAXY.otf') format('opentype');
-  font-weight: 400;
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
@@ -23,41 +24,42 @@
   font-family: 'AA-GALAXY Bold', Arial, sans-serif !important;
 }
 
-    .headerRow{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      width:100%;
-      box-sizing:border-box;
-      direction:ltr;
-    }
+.headerRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  width:100%;
+  box-sizing:border-box;
+  direction:ltr;
+}
 
-    .logo{
-      position:static;
-      width:64px;height:64px;
-      object-fit:contain;
-      flex:0 0 auto;
-    }
+.logo{
+  position:static;
+  width:64px;height:64px;
+  object-fit:contain;
+  flex:0 0 auto;
+}
 
-    h1{
-      margin:0;
-      color:var(--yellow);
-      font-size:28px;
-      font-family:'AA-GALAXY Bold', Arial, sans-serif;
-      font-weight:800;
-      flex:1 1 auto;
-      text-align:center;
-      line-height:1.2;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      direction:rtl;
+h1{
+  margin:0;
+  color:var(--yellow);
+  font-size:28px;
+  font-family:'AA-GALAXY Bold', Arial, sans-serif;
+  font-weight:800;
+  flex:1 1 auto;
+  text-align:center;
+  line-height:1.2;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  direction:rtl;
 
-      /* ✅ (مطلوب) إزاحة بسيطة لليمين */
-      position:relative;
-      transform: translateX(10px);
-    }
+  /* ✅ (مطلوب) إزاحة بسيطة لليمين */
+  position:relative;
+  transform: translateX(10px);
+}
+</style>
 
     .gameName{
       position:static;
