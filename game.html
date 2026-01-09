@@ -42,6 +42,9 @@
       --red:#ff2d2d;
       --green:#1aa34a;
       --orange:#f28c00;
+
+      /* ✅ جديد */
+      --cyan:#7dd3fc;
     }
 
     *{ box-sizing:border-box; }
@@ -168,8 +171,8 @@
       position:fixed;
       right:18px;
       bottom:24px;
-      color:rgba(255,255,255,.85);
-      font-size:18px;
+      color:rgba(255,255,255,.70); /* ✅ أخف */
+      font-size:14px;             /* ✅ أصغر */
       font-weight:700;
       z-index:20000;
       text-shadow:0 8px 18px rgba(0,0,0,.30);
@@ -293,9 +296,16 @@
       touch-action: manipulation;
       flex:0 0 auto;
       user-select:none;
+      position:relative;
+      overflow:visible;
     }
     .circleBtn:active{ transform: translateY(1px); }
     .circleBtn svg{ width:28px;height:28px; fill:#111; }
+
+    /* ✅ (4) زر الأسئلة الخاصة يتحول سماوي */
+    .circleBtn.cyan{
+      background: var(--cyan);
+    }
 
     .zoomWrap{
       flex:1 1 auto;
@@ -334,6 +344,130 @@
       border:2px solid rgba(255,255,255,.65);
       box-shadow:0 6px 14px rgba(0,0,0,.25);
     }
+
+    /* ✅ (2) علامة ؟ صغيرة + نافذة شرح */
+    .helpDot{
+      position:absolute;
+      top:-8px;
+      left:-8px;
+      width:22px;height:22px;
+      border-radius:50%;
+      background:rgba(255,255,255,.55);
+      border:2px solid rgba(0,0,0,.45);
+      color:rgba(0,0,0,.70);
+      font-size:14px;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 6px 12px rgba(0,0,0,.18);
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select:none;
+    }
+    .helpDot:active{ transform: translateY(1px); }
+
+    .tipPopup{
+      position:fixed;
+      z-index:30000;
+      max-width:min(80vw, 260px);
+      padding:10px 12px;
+      border-radius:14px;
+      background:#fff;
+      color:#111;
+      border:4px solid rgba(0,0,0,.85);
+      box-shadow:0 18px 28px rgba(0,0,0,.26);
+      font-size:16px;
+      font-weight:900;
+      line-height:1.35;
+      display:none;
+      text-align:right;
+    }
+
+    /* ✅ لوحة النتائج (8) */
+    .scoreBoard{
+      width:min(92vw, 760px);
+      margin:10px auto 6px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .teamPill{
+      flex:1 1 0;
+      height:56px;
+      border-radius:999px;
+      border:4px solid rgba(0,0,0,.85);
+      color:#fff;
+      font-size:22px;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 10px 18px rgba(0,0,0,.20);
+      white-space:nowrap;
+      user-select:none;
+    }
+    .teamPill.green{ background:rgba(26,163,74,.95); }
+    .teamPill.orange{ background:rgba(242,140,0,.95); }
+
+    .scoreBox{
+      width:64px;
+      height:56px;
+      border-radius:14px;
+      border:4px solid rgba(0,0,0,.85);
+      background:#fff;
+      color:#111;
+      font-size:28px;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 10px 18px rgba(0,0,0,.20);
+      user-select:none;
+    }
+    .scoreBox.clickable{ cursor:pointer; }
+    .scoreBox:active{ transform: translateY(1px); }
+
+    .scorePickerBackdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:25000;
+      padding:14px;
+    }
+    .scorePicker{
+      width:min(92vw, 420px);
+      background:#fff;
+      color:#111;
+      border-radius:18px;
+      padding:14px;
+      border:6px solid rgba(0,0,0,.85);
+      box-shadow:0 24px 36px rgba(0,0,0,.28);
+      text-align:center;
+    }
+    .scoreGrid{
+      display:grid;
+      grid-template-columns:repeat(5, 1fr);
+      gap:10px;
+      margin-top:12px;
+    }
+    .scoreNumBtn{
+      height:54px;
+      border-radius:16px;
+      border:4px solid rgba(0,0,0,.85);
+      background:#ffd54a;
+      color:#111;
+      font-size:22px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 8px 0 rgba(0,0,0,.18);
+    }
+    .scoreNumBtn:active{ transform: translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.18); }
 
     /* ✅ شريط اسم أول لاعب (pill) */
     .firstPressBar{
@@ -473,27 +607,37 @@
       line-height:1.45;
       font-size:34px;
       font-weight:900;
-      color:#ff2d2d;
+      color:#111; /* ✅ (3) أسود بدل أحمر */
       margin:0 0 12px;
       text-shadow:0 8px 16px rgba(0,0,0,.10);
     }
-    .answerPill{
+
+    /* ✅ (5) زر تفاعلي للجواب */
+    .answerBtn{
       margin:0 auto;
       width:min(86%, 420px);
-      background:#ff2d2d;
-      color:#fff;
       padding:14px 22px;
       border-radius:999px;
       text-align:center;
       font-size:28px;
       font-weight:900;
-      display:none;
       border:6px solid rgba(255,255,255,.35);
       box-shadow:0 16px 24px rgba(0,0,0,.18);
+      cursor:pointer;
+      display:none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select:none;
     }
-
-    /* ✅ إخفاء السكور (غير موجود بالصورة) — موجود وظيفياً بالكود لكن مخفي */
-    .scoreBar, .scoreHint{ display:none !important; }
+    .answerBtn.red{
+      background:#ff2d2d;
+      color:#fff;
+    }
+    .answerBtn.green{
+      background:#1aa34a;
+      color:#fff;
+    }
+    .answerBtn:active{ transform: translateY(1px); }
 
     /* ✅ زر شراء اللعبة */
     .buyNowWrap{margin-top:14px;display:flex;justify-content:center}
@@ -733,6 +877,99 @@
     }
     .timerMiniItem:active{ transform: translateY(1px); }
 
+    /* ✅ (9) احتفال الفوز */
+    .winBackdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:40000;
+      padding:14px;
+    }
+    .winModal{
+      width:min(92vw, 520px);
+      background:#fff;
+      color:#111;
+      border-radius:22px;
+      border:8px solid rgba(0,0,0,.85);
+      box-shadow:0 28px 44px rgba(0,0,0,.32);
+      padding:18px 14px;
+      text-align:center;
+      position:relative;
+      overflow:hidden;
+    }
+    .winTitle{
+      font-size:34px;
+      font-weight:900;
+      margin:0 0 8px;
+    }
+    .winSub{
+      font-size:18px;
+      font-weight:900;
+      margin:0;
+      opacity:.85;
+    }
+    .confetti{
+      position:absolute;
+      inset:-30px -30px auto -30px;
+      height:220px;
+      pointer-events:none;
+      opacity:.85;
+      background:
+        radial-gradient(circle at 10% 20%, rgba(255,45,45,.65) 0 6px, transparent 7px),
+        radial-gradient(circle at 30% 40%, rgba(26,163,74,.65) 0 6px, transparent 7px),
+        radial-gradient(circle at 55% 25%, rgba(242,140,0,.65) 0 6px, transparent 7px),
+        radial-gradient(circle at 75% 45%, rgba(125,211,252,.65) 0 6px, transparent 7px),
+        radial-gradient(circle at 90% 30%, rgba(255,215,80,.65) 0 6px, transparent 7px);
+      filter: blur(.2px);
+    }
+
+    /* ✅ (6) تحسين Landscape */
+    .gameLayout{ width:100%; }
+
+    @media (orientation: landscape){
+      body{ padding-bottom:70px; }
+      .wrap{ max-width:1200px; }
+
+      .gameLayout{
+        display:flex;
+        flex-direction:row;
+        align-items:flex-start;
+        justify-content:center;
+        gap:16px;
+        width:95vw;
+        margin:0 auto;
+      }
+      .landRight{
+        flex:0 0 56%;
+        max-width:56%;
+      }
+      .landLeft{
+        flex:0 0 44%;
+        max-width:44%;
+      }
+
+      .mapScale{ width:100%; }
+      .mapToolsRow{ width:100%; }
+      .scoreBoard{ width:100%; }
+      .firstPressBar{ width:100%; font-size:22px; padding:14px 14px; }
+      .controlsRow{ width:100%; margin:10px auto 10px; }
+      .questionCard{ width:100%; margin:10px auto 0; }
+      .playerBigBtn{ width:100%; }
+      .buyNowBtn{ width:100%; }
+
+      .pillBtn{ max-width:100%; width:100%; }
+      .controlsRow{
+        gap:12px;
+      }
+      .controlsRow .pillBtn{
+        height:72px;
+        font-size:24px;
+      }
+    }
+
     /* موبايل صغير */
     @media (max-width:420px){
       h1{ font-size:46px; }
@@ -757,7 +994,27 @@
   </div>
 
   <button class="footerBtn" onclick="location.href='index.html'">الرئيسية</button>
-  <div class="rights">عبارة الحقوق</div>
+  <div class="rights">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
+
+  <!-- ✅ نافذة شرح ? -->
+  <div id="tipPopup" class="tipPopup"></div>
+
+  <!-- ✅ نافذة اختيار نقاط السكور -->
+  <div id="scorePickerBackdrop" class="scorePickerBackdrop">
+    <div class="scorePicker">
+      <div id="scorePickerTitle" style="font-weight:900;font-size:20px">اختر النقاط</div>
+      <div class="scoreGrid" id="scoreGrid"></div>
+    </div>
+  </div>
+
+  <!-- ✅ احتفال الفوز -->
+  <div id="winBackdrop" class="winBackdrop">
+    <div class="winModal">
+      <div class="confetti"></div>
+      <div id="winTitle" class="winTitle">فاز الفريق!</div>
+      <p id="winSub" class="winSub">مبروك 🎉</p>
+    </div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -1150,7 +1407,7 @@
     QUESTIONS["ص"] = [
       { q: "يُطلَق على الشخص المختص بإعداد الأدوية", a: "صيدلي" },
       { q: "أين تُحفَظ الأموال والأشياء الثمينة داخل البنوك؟", a: "صندوق الامانات" },
-      { q: "هي قذيفة عرفها الصينيون منذ القرن الثالث عشر واستخدموها في الأفراح والأعياد وإرهاب العدو؟", a: "صاروخ" },
+      { q: "هي قذيفة عرفها الصينيون منذ القرن الثالث عشر واستخدموها في الأفراح والأعياد وإدهاب العدو؟", a: "صاروخ" },
       { q: "ما يتقرب به المؤمن  إلى الله؟", a: "صدقة" },
       { q: "ما الدولة الأوروبية الواقعة في البلقان وعاصمتها بلغراد؟", a: "صربيا" },
       { q: "هو الصوت العالي المُزعج", a: "صخب" },
@@ -1249,6 +1506,16 @@
 
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
+
+    const tipPopup = document.getElementById("tipPopup");
+
+    const scorePickerBackdrop = document.getElementById("scorePickerBackdrop");
+    const scoreGrid = document.getElementById("scoreGrid");
+    const scorePickerTitle = document.getElementById("scorePickerTitle");
+
+    const winBackdrop = document.getElementById("winBackdrop");
+    const winTitle = document.getElementById("winTitle");
+    const winSub = document.getElementById("winSub");
 
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
@@ -1478,6 +1745,20 @@
       });
     }
 
+    /* ✅ (8) تهيئة السكور */
+    function initScoresIfNeeded(room){
+      if(role !== "host") return;
+      if(!room) return;
+      const s = room.scores;
+      if(s && typeof s === "object" && Number.isFinite(Number(s.green)) && Number.isFinite(Number(s.orange))) return;
+
+      const key = `__scores_init_${code}`;
+      if(window[key]) return;
+      window[key] = true;
+
+      update(ref(db, `rooms/${code}`), { scores: { green:0, orange:0 } });
+    }
+
     function beep(){
       try{
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -1550,6 +1831,126 @@
         }
       }
     }, true);
+
+    /* ✅ (2) نظام التولتيب */
+    let TIP_OPEN = false;
+    function closeTip(){
+      TIP_OPEN = false;
+      tipPopup.style.display = "none";
+      tipPopup.textContent = "";
+    }
+    function openTip(anchorEl, text){
+      if(!anchorEl) return;
+      const r = anchorEl.getBoundingClientRect();
+      tipPopup.textContent = text;
+
+      const pad = 10;
+      tipPopup.style.display = "block";
+      // قياس بعد إظهارها
+      const w = tipPopup.offsetWidth || 220;
+      const h = tipPopup.offsetHeight || 60;
+
+      let left = Math.max(pad, Math.min(window.innerWidth - w - pad, r.left + (r.width/2) - (w/2)));
+      let top  = Math.max(pad, r.top - h - 10);
+      if(top < pad) top = Math.min(window.innerHeight - h - pad, r.bottom + 10);
+
+      tipPopup.style.left = left + "px";
+      tipPopup.style.top  = top + "px";
+
+      TIP_OPEN = true;
+    }
+
+    // اغلاق التولتيب بالنقر على أي مكان
+    document.addEventListener("click", (e) => {
+      const isHelp = e.target?.closest?.(".helpDot");
+      const isPopup = e.target?.closest?.("#tipPopup");
+      if(isHelp || isPopup) return;
+      if(TIP_OPEN) closeTip();
+    }, true);
+
+    /* ✅ (9) فحص اتصال الفوز على شبكة سداسية 5x5 */
+    function neighborsHex(r,c){
+      // odd-r layout
+      const odd = (r % 2) === 1;
+      const out = [];
+      out.push([r, c-1], [r, c+1]);
+      if(odd){
+        out.push([r-1, c], [r-1, c+1], [r+1, c], [r+1, c+1]);
+      }else{
+        out.push([r-1, c-1], [r-1, c], [r+1, c-1], [r+1, c]);
+      }
+      return out.filter(([rr,cc]) => rr>=0 && rr<5 && cc>=0 && cc<5);
+    }
+
+    function computeWinners(mapStatesForMap){
+      const getSt = (r,c) => Number(mapStatesForMap?.[cellKey(r,c)] ?? 0);
+
+      // green: col0 -> col4 using state2
+      const qG = [];
+      const seenG = new Set();
+      for(let r=0;r<5;r++){
+        if(getSt(r,0) === 2){
+          qG.push([r,0]);
+          seenG.add(cellKey(r,0));
+        }
+      }
+      let greenWin = false;
+      while(qG.length){
+        const [r,c] = qG.shift();
+        if(c === 4){ greenWin = true; break; }
+        for(const [rr,cc] of neighborsHex(r,c)){
+          const k = cellKey(rr,cc);
+          if(seenG.has(k)) continue;
+          if(getSt(rr,cc) === 2){
+            seenG.add(k);
+            qG.push([rr,cc]);
+          }
+        }
+      }
+
+      // orange: row0 -> row4 using state3
+      const qO = [];
+      const seenO = new Set();
+      for(let c=0;c<5;c++){
+        if(getSt(0,c) === 3){
+          qO.push([0,c]);
+          seenO.add(cellKey(0,c));
+        }
+      }
+      let orangeWin = false;
+      while(qO.length){
+        const [r,c] = qO.shift();
+        if(r === 4){ orangeWin = true; break; }
+        for(const [rr,cc] of neighborsHex(r,c)){
+          const k = cellKey(rr,cc);
+          if(seenO.has(k)) continue;
+          if(getSt(rr,cc) === 3){
+            seenO.add(k);
+            qO.push([rr,cc]);
+          }
+        }
+      }
+
+      return { greenWin, orangeWin };
+    }
+
+    let LAST_WIN_TS = 0;
+    function showWin(team){
+      if(!team) return;
+      winBackdrop.style.display = "flex";
+      if(team === "green"){
+        winTitle.textContent = "فاز الفريق الأخضر!";
+        winSub.textContent = "مبروك 🎉";
+      }else{
+        winTitle.textContent = "فاز الفريق البرتقالي!";
+        winSub.textContent = "مبروك 🎉";
+      }
+      setTimeout(()=> { winBackdrop.style.display = "none"; }, 2300);
+    }
+
+    winBackdrop.addEventListener("click", () => {
+      winBackdrop.style.display = "none";
+    });
 
     /* ✅ إدارة أسئلة المقدم */
     const CUSTOM_Q_UI = {
@@ -1936,6 +2337,9 @@
           activeMap: 0,
           freeze: false,
           buzzer: null,
+          scores: { green:0, orange:0 },
+          winEvent: null,
+          winState: null,
           current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
         });
       });
@@ -2021,6 +2425,45 @@
       `;
     }
 
+    // ✅ حالة زر الجواب التفاعلي (5)
+    const ANSWER_UI = {
+      revealed:false,
+      sig:""
+    };
+
+    // ✅ (8) اختيار نقاط السكور
+    let SCORE_PICK_TEAM = null;
+    function closeScorePicker(){
+      scorePickerBackdrop.style.display = "none";
+      SCORE_PICK_TEAM = null;
+    }
+    scorePickerBackdrop.addEventListener("click", (e) => {
+      if(e.target === scorePickerBackdrop) closeScorePicker();
+    });
+
+    function openScorePicker(team){
+      SCORE_PICK_TEAM = team;
+      scorePickerTitle.textContent = (team === "green") ? "نقاط الفريق الأخضر" : "نقاط الفريق البرتقالي";
+
+      scoreGrid.innerHTML = "";
+      const nums = Array.from({length:21}, (_,i)=>i); // 0..20
+      nums.forEach(n=>{
+        const b = document.createElement("button");
+        b.className = "scoreNumBtn";
+        b.type = "button";
+        b.textContent = String(n);
+        b.addEventListener("click", async () => {
+          if(role !== "host") return;
+          if(!SCORE_PICK_TEAM) return;
+          await update(ref(db, `rooms/${code}/scores`), { [SCORE_PICK_TEAM]: n });
+          closeScorePicker();
+        });
+        scoreGrid.appendChild(b);
+      });
+
+      scorePickerBackdrop.style.display = "flex";
+    }
+
     function renderGame(room, me){
       main.classList.add("inGame");
       setGameName(room?.name);
@@ -2029,6 +2472,7 @@
       const started = room.status === "started";
 
       initTimerDefaultsIfNeeded(room);
+      initScoresIfNeeded(room);
 
       const qMode = getQuestionMode(room);
 
@@ -2059,60 +2503,96 @@
 
       const modeBtnTitle = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
 
+      const scores = room.scores || { green:0, orange:0 };
+      const sg = Number(scores.green ?? 0);
+      const so = Number(scores.orange ?? 0);
+
       main.innerHTML = `
-        <div class="mapOuter">
-          <div id="mapScale" class="mapScale" style="--zoom:1">
-            <div id="mapBox" class="mapBox">
-              <img id="mapImg" src="" alt="">
-              <svg id="overlay" class="overlaySvg"></svg>
+        <div class="gameLayout">
+          <div class="landRight">
+            <div class="mapOuter">
+              <div id="mapScale" class="mapScale" style="--zoom:1">
+                <div id="mapBox" class="mapBox">
+                  <img id="mapImg" src="" alt="">
+                  <svg id="overlay" class="overlaySvg"></svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- ✅ الأزرار تحت الخريطة: من اليمين لليسار -->
+            <div class="mapToolsRow">
+              <div class="zoomWrap">
+                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
+              </div>
+
+              ${isHost ? `
+                <button id="mapBtn" class="circleBtn" type="button" aria-label="تغيير الخريطة" title="تغيير الخريطة">
+                  ${ICON_SWAP}
+                  <span class="helpDot" data-tip="تغيير الخريطة: التنقل بين الخرائط الثلاث.">؟</span>
+                </button>
+              ` : ``}
+
+              ${isHost ? `
+                <button id="clearBoardBtn" class="circleBtn" type="button" aria-label="تفريغ الخريطة" title="تفريغ الخريطة">
+                  ${ICON_CLEAR}
+                  <span class="helpDot" data-tip="تفريغ الخريطة: مسح ألوان الخلايا وإرجاعها للوضع الافتراضي.">؟</span>
+                </button>
+              ` : ``}
+
+              ${isHost ? `
+                <button id="qModeBtn" class="circleBtn ${qMode === "custom" ? "cyan" : ""}" type="button" aria-label="تغيير نوع الأسئلة" title="${modeBtnTitle}">
+                  ${ICON_Q}
+                  <span class="helpDot" data-tip="تغيير نوع الأسئلة: التبديل بين أسئلة اللعبة وأسئلة المقدم الخاصة.">؟</span>
+                </button>
+              ` : ``}
+
+              ${isHost ? `<button id="settingsBtn" class="circleBtn" type="button" aria-label="الاعدادات" title="الاعدادات">${ICON_GEAR}</button>` : ``}
+            </div>
+
+            <!-- ✅ (8) لوحة النتائج -->
+            <div class="scoreBoard">
+              <div class="teamPill green">الفريق الأخضر</div>
+              <div id="scoreGreen" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(sg) ? sg : 0}</div>
+              <div id="scoreOrange" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(so) ? so : 0}</div>
+              <div class="teamPill orange">الفريق البرتقالي</div>
             </div>
           </div>
-        </div>
 
-        <!-- ✅ الأزرار تحت الخريطة: من اليمين لليسار
-             (الزوم) → تغيير الخريطة → تفريغ الخريطة → تغيير نوع الأسئلة → الإعدادات -->
-        <div class="mapToolsRow">
-          <div class="zoomWrap">
-            <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
-          </div>
+          <div class="landLeft">
+            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
 
-          ${isHost ? `<button id="mapBtn" class="circleBtn" type="button" aria-label="تغيير الخريطة" title="تغيير الخريطة">${ICON_SWAP}</button>` : ``}
-          ${isHost ? `<button id="clearBoardBtn" class="circleBtn" type="button" aria-label="تفريغ الخريطة" title="تفريغ الخريطة">${ICON_CLEAR}</button>` : ``}
-          ${isHost ? `<button id="qModeBtn" class="circleBtn" type="button" aria-label="تغيير نوع الأسئلة" title="${modeBtnTitle}">${ICON_Q}</button>` : ``}
-          ${isHost ? `<button id="settingsBtn" class="circleBtn" type="button" aria-label="الاعدادات" title="الاعدادات">${ICON_GEAR}</button>` : ``}
-        </div>
+            <!-- ✅ (1) تبديل مكان الزرين حول المؤقت -->
+            <div class="controlsRow">
+              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
 
-        <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+              <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
+                <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
+                  <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+                  </svg>
+                  <span id="timerNumber" class="timerNumber">10</span>
+                </button>
+              </div>
 
-        <div class="controlsRow">
-          ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
-
-          <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
-            <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
-              <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
-                <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
-              </svg>
-              <span id="timerNumber" class="timerNumber">10</span>
-            </button>
-          </div>
-
-          ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
-        </div>
-
-        ${isHost ? `
-          <div class="questionCard">
-            <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
-            <div id="qAns" class="answerPill"></div>
-          </div>
-        ` : `
-          <div class="playerBtnWrap">
-            <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
-            ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
-            <div class="buyNowWrap">
-              <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
             </div>
+
+            ${isHost ? `
+              <div class="questionCard">
+                <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
+                <button id="ansBtn" class="answerBtn red" type="button">اضغط للإجابة</button>
+              </div>
+            ` : `
+              <div class="playerBtnWrap">
+                <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
+                ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
+                <div class="buyNowWrap">
+                  <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+                </div>
+              </div>
+            `}
           </div>
-        `}
+        </div>
       `;
 
       // ✅ المؤقت
@@ -2121,6 +2601,29 @@
       ensureTimerTicker();
       applyTimerDom();
 
+      // ✅ (2) تشغيل التولتيب على ? بدون ما يضغط الزر نفسه
+      main.querySelectorAll(".helpDot").forEach(dot => {
+        dot.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const txt = dot.getAttribute("data-tip") || "";
+          if(TIP_OPEN && tipPopup.style.display === "block"){
+            closeTip();
+            return;
+          }
+          openTip(dot, txt);
+        });
+      });
+
+      // ✅ (8) نقر السكور للمقدم فقط
+      if(isHost){
+        const sG = document.getElementById("scoreGreen");
+        const sO = document.getElementById("scoreOrange");
+        if(sG) sG.addEventListener("click", () => openScorePicker("green"));
+        if(sO) sO.addEventListener("click", () => openScorePicker("orange"));
+      }
+
+      // ✅ زر المؤقت للمقدم
       if(isHost){
         const clock = document.getElementById("timerClock");
         if(clock){
@@ -2291,11 +2794,15 @@
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
-      // ✅ عرض السؤال للمقدم
+      // ✅ عرض السؤال للمقدم + (5) زر الجواب التفاعلي
       if(isHost){
         const qText = document.getElementById("qText");
-        const qAns  = document.getElementById("qAns");
+        const ansBtn  = document.getElementById("ansBtn");
         const cur = room.current || {};
+
+        let curQ = "";
+        let curA = "";
+        let hasQuestion = false;
 
         if(cur.letter){
           const mode = getQuestionMode(room);
@@ -2304,34 +2811,70 @@
           if(mode === "custom"){
             list = getCustomList(room, cur.letter);
             if(!list.length){
-              qText.textContent = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
-              qAns.textContent  = "";
-              qAns.style.display = "none";
+              curQ = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
+              curA = "";
+              hasQuestion = true;
             }else{
               const idx = Number(cur.qIndex || 0) % list.length;
               const item = list[idx];
-              qText.textContent = item?.q ?? "—";
-              qAns.textContent  = item?.a ?? "";
-              qAns.style.display = (qAns.textContent.trim() ? "block" : "none");
+              curQ = item?.q ?? "—";
+              curA = (item?.a ?? "").trim();
+              hasQuestion = true;
             }
           }else{
             list = QUESTIONS[cur.letter] || [];
             if(!list.length){
-              qText.textContent = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
-              qAns.textContent  = "";
-              qAns.style.display = "none";
+              curQ = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
+              curA = "";
+              hasQuestion = true;
             }else{
               const idx = Number(cur.qIndex || 0) % list.length;
               const item = list[idx];
-              qText.textContent = item?.q ?? "—";
-              qAns.textContent  = item?.a ?? "";
-              qAns.style.display = (qAns.textContent.trim() ? "block" : "none");
+              curQ = item?.q ?? "—";
+              curA = (item?.a ?? "").trim();
+              hasQuestion = true;
             }
           }
         }else{
-          qText.textContent = "اختر حرفًا من الخريطة";
-          qAns.textContent  = "";
-          qAns.style.display = "none";
+          curQ = "اختر حرفًا من الخريطة";
+          curA = "";
+          hasQuestion = false;
+        }
+
+        qText.textContent = curQ;
+
+        // ✅ توقيع السؤال لتصفير زر الجواب عند التغيير
+        const sig = `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number(room.customQuestionsUpdatedAt||0)}`;
+        if(ANSWER_UI.sig !== sig){
+          ANSWER_UI.sig = sig;
+          ANSWER_UI.revealed = false;
+        }
+
+        if(ansBtn){
+          if(hasQuestion && curA){
+            ansBtn.style.display = "block";
+            if(ANSWER_UI.revealed){
+              ansBtn.classList.remove("red");
+              ansBtn.classList.add("green");
+              ansBtn.textContent = curA;
+            }else{
+              ansBtn.classList.remove("green");
+              ansBtn.classList.add("red");
+              ansBtn.textContent = "اضغط للإجابة";
+            }
+
+            ansBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if(ANSWER_UI.revealed) return; // مرة واحدة لكل سؤال
+              ANSWER_UI.revealed = true;
+              ansBtn.classList.remove("red");
+              ansBtn.classList.add("green");
+              ansBtn.textContent = curA;
+            };
+          }else{
+            ansBtn.style.display = "none";
+          }
         }
       }
 
@@ -2345,11 +2888,13 @@
       const mapBtn = document.getElementById("mapBtn");
       if(mapBtn){
         mapBtn.addEventListener("click", async () => {
+          closeTip();
           const next = (activeMap + 1) % 3;
           await update(roomRef, {
             activeMap: next,
             buzzer: null,
-            current: { letter: null, qIndex: 0, row: null, col: null, map: next }
+            current: { letter: null, qIndex: 0, row: null, col: null, map: next },
+            winState: null
           });
         });
       }
@@ -2382,14 +2927,16 @@
       const clearBoardBtn = document.getElementById("clearBoardBtn");
       if(clearBoardBtn){
         clearBoardBtn.addEventListener("click", async () => {
+          closeTip();
           const updates = {};
           updates[`rooms/${code}/mapStates/${activeMap}`] = null;
           updates[`rooms/${code}/buzzer`] = null;
+          updates[`rooms/${code}/winState`] = null;
           await update(ref(db), updates);
         });
       }
 
-      // ✅ اختيار حرف من الخريطة (للمقدم)
+      // ✅ اختيار حرف من الخريطة (للمقدم) + (9) فحص الفوز وإطلاق احتفال
       if(isHost){
         overlay.querySelectorAll(".cell").forEach(cell => {
           cell.addEventListener("click", async (e) => {
@@ -2405,10 +2952,31 @@
 
             const letter = MAPS[activeMap][r][c];
 
+            const nextStates = { ...(mapStates || {}) };
+            nextStates[k] = next;
+
+            const winners = computeWinners(nextStates);
+            const prevWin = (room.winState && room.winState[String(activeMap)]) ? room.winState[String(activeMap)] : { greenWin:false, orangeWin:false };
+
+            let winEvent = null;
+            const greenNew = !!winners.greenWin && !prevWin.greenWin;
+            const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
+
+            if(greenNew || orangeNew){
+              let team = null;
+              if(next === 2 && greenNew) team = "green";
+              else if(next === 3 && orangeNew) team = "orange";
+              else team = greenNew ? "green" : "orange";
+
+              winEvent = { team, ts: Date.now(), map: activeMap };
+            }
+
             const updates = {};
             updates[`rooms/${code}/mapStates/${activeMap}/${k}`] = next;
             updates[`rooms/${code}/buzzer`] = null;
             updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: r, col: c, map: activeMap };
+            updates[`rooms/${code}/winState/${activeMap}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
+            if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
 
             await update(ref(db), updates);
           });
@@ -2448,6 +3016,13 @@
 
       TIMER_UI.latestTimer = room.timer || {};
       applyTimerDom();
+
+      // ✅ (9) عرض الاحتفال للجميع عند تغير winEvent
+      const we = room.winEvent;
+      if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
+        LAST_WIN_TS = Number(we.ts);
+        showWin(String(we.team || ""));
+      }
 
       if(role === "host"){
         if(!hostKey || hostKey !== room.presenterKey){
