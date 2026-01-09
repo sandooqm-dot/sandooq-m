@@ -5,240 +5,116 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>سباق الحروف</title>
 
-  <!-- ✅ (تعديل) خط Baloo Bhaijaan لعنوان اللعبة -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan&display=swap" rel="stylesheet">
-
+  <!-- ✅ (مهم) خط AA-GALAXY
+       ضع ملف الخط AA-GALAXY.otf في نفس مجلد هذا الملف (game.html) داخل GitHub -->
   <style>
-    /* =========================
-   🎨 THEME (ألوان متناسقة مع AA-GALAXY)
-   الصق هذا المقطع قبل </style>
-   ========================= */
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("AA-GALAXY.otf") format("opentype");
+      font-weight:400;
+      font-style:normal;
+      font-display:swap;
+    }
 
-/* نعيد تعريف الألوان هنا (يستبدل القديم تلقائيًا لأنّه آخر شيء) */
-:root{
-  --bg:#163B84;          /* خلفية رئيسية */
-  --bg2:#0F2F66;         /* تدرّج خفيف للخلفية */
-  --yellow:#F4C400;      /* أصفر العلامة */
-  --card:#F7FAFF;        /* أبيض مائل للأزرق (أجمل مع الخط) */
-  --text:#0B1220;
-  --muted:#5B6474;
-
-  --green:#1aa34a;
-  --orange:#f28c00;
-  --red:#c01818;
-
-  --hexGreen:  rgba(0, 140, 70, .42);
-  --hexOrange: rgba(255, 140, 0, .42);
-  --hexPale:   rgba(255, 215, 80, .68);
-  --hexBorder: rgba(13,39,91,.18);
-
-  --purple:#7C5CFF;
-  --blue:#0ea5e9;
-
-  --navy:#0F2F66;        /* كحلي موحّد */
-  --timerBlue:#2B57B5;   /* أزرق المؤقت/بطاقة السؤال */
-
-  --panel:rgba(255,255,255,.08);
-  --panelBorder:rgba(255,255,255,.14);
-
-  --softShadow:0 8px 18px rgba(0,0,0,.12);
-  --hardShadow:0 10px 22px rgba(0,0,0,.18);
-
-  --outline:rgba(15,47,102,.22);
-  --blackOutline:rgba(0,0,0,.32);
-}
-
-/* خلفية أجمل ومتناسقة */
-body{
-  background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
-}
-
-/* الكروت/الصناديق: إطار وظل موحّد */
-.card{
-  background: var(--card);
-  border: 1px solid var(--outline);
-  box-shadow: var(--softShadow);
-}
-
-/* صندوق اسم اللعبة: أهدأ */
-.gameName{
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.20);
-  box-shadow: 0 2px 0 rgba(0,0,0,.10);
-}
-
-/* شريط أدوات الخريطة: أزرار كحلي بدل الأسود الثقيل */
-.iconBtn{
-  background: rgba(15,47,102,.78);
-  border: 2px solid rgba(255,255,255,.12);
-  box-shadow: 0 6px 14px rgba(0,0,0,.18);
-}
-.iconBtn svg{ fill:#fff; }
-
-/* صندوق التحكمات */
-.controlWrap{
-  background: var(--panel);
-  border: 1px solid var(--panelBorder);
-  box-shadow: var(--softShadow);
-}
-
-/* أزرار المقدم الأربعة: إطار أخف وأشيك */
-.sideCol .btn{
-  border: 2px solid var(--blackOutline);
-  box-shadow: 0 3px 0 rgba(0,0,0,.12);
-}
-
-/* المؤقت: حلقة كحلي بدل أسود قوي */
-.timerClockBtn{
-  border: 2px solid rgba(255,255,255,.90);
-  background: var(--timerBlue);
-  box-shadow: var(--hardShadow);
-}
-.timerRing circle{
-  stroke: rgba(15,47,102,.92);
-}
-
-/* بطاقة السؤال: إطار كحلي بدل الأسود الثقيل */
-.questionCard{
-  background: var(--timerBlue);
-  border: 3px solid rgba(15,47,102,.95);
-  box-shadow: var(--hardShadow);
-}
-
-/* شريط أول لاعب: إطار كحلي أوضح */
-.firstPressBar{
-  border: 2px solid rgba(15,47,102,.55);
-  box-shadow: var(--softShadow);
-}
-
-/* مربعات النقاط */
-.scoreBoxBtn{
-  border: 1px solid rgba(15,47,102,.18);
-  box-shadow: 0 2px 0 rgba(0,0,0,.10);
-}
-
-/* نافذة الإعدادات: إطار كحلي بدل أسود كثيف */
-.settingsPanel{
-  border: 8px solid rgba(15,47,102,.95);
-}
-.settingsBtn{
-  border: 4px solid rgba(15,47,102,.95);
-  box-shadow: 0 6px 0 rgba(0,0,0,.16);
-}
-
-/* زر الشراء البنفسجي: نغمة أهدأ */
-.buyNowBtn{
-  background: var(--purple);
-  box-shadow: 0 3px 0 rgba(0,0,0,.14);
-}
     :root{
-      --bg:#1f4fa3;
-      --yellow:#f4c400;
-      --card:#ffffff;
-      --text:#111;
-      --muted:#666;
-      --green:#1aa34a;
-      --orange:#f28c00;
-      --red:#c01818;
+      --bg1:#7b1f63;
+      --bg2:#5f214f;
+      --bg3:#3a1234;
+
+      --white:#fff;
+      --black:#111;
+
+      --pillA: rgba(255,255,255,.16);
+      --pillB: rgba(255,255,255,.10);
+
+      --outline: rgba(255,255,255,.75);
+      --outline2: rgba(0,0,0,.65);
+
+      --shadow: 0 16px 30px rgba(0,0,0,.30);
+
+      --timerFill:#b33a6a;
 
       --hexGreen:  rgba(0, 140, 70, .42);
       --hexOrange: rgba(255, 140, 0, .42);
       --hexPale:   rgba(255, 215, 80, .68);
       --hexBorder: rgba(0,0,0,.10);
 
-      /* ✅ ألوان إضافية */
-      --purple:#8b5cf6;
-      --blue:#0ea5e9;
-
-      /* ✅ ألوان UI جديدة */
-      --navy:#0f2f66;
-      --timerBlue:#2f5fb7;
+      --red:#ff2d2d;
+      --green:#1aa34a;
+      --orange:#f28c00;
     }
 
-    /* ✅✅ (التعديل الوحيد المطلوب) إضافة الخط وتطبيقه على جميع النصوص */
-    @font-face{
-      font-family: 'AA-GALAXY Bold';
-      src: url('./AA-GALAXY.otf') format('opentype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-    *{
-      font-family: 'AA-GALAXY Bold', Arial, sans-serif !important;
-    }
-    /* ✅✅ نهاية التعديل الوحيد */
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
 
-    body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
+    body{
+      margin:0;
+      color:#fff;
+      text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      background:
+        radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
+        radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
+        linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+      padding-bottom:96px;
+    }
 
-    /* ✅ (تعديل) هيدر صف واحد بدون فراغ علوي */
+    button, input, textarea{
+      font-family:"AA-GALAXY", Arial, sans-serif;
+    }
+
+    /* ✅ هيدر مثل الصورة */
     header{
       position:relative;
-      padding:14px 14px 0;
+      padding:18px 14px 8px;
     }
     .headerRow{
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       justify-content:space-between;
-      gap:10px;
+      gap:12px;
       width:100%;
-      box-sizing:border-box;
       direction:ltr;
     }
-
     .logo{
-      position:static;
-      width:64px;height:64px;
+      width:72px;height:72px;
       object-fit:contain;
       flex:0 0 auto;
     }
-
     h1{
       margin:0;
-      color:var(--yellow);
-      font-size:28px;
-      font-family:'Baloo Bhaijaan', Arial, sans-serif;
-      font-weight:800;
       flex:1 1 auto;
       text-align:center;
-      line-height:1.2;
+      color:#fff;
+      font-size:54px;
+      line-height:1.02;
+      font-weight:900;
+      text-shadow:0 10px 22px rgba(0,0,0,.35);
+      direction:rtl;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      direction:rtl;
-
-      /* ✅ (مطلوب) إزاحة بسيطة لليمين */
-      position:relative;
-      transform: translateX(10px);
+      padding-top:6px;
     }
-
     .gameName{
-      position:static;
       flex:0 0 auto;
-
-      width:min(28vw, 145px);
-      min-height:40px;
-      padding:6px 8px;
-      border-radius:12px;
-
-      background:rgba(255,255,255,.22);
-      border:1px solid rgba(255,255,255,.18);
+      width:min(30vw, 190px);
+      min-height:56px;
+      padding:10px 10px;
+      border-radius:10px;
+      background:rgba(0,0,0,.10);
+      border:4px solid rgba(0,0,0,.85);
       color:#fff;
-      box-shadow:0 2px 0 rgba(0,0,0,.12);
-
-      font-size:14px;
       font-weight:900;
-      line-height:1.25;
+      line-height:1.2;
       text-align:center;
-
       overflow:hidden;
-      box-sizing:border-box;
-
       direction:rtl;
+      box-shadow:0 8px 18px rgba(0,0,0,.22);
     }
     .gameName:empty{display:none;}
-
     .gnText{
       display:-webkit-box;
       -webkit-box-orient:vertical;
@@ -246,44 +122,103 @@ body{
       overflow:hidden;
       word-break:break-word;
       white-space:normal;
+      font-size:18px;
     }
 
-    .wrap{width:95%;max-width:900px;margin:0 auto}
+    .wrap{ width:95%; max-width:900px; margin:0 auto; }
 
+    /* ✅ جسم الصفحة شفاف مثل الصورة */
     .card{
-      background:var(--card);color:var(--text);
-      width:100%;margin:12px auto;padding:12px;border-radius:12px;
-      box-sizing:border-box
+      background:transparent;
+      color:#fff;
+      width:100%;
+      margin:0 auto;
+      padding:0;
+      border-radius:0;
     }
 
     #main.inGame{
-      margin-top:8px;
-      padding-top:8px;
+      margin-top:6px;
+      padding-top:0;
     }
 
     .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
-    .btn{padding:12px 14px;font-size:16px;border:none;border-radius:12px;cursor:pointer}
-    .btnYellow{background:var(--yellow);color:#000}
-    .btnGreen{background:var(--green);color:#fff}
-    .btnRed{background:var(--red);color:#fff}
-    .btnOrange{background:var(--orange);color:#fff}
-    .btnBlue{background:var(--blue);color:#fff}
-    .btnPurple{background:var(--purple);color:#fff}
 
-    .codeBox{font-size:18px}
-    .codeNum{font-size:28px;font-weight:bold;letter-spacing:2px}
+    /* ✅ زر الرجوع مثل الصورة (زر أبيض أسفل يسار) */
+    .footerBtn{
+      position:fixed;
+      left:18px;
+      bottom:18px;
+      padding:14px 20px;
+      border-radius:999px;
+      border:4px solid rgba(0,0,0,.85);
+      background:#fff;
+      color:#111;
+      font-size:22px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 10px 22px rgba(0,0,0,.26);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      z-index:20000;
+    }
+    .footerBtn:active{ transform: translateY(1px); }
 
-    .teams{display:flex;gap:10px;flex-wrap:wrap}
-    .teamCol{flex:1;min-width:240px;border-radius:12px;padding:10px;color:#fff}
-    .teamGreen{background:rgba(26,163,74,.9)}
-    .teamOrange{background:rgba(242,140,0,.9)}
-    .teamTitle{font-weight:bold;margin-bottom:8px}
-    .playerItem{
-      background:rgba(255,255,255,.18);
-      padding:8px;border-radius:10px;margin:6px 0;cursor:pointer
+    .rights{
+      position:fixed;
+      right:18px;
+      bottom:24px;
+      color:rgba(255,255,255,.85);
+      font-size:18px;
+      font-weight:700;
+      z-index:20000;
+      text-shadow:0 8px 18px rgba(0,0,0,.30);
     }
 
-    /* MAP */
+    /* ✅ صفحات اللوبي/الانتظار */
+    .codeBox{font-size:20px;font-weight:900}
+    .codeNum{font-size:36px;font-weight:900;letter-spacing:2px}
+    .smallNote{font-size:14px;opacity:.9;margin-top:8px}
+
+    .lobbyCard{
+      width:100%;
+      background:rgba(0,0,0,.10);
+      border:4px solid rgba(255,255,255,.22);
+      border-radius:18px;
+      padding:16px 14px;
+      box-shadow:0 12px 24px rgba(0,0,0,.20);
+      color:#fff;
+      margin:10px auto 0;
+    }
+    .btn{
+      padding:14px 18px;
+      font-size:20px;
+      border:none;
+      border-radius:18px;
+      cursor:pointer;
+      font-weight:900;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .btn:active{ transform: translateY(1px); }
+
+    .btnYellow{background:#ffd54a;color:#111;border:4px solid rgba(0,0,0,.80);box-shadow:0 8px 0 rgba(0,0,0,.18);}
+    .btnGreen{background:rgba(26,163,74,.95);color:#fff;border:4px solid rgba(0,0,0,.80);box-shadow:0 8px 0 rgba(0,0,0,.18);}
+    .btnOrange{background:rgba(242,140,0,.95);color:#fff;border:4px solid rgba(0,0,0,.80);box-shadow:0 8px 0 rgba(0,0,0,.18);}
+    .btnRed{background:#ff2d2d;color:#fff;border:4px solid rgba(0,0,0,.80);box-shadow:0 8px 0 rgba(0,0,0,.18);}
+
+    .teams{display:flex;gap:12px;flex-wrap:wrap}
+    .teamCol{flex:1;min-width:240px;border-radius:16px;padding:12px;color:#fff;border:4px solid rgba(0,0,0,.70);box-shadow:0 12px 24px rgba(0,0,0,.18)}
+    .teamGreen{background:rgba(26,163,74,.78)}
+    .teamOrange{background:rgba(242,140,0,.78)}
+    .teamTitle{font-weight:900;margin-bottom:8px;font-size:20px}
+    .playerItem{
+      background:rgba(255,255,255,.18);
+      padding:10px;border-radius:14px;margin:8px 0;cursor:pointer;
+      border:2px solid rgba(255,255,255,.18);
+    }
+
+    /* ✅ الخريطة */
     .mapOuter{width:100%;display:flex;justify-content:center}
     .mapScale{
       width:min(92vw, 760px);
@@ -293,9 +228,11 @@ body{
     .mapBox{
       position:relative;
       width:100%;
-      border-radius:12px;
       overflow:hidden;
+      border-radius:0;
       background:transparent;
+      box-shadow:0 18px 34px rgba(0,0,0,.30);
+      border:6px solid rgba(0,0,0,.80);
     }
     .mapBox img{
       width:100%;
@@ -303,7 +240,6 @@ body{
       display:block;
       object-fit:unset;
     }
-
     .overlaySvg{
       position:absolute;
       inset:0;
@@ -318,7 +254,6 @@ body{
       stroke: var(--hexBorder);
       stroke-width: 1;
     }
-
     .overlaySvg .state0{ fill: rgba(0,0,0,0.001); }
     .overlaySvg .state1{ fill: var(--hexPale); }
     .overlaySvg .state2{ fill: var(--hexGreen); }
@@ -331,95 +266,154 @@ body{
     }
     .overlaySvg .state1.pulse { animation: palePulse 0.9s ease-in-out infinite; }
 
-    /* ✅ صف الأدوات تحت الخريطة (أيقونات + زوم) */
+    /* ✅ صف الأزرار تحت الخريطة (نفس الصورة) */
     .mapToolsRow{
+      margin:12px auto 10px;
       display:flex;
       align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin:8px 0 6px;
+      justify-content:center;
+      gap:14px;
+      direction:rtl; /* لكي ترتيبها يكون من اليمين لليسار */
+      flex-wrap:nowrap;
+      width:min(92vw, 760px);
     }
-    .iconBtn{
-      width:46px;height:46px;
-      border:none;
+
+    .circleBtn{
+      width:58px;height:58px;
       border-radius:50%;
-      background:rgba(0,0,0,.70);
-      color:#fff;
+      border:4px solid rgba(0,0,0,.85);
+      background:#fff;
+      color:#111;
       display:flex;
       align-items:center;
       justify-content:center;
       cursor:pointer;
-      box-shadow:0 2px 0 rgba(0,0,0,.15);
+      box-shadow:0 10px 20px rgba(0,0,0,.25);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       flex:0 0 auto;
+      user-select:none;
     }
-    .iconBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.15); }
-    .iconBtn svg{ width:26px;height:26px; fill:#fff; }
-    .zoomSlider{
+    .circleBtn:active{ transform: translateY(1px); }
+    .circleBtn svg{ width:28px;height:28px; fill:#111; }
+
+    .zoomWrap{
       flex:1 1 auto;
       min-width:160px;
-    }
-    input[type="range"]{
-      width:100%;
-      accent-color: var(--yellow);
-    }
-
-    /* ✅ صف التحكمات حول المؤقت */
-    .controlWrap{
-      background:rgba(255,255,255,.06);
-      border:1px solid rgba(255,255,255,.12);
-      border-radius:14px;
-      padding:10px;
-      box-shadow:0 8px 18px rgba(0,0,0,.10);
-    }
-    .controlRow{
-      display:flex;
-      gap:12px;
-      align-items:center;
-      justify-content:space-between;
-    }
-    .sideCol{
-      width:min(38%, 190px);
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-    .sideCol .btn{
-      width:100%;
-      height:46px;
-      border-radius:14px;
-      font-weight:900;
-      box-shadow:0 2px 0 rgba(0,0,0,.12);
-
-      /* ✅ (مطلوب) إطار خفيف أسود للأزرار الأربعة */
-      border:2px solid rgba(0,0,0,.45);
-    }
-    .sideCol .btn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
-
-    /* ✅ المؤقت (بدون كلمة "المؤقت" - فقط رقم) */
-    .timerWrap{
+      max-width:420px;
       display:flex;
       align-items:center;
       justify-content:center;
-      flex:0 0 auto;
     }
-    .timerClockBtn{
-      width:118px;height:118px;
-      border-radius:50%;
-      border:2px solid rgba(255,255,255,.85);
-      background:var(--timerBlue);
-      box-shadow:0 10px 20px rgba(0,0,0,.18);
+
+    /* ✅ سلايدر مثل الصورة */
+    input[type="range"]{
+      width:100%;
+      -webkit-appearance:none;
+      appearance:none;
+      height:10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.80);
+      border:4px solid rgba(0,0,0,.85);
+      box-shadow:0 10px 18px rgba(0,0,0,.18);
+      outline:none;
+    }
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      appearance:none;
+      width:18px;height:34px;
+      border-radius:10px;
+      background:#111;
+      border:2px solid rgba(255,255,255,.65);
+      box-shadow:0 6px 14px rgba(0,0,0,.25);
+    }
+    input[type="range"]::-moz-range-thumb{
+      width:18px;height:34px;
+      border-radius:10px;
+      background:#111;
+      border:2px solid rgba(255,255,255,.65);
+      box-shadow:0 6px 14px rgba(0,0,0,.25);
+    }
+
+    /* ✅ شريط اسم أول لاعب (pill) */
+    .firstPressBar{
+      width:min(92vw, 760px);
+      margin:10px auto 10px;
+      border-radius:999px;
+      padding:16px 16px;
+      background:rgba(255,255,255,.16);
+      border:4px solid rgba(255,255,255,.70);
+      color:#fff;
+      font-weight:900;
+      box-shadow:0 16px 26px rgba(0,0,0,.22);
+      text-shadow:0 10px 18px rgba(0,0,0,.25);
+      font-size:24px;
+      line-height:1.1;
+    }
+    .firstPressBar.filled{
+      border-color: rgba(255,255,255,.85);
+      color:#fff;
+    }
+
+    /* ✅ صف أزرار (تجميد / مؤقت / تغيير سؤال) مثل الصورة */
+    .controlsRow{
+      width:min(92vw, 760px);
+      margin:12px auto 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    }
+
+    .pillBtn{
+      width:260px;
+      max-width:42vw;
+      height:78px;
+      border-radius:999px;
+      background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.10));
+      border:4px solid rgba(255,255,255,.80);
+      color:#fff;
+      font-size:28px;
+      font-weight:900;
       cursor:pointer;
+      box-shadow:0 18px 28px rgba(0,0,0,.22);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .pillBtn:active{ transform: translateY(1px); }
+    .pillBtn.red{
+      background:linear-gradient(180deg, rgba(255,45,45,.95), rgba(200,24,24,.95));
+      border-color: rgba(255,255,255,.85);
+    }
+
+    /* ✅ المؤقت الدائري مثل الصورة */
+    .timerWrap{
+      width:120px;height:120px;
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .timerClockBtn{
+      width:120px;height:120px;
+      border-radius:50%;
+      border:6px solid rgba(255,255,255,.90);
+      background:var(--timerFill);
+      cursor:pointer;
       position:relative;
       overflow:hidden;
       user-select:none;
+      box-shadow:0 18px 30px rgba(0,0,0,.25);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
-    .timerClockBtn:active{ transform: translateY(1px); box-shadow:0 8px 18px rgba(0,0,0,.18); }
+    .timerClockBtn:active{ transform: translateY(1px); }
 
-    /* ✅ (مطلوب) إطار دائري أسود يتناقص مع الوقت */
     .timerRing{
       position:absolute;
       inset:0;
@@ -431,12 +425,11 @@ body{
     }
     .timerRing circle{
       fill: transparent;
-      stroke: rgba(0,0,0,.90);
-      stroke-width: 8;
+      stroke: rgba(255,255,255,.95);
+      stroke-width: 10;
       stroke-linecap: round;
       transition: stroke-dashoffset .20s linear;
     }
-
     .timerNumber{
       position:absolute;
       inset:0;
@@ -445,333 +438,163 @@ body{
       justify-content:center;
       font-weight:900;
       color:#fff;
-      font-size:52px;
-      text-shadow:0 4px 14px rgba(0,0,0,.25);
+      font-size:50px;
       z-index:2;
+      text-shadow:0 10px 18px rgba(0,0,0,.25);
     }
-    .timerNumber.last5{ color:#ff3b30; }
-
-    @keyframes numPop {
-      0%   { transform:scale(.85); }
-      60%  { transform:scale(1.25); }
-      100% { transform:scale(1); }
-    }
+    .timerNumber.last5{ color:#fff; }
+    @keyframes numPop { 0%{transform:scale(.88)} 65%{transform:scale(1.18)} 100%{transform:scale(1)} }
     .timerNumber.pop{ animation:numPop .22s ease-out; }
 
     @keyframes timerFlash {
-      0%   { box-shadow:0 0 0 0 rgba(255,59,48,.0), 0 10px 20px rgba(0,0,0,.18); }
-      50%  { box-shadow:0 0 0 8px rgba(255,255,255,.35), 0 10px 20px rgba(0,0,0,.18); }
-      100% { box-shadow:0 0 0 0 rgba(255,59,48,.0), 0 10px 20px rgba(0,0,0,.18); }
+      0%   { box-shadow:0 0 0 0 rgba(255,255,255,.0), 0 18px 30px rgba(0,0,0,.25); }
+      50%  { box-shadow:0 0 0 10px rgba(255,255,255,.35), 0 18px 30px rgba(0,0,0,.25); }
+      100% { box-shadow:0 0 0 0 rgba(255,255,255,.0), 0 18px 30px rgba(0,0,0,.25); }
     }
     .timerClockBtn.doneFlashing{
       animation: timerFlash .55s linear infinite;
-      background: #ff3b30;
+      background:#ff2d2d;
     }
-
     .timerPlayerView{ pointer-events:none; user-select:none; }
 
-    /* ✅ شريط اسم اللاعب الذي يضغط أولاً */
-    .firstPressBar{
-      margin-top:10px;
-      width:100%;
-      border-radius:14px;
-      padding:12px 10px;
-      background:#fff;
-      color:rgba(0,0,0,.55);
-      border:2px solid rgba(15,47,102,.55);
-      font-weight:900;
-      box-sizing:border-box;
-      box-shadow:0 6px 14px rgba(0,0,0,.10);
-    }
-    .firstPressBar.filled{
-      border-color: rgba(0,0,0,.08);
-      color:#fff;
-    }
-
-    /* ✅ بطاقة السؤال (للمقدم) */
+    /* ✅ بطاقة السؤال مثل الصورة (مستطيل أبيض بإطار أسود ثقيل) */
     .questionCard{
-      margin-top:10px;
-      border-radius:16px;
-      background:var(--timerBlue);
-      border:4px solid rgba(0,0,0,.75);
-      box-shadow:0 10px 22px rgba(0,0,0,.18);
-      padding:18px 14px;
-      color:#fff;
+      width:min(92vw, 760px);
+      margin:14px auto 0;
+      border-radius:28px;
+      background:#fff;
+      border:10px solid rgba(0,0,0,.85);
+      box-shadow:0 22px 36px rgba(0,0,0,.28);
+      padding:22px 16px 18px;
+      color:#111;
       text-align:center;
     }
-    .questionBig{
-      font-size:44px;
-      font-weight:900;
-      line-height:1.2;
-      margin:0;
-      letter-spacing:.2px;
-    }
-    /* ✅ (تعديل) نص السؤال (بدون كلمة "السؤال") */
     .qText{
-      line-height:1.65;
-      font-size:22px;
+      line-height:1.45;
+      font-size:34px;
       font-weight:900;
-      margin-top:0;
+      color:#ff2d2d;
+      margin:0 0 12px;
+      text-shadow:0 8px 16px rgba(0,0,0,.10);
     }
     .answerPill{
-      margin:14px auto 0;
-      width:min(88%, 380px);
-      background:#fff;
-      color:#111;
-      padding:12px 18px;
+      margin:0 auto;
+      width:min(86%, 420px);
+      background:#ff2d2d;
+      color:#fff;
+      padding:14px 22px;
       border-radius:999px;
       text-align:center;
-      font-size:18px;
+      font-size:28px;
       font-weight:900;
       display:none;
-      box-sizing:border-box;
-      border:2px solid rgba(0,0,0,.12);
+      border:6px solid rgba(255,255,255,.35);
+      box-shadow:0 16px 24px rgba(0,0,0,.18);
     }
 
-    .smallNote{font-size:12px;opacity:.85;margin-top:8px}
+    /* ✅ إخفاء السكور (غير موجود بالصورة) — موجود وظيفياً بالكود لكن مخفي */
+    .scoreBar, .scoreHint{ display:none !important; }
+
+    /* ✅ زر شراء اللعبة */
+    .buyNowWrap{margin-top:14px;display:flex;justify-content:center}
+    .buyNowBtn{
+      width:min(92vw, 520px);
+      padding:16px 18px;
+      border:none;
+      border-radius:18px;
+      background:#8b5cf6;
+      color:#fff;
+      font-size:20px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 10px 18px rgba(0,0,0,.20);
+      border:4px solid rgba(0,0,0,.80);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .buyNowBtn:active{ transform: translateY(1px); }
 
     .playerBtnWrap{margin-top:14px}
     .playerBigBtn{
       width:min(92vw, 520px);
       height:110px;
       border:none;border-radius:18px;
-      background:var(--red);
+      background:#ff2d2d;
       cursor:pointer;
-
       display:flex;
       align-items:center;
       justify-content:center;
       color:#fff;
-      font-size:28px;
+      font-size:30px;
       font-weight:900;
       letter-spacing:.2px;
+      border:6px solid rgba(0,0,0,.80);
+      box-shadow:0 16px 28px rgba(0,0,0,.25);
     }
-    .disabled{opacity:.5;cursor:not-allowed}
+    .disabled{opacity:.55;cursor:not-allowed}
 
-    .footerBtn{
-      width:100%;max-width:520px;margin:10px auto 18px;
-      padding:14px;border:none;border-radius:12px;background:var(--yellow);cursor:pointer;color:#000;font-size:18px
-    }
     a{color:inherit}
 
-    .scoreBar{
-      width:100%;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      gap:12px;
-      margin:10px 0 8px;
-      flex-wrap:wrap;
-    }
-    .teamLabel{
-      font-weight:bold;
-      font-size:14px;
-      color:#fff;
-      padding:6px 10px;
-      border-radius:10px;
-      white-space:nowrap;
-    }
-    .teamLabel.green{ background: rgba(26,163,74,.95); }
-    .teamLabel.orange{ background: rgba(242,140,0,.95); }
-
-    .scoreBoxBtn{
-      min-width:64px;
-      height:44px;
-      border-radius:12px;
-      border:none;
-      background:#fff;
-      color:#111;
-      font-size:22px;
-      font-weight:bold;
-      cursor:default;
-    }
-
-    .scoreCtrl{
-      position:relative;
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-      align-items:center;
-      z-index:5;
-    }
-    .scoreBoxBtn.clickable{
-      cursor:pointer;
-      box-shadow: 0 2px 0 rgba(0,0,0,.12);
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .scoreBoxBtn.clickable:active{ transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
-
-    .scorePicker{
-      position:absolute;
-      top:calc(100% + 6px);
-      left:50%;
-      transform:translateX(-50%) translateY(-6px);
-      opacity:0;
-      pointer-events:none;
-      display:flex;
-      gap:6px;
-      flex-wrap:wrap;
-      justify-content:center;
-      width:min(280px, 86vw);
-      background:rgba(255,255,255,.96);
-      border:1px solid rgba(0,0,0,.08);
-      border-radius:12px;
-      padding:10px;
-      box-shadow:0 10px 22px rgba(0,0,0,.20);
-      transition: opacity .16s ease, transform .16s ease;
-      z-index:50;
-    }
-    .scorePicker.show{
-      opacity:1;
-      transform:translateX(-50%) translateY(0);
-      pointer-events:auto;
-    }
-    .scorePickBtn{
-      width:38px;height:34px;
-      border:none;border-radius:10px;
-      background:rgba(31,79,163,.08);
-      color:#111;
-      font-weight:bold;
-      cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .scorePickBtn:active{ transform: translateY(1px); }
-
-    .scoreHint{
-      font-size:12px;
-      opacity:.85;
-      margin-top:4px;
-    }
-
-    .buyNowWrap{margin-top:12px;display:flex;justify-content:center}
-    .buyNowBtn{
-      width:min(92vw, 520px);
-      padding:14px 16px;
-      border:none;
-      border-radius:14px;
-      background:#8b5cf6;
-      color:#fff;
-      font-size:18px;
-      font-weight:800;
-      cursor:pointer;
-      box-shadow:0 3px 0 rgba(0,0,0,.15);
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .buyNowBtn:active{ transform: translateY(1px); box-shadow:0 2px 0 rgba(0,0,0,.15); }
-
-    .waitingLayout{
-      display:flex;
-      flex-direction:column;
-      min-height:60vh;
-    }
-    .waitingLayout .buyNowWrap{
-      margin-top:auto;
-      padding-top:12px;
-    }
-
-    .shareBackdrop{
-      position:fixed;
-      inset:0;
+    /* ✅ مودالات المشاركة وأسئلة المقدم والإعدادات (نتركها كما هي وظيفياً لكن نخلي الخط AA-GALAXY) */
+    .shareBackdrop,.cqBackdrop,.settingsBackdrop{
+      position:fixed; inset:0;
       background:rgba(0,0,0,.45);
       display:none;
       align-items:center;
       justify-content:center;
       z-index:9999;
       padding:14px;
-      box-sizing:border-box;
     }
-    .shareModal{
-      width:min(92vw, 520px);
+
+    .shareModal,.cqModal{
+      width:min(92vw, 680px);
       background:#fff;
       color:#111;
-      border-radius:14px;
+      border-radius:18px;
       padding:14px;
       text-align:right;
       position:relative;
-      box-sizing:border-box;
+      border:6px solid rgba(0,0,0,.85);
+      box-shadow:0 24px 36px rgba(0,0,0,.28);
     }
+
     .shareClose{
-      position:absolute;
-      left:10px;
-      top:10px;
-      border:none;
-      background:transparent;
-      font-size:22px;
-      cursor:pointer;
-      line-height:1;
+      position:absolute; left:10px; top:10px;
+      border:none; background:transparent;
+      font-size:26px; cursor:pointer; line-height:1;
     }
-    .shareTitle{
-      font-weight:bold;
-      margin:0 0 10px;
-      text-align:center;
-    }
+    .shareTitle{font-weight:900;margin:0 0 10px;text-align:center;font-size:22px}
+
     .shareChoices{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 8px}
     .sharePanel{
       display:none;
-      background:rgba(31,79,163,.06);
-      border:1px solid rgba(0,0,0,.08);
-      border-radius:12px;
+      background:rgba(0,0,0,.04);
+      border:2px solid rgba(0,0,0,.10);
+      border-radius:14px;
       padding:12px;
       text-align:center;
     }
     .shareCodeBig{
       font-size:34px;
-      font-weight:bold;
+      font-weight:900;
       letter-spacing:2px;
       text-align:center;
       margin:6px 0 0;
     }
-    .qrImg{
-      width:220px;height:220px;
-      display:block;
-      margin:0 auto;
-      border-radius:10px;
-      background:#fff;
-    }
-    .shareSmall{
-      font-size:12px;
-      opacity:.85;
-      text-align:center;
-      margin-top:8px;
-      word-break:break-all;
-    }
+    .qrImg{ width:220px;height:220px; display:block; margin:0 auto; border-radius:12px; background:#fff; border:3px solid rgba(0,0,0,.25);}
+    .shareSmall{ font-size:12px; opacity:.85; text-align:center; margin-top:8px; word-break:break-all; }
 
-    /* ✅ (مطلوب سابقاً) نافذة أسئلة المقدم */
-    .cqBackdrop{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,.45);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:9998;
-      padding:14px;
-      box-sizing:border-box;
-    }
     .cqModal{
-      width:min(92vw, 680px);
       max-height:min(82vh, 760px);
       overflow:auto;
-      background:#fff;
-      color:#111;
-      border-radius:14px;
-      padding:14px;
-      text-align:right;
-      position:relative;
-      box-sizing:border-box;
     }
     .cqCloseRed{
       position:absolute;
-      left:10px;
-      top:10px;
-      width:36px;
-      height:36px;
+      left:10px; top:10px;
+      width:42px; height:42px;
       border:none;
-      border-radius:10px;
-      background:var(--red);
+      border-radius:12px;
+      background:#ff2d2d;
       color:#fff;
       font-size:22px;
       font-weight:900;
@@ -780,140 +603,78 @@ body{
       display:flex;
       align-items:center;
       justify-content:center;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
+      border:4px solid rgba(0,0,0,.85);
     }
-    .cqCloseRed:active{ transform: translateY(1px); }
 
-    .cqTitle{
-      font-weight:900;
-      margin:0 0 10px;
-      text-align:center;
-    }
-    .cqHint{
-      font-size:12px;
-      opacity:.85;
-      text-align:center;
-      margin:0 0 12px;
-    }
+    .cqTitle{font-weight:900;margin:0 0 10px;text-align:center;font-size:22px}
+    .cqHint{font-size:12px;opacity:.85;text-align:center;margin:0 0 12px}
 
     .cqItem{
-      border:1px solid rgba(0,0,0,.10);
-      border-radius:12px;
-      padding:8px 10px;
-      margin:10px 0;
-      background:rgba(31,79,163,.04);
+      border:2px solid rgba(0,0,0,.10);
+      border-radius:14px;
+      padding:10px 10px;
+      margin:12px 0;
+      background:rgba(0,0,0,.03);
     }
-    .cqItem summary{
-      cursor:pointer;
-      font-weight:900;
-      list-style:none;
-      outline:none;
-    }
-    .cqItem summary::-webkit-details-marker{ display:none; }
+    .cqItem summary{cursor:pointer;font-weight:900;list-style:none;outline:none}
+    .cqItem summary::-webkit-details-marker{display:none}
 
-    .cqLetterBody{
-      margin-top:10px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
+    .cqLetterBody{margin-top:10px;display:flex;flex-direction:column;gap:10px}
     .cqPair{
-      border:1px solid rgba(0,0,0,.10);
-      border-radius:12px;
+      border:2px solid rgba(0,0,0,.10);
+      border-radius:14px;
       padding:10px;
       background:#fff;
     }
-    .cqLbl{
-      font-weight:900;
-      margin:0 0 6px;
-      text-align:right;
-    }
+    .cqLbl{font-weight:900;margin:0 0 6px;text-align:right}
     .cqTA{
       width:100%;
-      box-sizing:border-box;
       padding:10px 10px;
-      border-radius:12px;
-      border:1px solid rgba(0,0,0,.12);
-      font-size:15px;
+      border-radius:14px;
+      border:2px solid rgba(0,0,0,.12);
+      font-size:16px;
       line-height:1.5;
       resize:none;
       outline:none;
       background:#fff;
       margin:0 0 10px;
     }
-    .cqTA:last-child{ margin-bottom:0; }
-
     .cqAddBtn{
-      width:54px;
-      height:46px;
-      border:none;
-      border-radius:12px;
-      background:var(--purple);
+      width:64px; height:52px;
+      border:none; border-radius:14px;
+      background:#8b5cf6;
       color:#fff;
-      font-size:26px;
+      font-size:28px;
       font-weight:900;
       cursor:pointer;
-      box-shadow:0 2px 0 rgba(0,0,0,.12);
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
+      box-shadow:0 8px 0 rgba(0,0,0,.18);
+      border:4px solid rgba(0,0,0,.85);
     }
-    .cqAddBtn:active{ transform: translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.12); }
-    .cqAddWrap{
-      display:flex;
-      justify-content:center;
-      margin-top:2px;
-    }
-
+    .cqAddWrap{display:flex;justify-content:center;margin-top:2px}
     .cqSaveFixed{
       position:sticky;
       bottom:10px;
       margin:10px auto 0;
       width:min(240px, 72%);
-      border-radius:12px;
+      border-radius:14px;
       font-weight:900;
-      box-shadow:0 2px 0 rgba(0,0,0,.12);
     }
-    .cqSavedMsg{
-      font-size:12px;
-      opacity:.9;
-      text-align:center;
-      margin-top:8px;
-    }
+    .cqSavedMsg{font-size:12px;opacity:.9;text-align:center;margin-top:8px}
 
-    /* ✅ (جديد) صفحة الإعدادات مثل الصورة */
-    .settingsBackdrop{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,.35);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:10050;
-      padding:14px;
-      box-sizing:border-box;
-    }
+    /* إعدادات */
     .settingsPanel{
       width:min(78vw, 360px);
       height:min(72vh, 560px);
-      background: var(--yellow);
+      background:#ffd54a;
       border-radius:26px;
       border:8px solid rgba(0,0,0,.85);
       box-shadow:0 16px 30px rgba(0,0,0,.25);
       padding:18px 14px;
-      box-sizing:border-box;
       display:flex;
       flex-direction:column;
       gap:18px;
     }
-
-    /* ✅ (مطلوب) مسافات بين أزرار القائمة البيضاء */
-    #settingsMenu{
-      display:flex;
-      flex-direction:column;
-      gap:14px;
-    }
-
+    #settingsMenu{display:flex;flex-direction:column;gap:14px}
     .settingsBtn{
       width:100%;
       height:64px;
@@ -922,12 +683,9 @@ body{
       background:#fff;
       color:#111;
       font-weight:900;
-      font-size:32px;
+      font-size:30px;
       cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
       box-shadow:0 6px 0 rgba(0,0,0,.18);
-      margin:0;
     }
     .settingsBtn:active{ transform: translateY(1px); box-shadow:0 5px 0 rgba(0,0,0,.18); }
 
@@ -940,14 +698,10 @@ body{
       border-radius:18px;
       border:3px solid rgba(0,0,0,.25);
       padding:14px;
-      box-sizing:border-box;
       color:#111;
       text-align:right;
     }
-    .settingsView h3{
-      margin:0 0 10px;
-      text-align:center;
-    }
+    .settingsView h3{margin:0 0 10px;text-align:center}
     .settingsBackMini{
       width:100%;
       height:52px;
@@ -966,13 +720,8 @@ body{
       border:3px solid rgba(0,0,0,.65);
       background:#fff;
       padding:10px;
-      box-sizing:border-box;
     }
-    .timerMiniList{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
+    .timerMiniList{display:flex;flex-direction:column;gap:10px}
     .timerMiniItem{
       height:52px;
       border-radius:16px;
@@ -981,13 +730,19 @@ body{
       font-weight:900;
       font-size:22px;
       cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
     }
     .timerMiniItem:active{ transform: translateY(1px); }
 
+    /* موبايل صغير */
+    @media (max-width:420px){
+      h1{ font-size:46px; }
+      .gameName{ min-height:52px; }
+      .pillBtn{ height:72px; font-size:26px; }
+      .qText{ font-size:30px; }
+    }
   </style>
 </head>
+
 <body>
   <header>
     <div class="headerRow">
@@ -999,8 +754,10 @@ body{
 
   <div class="wrap">
     <div id="main" class="card">جاري التحميل...</div>
-    <button class="footerBtn" onclick="location.href='index.html'">الرجوع للرئيسية</button>
   </div>
+
+  <button class="footerBtn" onclick="location.href='index.html'">الرئيسية</button>
+  <div class="rights">عبارة الحقوق</div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -1649,11 +1406,9 @@ body{
       const t = normalizeTimer(TIMER_UI.latestTimer || {});
       const view = computeTimerView(t);
 
-      // رقم دائم داخل الدائرة
       const displayNum = (view.running ? view.remaining : view.sel);
       numEl.textContent = String(displayNum);
 
-      // آخر 5 ثواني: الرقم أحمر + Pop
       numEl.classList.toggle("last5", !!view.inLast5);
       if(view.inLast5){
         if(TIMER_UI.lastSecond !== view.remaining){
@@ -1666,21 +1421,19 @@ body{
         TIMER_UI.lastSecond = null;
       }
 
-      // عند الانتهاء: وميض أحمر/أبيض
       if(view.done){
         clock.classList.add("doneFlashing");
       }else{
         clock.classList.remove("doneFlashing");
       }
 
-      // ✅ (مطلوب) تحديث إطار المؤقت الدائري (يتناقص)
       const ring = document.getElementById("timerRingCircle");
       if(ring){
         const r = 54;
         const C = 2 * Math.PI * r;
         ring.style.strokeDasharray = String(C);
 
-        let offset = 0; // 0 = كامل، C = مختفي
+        let offset = 0;
         if(view.done){
           offset = C;
         }else if(view.running){
@@ -1693,7 +1446,6 @@ body{
         ring.style.strokeDashoffset = String(offset);
       }
 
-      // تثبيت done في قاعدة البيانات للمقدم
       if(TIMER_UI.isHost){
         if(view.running && view.remaining === 0){
           update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
@@ -1723,13 +1475,6 @@ body{
         running: false,
         startTs: 0,
         done: false
-      });
-    }
-
-    if(!window.__scorePickerBound){
-      window.__scorePickerBound = true;
-      document.addEventListener("click", () => {
-        document.querySelectorAll(".scorePicker.show").forEach(p => p.classList.remove("show"));
       });
     }
 
@@ -1963,7 +1708,7 @@ body{
       return (m === "custom") ? "custom" : "default";
     }
 
-    /* ✅ (جديد) إعدادات المقدم مثل الصورة */
+    /* ✅ إعدادات المقدم */
     const SETTINGS_UI = {
       ready:false,
       els:{},
@@ -2012,8 +1757,8 @@ body{
               <ul>
                 <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
                 <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
-                <li><b>تفريغ اللوحة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للأبيض.</li>
-                <li><b>أسئلة عامة / أسئلة خاصة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم.</li>
+                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للأبيض.</li>
+                <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم.</li>
                 <li><b>المؤقت:</b> اضغط على دائرة المؤقت لبدء العد. اضغط مرة ثانية لتصفير المؤقت.</li>
                 <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
                 <li><b>تغيير الخريطة:</b> للتنقل بين الخرائط الثلاث.</li>
@@ -2069,7 +1814,6 @@ body{
           const v = Number(btn.getAttribute("data-t"));
           if(![10,15,20,25,30].includes(v)) return;
 
-          // عند اختيار الرقم: يتغير المؤقت ويختفي البوب-أب
           await update(ref(db, `rooms/${code}/timer`), {
             sel: v,
             dur: v,
@@ -2103,62 +1847,64 @@ body{
       const orange = list.filter(p => p.team === "orange");
 
       main.innerHTML = `
-        <div class="codeBox">رمز اللعبة</div>
-        <div class="codeNum">${escapeHtml(room.code)}</div>
-        <div class="smallNote">شارك الرمز مع اللاعبين للدخول</div>
+        <div class="lobbyCard">
+          <div class="codeBox">رمز اللعبة</div>
+          <div class="codeNum">${escapeHtml(room.code)}</div>
+          <div class="smallNote">شارك الرمز مع اللاعبين للدخول</div>
 
-        <div style="height:12px"></div>
+          <div style="height:12px"></div>
 
-        <div class="teams">
-          <div class="teamCol teamGreen">
-            <div class="teamTitle">الفريق الأخضر</div>
-            <div id="greenList"></div>
-          </div>
-          <div class="teamCol teamOrange">
-            <div class="teamTitle">الفريق البرتقالي</div>
-            <div id="orangeList"></div>
-          </div>
-        </div>
-
-        <div style="height:12px"></div>
-
-        <div class="row">
-          <button id="shareBtn" class="btn btnYellow">مشاركة اللعبة للاعبين</button>
-          <button id="startBtn" class="btn btnGreen">ابدأ اللعبة</button>
-        </div>
-
-        <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
-
-        <div id="shareBackdrop" class="shareBackdrop">
-          <div class="shareModal">
-            <button id="shareClose" class="shareClose" aria-label="إغلاق">×</button>
-            <div class="shareTitle">مشاركة اللعبة</div>
-
-            <div class="shareChoices">
-              <button id="shareQrBtn" class="btn btnOrange">باركود</button>
-              <button id="shareCodeBtn" class="btn btnGreen">رمز</button>
-              <button id="shareLinkBtn" class="btn btnYellow">رابط</button>
+          <div class="teams">
+            <div class="teamCol teamGreen">
+              <div class="teamTitle">الفريق الأخضر</div>
+              <div id="greenList"></div>
             </div>
+            <div class="teamCol teamOrange">
+              <div class="teamTitle">الفريق البرتقالي</div>
+              <div id="orangeList"></div>
+            </div>
+          </div>
 
-            <div id="shareQrPanel" class="sharePanel">
-              <img id="qrImg" class="qrImg" alt="QR">
-              <div class="shareSmall" id="joinUrlTxt"></div>
-              <div class="row" style="justify-content:center;margin-top:10px">
-                <button id="copyJoinBtn1" class="btn btnYellow">نسخ الرابط</button>
+          <div style="height:12px"></div>
+
+          <div class="row">
+            <button id="shareBtn" class="btn btnYellow">مشاركة اللعبة للاعبين</button>
+            <button id="startBtn" class="btn btnGreen">ابدأ اللعبة</button>
+          </div>
+
+          <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
+
+          <div id="shareBackdrop" class="shareBackdrop">
+            <div class="shareModal">
+              <button id="shareClose" class="shareClose" aria-label="إغلاق">×</button>
+              <div class="shareTitle">مشاركة اللعبة</div>
+
+              <div class="shareChoices">
+                <button id="shareQrBtn" class="btn btnOrange">باركود</button>
+                <button id="shareCodeBtn" class="btn btnGreen">رمز</button>
+                <button id="shareLinkBtn" class="btn btnYellow">رابط</button>
               </div>
-              <div class="shareSmall">امسح الباركود أو افتح الرابط للانتقال لصفحة كتابة الاسم</div>
-            </div>
 
-            <div id="shareCodePanel" class="sharePanel">
-              <div class="codeBox" style="text-align:center">رمز الغرفة</div>
-              <div class="shareCodeBig">${escapeHtml(room.code)}</div>
-            </div>
+              <div id="shareQrPanel" class="sharePanel">
+                <img id="qrImg" class="qrImg" alt="QR">
+                <div class="shareSmall" id="joinUrlTxt"></div>
+                <div class="row" style="justify-content:center;margin-top:10px">
+                  <button id="copyJoinBtn1" class="btn btnYellow">نسخ الرابط</button>
+                </div>
+                <div class="shareSmall">امسح الباركود أو افتح الرابط للانتقال لصفحة كتابة الاسم</div>
+              </div>
 
-            <div id="shareLinkPanel" class="sharePanel">
-              <div class="codeBox" style="text-align:center">رابط الدخول</div>
-              <div class="shareSmall" id="joinUrlTxt2"></div>
-              <div class="row" style="justify-content:center;margin-top:10px">
-                <button id="copyJoinBtn2" class="btn btnYellow">نسخ الرابط</button>
+              <div id="shareCodePanel" class="sharePanel">
+                <div class="codeBox" style="text-align:center">رمز الغرفة</div>
+                <div class="shareCodeBig">${escapeHtml(room.code)}</div>
+              </div>
+
+              <div id="shareLinkPanel" class="sharePanel">
+                <div class="codeBox" style="text-align:center">رابط الدخول</div>
+                <div class="shareSmall" id="joinUrlTxt2"></div>
+                <div class="row" style="justify-content:center;margin-top:10px">
+                  <button id="copyJoinBtn2" class="btn btnYellow">نسخ الرابط</button>
+                </div>
               </div>
             </div>
           </div>
@@ -2266,9 +2012,8 @@ body{
     function renderWaiting(msg){
       main.classList.remove("inGame");
       main.innerHTML = `
-        <div class="waitingLayout">
-          <div class="muted">${escapeHtml(msg)}</div>
-
+        <div class="lobbyCard">
+          <div class="smallNote" style="font-size:20px">${escapeHtml(msg)}</div>
           <div class="buyNowWrap">
             <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
           </div>
@@ -2285,60 +2030,36 @@ body{
 
       initTimerDefaultsIfNeeded(room);
 
-      const scores = room.scores || {};
-      const scoreGreen = Number(scores.green || 0);
-      const scoreOrange = Number(scores.orange || 0);
-
-      const pickerButtons = Array.from({length:11}, (_,i)=>(
-        `<button class="scorePickBtn" data-val="${i}" type="button">${i}</button>`
-      )).join("");
-
       const qMode = getQuestionMode(room);
-      const modeBtnText = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
 
-      const SHUFFLE_ICON = `
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      const ICON_GEAR = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-1,7.43,7.43,0,0,0-.05-1l2.11-1.65a.5.5,0,0,0,.12-.63l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.28,7.28,0,0,0-1.73-1l-.38-2.65A.5.5,0,0,0,11.7,1H7.3a.5.5,0,0,0-.49.42L6.43,4.07a7.28,7.28,0,0,0-1.73,1l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.63L1.86,10a7.43,7.43,0,0,0-.05,1,7.43,7.43,0,0,0,.05,1L-.25,14.59a.5.5,0,0,0-.12.63l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.28,7.28,0,0,0,1.73,1l.38,2.65A.5.5,0,0,0,7.3,23h4.4a.5.5,0,0,0,.49-.42l.38-2.65a7.28,7.28,0,0,0,1.73-1l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.63ZM9.5,15.5A3.5,3.5,0,1,1,13,12,3.5,3.5,0,0,1,9.5,15.5Z"></path>
+        </svg>
+      `;
+      const ICON_SWAP = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M16 3h5v5h-2V6.41l-3.29 3.3-1.42-1.42L17.59 5H16V3z"></path>
           <path d="M4 7h4.59l9.7 9.7-1.42 1.42L7.76 9H4V7z"></path>
           <path d="M4 15h4.59l2.12 2.12-1.42 1.42L7.76 17H4v-2z"></path>
           <path d="M16 16h1.59l-2.3-2.29 1.42-1.42L19 14.59V13h2v5h-5v-2z"></path>
         </svg>
       `;
+      const ICON_CLEAR = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.71 2.88 18.29 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"></path>
+        </svg>
+      `;
+      const ICON_Q = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M19 2H8C6.9 2 6 2.9 6 4V16c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h11v12z"></path>
+          <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"></path>
+        </svg>
+      `;
+
+      const modeBtnTitle = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
 
       main.innerHTML = `
-        <div class="scoreBar">
-          <span class="teamLabel orange">الفريق البرتقالي</span>
-
-          ${
-            isHost ? `
-              <div class="scoreCtrl">
-                <button id="scoreOrangeVal" class="scoreBoxBtn clickable" type="button">${scoreOrange}</button>
-                <div id="scorePickerOrange" class="scorePicker" role="menu" aria-label="اختيار نقاط البرتقالي">
-                  ${pickerButtons.replaceAll('data-val="', 'data-team="orange" data-val="')}
-                </div>
-              </div>
-            ` : `
-              <button class="scoreBoxBtn" disabled>${scoreOrange}</button>
-            `
-          }
-
-          ${
-            isHost ? `
-              <div class="scoreCtrl">
-                <button id="scoreGreenVal" class="scoreBoxBtn clickable" type="button">${scoreGreen}</button>
-                <div id="scorePickerGreen" class="scorePicker" role="menu" aria-label="اختيار نقاط الأخضر">
-                  ${pickerButtons.replaceAll('data-val="', 'data-team="green" data-val="')}
-                </div>
-              </div>
-            ` : `
-              <button class="scoreBoxBtn" disabled>${scoreGreen}</button>
-            `
-          }
-
-          <span class="teamLabel green">الفريق الأخضر</span>
-        </div>
-        ${isHost ? `<div class="scoreHint">المقدم فقط: اضغط على مربع النتيجة ثم اختر رقمًا من 0 إلى 10</div>` : ``}
-
         <div class="mapOuter">
           <div id="mapScale" class="mapScale" style="--zoom:1">
             <div id="mapBox" class="mapBox">
@@ -2348,116 +2069,53 @@ body{
           </div>
         </div>
 
-        <!-- ✅ (تبديل مكان) زر تغيير الخريطة يسار + الإعدادات يمين -->
+        <!-- ✅ الأزرار تحت الخريطة: من اليمين لليسار
+             (الزوم) → تغيير الخريطة → تفريغ الخريطة → تغيير نوع الأسئلة → الإعدادات -->
         <div class="mapToolsRow">
-          ${isHost ? `<button id="mapBtn" class="iconBtn" type="button" aria-label="تغيير الخريطة">${SHUFFLE_ICON}</button>` : `<span style="width:46px"></span>`}
-          <div class="zoomSlider">
-            <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
-          </div>
-          ${isHost ? `<button id="settingsBtn" class="iconBtn" type="button" aria-label="الإعدادات">⚙️</button>` : `<span style="width:46px"></span>`}
-        </div>
-
-        <div class="controlWrap">
-          <div class="controlRow">
-            <div class="sideCol">
-              ${isHost ? `<button id="freezeBtn" class="btn ${room.freeze ? "btnRed" : "btnYellow"}" type="button">${room.freeze ? "تجميد الأزرار" : "تجميد الأزرار"}</button>` : ``}
-              ${isHost ? `<button id="nextQ" class="btn btnYellow" type="button">تغيير السؤال</button>` : ``}
-            </div>
-
-            <div class="timerWrap ${isHost ? "" : "timerPlayerView"}" id="timerWrap">
-              <button id="timerClock" class="timerClockBtn ${isHost ? "" : "player"}" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"} aria-label="المؤقت">
-                <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-                  <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
-                </svg>
-                <span id="timerNumber" class="timerNumber">10</span>
-              </button>
-            </div>
-
-            <div class="sideCol">
-              ${isHost ? `<button id="qModeBtn" class="btn btnYellow" type="button">${modeBtnText}</button>` : ``}
-              ${isHost ? `<button id="clearBoardBtn" class="btn btnYellow" type="button">تفريغ اللوحة</button>` : ``}
-            </div>
+          <div class="zoomWrap">
+            <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
           </div>
 
-          <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
-
-          ${isHost ? `
-            <div class="questionCard">
-              <!-- ✅ (مطلوب) إزالة كلمة "السؤال" -->
-              <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
-              <div id="qAns" class="answerPill"></div>
-            </div>
-          ` : `
-            <div style="margin-top:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;color:#fff">
-              <div style="font-weight:900;margin-bottom:6px">الحالة</div>
-              <div style="font-weight:800">${started ? "جاهز" : "بانتظار المقدم"}</div>
-            </div>
-          `}
+          ${isHost ? `<button id="mapBtn" class="circleBtn" type="button" aria-label="تغيير الخريطة" title="تغيير الخريطة">${ICON_SWAP}</button>` : ``}
+          ${isHost ? `<button id="clearBoardBtn" class="circleBtn" type="button" aria-label="تفريغ الخريطة" title="تفريغ الخريطة">${ICON_CLEAR}</button>` : ``}
+          ${isHost ? `<button id="qModeBtn" class="circleBtn" type="button" aria-label="تغيير نوع الأسئلة" title="${modeBtnTitle}">${ICON_Q}</button>` : ``}
+          ${isHost ? `<button id="settingsBtn" class="circleBtn" type="button" aria-label="الاعدادات" title="الاعدادات">${ICON_GEAR}</button>` : ``}
         </div>
 
-        ${(!isHost) ? `
+        <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+
+        <div class="controlsRow">
+          ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
+
+          <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
+            <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
+              <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
+                <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+              </svg>
+              <span id="timerNumber" class="timerNumber">10</span>
+            </button>
+          </div>
+
+          ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
+        </div>
+
+        ${isHost ? `
+          <div class="questionCard">
+            <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
+            <div id="qAns" class="answerPill"></div>
+          </div>
+        ` : `
           <div class="playerBtnWrap">
             <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
             ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
-
             <div class="buyNowWrap">
               <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
             </div>
           </div>
-        ` : ""}
+        `}
       `;
 
-      if(isHost){
-        const pickerOrange = document.getElementById("scorePickerOrange");
-        const pickerGreen  = document.getElementById("scorePickerGreen");
-        const valOrangeBtn = document.getElementById("scoreOrangeVal");
-        const valGreenBtn  = document.getElementById("scoreGreenVal");
-
-        const hideAll = () => {
-          pickerOrange?.classList.remove("show");
-          pickerGreen?.classList.remove("show");
-        };
-
-        const togglePicker = (picker) => {
-          const shown = picker.classList.contains("show");
-          hideAll();
-          if(!shown) picker.classList.add("show");
-        };
-
-        const setScore = async (team, value) => {
-          const v = Math.max(0, Math.min(10, Number(value)));
-          await update(ref(db, `rooms/${code}/scores`), { [team]: v });
-        };
-
-        if(pickerOrange) pickerOrange.addEventListener("click", (e)=>e.stopPropagation());
-        if(pickerGreen)  pickerGreen.addEventListener("click", (e)=>e.stopPropagation());
-
-        if(valOrangeBtn && pickerOrange){
-          valOrangeBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            togglePicker(pickerOrange);
-          });
-        }
-        if(valGreenBtn && pickerGreen){
-          valGreenBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            togglePicker(pickerGreen);
-          });
-        }
-
-        main.querySelectorAll(".scorePickBtn").forEach(btn => {
-          btn.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            const team = btn.getAttribute("data-team");
-            const val  = btn.getAttribute("data-val");
-            if(!team) return;
-            await setScore(team, val);
-            hideAll();
-          });
-        });
-      }
-
-      // ✅ المؤقت: يبدأ مباشرة بالنقر على الدائرة، والنقر مرة أخرى يصفر
+      // ✅ المؤقت
       TIMER_UI.latestTimer = room.timer || {};
       TIMER_UI.isHost = isHost;
       ensureTimerTicker();
@@ -2471,7 +2129,6 @@ body{
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
-            // إذا يعمل أو انتهى => تصفير
             if(t.running || t.done){
               await update(ref(db, `rooms/${code}/timer`), {
                 running:false,
@@ -2482,7 +2139,6 @@ body{
               return;
             }
 
-            // ابدأ
             await update(ref(db, `rooms/${code}/timer`), {
               sel,
               dur: sel,
@@ -2502,7 +2158,7 @@ body{
         }
       }
 
-      // ✅ زر أسئلة عامة/خاصة
+      // ✅ زر تغيير نوع الأسئلة
       if(isHost){
         const qModeBtn = document.getElementById("qModeBtn");
         if(qModeBtn){
@@ -2631,10 +2287,11 @@ body{
         firstPressBar.textContent = buzzer.name;
       }else if(firstPressBar){
         firstPressBar.classList.remove("filled");
-        firstPressBar.style.background = "#fff";
+        firstPressBar.style.background = "rgba(255,255,255,.16)";
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
+      // ✅ عرض السؤال للمقدم
       if(isHost){
         const qText = document.getElementById("qText");
         const qAns  = document.getElementById("qAns");
@@ -2684,6 +2341,7 @@ body{
         applyZoomFix();
       });
 
+      // ✅ تغيير الخريطة
       const mapBtn = document.getElementById("mapBtn");
       if(mapBtn){
         mapBtn.addEventListener("click", async () => {
@@ -2696,6 +2354,7 @@ body{
         });
       }
 
+      // ✅ تجميد الأزرار
       const freezeBtn = document.getElementById("freezeBtn");
       if(freezeBtn){
         freezeBtn.addEventListener("click", async () => {
@@ -2703,6 +2362,7 @@ body{
         });
       }
 
+      // ✅ تغيير السؤال
       const nextQ = document.getElementById("nextQ");
       if(nextQ){
         nextQ.addEventListener("click", async () => {
@@ -2718,7 +2378,7 @@ body{
         });
       }
 
-      // ✅ تفريغ اللوحة (للمقدم فقط): يمسح ألوان الخلايا للخريطة الحالية
+      // ✅ تفريغ الخريطة
       const clearBoardBtn = document.getElementById("clearBoardBtn");
       if(clearBoardBtn){
         clearBoardBtn.addEventListener("click", async () => {
@@ -2729,6 +2389,7 @@ body{
         });
       }
 
+      // ✅ اختيار حرف من الخريطة (للمقدم)
       if(isHost){
         overlay.querySelectorAll(".cell").forEach(cell => {
           cell.addEventListener("click", async (e) => {
@@ -2754,6 +2415,7 @@ body{
         });
       }
 
+      // ✅ زر اللاعب
       const buzzBtn = document.getElementById("buzzBtn");
       if(buzzBtn){
         const disabled = (!started) || room.freeze || !me || !me.name;
