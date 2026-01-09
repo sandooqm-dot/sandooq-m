@@ -37,9 +37,6 @@
       --hexBorder: rgba(0,0,0,.10);
 
       --timerFill:#b43d69;
-
-      /* ✅ جديد: لون السماوي لزر الأسئلة الخاصة */
-      --cyan:#55d6ff;
     }
 
     *{ box-sizing:border-box; }
@@ -117,7 +114,7 @@
       font-size:18px;
     }
 
-    .wrap{width:95%;max-width:1100px;margin:0 auto}
+    .wrap{width:95%;max-width:900px;margin:0 auto}
 
     /* ✅ الكرت الأساسي شفاف */
     .card{
@@ -127,36 +124,6 @@
       margin:8px auto 0;
       padding:0;
       border-radius:0;
-    }
-
-    /* =========================
-       ✅ تخطيط اللعبة (Portrait / Landscape)
-    ========================= */
-    .gameLayout{
-      width:min(96vw, 1050px);
-      margin:0 auto;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-    .mapArea{ }
-    .leftArea{ }
-
-    @media (orientation: landscape){
-      .gameLayout{
-        display:grid;
-        grid-template-columns: 1fr 1.15fr;
-        gap:14px;
-        align-items:start;
-        grid-template-areas: "left map";
-      }
-      .leftArea{ grid-area:left; }
-      .mapArea{ grid-area:map; }
-      .bottomBar{ margin-top:10px; }
-      .mapToolsRow{ justify-content:flex-start; }
-      .firstPressBar, .controlRow, .questionCard, .playerBtnWrap{
-        width:100%;
-      }
     }
 
     /* =========================
@@ -227,13 +194,6 @@
       flex-wrap:wrap;
     }
 
-    .toolWrap{
-      position:relative;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-    }
-
     .toolBtn{
       width:54px;height:54px;
       border:none;
@@ -252,54 +212,6 @@
     .toolBtn:active{ transform: translateY(1px); box-shadow:0 6px 16px rgba(0,0,0,.20); }
     .toolBtn svg{ width:28px;height:28px; fill:#111; }
     .toolBtn .txtIcon{ font-size:30px; font-weight:900; line-height:1; }
-
-    /* ✅ سماوي عند الأسئلة الخاصة */
-    .toolBtn.cyan{
-      background: var(--cyan);
-      border-color: rgba(0,0,0,.12);
-    }
-
-    /* ✅ علامة الاستفهام الصغيرة الباهتة */
-    .helpDot{
-      position:absolute;
-      top:-6px;
-      right:-6px;
-      width:18px;height:18px;
-      border-radius:50%;
-      border:2px solid rgba(255,255,255,.75);
-      background:rgba(0,0,0,.18);
-      color:rgba(255,255,255,.85);
-      font-size:12px;
-      font-weight:900;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      cursor:pointer;
-      box-shadow:0 6px 12px rgba(0,0,0,.18);
-      opacity:.65;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .helpDot:active{ transform:translateY(1px); }
-
-    /* ✅ نافذة الشرح */
-    .tipBubble{
-      position:fixed;
-      z-index:10050;
-      display:none;
-      width:min(270px, 76vw);
-      background:rgba(255,255,255,.96);
-      color:#111;
-      border-radius:16px;
-      border:4px solid rgba(0,0,0,.80);
-      box-shadow:0 18px 34px rgba(0,0,0,.30);
-      padding:10px 12px;
-      text-align:right;
-      direction:rtl;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .tipTitle{font-weight:900;margin:0 0 6px;font-size:16px}
-    .tipBody{margin:0;font-weight:700;font-size:14px;line-height:1.55;opacity:.95}
 
     .zoomWrap{
       display:flex;
@@ -425,6 +337,7 @@
       background:var(--timerFill);
     }
 
+    /* نخلي حلقة التناقص موجودة لكن شفافة (عشان نطابق الصورة) */
     .timerRing{
       position:absolute;
       inset:0;
@@ -472,40 +385,42 @@
       text-align:center;
     }
 
-    /* ✅ (تعديل 3) نص السؤال أسود */
     .qText{
-      color:#111;
+      color:var(--red);
       font-size:34px;
       font-weight:900;
       line-height:1.35;
       margin:0 0 14px;
     }
 
-    /* ✅ (تعديل 5) زر الإجابة التفاعلي */
+    /* زر الجواب الأحمر مثل الصورة */
     .answerBtn{
-      width:min(520px, 92%);
-      min-height:64px;
-      height:auto;
-      padding:14px 18px;
+      width:min(340px, 84%);
+      height:64px;
       border-radius:999px;
       border:none;
-      background:#ff2a2a; /* أحمر */
+      background:#ff2a2a;
       color:#fff;
-      font-size:26px;
+      font-size:28px;
       font-weight:900;
       cursor:pointer;
       box-shadow:0 12px 24px rgba(0,0,0,.22);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      line-height:1.25;
-      white-space:normal;
-      word-break:break-word;
-    }
-    .answerBtn.revealed{
-      background: rgba(26,163,74,.95); /* أخضر */
     }
     .answerBtn:active{ transform: translateY(1px); box-shadow:0 10px 20px rgba(0,0,0,.22); }
     .answerBtn.disabled{ opacity:.45; cursor:not-allowed; }
+
+    .answerReveal{
+      display:none;
+      margin-top:12px;
+      font-size:22px;
+      font-weight:900;
+      color:#111;
+      background:rgba(0,0,0,.05);
+      border-radius:16px;
+      padding:12px 12px;
+    }
 
     /* =========================
        صفحات الانتظار/اللوبي تبقى شغالة
@@ -584,7 +499,7 @@
     /* ✅ أسفل الصفحة مثل الصورة */
     .bottomBar{
       width:95%;
-      max-width:1100px;
+      max-width:900px;
       margin:18px auto 14px;
       display:flex;
       align-items:center;
@@ -606,13 +521,11 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    /* ✅ (تعديل 7) حقوق أصغر وأخف */
     .rightsTxt{
-      font-size:14px;
-      opacity:.55;
+      font-size:18px;
+      opacity:.85;
       text-align:right;
       padding-right:6px;
-      white-space:nowrap;
     }
 
     /* مودالات المشاركة / أسئلة المقدم / الإعدادات (كما هي لكن لا نخرب التصميم) */
@@ -745,14 +658,8 @@
     <!-- ✅ أسفل الصفحة مثل الصورة -->
     <div class="bottomBar">
       <button class="homeBtn" onclick="location.href='index.html'">الرئيسية</button>
-      <div class="rightsTxt">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
+      <div class="rightsTxt">عبارة الحقوق</div>
     </div>
-  </div>
-
-  <!-- ✅ فقاعة الشرح (Tooltip) -->
-  <div id="tipBubble" class="tipBubble" role="dialog" aria-live="polite">
-    <div class="tipTitle" id="tipTitle"></div>
-    <p class="tipBody" id="tipBody"></p>
   </div>
 
   <script type="module">
@@ -1510,70 +1417,6 @@
       }
     }, true);
 
-    /* =========================
-       ✅ Tooltip (علامة ؟)
-    ========================= */
-    const TIP = {
-      open:false,
-      anchor:null
-    };
-    const tipEl = document.getElementById("tipBubble");
-    const tipTitleEl = document.getElementById("tipTitle");
-    const tipBodyEl  = document.getElementById("tipBody");
-
-    function closeTip(){
-      TIP.open = false;
-      TIP.anchor = null;
-      if(tipEl) tipEl.style.display = "none";
-    }
-
-    function openTipNear(anchorEl, title, body){
-      if(!tipEl) return;
-      TIP.open = true;
-      TIP.anchor = anchorEl;
-
-      tipTitleEl.textContent = title || "";
-      tipBodyEl.textContent = body || "";
-
-      tipEl.style.display = "block";
-
-      const r = anchorEl.getBoundingClientRect();
-      const pad = 10;
-
-      // نحاول نطلعها فوق الزر، ولو ما فيه مساحة ننزلها تحته
-      const w = tipEl.offsetWidth || 260;
-      const h = tipEl.offsetHeight || 90;
-
-      let left = r.left + (r.width/2) - (w/2);
-      left = Math.max(pad, Math.min(left, window.innerWidth - w - pad));
-
-      let top = r.top - h - 12;
-      if(top < pad){
-        top = r.bottom + 12;
-      }
-      top = Math.max(pad, Math.min(top, window.innerHeight - h - pad));
-
-      tipEl.style.left = `${left}px`;
-      tipEl.style.top  = `${top}px`;
-    }
-
-    document.addEventListener("click", (e) => {
-      if(!TIP.open) return;
-
-      // إذا ضغط داخل الفقاعة نفسها: تقفل
-      if(e.target === tipEl || tipEl.contains(e.target)){
-        closeTip();
-        return;
-      }
-
-      // إذا ضغط على نفس علامة ؟: خليه المنطق الخاص فيها يتصرف
-      const dot = e.target?.closest?.(".helpDot");
-      if(dot) return;
-
-      // أي مكان ثاني: تقفل
-      closeTip();
-    }, true);
-
     /* ✅ إدارة أسئلة المقدم */
     const CUSTOM_Q_UI = { ready:false, roomLatest:null, els:{} };
 
@@ -2058,119 +1901,63 @@
         </svg>
       `;
 
-      // نصوص التولتيب
-      const TIP_TEXT = {
-        map:   { title:"تغيير الخريطة", body:"ينقلك بين الخرائط الثلاث في اللعبة." },
-        clear: { title:"تفريغ الخريطة", body:"يمسح ألوان الخريطة الحالية ويعيدها للوضع الافتراضي." },
-        qmode: { title:"تغيير نوع الأسئلة", body:"تبديل بين الأسئلة العامة وأسئلة المقدم الخاصة." }
-      };
-
       main.innerHTML = `
-        <div class="gameLayout">
-          <!-- ✅ يمين (Landscape): الخريطة + أدواتها -->
-          <div class="mapArea">
-            <div class="mapOuter">
-              <div id="mapScale" class="mapScale" style="--zoom:1">
-                <div id="mapBox" class="mapBox">
-                  <img id="mapImg" src="" alt="">
-                  <svg id="overlay" class="overlaySvg"></svg>
-                </div>
-              </div>
+        <div class="mapOuter">
+          <div id="mapScale" class="mapScale" style="--zoom:1">
+            <div id="mapBox" class="mapBox">
+              <img id="mapImg" src="" alt="">
+              <svg id="overlay" class="overlaySvg"></svg>
             </div>
-
-            <!-- ✅ أدوات تحت الخريطة -->
-            <div class="mapToolsRow">
-              <div class="zoomWrap">
-                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
-              </div>
-
-              ${isHost ? `
-                <div class="toolWrap">
-                  <button id="mapBtn" class="toolBtn" type="button" aria-label="تغيير الخريطة">${MAP_ICON}</button>
-                  <button class="helpDot" type="button" data-tip="map" aria-label="مساعدة">?</button>
-                </div>
-
-                <div class="toolWrap">
-                  <button id="clearBoardBtn" class="toolBtn" type="button" aria-label="تفريغ الخريطة">${X_ICON}</button>
-                  <button class="helpDot" type="button" data-tip="clear" aria-label="مساعدة">?</button>
-                </div>
-
-                <div class="toolWrap">
-                  <button id="qModeBtn" class="toolBtn ${qMode === "custom" ? "cyan" : ""}" type="button" aria-label="تغيير نوع الأسئلة">${DOC_ICON}</button>
-                  <button class="helpDot" type="button" data-tip="qmode" aria-label="مساعدة">?</button>
-                </div>
-
-                <div class="toolWrap">
-                  <button id="settingsBtn" class="toolBtn" type="button" aria-label="الإعدادات">${GEAR_ICON}</button>
-                </div>
-              ` : ``}
-            </div>
-          </div>
-
-          <!-- ✅ يسار (Landscape): المؤقت + الأزرار + السؤال -->
-          <div class="leftArea">
-            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
-
-            <div class="controlRow">
-              <!-- ✅ (تعديل 1) تم تبديل المكان: تجميد يمين / تغيير السؤال يسار -->
-              ${isHost ? `<button id="freezeBtn" class="pillBtn" type="button">تجميد الأزرار</button>` : `<div style="flex:1 1 0"></div>`}
-
-              <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
-                <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"} aria-label="المؤقت">
-                  <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-                    <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
-                  </svg>
-                  <span id="timerNumber" class="timerNumber">30</span>
-                </button>
-              </div>
-
-              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<div style="flex:1 1 0"></div>`}
-            </div>
-
-            ${isHost ? `
-              <div class="questionCard">
-                <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
-                <button id="answerBtn" class="answerBtn disabled" type="button">اضغط للإجابة</button>
-              </div>
-            ` : `
-              <div class="playerBtnWrap">
-                <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
-                ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
-                <div class="buyNowWrap">
-                  <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
-                </div>
-              </div>
-            `}
           </div>
         </div>
+
+        <!-- ✅ أدوات تحت الخريطة (ترتيب يمين->يسار: زوم / تغيير الخريطة / تفريغ / نوع الأسئلة / إعدادات) -->
+        <div class="mapToolsRow">
+          <div class="zoomWrap">
+            <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
+          </div>
+
+          ${isHost ? `<button id="mapBtn" class="toolBtn" type="button" aria-label="تغيير الخريطة">${MAP_ICON}</button>` : ``}
+          ${isHost ? `<button id="clearBoardBtn" class="toolBtn" type="button" aria-label="تفريغ الخريطة">${X_ICON}</button>` : ``}
+          ${isHost ? `<button id="qModeBtn" class="toolBtn" type="button" aria-label="تغيير نوع الأسئلة">${DOC_ICON}</button>` : ``}
+          ${isHost ? `<button id="settingsBtn" class="toolBtn" type="button" aria-label="الإعدادات">${GEAR_ICON}</button>` : ``}
+        </div>
+
+        <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+
+        <div class="controlRow">
+          <!-- يمين: تغيير السؤال -->
+          ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<div style="flex:1 1 0"></div>`}
+
+          <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
+            <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"} aria-label="المؤقت">
+              <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+                <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+              </svg>
+              <span id="timerNumber" class="timerNumber">30</span>
+            </button>
+          </div>
+
+          <!-- يسار: تجميد الأزرار -->
+          ${isHost ? `<button id="freezeBtn" class="pillBtn" type="button">تجميد الأزرار</button>` : `<div style="flex:1 1 0"></div>`}
+        </div>
+
+        ${isHost ? `
+          <div class="questionCard">
+            <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
+            <button id="answerBtn" class="answerBtn" type="button">الجواب</button>
+            <div id="qAns" class="answerReveal"></div>
+          </div>
+        ` : `
+          <div class="playerBtnWrap">
+            <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
+            ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
+            <div class="buyNowWrap">
+              <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+            </div>
+          </div>
+        `}
       `;
-
-      // ✅ تفعيل التولتيب (علامة ؟)
-      main.querySelectorAll(".helpDot").forEach(dot => {
-        dot.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-
-          const key = dot.getAttribute("data-tip");
-          const data = TIP_TEXT[key];
-          if(!data) return;
-
-          // Toggle
-          if(TIP.open && TIP.anchor === dot){
-            closeTip();
-            return;
-          }
-          openTipNear(dot, data.title, data.body);
-        });
-      });
-
-      // لو ضغط على زر من الأزرار الصغيرة، اقفل التولتيب مباشرة
-      ["mapBtn","clearBoardBtn","qModeBtn","settingsBtn"].forEach(id=>{
-        const b = document.getElementById(id);
-        if(b){
-          b.addEventListener("click", ()=> closeTip(), true);
-        }
-      });
 
       // ✅ المؤقت
       TIMER_UI.latestTimer = room.timer || {};
@@ -2215,14 +2002,10 @@
         }
       }
 
-      // ✅ تغيير نوع الأسئلة (أيقونة الملف) + (تعديل 4) اللون السماوي عند الأسئلة الخاصة
+      // ✅ تغيير نوع الأسئلة (أيقونة الملف)
       if(isHost){
         const qModeBtn = document.getElementById("qModeBtn");
         if(qModeBtn){
-          // ضبط اللون حسب الحالة الحالية
-          if(getQuestionMode(room) === "custom") qModeBtn.classList.add("cyan");
-          else qModeBtn.classList.remove("cyan");
-
           qModeBtn.addEventListener("click", async () => {
             const cur = getQuestionMode(room);
             const next = (cur === "custom") ? "default" : "custom";
@@ -2384,20 +2167,18 @@
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
-      // ✅ المقدم: عرض السؤال + زر الإجابة التفاعلي (تعديل 5)
+      // ✅ المقدم: عرض السؤال + زر الجواب
       if(isHost){
         const qText = document.getElementById("qText");
+        const qAns  = document.getElementById("qAns");
         const ansBtn = document.getElementById("answerBtn");
         const cur = room.current || {};
 
-        function setAnswerForNewQuestion(answerText){
-          if(!ansBtn) return;
-          const a = String(answerText || "").trim();
-          ansBtn.dataset.answer = a;
-          ansBtn.dataset.revealed = "0";
-          ansBtn.classList.remove("revealed");
-          ansBtn.textContent = "اضغط للإجابة";
-          if(!a){
+        function setAnswerText(txt){
+          const s = String(txt || "").trim();
+          qAns.textContent = s;
+          qAns.style.display = "none";
+          if(!s){
             ansBtn.classList.add("disabled");
           }else{
             ansBtn.classList.remove("disabled");
@@ -2406,18 +2187,9 @@
 
         if(ansBtn){
           ansBtn.addEventListener("click", () => {
-            const a = String(ansBtn.dataset.answer || "").trim();
-            if(!a) return;
-            const isRev = (ansBtn.dataset.revealed === "1");
-            if(isRev){
-              ansBtn.dataset.revealed = "0";
-              ansBtn.classList.remove("revealed");
-              ansBtn.textContent = "اضغط للإجابة";
-            }else{
-              ansBtn.dataset.revealed = "1";
-              ansBtn.classList.add("revealed");
-              ansBtn.textContent = a;
-            }
+            const has = (qAns.textContent || "").trim();
+            if(!has) return;
+            qAns.style.display = (qAns.style.display === "block") ? "none" : "block";
           });
         }
 
@@ -2429,28 +2201,30 @@
             list = getCustomList(room, cur.letter);
             if(!list.length){
               qText.textContent = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
-              setAnswerForNewQuestion("");
+              setAnswerText("");
             }else{
               const idx = Number(cur.qIndex || 0) % list.length;
               const item = list[idx];
               qText.textContent = item?.q ?? "—";
-              setAnswerForNewQuestion(item?.a ?? "");
+              setAnswerText(item?.a ?? "");
             }
           }else{
             list = QUESTIONS[cur.letter] || [];
             if(!list.length){
               qText.textContent = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
-              setAnswerForNewQuestion("");
+              setAnswerText("");
             }else{
               const idx = Number(cur.qIndex || 0) % list.length;
               const item = list[idx];
               qText.textContent = item?.q ?? "—";
-              setAnswerForNewQuestion(item?.a ?? "");
+              setAnswerText(item?.a ?? "");
             }
           }
         }else{
           qText.textContent = "اختر حرفًا من الخريطة";
-          setAnswerForNewQuestion("");
+          if(qAns) qAns.textContent = "";
+          if(qAns) qAns.style.display = "none";
+          if(ansBtn) ansBtn.classList.add("disabled");
         }
       }
 
