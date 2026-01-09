@@ -5,13 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لعبة سباق الحروف</title>
   <style>
+    /* ✅ نفس خط اللعبة */
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("AA-GALAXY.otf") format("opentype");
+      font-weight:400;
+      font-style:normal;
+      font-display:swap;
+    }
+
     :root{
-      --bg:#1f4fa3;
+      /* ✅ نفس خلفية اللعبة */
+      --bg1:#7b1f63;
+      --bg2:#5f214f;
+      --bg3:#3a1234;
+
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
     }
-    body{margin:0;background:var(--bg);font-family:Arial, sans-serif;color:#fff;text-align:center}
+
+    body{
+      margin:0;
+      color:#fff;
+      text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      background:
+        radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
+        radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
+        linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+
+    button, input{
+      font-family:"AA-GALAXY", Arial, sans-serif;
+    }
+
     header{position:relative;padding:30px 16px 0}
     .logo{
       position:absolute;left:14px;top:14px;
@@ -37,16 +67,20 @@
 <body>
 
   <!-- ====== 🔒 بوابة تفعيل للمقدّم فقط ====== -->
-  <div id="licenseGate" style="position:fixed;inset:0;z-index:999999;background:#0b2a5a;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial;">
+  <div id="licenseGate" style="position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'AA-GALAXY', Arial, sans-serif;
+    background:
+      radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
+      radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
+      linear-gradient(135deg, #7b1f63 0%, #5f214f 48%, #3a1234 100%);">
     <div style="width:min(520px,92%);background:rgba(255,255,255,.10);padding:18px;border-radius:12px;text-align:center">
       <h2 style="margin:0 0 10px">تفعيل دخول المقدم</h2>
       <p style="margin:0 0 12px;opacity:.9">أدخل كود التفعيل اللي وصلك بعد الشراء. سيتم ربطه بهذا الجهاز.</p>
 
       <input id="licenseCode" placeholder="SNDQ-XXXX-XXXX-XXXX"
-        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;box-sizing:border-box;margin:8px 0" />
+        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;box-sizing:border-box;margin:8px 0;font-family:'AA-GALAXY', Arial, sans-serif;" />
 
       <button id="licenseBtn"
-        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;cursor:pointer;background:#f4c400;color:#000">
+        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;cursor:pointer;background:#f4c400;color:#000;font-family:'AA-GALAXY', Arial, sans-serif;">
         تفعيل ودخول
       </button>
 
@@ -143,7 +177,7 @@
   <div class="wrap">
     <div class="card">
       <input id="name" placeholder="ادخل اسم اللعبة">
-      <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 إلى 10)">
+      <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
       <button id="btn">انشئ اللعبة</button>
       <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
     </div>
@@ -185,8 +219,10 @@
       const players = Number(normalizeDigits(pRaw));
 
       if(!name){ alert("اكتب اسم اللعبة"); return; }
-      if(!Number.isFinite(players) || players < 1 || players > 10){
-        alert("عدد اللاعبين لازم من 1 إلى 10");
+
+      // ✅ بدون حد أعلى (1 أو أكثر)
+      if(!Number.isFinite(players) || players < 1){
+        alert("عدد اللاعبين لازم يكون 1 أو أكثر");
         return;
       }
 
