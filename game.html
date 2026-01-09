@@ -22,6 +22,10 @@
 
       --white:#fff;
       --black:#111;
+      --softWhite:rgba(255,255,255,.86);
+
+      --pillBg: rgba(255,255,255,.10);
+      --pillBg2: rgba(255,255,255,.14);
 
       --orange:#f28c00;
       --green:#1aa34a;
@@ -29,14 +33,13 @@
 
       --hexGreen:  rgba(0, 140, 70, .42);
       --hexOrange: rgba(255, 140, 0, .42);
-      --hexPale:   rgba(255, 215, 80, .70);
-      --hexBorder: rgba(0,0,0,.12);
+      --hexPale:   rgba(255, 215, 80, .68);
+      --hexBorder: rgba(0,0,0,.10);
 
       --timerFill:#b43d69;
 
-      /* ✅ سماوي زر الأسئلة الخاصة */
-      --cyan:#7fe7ff;
-      --cyan2:#3bd6ff;
+      /* ✅ جديد: لون السماوي لزر الأسئلة الخاصة */
+      --cyan:#55d6ff;
     }
 
     *{ box-sizing:border-box; }
@@ -55,7 +58,7 @@
 
     a{color:inherit}
 
-    /* ✅ هيدر */
+    /* ✅ هيدر مثل الصورة */
     header{
       padding:16px 14px 6px;
     }
@@ -114,81 +117,47 @@
       font-size:18px;
     }
 
-    .wrap{width:95%;max-width:980px;margin:0 auto}
-    .card{background:transparent;color:#fff;width:100%;margin:8px auto 0;padding:0;border-radius:0}
+    .wrap{width:95%;max-width:1100px;margin:0 auto}
+
+    /* ✅ الكرت الأساسي شفاف */
+    .card{
+      background:transparent;
+      color:#fff;
+      width:100%;
+      margin:8px auto 0;
+      padding:0;
+      border-radius:0;
+    }
 
     /* =========================
-       Layout (Portrait/Landscape)
+       ✅ تخطيط اللعبة (Portrait / Landscape)
     ========================= */
     .gameLayout{
-      width:min(92vw, 860px);
+      width:min(96vw, 1050px);
       margin:0 auto;
       display:flex;
       flex-direction:column;
       gap:10px;
-      direction:rtl; /* عشان يمين/يسار في الوضع الأفقي */
     }
-    .sideMap, .sideMain{ width:100%; }
+    .mapArea{ }
+    .leftArea{ }
 
-    /* ✅ الوضع الأفقي: الخريطة يمين + الأدوات تحتها، والباقي يسار */
     @media (orientation: landscape){
       .gameLayout{
-        width:min(96vw, 1180px);
-        max-width:1200px;
-        flex-direction:row;
-        align-items:flex-start;
+        display:grid;
+        grid-template-columns: 1fr 1.15fr;
         gap:14px;
+        align-items:start;
+        grid-template-areas: "left map";
       }
-      .sideMap{ flex:0 0 54%; }
-      .sideMain{ flex:1 1 auto; }
+      .leftArea{ grid-area:left; }
+      .mapArea{ grid-area:map; }
+      .bottomBar{ margin-top:10px; }
+      .mapToolsRow{ justify-content:flex-start; }
+      .firstPressBar, .controlRow, .questionCard, .playerBtnWrap{
+        width:100%;
+      }
     }
-
-    /* =========================
-       LANDING / LOBBY
-    ========================= */
-    .panel{
-      width:min(92vw, 760px);
-      margin:12px auto 0;
-      padding:16px;
-      border-radius:22px;
-      background:rgba(255,255,255,.10);
-      border:4px solid rgba(255,255,255,.35);
-      box-shadow:0 14px 28px rgba(0,0,0,.22);
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      text-align:center;
-    }
-    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
-    .in{
-      width:min(560px, 92%);
-      height:56px;
-      border-radius:18px;
-      border:4px solid rgba(0,0,0,.85);
-      outline:none;
-      padding:0 12px;
-      font-size:18px;
-      font-weight:900;
-      text-align:center;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .btn{
-      padding:12px 14px;
-      font-size:20px;
-      border:none;
-      border-radius:18px;
-      cursor:pointer;
-      font-weight:900;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-      box-shadow:0 10px 22px rgba(0,0,0,.22);
-      border:5px solid rgba(0,0,0,.85);
-      background:#fff;
-      color:#111;
-      min-width:180px;
-      height:62px;
-    }
-    .btn:active{ transform: translateY(1px); }
-    .smallNote{font-size:14px;opacity:.9;margin-top:2px}
 
     /* =========================
        MAP
@@ -205,15 +174,17 @@
       border-radius:8px;
       overflow:hidden;
       background:transparent;
-      border:10px solid rgba(242,140,0,.95);
+      border:10px solid rgba(242,140,0,.95); /* إطار برتقالي مثل الصورة */
       box-shadow:0 14px 28px rgba(0,0,0,.25);
     }
     .mapBox img{
       width:100%;
       height:auto;
       display:block;
+      object-fit:unset;
       background:#0b7a2a;
     }
+
     .overlaySvg{
       position:absolute;
       inset:0;
@@ -241,7 +212,9 @@
     .overlaySvg .state1.pulse { animation: palePulse 0.9s ease-in-out infinite; }
 
     /* =========================
-       أدوات تحت الخريطة
+       أدوات تحت الخريطة (مثل الصورة)
+       ترتيب من اليمين لليسار:
+       Zoom -> Map -> Clear -> QMode -> Settings
     ========================= */
     .mapToolsRow{
       margin:12px auto 8px;
@@ -252,6 +225,13 @@
       gap:14px;
       direction:rtl;
       flex-wrap:wrap;
+    }
+
+    .toolWrap{
+      position:relative;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
     }
 
     .toolBtn{
@@ -268,58 +248,58 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       border:3px solid rgba(0,0,0,.10);
-      position:relative;
-      overflow:visible;
-      font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    .toolBtn:active{ transform: translateY(1px); }
+    .toolBtn:active{ transform: translateY(1px); box-shadow:0 6px 16px rgba(0,0,0,.20); }
     .toolBtn svg{ width:28px;height:28px; fill:#111; }
     .toolBtn .txtIcon{ font-size:30px; font-weight:900; line-height:1; }
 
     /* ✅ سماوي عند الأسئلة الخاصة */
     .toolBtn.cyan{
-      background: linear-gradient(180deg, var(--cyan) 0%, var(--cyan2) 100%);
-      border-color: rgba(0,0,0,.18);
+      background: var(--cyan);
+      border-color: rgba(0,0,0,.12);
     }
-    .toolBtn.cyan svg{ fill:#08303a; }
-    .toolBtn.cyan .txtIcon{ color:#08303a; }
 
-    /* ✅ علامة (?) باهتة */
+    /* ✅ علامة الاستفهام الصغيرة الباهتة */
     .helpDot{
       position:absolute;
       top:-6px;
-      left:-6px;
+      right:-6px;
       width:18px;height:18px;
       border-radius:50%;
-      background:rgba(255,255,255,.55);
-      border:2px solid rgba(0,0,0,.20);
-      color:rgba(0,0,0,.55);
+      border:2px solid rgba(255,255,255,.75);
+      background:rgba(0,0,0,.18);
+      color:rgba(255,255,255,.85);
+      font-size:12px;
+      font-weight:900;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:12px;
-      font-weight:900;
-      line-height:1;
       cursor:pointer;
-      box-shadow:0 6px 14px rgba(0,0,0,.18);
-      user-select:none;
+      box-shadow:0 6px 12px rgba(0,0,0,.18);
+      opacity:.65;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
-    .helpPopover{
+    .helpDot:active{ transform:translateY(1px); }
+
+    /* ✅ نافذة الشرح */
+    .tipBubble{
       position:fixed;
-      z-index:99999;
-      max-width:min(300px, 86vw);
-      padding:10px 12px;
-      border-radius:14px;
-      background:rgba(255,255,255,.96);
-      border:4px solid rgba(0,0,0,.85);
-      box-shadow:0 16px 30px rgba(0,0,0,.25);
-      color:#111;
-      text-align:right;
-      font-weight:900;
-      font-size:14px;
-      line-height:1.5;
+      z-index:10050;
       display:none;
+      width:min(270px, 76vw);
+      background:rgba(255,255,255,.96);
+      color:#111;
+      border-radius:16px;
+      border:4px solid rgba(0,0,0,.80);
+      box-shadow:0 18px 34px rgba(0,0,0,.30);
+      padding:10px 12px;
+      text-align:right;
+      direction:rtl;
+      font-family:"AA-GALAXY", Arial, sans-serif;
     }
+    .tipTitle{font-weight:900;margin:0 0 6px;font-size:16px}
+    .tipBody{margin:0;font-weight:700;font-size:14px;line-height:1.55;opacity:.95}
 
     .zoomWrap{
       display:flex;
@@ -330,6 +310,8 @@
       border-radius:14px;
       background:transparent;
     }
+
+    /* ✅ شكل السلايدر مثل الصورة (شريط أبيض + مقبض أسود مستطيل) */
     input[type="range"]{
       -webkit-appearance:none;
       appearance:none;
@@ -356,111 +338,16 @@
       background:#111;border:3px solid rgba(255,255,255,.80);
       cursor:pointer;
     }
+    input[type="range"]::-moz-range-track{
+      height:8px;border-radius:999px;background:rgba(255,255,255,.70);
+    }
 
     /* =========================
-       لوحة النتائج (Scoreboard)
-    ========================= */
-    .scoreBar{
-      width:100%;
-      margin:6px auto 10px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
-      direction:rtl;
-      flex-wrap:wrap;
-    }
-    .teamPill{
-      min-width:170px;
-      height:52px;
-      border-radius:999px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight:900;
-      font-size:24px;
-      color:#fff;
-      border:4px solid rgba(0,0,0,.55);
-      box-shadow:0 10px 22px rgba(0,0,0,.22);
-      padding:0 14px;
-      white-space:nowrap;
-    }
-    .teamPill.orange{ background:rgba(242,140,0,.95); }
-    .teamPill.green{ background:rgba(26,163,74,.95); }
-
-    .scoreBox{
-      width:64px;
-      height:64px;
-      border-radius:18px;
-      border:6px solid rgba(0,0,0,.85);
-      background:#fff;
-      color:#111;
-      font-weight:900;
-      font-size:34px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      box-shadow:0 12px 24px rgba(0,0,0,.22);
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-      user-select:none;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    button.scoreBox{ cursor:pointer; }
-    .scoreBox.readonly{ opacity:.95; }
-
-    /* نافذة اختيار رقم النقاط */
-    .scoreBackdrop{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,.45);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:99998;
-      padding:14px;
-    }
-    .scoreModal{
-      width:min(92vw, 560px);
-      background:#fff;
-      color:#111;
-      border-radius:20px;
-      border:8px solid rgba(0,0,0,.85);
-      box-shadow:0 18px 34px rgba(0,0,0,.30);
-      padding:14px 14px 16px;
-      text-align:center;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .scoreTitle{
-      font-weight:900;
-      font-size:22px;
-      margin:4px 0 10px;
-    }
-    .scoreGrid{
-      display:grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap:10px;
-      direction:ltr;
-    }
-    .scorePick{
-      height:56px;
-      border-radius:16px;
-      border:5px solid rgba(0,0,0,.85);
-      background:#fff;
-      font-weight:900;
-      font-size:24px;
-      cursor:pointer;
-      box-shadow:0 10px 22px rgba(0,0,0,.18);
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .scorePick:active{ transform: translateY(1px); }
-
-    /* =========================
-       شريط اسم أول لاعب
+       شريط اسم أول لاعب (مثل الصورة)
     ========================= */
     .firstPressBar{
       margin:8px auto 10px;
-      width:100%;
+      width:min(92vw, 760px);
       border-radius:999px;
       padding:14px 14px;
       background:rgba(255,255,255,.10);
@@ -476,10 +363,10 @@
     }
 
     /* =========================
-       صف الأزرار + المؤقت
+       صف الأزرار + المؤقت (مثل الصورة)
     ========================= */
     .controlRow{
-      width:100%;
+      width:min(92vw, 760px);
       margin:0 auto 10px;
       display:flex;
       align-items:center;
@@ -504,10 +391,8 @@
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      font-family:"AA-GALAXY", Arial, sans-serif;
     }
     .pillBtn:active{ transform: translateY(1px); box-shadow:0 8px 18px rgba(0,0,0,.22); }
-    .pillBtn.disabled{opacity:.45; cursor:not-allowed}
 
     /* المؤقت وسط */
     .timerWrap{ flex:0 0 auto; display:flex; justify-content:center; align-items:center; }
@@ -521,8 +406,8 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       user-select:none;
-      font-family:"AA-GALAXY", Arial, sans-serif;
     }
+    /* حلقة خارجية بيضاء */
     .timerClockBtn::before{
       content:"";
       position:absolute;
@@ -531,6 +416,7 @@
       border:6px solid rgba(255,255,255,.85);
       box-shadow:0 12px 26px rgba(0,0,0,.28);
     }
+    /* تعبئة داخلية وردية */
     .timerClockBtn::after{
       content:"";
       position:absolute;
@@ -538,6 +424,7 @@
       border-radius:50%;
       background:var(--timerFill);
     }
+
     .timerRing{
       position:absolute;
       inset:0;
@@ -555,6 +442,7 @@
       stroke-linecap: round;
       transition: stroke-dashoffset .20s linear;
     }
+
     .timerNumber{
       position:absolute;
       inset:0;
@@ -567,26 +455,13 @@
       z-index:3;
       text-shadow:0 10px 24px rgba(0,0,0,.35);
     }
-    .timerNumber.red{ color:#ff2a2a; }
-    @keyframes pop {
-      0%{ transform:scale(1); }
-      50%{ transform:scale(1.12); }
-      100%{ transform:scale(1); }
-    }
-    .timerNumber.pop{ animation:pop .20s ease-in-out; }
-
-    @keyframes flash {
-      0%{ filter:brightness(1); }
-      50%{ filter:brightness(1.8); }
-      100%{ filter:brightness(1); }
-    }
-    .timerClockBtn.flash{ animation:flash .45s ease-in-out infinite; }
+    .timerPlayerView{ pointer-events:none; user-select:none; opacity:1; }
 
     /* =========================
-       بطاقة السؤال
+       بطاقة السؤال (مثل الصورة)
     ========================= */
     .questionCard{
-      width:100%;
+      width:min(92vw, 760px);
       margin:10px auto 6px;
       background:#fff;
       color:#111;
@@ -596,7 +471,8 @@
       padding:22px 16px 18px;
       text-align:center;
     }
-    /* ✅ لون السؤال أسود */
+
+    /* ✅ (تعديل 3) نص السؤال أسود */
     .qText{
       color:#111;
       font-size:34px;
@@ -605,12 +481,15 @@
       margin:0 0 14px;
     }
 
-    /* ✅ زر الجواب التفاعلي */
+    /* ✅ (تعديل 5) زر الإجابة التفاعلي */
     .answerBtn{
-      width:min(380px, 92%);
-      height:70px;
+      width:min(520px, 92%);
+      min-height:64px;
+      height:auto;
+      padding:14px 18px;
       border-radius:999px;
       border:none;
+      background:#ff2a2a; /* أحمر */
       color:#fff;
       font-size:26px;
       font-weight:900;
@@ -618,21 +497,73 @@
       box-shadow:0 12px 24px rgba(0,0,0,.22);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      padding:0 16px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      font-family:"AA-GALAXY", Arial, sans-serif;
+      line-height:1.25;
+      white-space:normal;
+      word-break:break-word;
     }
-    .answerBtn:active{ transform: translateY(1px); }
+    .answerBtn.revealed{
+      background: rgba(26,163,74,.95); /* أخضر */
+    }
+    .answerBtn:active{ transform: translateY(1px); box-shadow:0 10px 20px rgba(0,0,0,.22); }
     .answerBtn.disabled{ opacity:.45; cursor:not-allowed; }
-    .answerBtn.answerHidden{ background:#ff2a2a; }
-    .answerBtn.answerShown{ background:rgba(26,163,74,.98); }
 
     /* =========================
-       Player big button
+       صفحات الانتظار/اللوبي تبقى شغالة
     ========================= */
-    .playerBtnWrap{margin-top:10px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+    .btn{padding:12px 14px;font-size:18px;border:none;border-radius:16px;cursor:pointer;font-family:"AA-GALAXY", Arial, sans-serif}
+    .btnYellow{background:#fff;color:#111;border:4px solid rgba(0,0,0,.85); box-shadow:0 10px 22px rgba(0,0,0,.22);}
+    .btnGreen{background:rgba(26,163,74,.95);color:#fff}
+    .btnRed{background:rgba(224,57,53,.95);color:#fff}
+    .btnOrange{background:rgba(242,140,0,.95);color:#fff}
+
+    .smallNote{font-size:14px;opacity:.9;margin-top:8px}
+    .codeBox{font-size:18px}
+    .codeNum{font-size:34px;font-weight:900;letter-spacing:2px}
+
+    .teams{display:flex;gap:10px;flex-wrap:wrap}
+    .teamCol{flex:1;min-width:240px;border-radius:16px;padding:10px;color:#fff}
+    .teamGreen{background:rgba(26,163,74,.65)}
+    .teamOrange{background:rgba(242,140,0,.65)}
+    .teamTitle{font-weight:900;margin-bottom:8px}
+    .playerItem{
+      background:rgba(255,255,255,.18);
+      padding:10px;border-radius:14px;margin:6px 0;cursor:pointer
+    }
+
+    .waitingLayout{
+      width:min(92vw, 760px);
+      margin:12px auto 0;
+      padding:16px;
+      border-radius:22px;
+      background:rgba(255,255,255,.10);
+      border:4px solid rgba(255,255,255,.35);
+      box-shadow:0 14px 28px rgba(0,0,0,.22);
+      display:flex;
+      flex-direction:column;
+      min-height:52vh;
+      justify-content:center;
+      gap:14px;
+    }
+
+    .buyNowWrap{display:flex;justify-content:center;margin-top:10px}
+    .buyNowBtn{
+      width:min(92vw, 520px);
+      padding:14px 16px;
+      border:none;
+      border-radius:18px;
+      background:rgba(255,255,255,.92);
+      color:#111;
+      font-size:20px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 10px 22px rgba(0,0,0,.22);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      border:5px solid rgba(0,0,0,.85);
+    }
+
+    .playerBtnWrap{margin-top:14px}
     .playerBigBtn{
       width:min(92vw, 520px);
       height:110px;
@@ -643,19 +574,17 @@
       align-items:center;
       justify-content:center;
       color:#fff;
-      font-size:30px;
+      font-size:28px;
       font-weight:900;
+      letter-spacing:.2px;
       box-shadow:0 14px 28px rgba(0,0,0,.25);
-      font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    .playerBigBtn.disabled{opacity:.45; cursor:not-allowed}
+    .disabled{opacity:.5;cursor:not-allowed}
 
-    /* =========================
-       أسفل الصفحة
-    ========================= */
+    /* ✅ أسفل الصفحة مثل الصورة */
     .bottomBar{
       width:95%;
-      max-width:980px;
+      max-width:1100px;
       margin:18px auto 14px;
       display:flex;
       align-items:center;
@@ -676,85 +605,127 @@
       border:5px solid rgba(0,0,0,.85);
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    /* ✅ عبارة الحقوق أصغر وأخف */
+    /* ✅ (تعديل 7) حقوق أصغر وأخف */
     .rightsTxt{
-      font-size:13px;
+      font-size:14px;
       opacity:.55;
       text-align:right;
       padding-right:6px;
       white-space:nowrap;
     }
 
-    /* =========================
-       احتفال الفوز
-    ========================= */
-    .winBackdrop{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,.55);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:99997;
-      padding:14px;
+    /* مودالات المشاركة / أسئلة المقدم / الإعدادات (كما هي لكن لا نخرب التصميم) */
+    .shareBackdrop,.cqBackdrop,.settingsBackdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,.45);
+      display:none; align-items:center; justify-content:center;
+      z-index:9999; padding:14px;
     }
-    .winCard{
+    .shareModal,.cqModal{
       width:min(92vw, 680px);
-      border-radius:28px;
-      border:10px solid rgba(0,0,0,.88);
-      background:rgba(255,255,255,.96);
-      box-shadow:0 20px 36px rgba(0,0,0,.32);
-      padding:26px 18px 22px;
+      background:#fff; color:#111;
+      border-radius:18px; padding:14px; text-align:right; position:relative;
+      border:6px solid rgba(0,0,0,.85);
+      box-shadow:0 18px 34px rgba(0,0,0,.30);
+    }
+    .shareClose{
+      position:absolute; left:10px; top:10px; border:none; background:transparent;
+      font-size:26px; cursor:pointer;
+    }
+    .shareTitle{font-weight:900;margin:0 0 10px;text-align:center}
+    .shareChoices{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 8px}
+    .sharePanel{
+      display:none;
+      background:rgba(0,0,0,.04);
+      border:2px solid rgba(0,0,0,.10);
+      border-radius:14px;
+      padding:12px;
       text-align:center;
-      color:#111;
-      position:relative;
-      overflow:hidden;
+    }
+    .shareCodeBig{font-size:34px;font-weight:900;letter-spacing:2px;text-align:center;margin:6px 0 0}
+    .qrImg{width:220px;height:220px;display:block;margin:0 auto;border-radius:12px;background:#fff}
+    .shareSmall{font-size:12px;opacity:.85;text-align:center;margin-top:8px;word-break:break-all}
+
+    .cqCloseRed{
+      position:absolute; left:10px; top:10px;
+      width:40px;height:40px;border:none;border-radius:12px;
+      background:rgba(224,57,53,.95);color:#fff;font-size:22px;font-weight:900;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .cqTitle{font-weight:900;margin:0 0 10px;text-align:center}
+    .cqHint{font-size:12px;opacity:.85;text-align:center;margin:0 0 12px}
+
+    .cqItem{border:2px solid rgba(0,0,0,.10);border-radius:14px;padding:8px 10px;margin:10px 0;background:rgba(0,0,0,.03)}
+    .cqItem summary{cursor:pointer;font-weight:900;list-style:none;outline:none}
+    .cqItem summary::-webkit-details-marker{display:none}
+
+    .cqPair{border:2px solid rgba(0,0,0,.10);border-radius:14px;padding:10px;background:#fff;margin-top:10px}
+    .cqLbl{font-weight:900;margin:0 0 6px;text-align:right}
+    .cqTA{
+      width:100%;
+      padding:10px 10px;
+      border-radius:14px;
+      border:2px solid rgba(0,0,0,.12);
+      font-size:15px;
+      line-height:1.5;
+      resize:none;
+      outline:none;
+      background:#fff;
+      margin:0 0 10px;
       font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    .winTitle{
+    .cqAddBtn{
+      width:56px;height:48px;border:none;border-radius:14px;
+      background:rgba(180,61,105,.95);color:#fff;font-size:26px;font-weight:900;cursor:pointer;
+      box-shadow:0 10px 22px rgba(0,0,0,.22);
+    }
+    .cqAddWrap{display:flex;justify-content:center;margin-top:2px}
+    .cqSaveFixed{
+      position:sticky; bottom:10px; margin:10px auto 0;
+      width:min(240px, 72%);
+      border-radius:14px;
       font-weight:900;
-      font-size:38px;
-      line-height:1.2;
-      margin:0 0 10px;
+      box-shadow:0 10px 22px rgba(0,0,0,.22);
     }
-    .winSub{
-      font-weight:900;
-      font-size:22px;
-      opacity:.85;
-      margin:0;
-    }
-    .winConfetti{
-      position:absolute;
-      inset:-20px;
-      pointer-events:none;
-      opacity:.85;
-    }
-    .confettiPiece{
-      position:absolute;
-      width:10px;
-      height:18px;
-      border-radius:4px;
-      opacity:.95;
-      animation: fall 1.6s linear infinite;
-    }
-    @keyframes fall{
-      0%{ transform: translateY(-40px) rotate(0deg); opacity:.95; }
-      100%{ transform: translateY(520px) rotate(260deg); opacity:.90; }
-    }
+    .cqSavedMsg{font-size:12px;opacity:.9;text-align:center;margin-top:8px}
 
-    /* رسالة صغيرة */
-    .toast{
-      width:min(92vw, 760px);
-      margin:10px auto 0;
-      background:rgba(255,255,255,.10);
-      border:3px solid rgba(255,255,255,.30);
-      border-radius:18px;
-      padding:10px 12px;
-      font-weight:900;
-      box-shadow:0 10px 22px rgba(0,0,0,.18);
-      display:none;
+    .settingsPanel{
+      width:min(78vw, 360px);
+      height:min(72vh, 560px);
+      background: rgba(255,255,255,.92);
+      border-radius:26px;
+      border:8px solid rgba(0,0,0,.85);
+      box-shadow:0 16px 30px rgba(0,0,0,.25);
+      padding:18px 14px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      color:#111;
+    }
+    #settingsMenu{display:flex;flex-direction:column;gap:14px}
+    .settingsBtn{
+      width:100%;height:64px;border-radius:22px;border:4px solid rgba(0,0,0,.85);
+      background:#fff;color:#111;font-weight:900;font-size:28px;cursor:pointer;
+      box-shadow:0 6px 0 rgba(0,0,0,.18);
+      font-family:"AA-GALAXY", Arial, sans-serif;
+    }
+    .settingsView{
+      display:none;width:100%;height:100%;overflow:auto;background:#fff;border-radius:18px;
+      border:3px solid rgba(0,0,0,.25);padding:14px;color:#111;text-align:right
+    }
+    .settingsView h3{margin:0 0 10px;text-align:center}
+    .settingsBackMini{
+      width:100%;height:52px;border-radius:18px;border:3px solid rgba(0,0,0,.65);
+      background:#fff;font-weight:900;cursor:pointer;margin-top:10px;font-family:"AA-GALAXY", Arial, sans-serif;
+    }
+    .timerMiniPicker{
+      display:none;width:100%;border-radius:18px;border:3px solid rgba(0,0,0,.65);
+      background:#fff;padding:10px;
+    }
+    .timerMiniList{display:flex;flex-direction:column;gap:10px}
+    .timerMiniItem{
+      height:52px;border-radius:16px;border:3px solid rgba(0,0,0,.25);background:#fff;
+      font-weight:900;font-size:22px;cursor:pointer;font-family:"AA-GALAXY", Arial, sans-serif;
     }
   </style>
 </head>
@@ -769,43 +740,25 @@
   </header>
 
   <div class="wrap">
-    <div id="toast" class="toast"></div>
     <div id="main" class="card">جاري التحميل...</div>
 
+    <!-- ✅ أسفل الصفحة مثل الصورة -->
     <div class="bottomBar">
       <button class="homeBtn" onclick="location.href='index.html'">الرئيسية</button>
       <div class="rightsTxt">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
     </div>
   </div>
 
-  <!-- ✅ نافذة شرح الأزرار -->
-  <div id="helpPopover" class="helpPopover"></div>
-
-  <!-- ✅ اختيار النقاط -->
-  <div id="scoreBackdrop" class="scoreBackdrop">
-    <div class="scoreModal" role="dialog" aria-modal="true" aria-label="اختيار النقاط">
-      <div id="scoreTitle" class="scoreTitle">اختر النقاط</div>
-      <div id="scoreGrid" class="scoreGrid"></div>
-      <div class="smallNote" style="color:#111;opacity:.75;margin-top:10px">انقر خارج النافذة للإغلاق</div>
-    </div>
-  </div>
-
-  <!-- ✅ احتفال الفوز -->
-  <div id="winBackdrop" class="winBackdrop">
-    <div class="winCard" role="dialog" aria-modal="true" aria-label="احتفال الفوز">
-      <div id="winConfetti" class="winConfetti"></div>
-      <div id="winTitle" class="winTitle">مبروك الفوز</div>
-      <p id="winSub" class="winSub"></p>
-    </div>
+  <!-- ✅ فقاعة الشرح (Tooltip) -->
+  <div id="tipBubble" class="tipBubble" role="dialog" aria-live="polite">
+    <div class="tipTitle" id="tipTitle"></div>
+    <p class="tipBody" id="tipBody"></p>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, onValue, update, get, child, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-    /* =========================
-       Firebase
-    ========================= */
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
       authDomain: "sabaq-alhorof.firebaseapp.com",
@@ -816,12 +769,6 @@
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    /* =========================
-       بيانات الخرائط (كما عندك)
-    ========================= */
     const MAPS = [
       [
         ["ش","أ","ث","د","هـ"],
@@ -846,14 +793,13 @@
       ]
     ];
 
-    /* =========================
-       الأسئلة
-       (ملاحظة: باقي الحروف placeholders — كما عندك)
-    ========================= */
     const QUESTIONS = {};
     const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
     for(const L of ALL_LETTERS){
-      QUESTIONS[L] = Array.from({length:25}, (_,i) => ({ q:`(${i+1}) سؤال لحرف ${L}`, a:`${L}...` }));
+      QUESTIONS[L] = Array.from({length:25}, (_,i) => ({
+        q: `(${i+1}) سؤال لحرف ${L}`,
+        a: `${L}...`
+      }));
     }
 
     QUESTIONS["هـ"] = [
@@ -884,940 +830,1745 @@
       { q: "هو ممر مائي ضيق يربط الخليج العربي بخليج عُمان يسمى مضيق ……..؟", a: "هرمز" }
     ];
 
-    /* =========================
-       Helpers
-    ========================= */
-    const $ = (id)=>document.getElementById(id);
-    const main = $("main");
-    const toastEl = $("toast");
+    QUESTIONS["د"] = [
+      { q: "هي قول يطلب به الإنسان إثبات حق على على الغير في المحاكم", a: "دعوى" },
+      { q: "من هو مخترع الاطارات المنفوخة للسيارات", a: "جون بويد دنلوب" },
+      { q: "هو القانون الأساسي الذي يحدد نظام الحكم في الدولة ويحدد حقوق وواجبات المواطنين", a: "دستور" },
+      { q: "يسمى النظام السياسي الذي يتميز بحكم الشعب …..", a: "ديمقراطية" },
+      { q: "ماهو اسم اول عملة اسلامية في التاريخ", a: "دينار" },
+      { q: "هو الزمن الطويل او مدة الحياة كلها", a: "دهر" },
+      { q: "ماهي عاصمة دولة السنغال", a: "داكار" },
+      { q: "هو سواد الليل وضلمته", a: "دجى" },
+      { q: "هو ماء لم يخرج من الارض ولم ينزل من السماء", a: "دموع" },
+      { q: "هو المخادع أو المحتال في أقواله وافعاله", a: "دجال" },
+      { q: "هو الاحتيال والخداع وتدبير الشر بمهارة", a: "هدير" },
+      { q: "هي صفه تمزج بين الفطنة والذكاء وإدراك الامور", a: "دهاء" },
+      { q: "ماهي عاصمة دولة تنزانيا", a: "دار السلام" },
+      { q: "من مدن جمهورية مصر العرب", a: "دمياط" },
+      { q: "هو صغير الدب", a: "ديسم" },
+      { q: "هو الطائر الذي يكنى بأبي اليقضات", a: "ديك" },
+      { q: "ماهي عاصمة ايرلندا", a: "دبلن" },
+      { q: "ماهو الشيء الذي الذي ليس له نقطة بداية ولايحتوي على نهاية", a: "دائرة" },
+      { q: "هو المرض و العلة", a: "داء" },
+      { q: "ماهو الحيوان البحري الذي وُصف بأنه اذكى مخلوقات البحر", a: "دولفين" },
+      { q: "هو عكس كلمة فاتح", a: "داكن" },
+      { q: "هي السحابة كثيرة المطر", a: "داجنة" },
+      { q: "اكمل المثل : من خرج من……..قل مقداره", a: "داره" },
+      { q: "اكمل المثل : لكل……..دواء", a: "داء" },
+      { q: "هي مرادف كلمة ……إشارة", a: "دلالة" }
+    ];
 
-    function toast(msg){
-      toastEl.textContent = msg;
-      toastEl.style.display = "block";
-      clearTimeout(toastEl._t);
-      toastEl._t = setTimeout(()=>toastEl.style.display="none", 2400);
+    QUESTIONS["أ"] = [
+      { q: "وحدة لقياس شدة التيار الكهربائي", a: "أمبير" },
+      { q: "من هو اول من جمع القرآن الكريم بين لوحين", a: "ابو بكر الصديق" },
+      { q: "ماهو الكوكب الذي يُعرف بالكوكب الازرق", a: "الارض" },
+      { q: "ماهو النبي الذي الذي أُطلق عليه لقب نبي الصبر", a: "أيوب عليه السلام" },
+      { q: "هو غاز يتكون من ثلاثة ذرات أكسجين ويوجد في الغلاف الجوي للارض كطبقة مشهورة", a: "الاوزون" },
+      { q: "ماهي عاصمة دولة الإمارات", a: "أبو ظبي" },
+      { q: "من هو الرئيس الامريكي الذي اصدر اعلان التحرير", a: "أبراهام لينكولن" },
+      { q: "سورة في القران الكريم طلق عليها اسم اخت الطويلتين", a: "الأعراف" },
+      { q: "من هو الشاعر العربي الذي يعتبر أمير الشعراء", a: "أحمد شوقي" },
+      { q: "ماهو اطول نهر في العالم بعد نهر النيل", a: "الأمازون" },
+      { q: "ماهو الشخص الذي يرى صديقة وعدوه بعين واحدة", a: "الأعور" },
+      { q: "ماهو الاسم الذي يُطلق على اسبانيا قديماً", a: "الأندلس" },
+      { q: "ماهو الشيء الذي كلما تحرك خطوة فقد جزء من ذيله", a: "الإبرة" },
+      { q: "ما هو اسم الانسجة التي تقوم على ربط العضلات بالعظام", a: "أوتار" },
+      { q: "ماهو لون الزمرد", a: "أخضر" },
+      { q: "ماهي عاصمة تركيا", a: "أنقرة" },
+      { q: "ماهي الدولة التي فازت بأول نسخة لكأس العالم", a: "أوروغواي" },
+      { q: "ماهو اسم الكوكب الذي ترتيبه الثالث من الكواكب الشمسيه", a: "الارض" },
+      { q: "هي عاصمة اليونان", a: "أثينا" },
+      { q: "هي اصغر قارة في العالم من حيث المساحة", a: "اوروبا" },
+      { q: "ماهو اللون الناتج عن مزج اللون الاصفر والازرق", a: "اخضر" },
+      { q: "هو مجال يهتم بحماية الأنظمة والشبكات والبرامج من الهجمات الرقمية", a: "الامن السيبراني" },
+      { q: "اكمل المثل : القرد بعين ……..غزال", a: "أمه" },
+      { q: "هو علم يهتم بدارسة الطبيعة والكائنات الحية", a: "أحياء" },
+      { q: "ماهو معنى كلمة إماطة", a: "إزالة" }
+    ];
+
+    QUESTIONS["ث"] = [
+      { q: "ماهو عدد الحروف في الأبجدية العربية", a: "ثمانية وعشرون حرفاً" },
+      { q: "صفة من أهم صفات الشجاعة", a: "ثبات" },
+      { q: "هو وصف يطلق على كثير الكلام", a: "ثرثار" },
+      { q: "كم عدد كواكب المجموعة الشمسية", a: "ثمانية" },
+      { q: "ماهو عدد اجزاء القرآن الكريم", a: "ثلاثون جزءً" },
+      { q: "من اول الخطباء المسلمين ولُقب بخطيب الرسول", a: "ثابت بن قيس" },
+      { q: "هو منطقة في الفضاء حيث الجاذبية قوية لدرجة انه لايستطيع احد الهروب منها ، حتى الضوء", a: "الثقب الاسود" },
+      { q: "ماهو عدد اللاعبين في لعبة الكرة الحديدية", a: "ثلاثة لاعبين" },
+      { q: "كم عدد فقرات العمود الفقري", a: "ثلاثة وثلاثون" },
+      { q: "يطلق في اللغة العربية الفصحى على الجماعة من الناس", a: "ثُلة" },
+      { q: "بلدة الرحالة العربي المشهور أحمد بن ماجد قرب الرياض (في السعودية)", a: "ثرمدا" },
+      { q: "ماهو اسم السبعة نجوم المتلاصقة في السماء", a: "ثريا" },
+      { q: "كم تستغرق الارض للدوران حول الشمس", a: "ثلاث مأئه وخمسة وستون يوماً" },
+      { q: "كلمة تستطيع أن تقرأها من اليمين و الشمال", a: "ثلث" },
+      { q: "هو مرض يصيب فروة شعر الانسان", a: "ثعلبة" },
+      { q: "هو الطائر الذي يكنى بأبي اليقضات", a: "ديك" },
+      { q: "اسم نبات يستخدم في الطب كمضاد للالتهاب", a: "ثوم" },
+      { q: "هي مدينة سعودية ساحلية على البحر الاحمر", a: "ثول" },
+      { q: "هو وفرة المال وكثرته", a: "ثراء" },
+      { q: "مرادف كلمة وزن", a: "ثقل" },
+      { q: "هو الماء المنهمر بغزارة و سيلانه شديد", a: "ثجاج" },
+      { q: "ماهو الصوت التي تصدرة الشاة او الخروف في اللغة العربية", a: "ثغاء" },
+      { q: "ماهو الاسم الاخير للحجاج بن يوسف", a: "الثقفي" },
+      { q: "هو عكس كلمة متحرك", a: "ثابت" }
+    ];
+
+    QUESTIONS["ش"] = [
+      { q: "هو يستعمل لتثبيت الشموع فيه للزينة", a: "شمعدان" },
+      { q: "هو الماء الجاري والمتساقط من الجبل", a: "شلال" },
+      { q: "ماهو اسم صغير الضفدع", a: "شرغوف" },
+      { q: "ماهي السورة التي تسمى الجامعة", a: "الشعراء" },
+      { q: "من هي المرأة التي حكمت مصر 80 يوماً بعد وفاة زوجها", a: "شجرة الدر" },
+      { q: "هو الخصام والقطيعة بين فرد أو جماعة أخرى", a: "شقاق" },
+      { q: "ماهو اسم السبت قبل الاسلام", a: "شيار" },
+      { q: "هي القطع الصغيرة المتطايرة من قنبلة ما", a: "شظايا" },
+      { q: "هو مايتطابر من النار", a: "شرارة" },
+      { q: "هو اسم للضوء الذي ينطلق من مكان واحد باستقامه", a: "شعاع" },
+      { q: "هو اسم من اسماء الصقور", a: "شاهين" },
+      { q: "هو اسم يُطلق على البخيل الحريص على المال", a: "شحيح" },
+      { q: "هي لعبة تُلعب على لوح يتكون من لونين فقط", a: "شطرنج" },
+      { q: "ما هي احدى مراحل تطور الفراشة", a: "شرنقة" },
+      { q: "هو اسم يُطلق على صغير الغزال", a: "شادن" },
+      { q: "هي اوعية تنقل الدم من القلب الى جميع انحاء الجسم", a: "شرايين" },
+      { q: "هو قطعة كبيرة من القماش يتم تعليقة في السفينة لصد الرياح", a: "شراع" },
+      { q: "هو عكس كلمة ضعيف", a: "شديد" },
+      { q: "هو عكس كلمة جبان", a: "شجاع" },
+      { q: "هو مرادف لكلمة قاسٍ", a: "شرس" },
+      { q: "هو اسم شارع في شهير في مدينة باريس", a: "شانزليزيه" },
+      { q: "هي مدينة ساحلية في مصر", a: "شرم الشيخ" },
+      { q: "هو مايطلق على الاخبار الكاذبة", a: "شائعات" },
+      { q: "ما هي المادة تفرزها الاذن لحمايتها", a: "شمع" },
+      { q: "هي مجموعة من العلوم الدينية التي تدرس وتفهم وتطبق أحكام الإسلام", a: "شريعة" }
+    ];
+
+    QUESTIONS["ك"] = [
+      { q: "ماهو العنصر الكيميائي الذي له الرمز C", a: "كربون" },
+      { q: "صفه اخرجت ابليس من الجنة", a: "الكبر" },
+      { q: "هو شيء له جناحان ولاكن لايطير", a: "كتاب" },
+      { q: "هو مجلس تصدر منه القرارات في الولايات المتحدة الامريكية", a: "كونغرس" },
+      { q: "هي اقصر سورة في القرآن الكريم", a: "الكوثر" },
+      { q: "هي وحدة قياس الكتلة", a: "كيلو" },
+      { q: "هي الرياضة الرسمية في دولة المانيا", a: "كرة القدم" },
+      { q: "هي اللعبة الاكثر تأثيراً وشعبية في دولة الهند", a: "كريكت" },
+      { q: "ماهو اسم ابن النبي نوح الذي غرق في الطوفان", a: "كنعان" },
+      { q: "هي عاصمة ماليزيا", a: "كوالالمبور" },
+      { q: "هي عمل أوجبه ديننا الحنيف لمحو ذنب معين", a: "كفارة" },
+      { q: "هو حبس الغضب الشديد وكتمه وعدم إظهاره", a: "كظم الغيظ" },
+      { q: "هي جعبة صغيرة توضع فيها النبال او الاسهم", a: "كنانه" },
+      { q: "هو قصد إيذاء الاخرين دون علمهم", a: "كيد" },
+      { q: "هو اسم نهر في الجنة", a: "كوثر" },
+      { q: "ما الحيوان الأليف الذي يُعَدّ وفيًّا ويُنعَت بأنّه أفضل صديق للإنسان؟", a: "كلب" },
+      { q: "يستخرج العنبر من….؟", a: "كبد الحوت" },
+      { q: "ماهو اسم العملة الرسمية في النرويج", a: "كرونة" },
+      { q: "هو حفرة كبيرة تحت الأرض أو في جبل", a: "كهف" },
+      { q: "هي عاصمة اوكرانيا", a: "كييف" },
+      { q: "هي مادة منبهة توجد في القهوة والشاي بكثرة.", a: "كافيين" },
+      { q: "هو مبنى صغير وبسيط عادةً يبنى بالخشب", a: "كوخ" },
+      { q: "هو اسم شامل يصف الكواكب والنجوم والمجرات", a: "كون" },
+      { q: "هو من الظواهر الكونية للشمس", a: "كسوف" },
+      { q: "ماهو عكس كلمة قليل", a: "كثير" }
+    ];
+
+    QUESTIONS["ن"] = [
+      { q: "بماذا يُلقب المنتخب التونسي", a: "نسور قرطاج" },
+      { q: "بماذا تسمى الرغبة في النوم او النوم الخفيف", a: "نعاس" },
+      { q: "هي تقديم الارشاد من القلب لإرادة الخير للاخرين", a: "نصيحة" },
+      { q: "ماهو اكبر طائر في العالم", a: "نعامة" },
+      { q: "هو نادي يقع في جنوب ايطاليا", a: "نابولي" },
+      { q: "خلق منها ابليس ؟", a: "نار" },
+      { q: "نبي سميت سورة من القران بأسمه ? ", a: "نوح عليه السلام" },
+      { q: "قال الرسول صلى الله عليه وسلم لايدخل الجنة…..؟", a: "نمام" },
+      { q: "الملك الذى امر بحرق النبي ابراهيم عليه السلام؟", a: "النمرود" },
+      { q: "هو السائل الزيتي الذي يشتق منه أنواع الوقود", a: "نفط" }
+    ];
+
+    QUESTIONS["ض"] = [
+      { q: "هي الاحتياج الشديد الذي يُحمل الإنسان على ما فيه ضرر", a: "ضرورة" },
+      { q: "هي الحالة النفسية التي يشعر فيها الإنسان بانقباضٍ وعدم ارتياح", a: "ضيق" },
+      { q: "ما التعبير الوجهي أو الصوتي الذي يدل على الفرح والسرور", a: "ضحكة" },
+      { q: "ما الحالة المرضية التي ترتفع فيها قوة الدفع داخل الأوعية الدموية", a: "ضغط" },
+      { q: "ما المصطلح الطبي الذي يدلّ على انكماش النسيج أو تقلُّص حجمه مع الزمن", a: "ضمور" },
+      { q: "ما الكلمة التي تعبِّر عن القسوة والقوة الشديدة في الاعتداء أو الهجوم", a: "ضراوة" },
+      { q: "هي الحالة النفسية التي يشعر فيها الإنسان بالملل والانزعاج لسوء الأوضاع", a: "ضجر" },
+      { q: "هي الصلاة النافلة التي تُؤدّى في الصباح بعد شروق الشمس وارتفاعها قليلًا", a: "ضحى" },
+      { q: "هي منطقة سكنية تقع على أطراف المدينة أو البلدة الرئيسية", a: "ضاحية" },
+      { q: "هو حيوان يعش في بِرك الماء", a: "ضفدع" },
+      { q: "هو جزء منحني في القفص الصدري لحماية اعضاء الصدر", a: "ضلع" },
+      { q: "ما الحالة التي يفقد فيها الإنسان السيطرة أو يتبدّد ماله وهدفه", a: "ضياع" },
+      { q: "هي حالة جوية تقل فيها الرؤية", a: "ضباب" },
+      { q: "هي مبلغ مالي تفرضه الدولة على الأفراد والمؤسسات للمساهمة في النفقات العامة؟", a: "ضريبه" },
+      { q: "هو مصطلح يشير إلى الأصوات العالية المزعجة والمشتتة", a: "ضوضاء" }
+    ];
+
+    QUESTIONS["ح"] = [
+      { q: "هي صفة تدل على ضبط النفس، والتأني، وعدم التسرع", a: "حلم" },
+      { q: "هي المنطقة الجبلية في غرب شبه الجزيرة العربية والتي تضم مكة والمدينة", a: "حجاز" },
+      { q: "ما الحيوان الرخوي البحري الذي يفرز حبرًا داكنًا للدفاع عن نفسه", a: "حبار" },
+      { q: "هي مدينة في شمال سوريا", a: "حماة" },
+      { q: "ما اللفظ الذي يُطلَق على الشدة والقسوة في الظروف أو التعامل", a: "حدة" },
+      { q: "ما اسم ابنة عمر بن الخطاب رضي الله عنه وزوجة النبي صلى الله عليه وسلم", a: "حفصة رضي الله عنها" },
+      { q: "هي خيوط الطبيعية فاخرة تُستخدم في نسج الأقمشة الفاخرة", a: "حرير" },
+      { q: "هو المباح الذي انحلت عنه عقدة الحظر في الشريعة الإسلامية", a: "حلال" },
+      { q: "ما النبات الذي يُنقَع في الماء ويُعرَف بفوائده الصحية في الطب البديل", a: "حلبه" },
+      { q: "ما هي الكلمة التي تعني زحف المولود الصغير", a: "حبو" }
+    ];
+
+    QUESTIONS["ي"] = [
+      { q: "هو طائر يرمز بشكل أساسي إلى السلام والمحبة والوفاء والأمل والتجديد", a: "يمامه" },
+      { q: "هي الحضارة القديمة التي اشتهرت بفلسفة أرسطو وأفلاطون", a: "يونان" },
+      { q: "نبي ورد ذكره في القرآن؟", a: "يونس عليه السلام" },
+      { q: "قال النبي صلى الله عليه وسلم: \"من لا يرحم لا...\"؟", a: "يُرحم" },
+      { q: "سورة تسمى قلب القران ما هي ؟", a: "يس" },
+      { q: "ماهو اسم المدينة المنورة قبل الاسلام", a: "يثرب" },
+      { q: "هو نبي وابن نبي", a: "يحيى" },
+      { q: "هو من أبناء نوح عليه السلام؟", a: "يافث" },
+      { q: "من هو النبي الذي ذُكر في القرآن وابنه يوسف؟", a: "يعقوب" },
+      { q: "يتعود على بيئة غير بيئته الأولى؟", a: "يتكيف" }
+    ];
+
+    QUESTIONS["ع"] = [
+      { q: "من الصحف المحلية المعروفة في المملكة؟", a: "عكاظ" },
+      { q: "ما اسم الأوعية الدموية التي تحمل الدم بعيدًا عن القلب؟", a: "عروق" },
+      { q: "هو العضو المسؤول عن التفكير والتحليل لدى الإنسان؟", a: "عقل" },
+      { q: "ما اسم الصعوبة التي تعترض سبيل تحقيق الهدف؟", a: "عرقله" },
+      { q: "ما اسم الأنسجة التي تمكن الجسم من الحركة", a: "عضلات" },
+      { q: "أصغر إمارة في دولة الإمارات من حيث المساحة", a: "عجمان" },
+      { q: "في المعلومات العامة، دعامة يقوم عليها المبنى", a: "عمود" },
+      { q: "قال الرسول صلى الله عليه وسلم من ترك صلاة العصر فقد هبط…..؟", a: "عمله" },
+      { q: "ما اسم المفهوم الذي يشير إلى التفكير المنطقي واستخدام العقل", a: "عقلانية" },
+      { q: "ما اسم المفهوم الذي يعني المساواة وعدم التمييز بين الناس؟", a: "عدالة" }
+    ];
+
+    QUESTIONS["ر"] = [
+      { q: "ما هو الحيوان الصغير الذكي الذي يتميز بقناع أسود حول عينيه؟", a: "راكون" },
+      { q: "ما هي الكلمة التي تبدأ بحرف الراء وتعني سيد القوم؟", a: "رئيس" },
+      { q: "من هي ابنة الرسول صلى الله عليه وسلم التي تزوجها عثمان بن عفان؟", a: "رقية" },
+      { q: "ما هو الأجر المدفوع لقاء عمل معين وفي وقت محدد؟", a: "راتب" },
+      { q: "شىء تفرزه الزهرة ؟", a: "رحيق" },
+      { q: "من الازهار ورد في القران الكريم ?", a: "ريحان" },
+      { q: "إذا دخل أحدكم المسجد فلا يجلس حتى يصلي؟", a: "ركعتين" },
+      { q: "جبل عرفات هو جبل الـــ....؟", a: "الرحمة" },
+      { q: "هدف تسعى الحكومات لتحقيقه لشعوبها؟", a: "رفاهية" },
+      { q: "هو افضل لاعب كرة قدم في البرتغال؟", a: "رونالدو" }
+    ];
+
+    QUESTIONS["ق"] = [
+      { q: "ما ما اسمُ البِهِارَةِ العطريّةِ التي تُستخرَجُ من لحاءِ شجرةٍ", a: "قرفه" },
+      { q: "كان يطلق على البحر الاحمر قديما بحر ال ـــــ ؟", a: "قلزم" },
+      { q: "هي مجموعة من الغنم والأنعام وغيرها؟", a: "قطيع" },
+      { q: "ما المصطلحُ الذي يُطلَقُ على معجمٍ لغويٍّ يشرحُ معاني الكلمات؟", a: "قاموس" },
+      { q: "هو مجرى مائي صناعي يشق لأغراض تسهيل النقل البحري؟", a: "قناة" },
+      { q: "ما الحيوانُ البحريُّ الشوكيُّ الذي يعيشُ قربَ الشِّعابِ المرجانيّة؟", a: "قنفذ البحر" },
+      { q: "كلمة إيطالية الأصل معناها الغزو بالبحر بقصد النهب والسلب؟", a: "قرصنه" },
+      { q: "ما سلسلةُ الجبالِ الواقعةُ بين البحرِ الأسود وبحرِ قزوين؟", a: "قوقاز" },
+      { q: "ما الطبقةُ الخارجيّةُ الشفّافةُ في العينِ التي تحميها من الأمام؟", a: "قرنيه" },
+      { q: "في التاريخ، لقب أباطرة الرومان وبيزنطة.", a: "قياصره" }
+    ];
+
+    QUESTIONS["ظ"] = [
+      { q: "ما الحالة التي تدل على غياب الضوء وانتشار العتمة؟", a: "ظلام" },
+      { q: "ما الاسم الدالّ على التوقع والترجيح بلا يقين؟", a: "ظن" },
+      { q: "هو وعاء ورقي مخصّص لوضع الرسائل أو المستندات؟", a: "ظرف" },
+      { q: "ما الحالة التي يُصاب فيها المرء بالعرج أو صعوبة المشي؟", a: "ضلع" },
+      { q: "ما اللفظة التي تعني اللطافة وحُسن المعشر وخفّة الروح؟", a: "ظرافه" },
+      { q: "ماذا يعني فقدان الماء من الجسم والإحساس بالعطش؟", a: "ضمأ" },
+      { q: "ما الصفة التي تنطبق على من يقسو ويتعدّى على الآخرين بغير حق؟", a: "ظالم" },
+      { q: "ما التسريحة المصنوعة من تجديل شعر الرأس في خُصلٍ ملتفّة؟", a: "ظفيرة" },
+      { q: "ما الاسم الذي يُطلَق على الفترة اللاحقة لمنتصف النهار حيث تشتدّ الحرارة؟", a: "ظهيرة" },
+      { q: "ما المحافظة العُمانيّة الواقعة جنوب السلطنة وتشتهر بخريفها؟", a: "ظفار" }
+    ];
+
+    QUESTIONS["غ"] = [
+      { q: "إعانة ونصرة في الشدة؟", a: "غوث" },
+      { q: "تكوين عظمي قليل الصلابة مثل ذلك الذي يوجد في الأنف وعظام المفاصل؟", a: "غضروف" },
+      { q: "ما الحالة الطبية الخطيرة التي يحدث فيها موت لأنسجة الجسم بسبب نقص تدفق الدم؟", a: "غرغرينا" },
+      { q: "ما الحالة التي يفقد فيها الشخص وعيه لفترة طويلة نتيجة مرض أو إصابة؟", a: "غيبوبه" },
+      { q: "يعاقب به المرء بعد ان يخالف انظمة المرور", a: "غرامه" },
+      { q: "ما الكائن الخرافي في التراث العربي الذي يتميّز بمظهر مخيف ويُضرب به المثل؟", a: "غول" },
+      { q: "ما الصفة التي تنطبق على من يقسو ويتعدّى على الآخرين بغير حق؟", a: "ظالم" },
+      { q: "مرادف لكلمة فاز", a: "غنِم" },
+      { q: "ما الحالة التي يكون فيها أمر ما مبهمًا وصعب الفهم لنقص المعلومات؟", a: "غموض" },
+      { q: "ما الكلمة العربية التي تشير إلى الفترة الصباحية الباكرة؟", a: "غداً" }
+    ];
+
+    QUESTIONS["و"] = [
+      { q: "انتقال الصفات المميزة؟", a: "وراثة" },
+      { q: "إدراك الشخص إدراكا عاما بما يجري حوله في لحظة معينة؟", a: "وعي" },
+      { q: "هي سلسلة الأفعال المتكررة التي تسير على نمط واحد؟", a: "وتيرة" },
+      { q: "هو شيء ينتشر بسرعة ويؤدي إلى ما يشبه الكارثة؟", a: "وباء" },
+      { q: "ما هو المنصب الذي يعطى لمن يكون مسؤل عن بلدة ما قديماً", a: "والي" },
+      { q: "مرادف كلمة مخده", a: "وسادة" },
+      { q: "صوف بعض الحيوانات؟", a: "وبر" },
+      { q: "منخفض بين جبلين ويسير معه الماء", a: "وادي" },
+      { q: "عاصمة بولندا؟", a: "وارسو" },
+      { q: "أكمل المثل الشعبي: \"فص ملح...\"؟", a: "وذاب" }
+    ];
+
+    QUESTIONS["ط"] = [
+      { q: "ما المصطلح العسكري الذي يشير إلى تجمع الجنود في صفوف منظمة", a: "طابور" },
+      { q: "ما الوعاء المعدني الصغير الذي يُستخدَم للشرب أو الكيل في المطابخ العربية؟", a: "طاسه" },
+      { q: "ما الآلة الإيقاعية التي يُضرَب عليها بالعصا أو باليد في الاحتفالات الشعبية؟", a: "طبل" },
+      { q: "ما الإجراء الشرعي الذي يُنهي عقد الزواج في الإسلام؟", a: "طلاق" },
+      { q: "هو الكائن الصغير الذي يحوم في الهواء ويتغذّى على رحيق الأزهار؟", a: "طائر الطنان" },
+      { q: "ما الاسم الذي يُطلَق على الجهاز الطبي التعويضي الذي يحلّ محل أحد الأطراف؟", a: "طرف صناعي" },
+      { q: "ما هي الورقة الرسمية التي تمثل الأجرة التي ندفعها ثمناً لنقل الرسالة؟", a: "طابع بريدي" },
+      { q: "الدور من البناية", a: "طابق" },
+      { q: "ما المادة البيضاء الناعمة التي تُستخدم للكتابة", a: "طباشير" },
+      { q: "ما الغطاء التقليدي للرأس الذي اشتهر في بلدان الشام", a: "طربوش" }
+    ];
+
+    QUESTIONS["س"] = [
+      { q: "هي دولة عربية على تطل على بحر العرب", a: "سلطنة عمان" },
+      { q: "ما الاسم القرآني الذي يُطلَق على يوم القيامة؟", a: "ساعة" },
+      { q: "هو المكان الذي تحفظ به المستندات والأوراق؟", a: "سجل" },
+      { q: "بماذا لقب  الصحابي الجليل خالد بن الوليد ؟", a: "سيف الله المسلول" },
+      { q: "ما الذي يطلق على وصف المشاهد وحوار الشخصيات في العمل السينمائي؟", a: "سيناريو" },
+      { q: "ما هو البناء الوحيد الذي شيده الإنسان على الأرض ويمكن رؤيته من على سطح القمر؟", a: "سور الصين العظيم" },
+      { q: "كم كان عمر النبي صلى الله عليه وسلم حين توفت امه ؟", a: "ستة سنوات" },
+      { q: "من هو نجم العرب والسعودية الذي كان هدفه في مرمى بلجيكا أحد أجمل عشرة أهداف في مونديال 1994؟", a: "سعيد العويران" },
+      { q: "هي وصف تدلّ على انعدام الحركة؟", a: "سكون" },
+      { q: "ما هي الدولة المدينة الواقعة جنوب شرق آسيا وتُعد من أصغر الدول مساحةً؟", a: "سنغافورة" }
+    ];
+
+    QUESTIONS["ز"] = [
+      { q: "ما هو الجزء من جسم الإنسان الذي قد يُصاب بالتهاب ويستلزم استئصالًا؟", a: "زائدة دودية" },
+      { q: "الرفيق في العمل أو السفر؟", a: "زميل" },
+      { q: "هي ثالث اركان الاسلام", a: "زكاة" },
+      { q: "من هو النبي الذي كان يعمل في النجارة وذكر في القرآن الكريم؟", a: "زكريا" },
+      { q: "شجرة يأكل منها أهل النار؟", a: "زقوم" },
+      { q: "ما الاسم الذي يُطلَق على صوت الأسد باللغة العربية؟", a: "رئير" },
+      { q: "من الاحجار الكريمة؟", a: "زبرجد" },
+      { q: "ما النبات العطري ذو الجذور الذي يُستخدم في الطهي والشراب؟", a: "زنجبيل" },
+      { q: "أداة في البندقية", a: "زناد" },
+      { q: "قبيلة في المملكة العربية.", a: "زهران" }
+    ];
+
+    QUESTIONS["ص"] = [
+      { q: "يُطلَق على الشخص المختص بإعداد الأدوية", a: "صيدلي" },
+      { q: "أين تُحفَظ الأموال والأشياء الثمينة داخل البنوك؟", a: "صندوق الامانات" },
+      { q: "هي قذيفة عرفها الصينيون منذ القرن الثالث عشر واستخدموها في الأفراح والأعياد وإرهاب العدو؟", a: "صاروخ" },
+      { q: "ما يتقرب به المؤمن  إلى الله؟", a: "صدقة" },
+      { q: "ما الدولة الأوروبية الواقعة في البلقان وعاصمتها بلغراد؟", a: "صربيا" },
+      { q: "هو الصوت العالي المُزعج", a: "صخب" },
+      { q: "هو واحد من أشهر نجوم كرة القدم في الخليج والسعودية؟", a: "صالح النعيمه" },
+      { q: "هو مصطلح يشير إلى قوة مقاومة المادة ضد الكسر أو الثني؟", a: "صلابه" },
+      { q: "اتفاق يتضمن بيعا أو شراء للممتلكات", a: "صفقه" },
+      { q: "مادة لاصقة تُستخرَج من بعض الأشجار", a: "صمغ" }
+    ];
+
+    QUESTIONS["ج"] = [
+      { q: "ما المصطلح الشرعي الذي يشير إلى الذنب أو الخطأ الذي يستحق عقوبة؟", a: "جريمة" },
+      { q: "ما الجزيرة الواقعة غرب المملكة العربية السعودية وتعدّ من أبرز الوجهات السياحية على البحر الأحمر؟", a: "جزيرة فرسان" },
+      { q: "من هو الشاعر الأموي المعروف بمهاجاته للفرزدق والأخطل؟", a: "جرير" },
+      { q: "موسوعة عالمية؟", a: "جينيس" },
+      { q: "وصف يقال للصوت المرتفع العالي؟", a: "جهوري" },
+      { q: "ما الفاكهة الاستوائية الغنية بفيتامين C وتُزرع في المناطق الحارة؟", a: "جوافه" },
+      { q: "ما هي الكلمة التي تعني ضفيرة الشعر؟", a: "جديلة" },
+      { q: "مرادف لكلمة يابس", a: "جاف" },
+      { q: "حيوان صحراوي صغير له ارجل طويلة وذيل طويل", a: "جربوع" },
+      { q: "إحدى المستعمرات البريطانية جنوب إسبانيا، تقع على مضيق يصل بين البحر المتوسط والمحيط الأطلسي", a: "جبل طارق" }
+    ];
+
+    QUESTIONS["م"] = [
+      { q: "هو  عضو في جسم الإنسان يتحكم في الذاكرة؟", a: "مخ" },
+      { q: "هو مكان يعرض فيه الاشياء الفنية والاثرية", a: "متحف" },
+      { q: "هو جهاز ينتج الطاقة الذرية ويسيطر عليها؟", a: "مفاعل نووي" },
+      { q: "الظفر الحاد المستدق؟", a: "مخلب" },
+      { q: "ما اسم الشركة التي تنتج نظام التشغيل Windows؟", a: "مايكروسوفت" },
+      { q: "آلة لتحويل طاقة معينة إلى حركة ميكانيكية؟", a: "محرك او مكينة" },
+      { q: "نوع من المناقشة حيث تتعارض الحجج؟", a: "مناظرة" },
+      { q: "الة بصرية وظيفتها تكبير الاجزاء الدقيقة", a: "مجهر" },
+      { q: "ما هو أول مستشفى من نوعه أقيم في المملكة؟", a: "مستشفى الملك فيصل التخصصي" },
+      { q: "ما نهى عنه الشارع دون تشديد وهو أقل من الحرام في رتبته؟.", a: "مكروه" }
+    ];
+
+    QUESTIONS["ب"] = [
+      { q: "ما الكلمة التي تعني الأخذ بالعنف والشدة؟", a: "بطش" },
+      { q: "أي بحر يقع بين قارتي أوروبا وإفريقيا؟", a: "بحر المتوسط" },
+      { q: "ما اسم العملية الحيوية التي تستخدمها النباتات لصنع الغذاء من أشعة الشمس؟", a: "بناء ضوئي" },
+      { q: "ما البيعة التي تمت تحت الشجرة بين المسلمين والنبي قبل فتح مكة؟", a: "بيعة الرضوان" },
+      { q: "من هو رجل الأعمال الذي شارك في تأسيس شركة مايكروسوft؟", a: "بيل غيتس" },
+      { q: "أي حيوان يُعتبر رمزًا للحفاظ على البيئة في الصين؟", a: "باندا" },
+      { q: "آفة من آفات المجتمع ومعناها عدم توفر العمل للراغب فيه؟", a: "بطالة" },
+      { q: "ما اسم المدينة الأوروبية التي دمرت في الحرب العالمية الثانية وأعيد بناؤها وقسمت؟", a: "برلين" },
+      { q: "ما العشب الذي يُستخدم غالبًا في صنع شاي مُهَدِّئ؟", a: "بابونج" },
+      { q: "مجموعة خلايا وأعمدة كهربائية متصل بعضها ببعض لتوليد طاقة كهربائية؟", a: "بطارية" }
+    ];
+
+    QUESTIONS["ل"] = [
+      { q: "عباره عن حديدةٌ وما يتَّصل بها تُوضع في فم الحصان أو البَغْل أو الحمار لقيادتها.؟", a: "لجام" },
+      { q: "ما اسم اللوحة الفنية التي رسمها ليوناردو دا فينشي؟", a: "موناليزا" },
+      { q: "سؤال فيه غموض ؟", a: "لغز" },
+      { q: "طائر مهاجر له أرجل طويلة", a: "لقلق" },
+      { q: "ما اسم اللقب الذي يُطلق على الأسد في اللغة العربية؟", a: "ليث" },
+      { q: "لهب النار الخالص الذي لا دخان فيه ؟", a: "لضى" },
+      { q: "هي قطعة القماش المصمغة التي توضع على أماكن الألم", a: "لصقة جروح" },
+      { q: "مكث واقام في المكان ؟", a: "لبث" },
+      { q: "ماذا يسمى المشهد من الفيلم إذا نُظر إليه بعيداً عن بقية المشاهد؟", a: "لقطة" },
+      { q: "ما اسم المكسرات التي تُستخدم في الحلويات", a: "لوز" }
+    ];
+
+    QUESTIONS["ذ"] = [
+      { q: "ما القيمة الأخلاقية التي تعني الوفاء بالعهد وحفظ الحقوق والأمانة؟", a: "ذمة" },
+      { q: "ما الصفة العقلية التي تدلّ على سرعة البديهة وحسن الفهم؟", a: "ذكاء" },
+      { q: "ما الشعور الذي ينتاب الإنسان عند حدوث خوف مفاجئ", a: "ذعر" },
+      { q: "حشرة ذكرت في القران الكريم ؟", a: "ذبابة" },
+      { q: "ما المفردة العربية التي تدلّ على الشيء المُخبَّأ لوقت الحاجة والاستعانة به؟", a: "ذخر" },
+      { q: "من الشخصية القرآنية التي ارتحلت بين المشرق والمغرب وأقامت سدًّا أمام يأجوج ومأجوج؟", a: "ذو القرنين" },
+      { q: "ما العملية العقلية التي يخزّن فيها الإنسان معلوماته ويسترجعها عند الحاجة؟", a: "ذاكرة" },
+      { q: "ما الحرف التاسع من حروف الهجاء في اللغة العربية؟", a: "ذال" },
+      { q: "ما الصفة التي تعبّر عن فقدان المرء عِزّته واستكانته للغير؟", a: "ذل" },
+      { q: "ما اسم المكسرات التي تُستخدم في الحلويات", a: "لوز" }
+    ];
+
+    QUESTIONS["خ"] = [
+      { q: "هو لقب أطلق على النبي إبراهيم.", a: "خليل الله" },
+      { q: "ماهي الأرض التي فتحها المسلمون في عهد النبي بعد معركة قصيرة مع اليهود؟", a: "خيبر" },
+      { q: "ما هو المصطلح العربي والقرآني الذي يعني أن عاقبة الأمر كرائحة المسك؟", a: "ختامها مسك" },
+      { q: "هو امتداد واسع في الأرض يحدثه بحر؟", a: "خليج" },
+      { q: "انتقال مفصل من موضعه؟", a: "خلع" },
+      { q: "في مجال القانون، الطرف الآخر في القضية", a: "خصم" },
+      { q: "ما اللفظ الذي يدلُّ على الإيجاز والاختصار في أي سياق أو نص؟", a: "خلاصة" },
+      { q: "انعقاد اللسان عن الكلام ؟", a: "خرس" },
+      { q: "ما الفعل الذي يعني الاستسلام والخضوع مع انعدام المقاومة؟", a: "خنوع" },
+      { q: "هو بمعنى فقد بعض ما عنده؟", a: "خسر" }
+    ];
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const params = new URLSearchParams(location.search);
+    const role = params.get("role");
+    const code = params.get("code");
+    const hostKey = params.get("key");
+    const pid = params.get("pid");
+
+    const main = document.getElementById("main");
+    const gameNameEl = document.getElementById("gameName");
+
+    const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
+    const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
+
+    function setGameName(raw){
+      if(!gameNameEl) return;
+      const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
+      if(!s0){
+        gameNameEl.innerHTML = "";
+        return;
+      }
+      const MAX_CHARS = 80;
+      let s = s0;
+      if(s.length > MAX_CHARS){
+        s = s.slice(0, MAX_CHARS - 1).trim() + "…";
+      }
+      gameNameEl.innerHTML = `<span class="gnText">${escapeHtml(s)}</span>`;
     }
 
-    function qs(){
-      const p = new URLSearchParams(location.search);
+    if(!role || !code){
+      main.textContent = "بيانات الدخول غير مكتملة.";
+      throw new Error("Missing params");
+    }
+
+    const roomRef = ref(db, `rooms/${code}`);
+
+    function teamColor(team){
+      return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
+    }
+
+    function escapeHtml(s){
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[c]));
+    }
+
+    function cellKey(row,col){ return `${row}-${col}`; }
+
+    const BBOX_CACHE = {};
+
+    function detectHexBBox(img){
+      const nw = img.naturalWidth, nh = img.naturalHeight;
+      const maxW = 700;
+      const scale = Math.min(1, maxW / nw);
+
+      const cw = Math.round(nw * scale);
+      const ch = Math.round(nh * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext("2d", { willReadFrequently:true });
+      ctx.drawImage(img, 0, 0, cw, ch);
+
+      const data = ctx.getImageData(0,0,cw,ch).data;
+
+      let minX = cw, minY = ch, maxX = -1, maxY = -1;
+      let found = false;
+
+      const step = 2;
+      for(let y=0; y<ch; y+=step){
+        for(let x=0; x<cw; x+=step){
+          const i = (y*cw + x) * 4;
+          const r = data[i], g = data[i+1], b = data[i+2];
+          const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+          const avg = (r+g+b)/3;
+
+          if(avg > 180 && (mx - mn) < 60){
+            found = true;
+            if(x < minX) minX = x;
+            if(y < minY) minY = y;
+            if(x > maxX) maxX = x;
+            if(y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if(!found){
+        return { x0:0.12, y0:0.04, x1:0.90, y1:0.95 };
+      }
+
+      minX = Math.max(0, minX - 2);
+      minY = Math.max(0, minY - 2);
+      maxX = Math.min(cw - 1, maxX + 2);
+      maxY = Math.min(ch - 1, maxY + 2);
+
       return {
-        code: (p.get("code")||"").trim(),
-        role: (p.get("role")||"").trim(), // "host" | "player"
-        name: (p.get("name")||"").trim()
+        x0: minX / cw,
+        y0: minY / ch,
+        x1: (maxX + 1) / cw,
+        y1: (maxY + 1) / ch,
       };
     }
 
-    function genCode(){
-      return String(Math.floor(100000 + Math.random()*900000));
+    function setStateClass(el, st){
+      el.classList.remove("state0","state1","state2","state3","pulse");
+      el.classList.add(`state${st}`);
+      if(st === 1) el.classList.add("pulse");
     }
 
-    function safeText(s){ return (s||"").toString(); }
-
-    /* =========================
-       UI: Help Popover
-    ========================= */
-    const helpPopover = $("helpPopover");
-    let helpOpen = false;
-
-    function showHelp(anchorEl, text){
-      helpPopover.textContent = text;
-      helpPopover.style.display = "block";
-      helpOpen = true;
-
-      const r = anchorEl.getBoundingClientRect();
-      const x = Math.min(window.innerWidth - 16, Math.max(16, r.left + r.width/2));
-      const y = Math.min(window.innerHeight - 16, Math.max(16, r.top + r.height + 10));
-      helpPopover.style.left = x + "px";
-      helpPopover.style.top = y + "px";
-      helpPopover.style.transform = "translateX(-50%)";
+    function hexPointsPointyTop(x, y, w, h){
+      const pts = [
+        [x + w/2, y],
+        [x + w,   y + h*0.25],
+        [x + w,   y + h*0.75],
+        [x + w/2, y + h],
+        [x,       y + h*0.75],
+        [x,       y + h*0.25],
+      ];
+      return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
     }
 
-    function hideHelp(){
-      helpPopover.style.display = "none";
-      helpOpen = false;
+    const TIMER_UI = {
+      tick: null,
+      lastSecond: null,
+      latestTimer: null,
+      isHost: false
+    };
+
+    function normalizeTimer(t){
+      const sel = Number(t?.sel || 30);
+      const dur = Number(t?.dur || sel);
+      const running = !!t?.running;
+      const startTs = Number(t?.startTs || 0);
+      const done = !!t?.done;
+      return { sel, dur, running, startTs, done };
     }
 
-    document.addEventListener("click", (e)=>{
-      if(!helpOpen) return;
-      const t = e.target;
-      if(t.classList && t.classList.contains("helpDot")) return;
-      if(t === helpPopover || helpPopover.contains(t)) return;
-      hideHelp();
+    function computeTimerView(t){
+      const now = Date.now();
+      const sel = Number(t.sel || 30);
+      const dur = Number(t.dur || sel);
+      const running = !!t.running;
+      const startTs = Number(t.startTs || 0);
+      const doneFlag = !!t.done;
+
+      let remaining = sel;
+      if(running && startTs){
+        remaining = dur - Math.floor((now - startTs) / 1000);
+      }else{
+        remaining = sel;
+      }
+      if(!Number.isFinite(remaining)) remaining = sel;
+      remaining = Math.max(0, remaining);
+
+      const done = doneFlag || (running && remaining === 0);
+      const inLast5 = running && remaining > 0 && remaining <= 5;
+      return { sel, dur, running, startTs, remaining, done, inLast5 };
+    }
+
+    function applyTimerDom(){
+      const clock = document.getElementById("timerClock");
+      const numEl = document.getElementById("timerNumber");
+      if(!clock || !numEl) return;
+
+      const t = normalizeTimer(TIMER_UI.latestTimer || {});
+      const view = computeTimerView(t);
+
+      const displayNum = (view.running ? view.remaining : view.sel);
+      numEl.textContent = String(displayNum);
+
+      const ring = document.getElementById("timerRingCircle");
+      if(ring){
+        const r = 54;
+        const C = 2 * Math.PI * r;
+        ring.style.strokeDasharray = String(C);
+
+        let offset = 0;
+        if(view.done){
+          offset = C;
+        }else if(view.running){
+          const ratio = (view.dur > 0) ? (view.remaining / view.dur) : 0;
+          const clamped = Math.max(0, Math.min(1, ratio));
+          offset = C * (1 - clamped);
+        }else{
+          offset = 0;
+        }
+        ring.style.strokeDashoffset = String(offset);
+      }
+
+      if(TIMER_UI.isHost){
+        if(view.running && view.remaining === 0){
+          update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
+        }
+      }
+    }
+
+    function ensureTimerTicker(){
+      if(TIMER_UI.tick) return;
+      TIMER_UI.tick = setInterval(() => applyTimerDom(), 200);
+    }
+
+    function initTimerDefaultsIfNeeded(room){
+      if(role !== "host") return;
+      if(!room) return;
+
+      const t = room.timer;
+      if(t && typeof t === "object") return;
+
+      const key = `__timer_init_${code}`;
+      if(window[key]) return;
+      window[key] = true;
+
+      update(ref(db, `rooms/${code}/timer`), {
+        sel: 30,
+        dur: 30,
+        running: false,
+        startTs: 0,
+        done: false
+      });
+    }
+
+    function buildJoinUrl(roomCode){
+      const u = new URL("join.html", location.href);
+      u.searchParams.set("code", roomCode);
+      return u.toString();
+    }
+    function buildQrUrl(dataUrl){
+      const size = "220x220";
+      return `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(dataUrl)}`;
+    }
+    async function copyText(txt){
+      try{
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(txt);
+          return true;
+        }
+      }catch(e){}
+      try{
+        const ta = document.createElement("textarea");
+        ta.value = txt;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      }catch(e){}
+      return false;
+    }
+
+    const STORE_URL = "https://sandooq-m.com";
+    function openStoreUrl(){
+      try{
+        const w = window.open(STORE_URL, "_blank", "noopener,noreferrer");
+        if(!w) location.href = STORE_URL;
+      }catch(e){
+        location.href = STORE_URL;
+      }
+    }
+    document.addEventListener("click", (e) => {
+      const el = e.target?.closest?.('[data-store-link], #storeBtn, #storeLink');
+      if(el){
+        e.preventDefault();
+        openStoreUrl();
+      }
+      const a = e.target?.closest?.("a[href]");
+      if(a){
+        const href = (a.getAttribute("href") || "").trim();
+        if(href.includes("sandooq-m.com") && !/^https?:\/\//i.test(href)){
+          a.setAttribute("href", "https://" + href.replace(/^\/+/, ""));
+        }
+      }
     }, true);
 
     /* =========================
-       UI: Score Modal
+       ✅ Tooltip (علامة ؟)
     ========================= */
-    const scoreBackdrop = $("scoreBackdrop");
-    const scoreGrid = $("scoreGrid");
-    const scoreTitle = $("scoreTitle");
-    let scorePickCb = null;
+    const TIP = {
+      open:false,
+      anchor:null
+    };
+    const tipEl = document.getElementById("tipBubble");
+    const tipTitleEl = document.getElementById("tipTitle");
+    const tipBodyEl  = document.getElementById("tipBody");
 
-    function openScorePicker(title, cb){
-      scoreTitle.textContent = title;
-      scoreGrid.innerHTML = "";
-      scorePickCb = cb;
+    function closeTip(){
+      TIP.open = false;
+      TIP.anchor = null;
+      if(tipEl) tipEl.style.display = "none";
+    }
 
-      // أرقام 0 - 30
-      const nums = Array.from({length:31}, (_,i)=>i);
-      for(const n of nums){
-        const b = document.createElement("button");
-        b.className = "scorePick";
-        b.textContent = n;
-        b.onclick = ()=>{
-          closeScorePicker();
-          cb(n);
-        };
-        scoreGrid.appendChild(b);
+    function openTipNear(anchorEl, title, body){
+      if(!tipEl) return;
+      TIP.open = true;
+      TIP.anchor = anchorEl;
+
+      tipTitleEl.textContent = title || "";
+      tipBodyEl.textContent = body || "";
+
+      tipEl.style.display = "block";
+
+      const r = anchorEl.getBoundingClientRect();
+      const pad = 10;
+
+      // نحاول نطلعها فوق الزر، ولو ما فيه مساحة ننزلها تحته
+      const w = tipEl.offsetWidth || 260;
+      const h = tipEl.offsetHeight || 90;
+
+      let left = r.left + (r.width/2) - (w/2);
+      left = Math.max(pad, Math.min(left, window.innerWidth - w - pad));
+
+      let top = r.top - h - 12;
+      if(top < pad){
+        top = r.bottom + 12;
       }
-      scoreBackdrop.style.display = "flex";
-    }
-    function closeScorePicker(){
-      scoreBackdrop.style.display = "none";
-      scorePickCb = null;
-    }
-    scoreBackdrop.addEventListener("click", (e)=>{
-      if(e.target === scoreBackdrop) closeScorePicker();
-    });
+      top = Math.max(pad, Math.min(top, window.innerHeight - h - pad));
 
-    /* =========================
-       UI: Winner Celebration
-    ========================= */
-    const winBackdrop = $("winBackdrop");
-    const winTitle = $("winTitle");
-    const winSub = $("winSub");
-    const winConfetti = $("winConfetti");
+      tipEl.style.left = `${left}px`;
+      tipEl.style.top  = `${top}px`;
+    }
 
-    function buildConfetti(){
-      winConfetti.innerHTML = "";
-      const colors = ["#f28c00","#1aa34a","#b43d69","#7fe7ff","#ffffff","#111111"];
-      for(let i=0;i<36;i++){
-        const d = document.createElement("div");
-        d.className = "confettiPiece";
-        d.style.left = (Math.random()*100) + "%";
-        d.style.top = (-10 - Math.random()*40) + "px";
-        d.style.animationDelay = (Math.random()*0.8) + "s";
-        d.style.animationDuration = (1.2 + Math.random()*0.9) + "s";
-        d.style.background = colors[Math.floor(Math.random()*colors.length)];
-        winConfetti.appendChild(d);
+    document.addEventListener("click", (e) => {
+      if(!TIP.open) return;
+
+      // إذا ضغط داخل الفقاعة نفسها: تقفل
+      if(e.target === tipEl || tipEl.contains(e.target)){
+        closeTip();
+        return;
       }
+
+      // إذا ضغط على نفس علامة ؟: خليه المنطق الخاص فيها يتصرف
+      const dot = e.target?.closest?.(".helpDot");
+      if(dot) return;
+
+      // أي مكان ثاني: تقفل
+      closeTip();
+    }, true);
+
+    /* ✅ إدارة أسئلة المقدم */
+    const CUSTOM_Q_UI = { ready:false, roomLatest:null, els:{} };
+
+    function autosizeTA(ta){
+      if(!ta) return;
+      ta.style.height = "auto";
+      ta.style.height = Math.min(240, ta.scrollHeight) + "px";
     }
 
-    function showWin(team){
-      buildConfetti();
-      winTitle.textContent = "مبروك الفوز";
-      if(team === "green"){
-        winSub.textContent = "الفوز للفريق الأخضر";
-      }else if(team === "orange"){
-        winSub.textContent = "الفوز للفريق البرتقالي";
+    function getCustomList(room, letter){
+      const cq = room?.customQuestions || {};
+      const v = cq?.[letter];
+      if(Array.isArray(v)) return v.filter(x => x && (x.q || x.a));
+      if(v && typeof v === "object") return [v].filter(x => x && (x.q || x.a));
+      return [];
+    }
+
+    function createPairEl(qVal="", aVal=""){
+      const wrap = document.createElement("div");
+      wrap.className = "cqPair";
+      wrap.innerHTML = `
+        <div class="cqLbl">السؤال</div>
+        <textarea class="cqTA cqQ" rows="1" placeholder="اكتب هنا السؤال"></textarea>
+        <div class="cqLbl">الجواب</div>
+        <textarea class="cqTA cqA" rows="1" placeholder="اكتب هنا الجواب"></textarea>
+      `;
+      const q = wrap.querySelector(".cqQ");
+      const a = wrap.querySelector(".cqA");
+      q.value = qVal || "";
+      a.value = aVal || "";
+      requestAnimationFrame(()=>{ autosizeTA(q); autosizeTA(a); });
+
+      [q,a].forEach(ta=>{
+        ta.addEventListener("input", ()=> autosizeTA(ta));
+      });
+
+      return wrap;
+    }
+
+    function buildLetterEditor(item, letter, room){
+      const body = item.querySelector(".cqLetterBody");
+      if(!body) return;
+      body.innerHTML = "";
+
+      const pairsWrap = document.createElement("div");
+      pairsWrap.className = "cqPairs";
+
+      const existing = getCustomList(room, letter);
+      if(existing.length){
+        existing.forEach(obj => pairsWrap.appendChild(createPairEl(String(obj.q||""), String(obj.a||""))));
       }else{
-        winSub.textContent = "";
+        pairsWrap.appendChild(createPairEl("", ""));
       }
-      winBackdrop.style.display = "flex";
-      clearTimeout(winBackdrop._t);
-      winBackdrop._t = setTimeout(()=> winBackdrop.style.display="none", 2600);
+
+      const addWrap = document.createElement("div");
+      addWrap.className = "cqAddWrap";
+      addWrap.innerHTML = `<button class="cqAddBtn" type="button" aria-label="إضافة سؤال">+</button>`;
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btnYellow cqSaveFixed";
+      saveBtn.type = "button";
+      saveBtn.textContent = "حفظ";
+
+      const savedMsg = document.createElement("div");
+      savedMsg.className = "cqSavedMsg";
+
+      body.appendChild(pairsWrap);
+      body.appendChild(addWrap);
+      body.appendChild(saveBtn);
+      body.appendChild(savedMsg);
+
+      addWrap.querySelector(".cqAddBtn").addEventListener("click", () => {
+        pairsWrap.appendChild(createPairEl("", ""));
+      });
+
+      saveBtn.addEventListener("click", async () => {
+        const out = [];
+        pairsWrap.querySelectorAll(".cqPair").forEach(p => {
+          const q = (p.querySelector(".cqQ")?.value || "").trim();
+          const a = (p.querySelector(".cqA")?.value || "").trim();
+          if(q || a) out.push({ q, a });
+        });
+
+        await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
+        await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
+
+        savedMsg.textContent = "تم الحفظ ✅";
+        setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+      });
     }
-    winBackdrop.addEventListener("click", ()=>{ winBackdrop.style.display="none"; });
 
-    /* =========================
-       Hex grid geometry (25 خلايا)
-       (شبكة 5x5 — للتوافق مع خرائطك الحالية)
-    ========================= */
-    const ROWS = 5;
-    const COLS = 5;
-    const CELL_COUNT = ROWS * COLS;
+    function ensureCustomQuestionsModal(){
+      if(CUSTOM_Q_UI.ready) return;
 
-    // جيران سداسي (نمط offset)
-    function neighbors(r,c){
-      // even-r horizontal layout (flat-top)
-      const even = (r % 2 === 0);
-      const dirs = even
-        ? [[0,-1],[0,1],[-1,0],[-1,1],[1,0],[1,1]]
-        : [[0,-1],[0,1],[-1,-1],[-1,0],[1,-1],[1,0]];
-      const out = [];
-      for(const [dr,dc] of dirs){
-        const nr=r+dr, nc=c+dc;
-        if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS) out.push([nr,nc]);
+      const backdrop = document.createElement("div");
+      backdrop.id = "cqBackdrop";
+      backdrop.className = "cqBackdrop";
+      backdrop.innerHTML = `
+        <div class="cqModal" role="dialog" aria-modal="true" aria-label="أسئلة المقدم">
+          <button id="cqClose" class="cqCloseRed" aria-label="إغلاق">X</button>
+          <div class="cqTitle">أسئلة خاصة للمقدم</div>
+          <div class="cqHint">اضغط على الحرف لفتح صفحة أسئلته. يمكنك إضافة أكثر من سؤال وجواب لنفس الحرف.</div>
+          <div id="cqList"></div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const cqList = backdrop.querySelector("#cqList");
+      cqList.innerHTML = GAME_LETTERS.map(L => `
+        <details class="cqItem" data-letter="${escapeHtml(L)}">
+          <summary>حرف ${escapeHtml(L)}</summary>
+          <div class="cqLetterBody"></div>
+        </details>
+      `).join("");
+
+      function close(){
+        backdrop.style.display = "none";
+        cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
       }
-      return out;
+
+      backdrop.querySelector("#cqClose").addEventListener("click", close);
+      backdrop.addEventListener("click", (e) => {
+        if(e.target === backdrop) close();
+      });
+
+      cqList.querySelectorAll(".cqItem").forEach(det => {
+        det.addEventListener("toggle", () => {
+          if(!det.open) return;
+          cqList.querySelectorAll(".cqItem").forEach(o => {
+            if(o !== det) o.removeAttribute("open");
+          });
+          const letter = det.getAttribute("data-letter");
+          buildLetterEditor(det, letter, CUSTOM_Q_UI.roomLatest || {});
+        });
+      });
+
+      CUSTOM_Q_UI.ready = true;
+      CUSTOM_Q_UI.els = { backdrop, cqList };
     }
 
-    function idx(r,c){ return r*COLS + c; }
+    function openCustomQuestionsModal(room){
+      ensureCustomQuestionsModal();
+      CUSTOM_Q_UI.roomLatest = room || {};
+      const { backdrop, cqList } = CUSTOM_Q_UI.els;
+      cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
+      backdrop.style.display = "flex";
+    }
 
-    /* =========================
-       Winner detection
-       الأخضر: وصل يسار -> يمين
-       البرتقالي: وصل أعلى -> أسفل
-    ========================= */
-    function hasGreenWin(states){
-      const q = [];
-      const seen = new Set();
-      // start: left edge cells that are green(state2)
-      for(let r=0;r<ROWS;r++){
-        if(states[idx(r,0)] === 2){
-          q.push([r,0]);
-          seen.add(r+","+0);
-        }
+    function getQuestionMode(room){
+      const m = String(room?.questionMode || "default");
+      return (m === "custom") ? "custom" : "default";
+    }
+
+    /* ✅ إعدادات المقدم */
+    const SETTINGS_UI = { ready:false, els:{}, roomLatest:null };
+
+    function ensureSettingsModal(){
+      if(SETTINGS_UI.ready) return;
+
+      const bd = document.createElement("div");
+      bd.id = "settingsBackdrop";
+      bd.className = "settingsBackdrop";
+      bd.innerHTML = `
+        <div class="settingsPanel" role="dialog" aria-modal="true" aria-label="الإعدادات">
+          <div id="settingsMenu">
+            <button id="sHelp" class="settingsBtn" type="button">التعليمات</button>
+            <button id="sTimer" class="settingsBtn" type="button">تعديل المؤقت</button>
+            <button id="sAddQ" class="settingsBtn" type="button">اضافة الاسئلة</button>
+            <button id="sMore" class="settingsBtn" type="button">العابنا الاخرى</button>
+
+            <div id="timerMiniPicker" class="timerMiniPicker" aria-label="اختيار وقت المؤقت">
+              <div class="timerMiniList">
+                <button class="timerMiniItem" data-t="10" type="button">١٠</button>
+                <button class="timerMiniItem" data-t="15" type="button">١٥</button>
+                <button class="timerMiniItem" data-t="20" type="button">٢٠</button>
+                <button class="timerMiniItem" data-t="25" type="button">٢٥</button>
+                <button class="timerMiniItem" data-t="30" type="button">٣٠</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="helpView" class="settingsView">
+            <h3>تعليمات اللعبة</h3>
+            <div style="line-height:1.75;font-weight:700;font-family:'AA-GALAXY', Arial, sans-serif">
+              <p><b>فكرة اللعبة:</b> يختار المقدم حرفًا من الخريطة، ثم يظهر سؤال لهذا الحرف. أول لاعب يضغط زر الإجابة يظهر اسمه في الشريط.</p>
+
+              <p><b>طريقة اللعب باختصار:</b></p>
+              <ul>
+                <li>المقدم يضغط على خلية حرف في الخريطة لاختيار الحرف.</li>
+                <li>يظهر السؤال داخل بطاقة السؤال.</li>
+                <li>اللاعبون يضغطون زر "اضغط هنا للإجابة". أول لاعب يضغط يظهر اسمه.</li>
+                <li>المقدم يقرر النقاط ويحدّث النتيجة من مربعات النقاط.</li>
+              </ul>
+
+              <p><b>شرح الأزرار للمقدم:</b></p>
+              <ul>
+                <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
+                <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
+                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية.</li>
+                <li><b>تغيير نوع الأسئلة:</b> أسئلة عامة / أسئلة خاصة.</li>
+                <li><b>المؤقت:</b> اضغط على دائرة المؤقت لبدء العد. اضغط مرة ثانية لتصفير المؤقت.</li>
+                <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
+                <li><b>تغيير الخريطة:</b> للتنقل بين الخرائط الثلاث.</li>
+              </ul>
+            </div>
+            <button id="helpBack" class="settingsBackMini" type="button">رجوع</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(bd);
+
+      function closeSettings(){
+        bd.style.display = "none";
+        bd.querySelector("#helpView").style.display = "none";
+        bd.querySelector("#settingsMenu").style.display = "flex";
+        const tm = bd.querySelector("#timerMiniPicker");
+        if(tm) tm.style.display = "none";
       }
-      while(q.length){
-        const [r,c] = q.shift();
-        if(c === COLS-1) return true; // reached right edge
-        for(const [nr,nc] of neighbors(r,c)){
-          const key = nr+","+nc;
-          if(seen.has(key)) continue;
-          if(states[idx(nr,nc)] !== 2) continue;
-          seen.add(key);
-          q.push([nr,nc]);
-        }
-      }
-      return false;
+
+      bd.addEventListener("click", (e) => {
+        if(e.target === bd) closeSettings();
+      });
+
+      bd.querySelector("#helpBack").addEventListener("click", () => {
+        bd.querySelector("#helpView").style.display = "none";
+        bd.querySelector("#settingsMenu").style.display = "flex";
+      });
+
+      bd.querySelector("#sHelp").addEventListener("click", () => {
+        bd.querySelector("#settingsMenu").style.display = "none";
+        bd.querySelector("#helpView").style.display = "block";
+      });
+
+      bd.querySelector("#sMore").addEventListener("click", () => {
+        closeSettings();
+        openStoreUrl();
+      });
+
+      bd.querySelector("#sAddQ").addEventListener("click", () => {
+        const room = SETTINGS_UI.roomLatest || {};
+        closeSettings();
+        openCustomQuestionsModal(room);
+      });
+
+      bd.querySelector("#sTimer").addEventListener("click", () => {
+        const tm = bd.querySelector("#timerMiniPicker");
+        if(!tm) return;
+        tm.style.display = (tm.style.display === "block") ? "none" : "block";
+      });
+
+      bd.querySelectorAll(".timerMiniItem").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const v = Number(btn.getAttribute("data-t"));
+          if(![10,15,20,25,30].includes(v)) return;
+
+          await update(ref(db, `rooms/${code}/timer`), {
+            sel: v,
+            dur: v,
+            running: false,
+            done: false,
+            startTs: 0
+          });
+
+          const tm = bd.querySelector("#timerMiniPicker");
+          if(tm) tm.style.display = "none";
+        });
+      });
+
+      SETTINGS_UI.ready = true;
+      SETTINGS_UI.els = { backdrop: bd, closeSettings };
     }
 
-    function hasOrangeWin(states){
-      const q = [];
-      const seen = new Set();
-      // start: top edge cells that are orange(state3)
-      for(let c=0;c<COLS;c++){
-        if(states[idx(0,c)] === 3){
-          q.push([0,c]);
-          seen.add("0,"+c);
-        }
-      }
-      while(q.length){
-        const [r,c] = q.shift();
-        if(r === ROWS-1) return true; // reached bottom edge
-        for(const [nr,nc] of neighbors(r,c)){
-          const key = nr+","+nc;
-          if(seen.has(key)) continue;
-          if(states[idx(nr,nc)] !== 3) continue;
-          seen.add(key);
-          q.push([nr,nc]);
-        }
-      }
-      return false;
+    function openSettings(room){
+      ensureSettingsModal();
+      SETTINGS_UI.roomLatest = room || {};
+      SETTINGS_UI.els.backdrop.style.display = "flex";
+      SETTINGS_UI.els.backdrop.querySelector("#settingsMenu").style.display = "flex";
     }
 
-    /* =========================
-       Question helpers
-    ========================= */
-    function pickRandomLetter(mapIndex){
-      const letters = MAPS[mapIndex].flat();
-      return letters[Math.floor(Math.random()*letters.length)];
-    }
+    function renderHostLobby(room){
+      const players = room.players || {};
+      const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
 
-    function pickQuestion(letter, mode, privateBank){
-      const list = (mode === "private" && privateBank && privateBank[letter] && privateBank[letter].length)
-        ? privateBank[letter]
-        : (QUESTIONS[letter] || []);
-      if(!list.length) return { q:`سؤال لحرف ${letter}`, a:`${letter}...` };
-      return list[Math.floor(Math.random()*list.length)];
-    }
+      const green = list.filter(p => p.team === "green");
+      const orange = list.filter(p => p.team === "orange");
 
-    function loadPrivateQuestions(code){
-      try{
-        const raw = localStorage.getItem("PRIVATE_Q_"+code);
-        if(!raw) return {};
-        const obj = JSON.parse(raw);
-        return (obj && typeof obj === "object") ? obj : {};
-      }catch(e){ return {}; }
-    }
-    function savePrivateQuestions(code, obj){
-      localStorage.setItem("PRIVATE_Q_"+code, JSON.stringify(obj||{}));
-    }
-
-    /* =========================
-       Timer helpers (Host controls)
-    ========================= */
-    const TIMER_DEFAULT = 25;
-
-    function nowMs(){ return Date.now(); }
-
-    function computeTimerRemaining(timer){
-      // timer: {running, total, endAtMs, remaining}
-      if(!timer) return TIMER_DEFAULT;
-      if(!timer.running) return (typeof timer.remaining === "number" ? timer.remaining : TIMER_DEFAULT);
-      const left = Math.max(0, Math.ceil((timer.endAtMs - nowMs())/1000));
-      return left;
-    }
-
-    /* =========================
-       Render: Landing
-    ========================= */
-    function renderLanding(){
       main.innerHTML = `
-        <div class="panel">
-          <div style="font-size:26px;font-weight:900">إنشاء / دخول</div>
+        <div class="waitingLayout">
+          <div class="codeBox">رمز اللعبة</div>
+          <div class="codeNum">${escapeHtml(room.code)}</div>
+          <div class="smallNote">شارك الرمز مع اللاعبين للدخول</div>
 
-          <div class="row">
-            <button id="createBtn" class="btn">إنشاء لعبة</button>
+          <div class="teams" style="margin-top:10px">
+            <div class="teamCol teamGreen">
+              <div class="teamTitle">الفريق الأخضر</div>
+              <div id="greenList"></div>
+            </div>
+            <div class="teamCol teamOrange">
+              <div class="teamTitle">الفريق البرتقالي</div>
+              <div id="orangeList"></div>
+            </div>
           </div>
 
-          <div class="row" style="margin-top:6px">
-            <input id="joinCode" class="in" inputmode="numeric" placeholder="اكتب كود اللعبة (6 أرقام)" maxlength="6" />
-            <input id="joinName" class="in" placeholder="اكتب اسمك" maxlength="18" />
+          <div class="row" style="margin-top:10px">
+            <button id="shareBtn" class="btn btnYellow">مشاركة اللعبة للاعبين</button>
+            <button id="startBtn" class="btn btnGreen">ابدأ اللعبة</button>
           </div>
 
-          <div class="row">
-            <button id="joinBtn" class="btn">دخول لاعب</button>
-          </div>
+          <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
+        </div>
 
-          <div class="smallNote">المقدم ينشئ اللعبة ثم يشارك الكود مع اللاعبين</div>
+        <div id="shareBackdrop" class="shareBackdrop">
+          <div class="shareModal">
+            <button id="shareClose" class="shareClose" aria-label="إغلاق">×</button>
+            <div class="shareTitle">مشاركة اللعبة</div>
+
+            <div class="shareChoices">
+              <button id="shareQrBtn" class="btn btnOrange">باركود</button>
+              <button id="shareCodeBtn" class="btn btnGreen">رمز</button>
+              <button id="shareLinkBtn" class="btn btnYellow">رابط</button>
+            </div>
+
+            <div id="shareQrPanel" class="sharePanel">
+              <img id="qrImg" class="qrImg" alt="QR">
+              <div class="shareSmall" id="joinUrlTxt"></div>
+              <div class="row" style="justify-content:center;margin-top:10px">
+                <button id="copyJoinBtn1" class="btn btnYellow">نسخ الرابط</button>
+              </div>
+              <div class="shareSmall">امسح الباركود أو افتح الرابط للانتقال لصفحة كتابة الاسم</div>
+            </div>
+
+            <div id="shareCodePanel" class="sharePanel">
+              <div class="codeBox" style="text-align:center">رمز الغرفة</div>
+              <div class="shareCodeBig">${escapeHtml(room.code)}</div>
+            </div>
+
+            <div id="shareLinkPanel" class="sharePanel">
+              <div class="codeBox" style="text-align:center">رابط الدخول</div>
+              <div class="shareSmall" id="joinUrlTxt2"></div>
+              <div class="row" style="justify-content:center;margin-top:10px">
+                <button id="copyJoinBtn2" class="btn btnYellow">نسخ الرابط</button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
 
-      $("createBtn").onclick = async ()=>{
-        const code = genCode();
-        const roomRef = ref(db, "rooms/"+code);
-        const init = {
-          createdAt: nowMs(),
-          state: {
-            mapIndex: 0,
-            zoom: 1,
-            cells: Array(CELL_COUNT).fill(0),
-            qMode: "general",
-            q: { text:"", answer:"", letter:"", shown:false },
-            scores: { green:0, orange:0 },
-            firstPress: { name:"", team:"", frozen:false },
-            timer: { running:false, total:TIMER_DEFAULT, remaining:TIMER_DEFAULT, endAtMs:0 },
-            winner: "" // "green" | "orange" | ""
-          },
-          players: {}
-        };
-        await update(roomRef, init);
-        location.href = location.pathname + "?code="+code+"&role=host";
-      };
+      const greenList = document.getElementById("greenList");
+      const orangeList = document.getElementById("orangeList");
 
-      $("joinBtn").onclick = ()=>{
-        const code = $("joinCode").value.trim();
-        const name = $("joinName").value.trim();
-        if(code.length !== 6) return toast("اكتب كود صحيح (6 أرقام)");
-        if(!name) return toast("اكتب اسمك");
-        location.href = location.pathname + "?code="+encodeURIComponent(code)+"&role=player&name="+encodeURIComponent(name);
-      };
+      function draw(colEl, arr){
+        colEl.innerHTML = arr.map(p => `<div class="playerItem" data-id="${escapeHtml(p.id)}">${escapeHtml(p.name)}</div>`).join("") || `<div class="smallNote">لا يوجد</div>`;
+      }
+      draw(greenList, green);
+      draw(orangeList, orange);
+
+      main.querySelectorAll(".playerItem").forEach(el => {
+        el.addEventListener("click", async () => {
+          const id = el.getAttribute("data-id");
+          const p = players[id];
+          if(!p) return;
+          const newTeam = (p.team === "green") ? "orange" : "green";
+          await update(ref(db, `rooms/${code}/players/${id}`), { team: newTeam });
+        });
+      });
+
+      document.getElementById("startBtn").addEventListener("click", async () => {
+        await update(roomRef, {
+          status: "started",
+          activeMap: 0,
+          freeze: false,
+          buzzer: null,
+          current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
+        });
+      });
+
+      const shareBackdrop = document.getElementById("shareBackdrop");
+      const shareBtn = document.getElementById("shareBtn");
+      const shareClose = document.getElementById("shareClose");
+      const shareQrBtn = document.getElementById("shareQrBtn");
+      const shareCodeBtn = document.getElementById("shareCodeBtn");
+      const shareLinkBtn = document.getElementById("shareLinkBtn");
+      const shareQrPanel = document.getElementById("shareQrPanel");
+      const shareCodePanel = document.getElementById("shareCodePanel");
+      const shareLinkPanel = document.getElementById("shareLinkPanel");
+      const qrImg = document.getElementById("qrImg");
+      const joinUrlTxt = document.getElementById("joinUrlTxt");
+      const joinUrlTxt2 = document.getElementById("joinUrlTxt2");
+      const copyJoinBtn1 = document.getElementById("copyJoinBtn1");
+      const copyJoinBtn2 = document.getElementById("copyJoinBtn2");
+
+      const joinUrl = buildJoinUrl(room.code);
+      const qrUrl = buildQrUrl(joinUrl);
+
+      function showPanel(which){
+        shareQrPanel.style.display = (which === "qr") ? "block" : "none";
+        shareCodePanel.style.display = (which === "code") ? "block" : "none";
+        shareLinkPanel.style.display = (which === "link") ? "block" : "none";
+      }
+
+      function openShare(){
+        shareBackdrop.style.display = "flex";
+        showPanel("code");
+      }
+      function closeShare(){
+        shareBackdrop.style.display = "none";
+      }
+
+      shareBtn.addEventListener("click", openShare);
+      shareClose.addEventListener("click", closeShare);
+      shareBackdrop.addEventListener("click", (e) => {
+        if(e.target === shareBackdrop) closeShare();
+      });
+
+      shareQrBtn.addEventListener("click", () => {
+        showPanel("qr");
+        qrImg.src = qrUrl;
+        joinUrlTxt.textContent = joinUrl;
+      });
+
+      shareCodeBtn.addEventListener("click", () => {
+        showPanel("code");
+      });
+
+      shareLinkBtn.addEventListener("click", () => {
+        showPanel("link");
+        joinUrlTxt2.textContent = joinUrl;
+      });
+
+      if(copyJoinBtn1){
+        copyJoinBtn1.addEventListener("click", async () => {
+          const ok = await copyText(joinUrl);
+          copyJoinBtn1.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyJoinBtn1.textContent = "نسخ الرابط", 1200);
+        });
+      }
+      if(copyJoinBtn2){
+        copyJoinBtn2.addEventListener("click", async () => {
+          const ok = await copyText(joinUrl);
+          copyJoinBtn2.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyJoinBtn2.textContent = "نسخ الرابط", 1200);
+        });
+      }
     }
 
-    /* =========================
-       Render: Host / Player
-    ========================= */
-    function renderGameShell(role){
-      const isHost = (role === "host");
+    function renderWaiting(msg){
+      main.innerHTML = `
+        <div class="waitingLayout">
+          <div style="font-size:22px;font-weight:900">${escapeHtml(msg)}</div>
+          <div class="buyNowWrap">
+            <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGame(room, me){
+      setGameName(room?.name);
+
+      const isHost = role === "host";
+      const started = room.status === "started";
+
+      initTimerDefaultsIfNeeded(room);
+
+      const qMode = getQuestionMode(room);
+
+      const MAP_ICON = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M17.65 6.35A7.95 7.95 0 0012 4V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 01-8.66 3.54l-1.42 1.42A7 7 0 1019 12c0-2.21-.9-4.21-2.35-5.65z"></path>
+        </svg>
+      `;
+      const X_ICON = `<span class="txtIcon">×</span>`;
+      const DOC_ICON = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm1 7V3.5L19.5 9H15z"></path>
+          <path d="M8 13h8v2H8v-2zm0 4h8v2H8v-2zm0-8h6v2H8V9z"></path>
+        </svg>
+      `;
+      const GEAR_ICON = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2.11-1.65a.5.5,0,0,0,.12-.64l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.3,7.3,0,0,0-1.63-.94l-.38-2.65A.5.5,0,0,0,12.79,2H9.21a.5.5,0,0,0-.49.42L8.34,5.07a7.3,7.3,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.64L3.86,11.06a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94L1.75,14.59a.5.5,0,0,0-.12.64l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.3,7.3,0,0,0,1.63.94l.38,2.65a.5.5,0,0,0,.49.42h3.58a.5.5,0,0,0,.49-.42l.38-2.65a7.3,7.3,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.64ZM11,15.5A3.5,3.5,0,1,1,14.5,12,3.5,3.5,0,0,1,11,15.5Z"></path>
+        </svg>
+      `;
+
+      // نصوص التولتيب
+      const TIP_TEXT = {
+        map:   { title:"تغيير الخريطة", body:"ينقلك بين الخرائط الثلاث في اللعبة." },
+        clear: { title:"تفريغ الخريطة", body:"يمسح ألوان الخريطة الحالية ويعيدها للوضع الافتراضي." },
+        qmode: { title:"تغيير نوع الأسئلة", body:"تبديل بين الأسئلة العامة وأسئلة المقدم الخاصة." }
+      };
 
       main.innerHTML = `
         <div class="gameLayout">
-          <div class="sideMap">
+          <!-- ✅ يمين (Landscape): الخريطة + أدواتها -->
+          <div class="mapArea">
             <div class="mapOuter">
-              <div class="mapScale" id="mapScale" style="--zoom:1">
-                <div class="mapBox">
-                  <img id="mapImg" src="map1.jpeg" alt="الخريطة">
-                  <svg id="overlaySvg" class="overlaySvg" viewBox="0 0 1000 600" preserveAspectRatio="none"></svg>
+              <div id="mapScale" class="mapScale" style="--zoom:1">
+                <div id="mapBox" class="mapBox">
+                  <img id="mapImg" src="" alt="">
+                  <svg id="overlay" class="overlaySvg"></svg>
                 </div>
               </div>
             </div>
 
+            <!-- ✅ أدوات تحت الخريطة -->
             <div class="mapToolsRow">
               <div class="zoomWrap">
-                <input id="zoomRange" type="range" min="0.8" max="1.6" step="0.05" value="1">
+                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" />
               </div>
 
-              <button id="btnMap" class="toolBtn" title="تغيير الخريطة">
-                <span class="helpDot" data-help="تغيير الخريطة">?</span>
-                <span class="txtIcon">↻</span>
-              </button>
+              ${isHost ? `
+                <div class="toolWrap">
+                  <button id="mapBtn" class="toolBtn" type="button" aria-label="تغيير الخريطة">${MAP_ICON}</button>
+                  <button class="helpDot" type="button" data-tip="map" aria-label="مساعدة">?</button>
+                </div>
 
-              <button id="btnClear" class="toolBtn" title="تفريغ الخريطة">
-                <span class="helpDot" data-help="تفريغ الخريطة">?</span>
-                <span class="txtIcon">×</span>
-              </button>
+                <div class="toolWrap">
+                  <button id="clearBoardBtn" class="toolBtn" type="button" aria-label="تفريغ الخريطة">${X_ICON}</button>
+                  <button class="helpDot" type="button" data-tip="clear" aria-label="مساعدة">?</button>
+                </div>
 
-              <button id="btnQMode" class="toolBtn" title="تغيير نوع الأسئلة">
-                <span class="helpDot" data-help="تغيير نوع الأسئلة">?</span>
-                <span class="txtIcon">▣</span>
-              </button>
+                <div class="toolWrap">
+                  <button id="qModeBtn" class="toolBtn ${qMode === "custom" ? "cyan" : ""}" type="button" aria-label="تغيير نوع الأسئلة">${DOC_ICON}</button>
+                  <button class="helpDot" type="button" data-tip="qmode" aria-label="مساعدة">?</button>
+                </div>
 
-              <button id="btnSettings" class="toolBtn" title="الإعدادات">
-                <span class="txtIcon">⚙</span>
-              </button>
+                <div class="toolWrap">
+                  <button id="settingsBtn" class="toolBtn" type="button" aria-label="الإعدادات">${GEAR_ICON}</button>
+                </div>
+              ` : ``}
             </div>
           </div>
 
-          <div class="sideMain">
-            <div class="scoreBar">
-              <div class="teamPill orange">الفريق البرتقالي</div>
-              <button id="scoreOrange" class="scoreBox ${isHost ? "" : "readonly"}" ${isHost ? "" : "disabled"}>0</button>
-              <button id="scoreGreen" class="scoreBox ${isHost ? "" : "readonly"}" ${isHost ? "" : "disabled"}>0</button>
-              <div class="teamPill green">الفريق الأخضر</div>
-            </div>
-
-            <div id="firstPress" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+          <!-- ✅ يسار (Landscape): المؤقت + الأزرار + السؤال -->
+          <div class="leftArea">
+            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
 
             <div class="controlRow">
-              <!-- ✅ تم تبديل مكان زر تجميد الأزرار مع زر تغيير السؤال -->
-              <button id="btnFreeze" class="pillBtn">تجميد الأزرار</button>
+              <!-- ✅ (تعديل 1) تم تبديل المكان: تجميد يمين / تغيير السؤال يسار -->
+              ${isHost ? `<button id="freezeBtn" class="pillBtn" type="button">تجميد الأزرار</button>` : `<div style="flex:1 1 0"></div>`}
 
-              <div class="timerWrap">
-                <button id="timerBtn" class="timerClockBtn" ${isHost ? "" : "disabled"} aria-label="المؤقت">
-                  <svg id="timerRing" class="timerRing" viewBox="0 0 100 100">
-                    <circle id="ringCircle" cx="50" cy="50" r="44"></circle>
+              <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
+                <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"} aria-label="المؤقت">
+                  <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+                    <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
                   </svg>
-                  <div id="timerNum" class="timerNumber">25</div>
+                  <span id="timerNumber" class="timerNumber">30</span>
                 </button>
               </div>
 
-              <button id="btnNextQ" class="pillBtn">تغيير السؤال</button>
-            </div>
-
-            <div class="questionCard">
-              <div id="qText" class="qText">—</div>
-              <button id="answerBtn" class="answerBtn answerHidden">${isHost ? "اضغط للإجابة" : "اضغط للإجابة"}</button>
+              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<div style="flex:1 1 0"></div>`}
             </div>
 
             ${isHost ? `
-              <div class="panel" style="margin-top:10px">
-                <div style="font-size:20px;font-weight:900">اللاعبون</div>
-                <div id="playersList" style="text-align:right"></div>
-                <div class="smallNote">اضغط على اسم اللاعب لتبديل الفريق (أخضر / برتقالي)</div>
+              <div class="questionCard">
+                <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
+                <button id="answerBtn" class="answerBtn disabled" type="button">اضغط للإجابة</button>
               </div>
             ` : `
               <div class="playerBtnWrap">
-                <button id="playerBuzz" class="playerBigBtn">اضغط هنا</button>
+                <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
+                ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
+                <div class="buyNowWrap">
+                  <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+                </div>
               </div>
             `}
           </div>
         </div>
       `;
-    }
 
-    /* =========================
-       SVG overlay hexes (توليد 25 خلية)
-    ========================= */
-    function buildHexOverlay(svgEl){
-      svgEl.innerHTML = "";
-      // ضبط أبعاد السداسي في الـ viewBox
-      const W = 1000, H = 600;
-      const hexW = 150;
-      const hexH = 130;
-      const startX = 220;
-      const startY = 95;
+      // ✅ تفعيل التولتيب (علامة ؟)
+      main.querySelectorAll(".helpDot").forEach(dot => {
+        dot.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
 
-      // حساب نقاط سداسي flat-top
-      function hexPoints(cx, cy){
-        const a = hexW/2;
-        const b = hexH/2;
-        const pts = [
-          [cx-a*0.5, cy-b],
-          [cx+a*0.5, cy-b],
-          [cx+a,     cy],
-          [cx+a*0.5, cy+b],
-          [cx-a*0.5, cy+b],
-          [cx-a,     cy]
-        ];
-        return pts.map(p=>p.join(",")).join(" ");
-      }
+          const key = dot.getAttribute("data-tip");
+          const data = TIP_TEXT[key];
+          if(!data) return;
 
-      for(let r=0;r<ROWS;r++){
-        for(let c=0;c<COLS;c++){
-          const shift = (r%2===0) ? 0 : (hexW*0.5);
-          const cx = startX + c*hexW*0.9 + shift;
-          const cy = startY + r*hexH*0.82;
+          // Toggle
+          if(TIP.open && TIP.anchor === dot){
+            closeTip();
+            return;
+          }
+          openTipNear(dot, data.title, data.body);
+        });
+      });
 
-          const poly = document.createElementNS("http://www.w3.org/2000/svg","polygon");
-          poly.setAttribute("points", hexPoints(cx,cy));
-          poly.setAttribute("data-r", r);
-          poly.setAttribute("data-c", c);
-          poly.setAttribute("class", "cell state0");
-          svgEl.appendChild(poly);
+      // لو ضغط على زر من الأزرار الصغيرة، اقفل التولتيب مباشرة
+      ["mapBtn","clearBoardBtn","qModeBtn","settingsBtn"].forEach(id=>{
+        const b = document.getElementById(id);
+        if(b){
+          b.addEventListener("click", ()=> closeTip(), true);
+        }
+      });
+
+      // ✅ المؤقت
+      TIMER_UI.latestTimer = room.timer || {};
+      TIMER_UI.isHost = isHost;
+      ensureTimerTicker();
+      applyTimerDom();
+
+      if(isHost){
+        const clock = document.getElementById("timerClock");
+        if(clock){
+          clock.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const t = normalizeTimer(TIMER_UI.latestTimer || {});
+            const sel = Number(t.sel || 30);
+
+            if(t.running || t.done){
+              await update(ref(db, `rooms/${code}/timer`), {
+                running:false,
+                done:false,
+                startTs:0,
+                dur: sel
+              });
+              return;
+            }
+
+            await update(ref(db, `rooms/${code}/timer`), {
+              sel,
+              dur: sel,
+              running:true,
+              done:false,
+              startTs: Date.now()
+            });
+          });
         }
       }
-    }
 
-    function setHexStates(svgEl, states, pulseIdx){
-      const polys = svgEl.querySelectorAll("polygon.cell");
-      polys.forEach((p)=>{
-        const r = +p.getAttribute("data-r");
-        const c = +p.getAttribute("data-c");
-        const s = states[idx(r,c)] || 0;
-        p.classList.remove("state0","state1","state2","state3","pulse");
-        p.classList.add("state"+s);
-        if(s === 1 && pulseIdx === idx(r,c)) p.classList.add("pulse");
+      // ✅ الإعدادات
+      if(isHost){
+        const settingsBtn = document.getElementById("settingsBtn");
+        if(settingsBtn){
+          settingsBtn.addEventListener("click", () => openSettings(room));
+        }
+      }
+
+      // ✅ تغيير نوع الأسئلة (أيقونة الملف) + (تعديل 4) اللون السماوي عند الأسئلة الخاصة
+      if(isHost){
+        const qModeBtn = document.getElementById("qModeBtn");
+        if(qModeBtn){
+          // ضبط اللون حسب الحالة الحالية
+          if(getQuestionMode(room) === "custom") qModeBtn.classList.add("cyan");
+          else qModeBtn.classList.remove("cyan");
+
+          qModeBtn.addEventListener("click", async () => {
+            const cur = getQuestionMode(room);
+            const next = (cur === "custom") ? "default" : "custom";
+            await update(ref(db, `rooms/${code}`), { questionMode: next });
+          });
+        }
+      }
+
+      // ✅ تغيير الخريطة
+      const mapBtn = document.getElementById("mapBtn");
+      if(mapBtn){
+        mapBtn.addEventListener("click", async () => {
+          const activeMap = Number(room.activeMap || 0);
+          const next = (activeMap + 1) % 3;
+          await update(roomRef, {
+            activeMap: next,
+            buzzer: null,
+            current: { letter: null, qIndex: 0, row: null, col: null, map: next }
+          });
+        });
+      }
+
+      // ✅ تفريغ الخريطة
+      const clearBoardBtn = document.getElementById("clearBoardBtn");
+      if(clearBoardBtn){
+        clearBoardBtn.addEventListener("click", async () => {
+          const activeMap = Number(room.activeMap || 0);
+          const updates = {};
+          updates[`rooms/${code}/mapStates/${activeMap}`] = null;
+          updates[`rooms/${code}/buzzer`] = null;
+          await update(ref(db), updates);
+        });
+      }
+
+      // ✅ زوم
+      const mapImg = document.getElementById("mapImg");
+      const overlay = document.getElementById("overlay");
+      const mapScale = document.getElementById("mapScale");
+      const zoom = document.getElementById("zoom");
+
+      const activeMap = Number(room.activeMap || 0);
+      const src = ([
+        "maps/map1.jpeg",
+        "maps/map2.jpeg",
+        "maps/map3.jpeg"
+      ][activeMap] || "maps/map1.jpeg");
+      mapImg.src = src;
+
+      overlay.innerHTML = "";
+      overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+      const svgNS = "http://www.w3.org/2000/svg";
+      for(let row=0; row<5; row++){
+        for(let col=0; col<5; col++){
+          const poly = document.createElementNS(svgNS, "polygon");
+          poly.classList.add("cell", "state0");
+          poly.setAttribute("data-row", row);
+          poly.setAttribute("data-col", col);
+          overlay.appendChild(poly);
+        }
+      }
+
+      overlay.style.pointerEvents = isHost ? "auto" : "none";
+
+      const ZOOM_KEY = `sabaq_zoom_${code}`;
+      const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
+      if(zoom && Number.isFinite(savedZoom) && savedZoom >= 0.8 && savedZoom <= 1.35){
+        zoom.value = String(savedZoom);
+      }
+
+      function applyZoomFix(){
+        const mapBox = document.getElementById("mapBox");
+        const mapOuter = document.querySelector(".mapOuter");
+        if(!mapBox || !mapOuter) return;
+
+        const z = Number(zoom.value || 1);
+        mapScale.style.setProperty("--zoom", z);
+
+        const baseH = mapBox.offsetHeight || 0;
+        const extra = Math.max(0, baseH * (z - 1));
+        mapOuter.style.marginBottom = `${extra}px`;
+      }
+
+      function placeHexes(){
+        const W = mapImg.clientWidth;
+        const H = mapImg.clientHeight;
+        if(!W || !H) return;
+
+        overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
+        overlay.setAttribute("preserveAspectRatio", "none");
+
+        const bbox = BBOX_CACHE[src];
+        if(!bbox) return;
+
+        const x0 = bbox.x0 * W;
+        const y0 = bbox.y0 * H;
+        const x1 = bbox.x1 * W;
+        const y1 = bbox.y1 * H;
+
+        const gridW = x1 - x0;
+        const gridH = y1 - y0;
+
+        const w = gridW / 5.5;
+        const h = gridH / 4.0;
+        const stepY = h * 0.75;
+
+        const cells = overlay.querySelectorAll(".cell");
+        let i = 0;
+        for(let row=0; row<5; row++){
+          for(let col=0; col<5; col++){
+            const left = x0 + col*w + (row%2)*(w/2);
+            const top  = y0 + row*stepY;
+            cells[i++].setAttribute("points", hexPointsPointyTop(left, top, w, h));
+          }
+        }
+
+        applyZoomFix();
+      }
+
+      function onMapReady(){
+        if(!BBOX_CACHE[src]) BBOX_CACHE[src] = detectHexBBox(mapImg);
+        requestAnimationFrame(placeHexes);
+      }
+
+      if(mapImg.complete) onMapReady();
+      else mapImg.addEventListener("load", onMapReady, { once:true });
+
+      window.addEventListener("resize", () => {
+        placeHexes();
+        applyZoomFix();
       });
+
+      zoom.addEventListener("input", () => {
+        const z = Number(zoom.value || 1);
+        localStorage.setItem(ZOOM_KEY, String(z));
+        applyZoomFix();
+      });
+
+      // حالات الخريطة
+      const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
+      overlay.querySelectorAll(".cell").forEach(cell => {
+        const r = Number(cell.getAttribute("data-row"));
+        const c = Number(cell.getAttribute("data-col"));
+        const k = cellKey(r,c);
+        const st = Number(mapStates?.[k] ?? 0);
+        setStateClass(cell, st);
+      });
+
+      // شريط أول لاعب يضغط
+      const firstPressBar = document.getElementById("firstPressBar");
+      const buzzer = room.buzzer;
+      if(buzzer && buzzer.name && firstPressBar){
+        firstPressBar.classList.add("filled");
+        firstPressBar.style.background = teamColor(buzzer.team);
+        firstPressBar.textContent = buzzer.name;
+      }else if(firstPressBar){
+        firstPressBar.classList.remove("filled");
+        firstPressBar.style.background = "rgba(255,255,255,.10)";
+        firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
+      }
+
+      // ✅ المقدم: عرض السؤال + زر الإجابة التفاعلي (تعديل 5)
+      if(isHost){
+        const qText = document.getElementById("qText");
+        const ansBtn = document.getElementById("answerBtn");
+        const cur = room.current || {};
+
+        function setAnswerForNewQuestion(answerText){
+          if(!ansBtn) return;
+          const a = String(answerText || "").trim();
+          ansBtn.dataset.answer = a;
+          ansBtn.dataset.revealed = "0";
+          ansBtn.classList.remove("revealed");
+          ansBtn.textContent = "اضغط للإجابة";
+          if(!a){
+            ansBtn.classList.add("disabled");
+          }else{
+            ansBtn.classList.remove("disabled");
+          }
+        }
+
+        if(ansBtn){
+          ansBtn.addEventListener("click", () => {
+            const a = String(ansBtn.dataset.answer || "").trim();
+            if(!a) return;
+            const isRev = (ansBtn.dataset.revealed === "1");
+            if(isRev){
+              ansBtn.dataset.revealed = "0";
+              ansBtn.classList.remove("revealed");
+              ansBtn.textContent = "اضغط للإجابة";
+            }else{
+              ansBtn.dataset.revealed = "1";
+              ansBtn.classList.add("revealed");
+              ansBtn.textContent = a;
+            }
+          });
+        }
+
+        if(cur.letter){
+          const mode = getQuestionMode(room);
+
+          let list = [];
+          if(mode === "custom"){
+            list = getCustomList(room, cur.letter);
+            if(!list.length){
+              qText.textContent = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
+              setAnswerForNewQuestion("");
+            }else{
+              const idx = Number(cur.qIndex || 0) % list.length;
+              const item = list[idx];
+              qText.textContent = item?.q ?? "—";
+              setAnswerForNewQuestion(item?.a ?? "");
+            }
+          }else{
+            list = QUESTIONS[cur.letter] || [];
+            if(!list.length){
+              qText.textContent = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
+              setAnswerForNewQuestion("");
+            }else{
+              const idx = Number(cur.qIndex || 0) % list.length;
+              const item = list[idx];
+              qText.textContent = item?.q ?? "—";
+              setAnswerForNewQuestion(item?.a ?? "");
+            }
+          }
+        }else{
+          qText.textContent = "اختر حرفًا من الخريطة";
+          setAnswerForNewQuestion("");
+        }
+      }
+
+      // ✅ تجميد الأزرار
+      const freezeBtn = document.getElementById("freezeBtn");
+      if(freezeBtn){
+        freezeBtn.addEventListener("click", async () => {
+          await update(roomRef, { freeze: !room.freeze, buzzer: null });
+        });
+      }
+
+      // ✅ تغيير السؤال
+      const nextQ = document.getElementById("nextQ");
+      if(nextQ){
+        nextQ.addEventListener("click", async () => {
+          const cur = room.current || {};
+          if(!cur.letter) return;
+
+          const mode = getQuestionMode(room);
+          const list = (mode === "custom") ? getCustomList(room, cur.letter) : (QUESTIONS[cur.letter] || []);
+          if(!list.length) return;
+
+          const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
+          await update(roomRef, { current: { ...cur, qIndex: nextIndex } });
+        });
+      }
+
+      // ✅ اختيار حرف من الخريطة
+      if(isHost){
+        overlay.querySelectorAll(".cell").forEach(cell => {
+          cell.addEventListener("click", async (e) => {
+            e.preventDefault();
+            if(room.status !== "started") return;
+
+            const r = Number(cell.getAttribute("data-row"));
+            const c = Number(cell.getAttribute("data-col"));
+            const k = cellKey(r,c);
+
+            const st = Number(mapStates?.[k] ?? 0);
+            const next = (st + 1) % 4;
+
+            const letter = MAPS[activeMap][r][c];
+
+            const updates = {};
+            updates[`rooms/${code}/mapStates/${activeMap}/${k}`] = next;
+            updates[`rooms/${code}/buzzer`] = null;
+            updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: r, col: c, map: activeMap };
+
+            await update(ref(db), updates);
+          });
+        });
+      }
+
+      // ✅ اللاعب: زر الإجابة
+      const buzzBtn = document.getElementById("buzzBtn");
+      if(buzzBtn){
+        const disabled = (!started) || room.freeze || !me || !me.name;
+        if(disabled) buzzBtn.classList.add("disabled");
+
+        buzzBtn.addEventListener("click", async () => {
+          if(!started) return;
+          if(room.freeze) return;
+          if(!me) return;
+
+          const buzzerRef = ref(db, `rooms/${code}/buzzer`);
+          await runTransaction(buzzerRef, (cur) => {
+            if(cur === null){
+              return { pid, name: me.name, team: me.team, ts: Date.now() };
+            }
+            return;
+          });
+        });
+      }
     }
 
-    /* =========================
-       Main: connect to room
-    ========================= */
-    async function runRoom(code, role, name){
-      renderGameShell(role);
-      const isHost = (role === "host");
-
-      const roomRef = ref(db, "rooms/"+code);
-      const stateRef = ref(db, "rooms/"+code+"/state");
-      const playersRef = ref(db, "rooms/"+code+"/players");
-
-      // تحقق وجود الغرفة
-      const snap = await get(roomRef);
+    onValue(roomRef, (snap) => {
       if(!snap.exists()){
-        toast("الكود غير موجود");
-        renderLanding();
+        main.textContent = "اللعبة غير موجودة (رمز غير صحيح).";
+        setGameName("");
+        return;
+      }
+      const room = snap.val();
+      setGameName(room?.name);
+
+      TIMER_UI.latestTimer = room.timer || {};
+      applyTimerDom();
+
+      if(role === "host"){
+        if(!hostKey || hostKey !== room.presenterKey){
+          main.textContent = "صلاحية المقدم غير صحيحة.";
+          return;
+        }
+        if(room.status === "lobby"){
+          renderHostLobby(room);
+          return;
+        }
+        renderGame(room, null);
         return;
       }
 
-      // تسجيل اللاعب
-      let myId = "";
-      if(!isHost){
-        myId = "p_" + Math.random().toString(16).slice(2,10);
-        // اختيار فريق تلقائي (يتبدل عند دخول لاعبين جدد)
-        await runTransaction(playersRef, (players)=>{
-          players = players || {};
-          const count = Object.keys(players).length;
-          const team = (count % 2 === 0) ? "green" : "orange";
-          players[myId] = { name: safeText(name||"لاعب"), team, joinedAt: nowMs() };
-          return players;
-        });
+      const players = room.players || {};
+      const me = pid ? players[pid] : null;
+
+      if(!pid || !me){
+        main.textContent = "بيانات اللاعب غير صحيحة.";
+        return;
       }
 
-      // private questions bank (على جهاز المقدم فقط)
-      const privateBank = loadPrivateQuestions(code);
-
-      // عناصر UI
-      const mapImg = $("mapImg");
-      const overlaySvg = $("overlaySvg");
-      const mapScale = $("mapScale");
-      const zoomRange = $("zoomRange");
-
-      const btnMap = $("btnMap");
-      const btnClear = $("btnClear");
-      const btnQMode = $("btnQMode");
-      const btnSettings = $("btnSettings");
-
-      const scoreOrangeBtn = $("scoreOrange");
-      const scoreGreenBtn = $("scoreGreen");
-
-      const firstPressEl = $("firstPress");
-
-      const btnFreeze = $("btnFreeze");
-      const btnNextQ = $("btnNextQ");
-
-      const timerBtn = $("timerBtn");
-      const timerRing = $("timerRing");
-      const ringCircle = $("ringCircle");
-      const timerNum = $("timerNum");
-
-      const qTextEl = $("qText");
-      const answerBtn = $("answerBtn");
-
-      const playersList = $("playersList");
-      const playerBuzz = $("playerBuzz");
-
-      buildHexOverlay(overlaySvg);
-
-      // Tooltips (?) — فقط للأزرار الثلاثة المطلوبة
-      main.querySelectorAll(".helpDot").forEach(dot=>{
-        dot.addEventListener("click",(e)=>{
-          e.stopPropagation();
-          const t = dot.getAttribute("data-help") || "";
-          let msg = "";
-          if(t === "تغيير الخريطة") msg = "يبدّل بين الخرائط الثلاثة ويعيد تفريغ الخلايا للجولة الجديدة.";
-          if(t === "تفريغ الخريطة") msg = "يعيد الخلايا للون الأبيض (تفريغ الجولة الحالية).";
-          if(t === "تغيير نوع الأسئلة") msg = "يبدّل بين الأسئلة العامة وأسئلة المقدم الخاصة.";
-          showHelp(dot, msg);
-        });
-      });
-
-      // إعدادات (بسيطة: تعديل اسم اللعبة + تعديل أسئلة خاصة على جهاز المقدم)
-      btnSettings.onclick = ()=>{
-        if(!isHost){
-          toast("الإعدادات للمقدم فقط");
-          return;
-        }
-        const g = prompt("اكتب اسم اللعبة (اختياري):", "");
-        if(g !== null){
-          const el = $("gameName");
-          el.innerHTML = g.trim() ? `<div class="gnText">${safeText(g.trim())}</div>` : "";
-        }
-        const want = confirm("هل تريد تعديل الأسئلة الخاصة على هذا الجهاز؟");
-        if(!want) return;
-
-        const letter = prompt("اكتب الحرف الذي تريد إضافة سؤال له (مثال: هـ):", "هـ");
-        if(!letter) return;
-        const q = prompt("اكتب نص السؤال:", "");
-        if(!q) return;
-        const a = prompt("اكتب الجواب:", "");
-        if(!a) return;
-        const L = letter.trim();
-        privateBank[L] = privateBank[L] || [];
-        privateBank[L].push({ q:q.trim(), a:a.trim() });
-        savePrivateQuestions(code, privateBank);
-        toast("تم حفظ السؤال الخاص على جهاز المقدم");
-      };
-
-      // Zoom
-      zoomRange.oninput = ()=>{
-        const z = +zoomRange.value;
-        mapScale.style.setProperty("--zoom", z);
-        if(isHost) update(stateRef, { zoom: z });
-      };
-
-      // Change map
-      btnMap.onclick = async ()=>{
-        if(!isHost){ toast("للمقدم فقط"); return; }
-        const s = (await get(stateRef)).val();
-        const next = ((s?.mapIndex ?? 0) + 1) % 3;
-        await update(stateRef, {
-          mapIndex: next,
-          cells: Array(CELL_COUNT).fill(0),
-          winner: "", // ✅ بدء جولة جديدة تلقائياً
-          firstPress: { name:"", team:"", frozen: (s?.firstPress?.frozen ?? false) }
-        });
-      };
-
-      // Clear map
-      btnClear.onclick = async ()=>{
-        if(!isHost){ toast("للمقدم فقط"); return; }
-        const s = (await get(stateRef)).val();
-        await update(stateRef, {
-          cells: Array(CELL_COUNT).fill(0),
-          winner: "", // ✅ بدء جولة جديدة تلقائياً
-          firstPress: { name:"", team:"", frozen: (s?.firstPress?.frozen ?? false) }
-        });
-      };
-
-      // Toggle Q Mode
-      btnQMode.onclick = async ()=>{
-        if(!isHost){ toast("للمقدم فقط"); return; }
-        const s = (await get(stateRef)).val();
-        const cur = s?.qMode || "general";
-        const next = (cur === "general") ? "private" : "general";
-        await update(stateRef, { qMode: next });
-      };
-
-      // Score pickers (Host only)
-      if(isHost){
-        scoreOrangeBtn.onclick = ()=> openScorePicker("نقاط الفريق البرتقالي", async (n)=>{
-          await update(stateRef, { "scores/orange": n });
-        });
-        scoreGreenBtn.onclick = ()=> openScorePicker("نقاط الفريق الأخضر", async (n)=>{
-          await update(stateRef, { "scores/green": n });
-        });
+      if(room.status === "lobby"){
+        renderWaiting("بانتظار بدء اللعبة من المقدم...");
+        return;
       }
 
-      // Freeze buzzer
-      btnFreeze.onclick = async ()=>{
-        if(!isHost){ toast("للمقدم فقط"); return; }
-        const s = (await get(stateRef)).val();
-        const frozen = !!(s?.firstPress?.frozen);
-        await update(stateRef, { "firstPress/frozen": !frozen });
-      };
+      renderGame(room, me);
+    });
 
-      // Next Question
-      btnNextQ.onclick = async ()=>{
-        if(!isHost){ toast("للمقدم فقط"); return; }
-        const s = (await get(stateRef)).val();
-        const mapIndex = s?.mapIndex ?? 0;
-        const mode = s?.qMode ?? "general";
-
-        const letter = pickRandomLetter(mapIndex);
-        const qa = pickQuestion(letter, mode, privateBank);
-
-        await update(stateRef, {
-          q: { text: qa.q, answer: qa.a, letter, shown: false }
-        });
-      };
-
-      // Answer button (Host reveals only)
-      answerBtn.onclick = async ()=>{
-        if(!isHost) return; // اللاعب ما يكشف الجواب
-        const s = (await get(stateRef)).val();
-        const q = s?.q || {};
-        if(!q.text) return;
-        const shown = !!q.shown;
-        await update(stateRef, { "q/shown": !shown });
-      };
-
-      // Player buzz
-      if(playerBuzz){
-        playerBuzz.onclick = async ()=>{
-          const s = (await get(stateRef)).val();
-          if(s?.firstPress?.frozen) return;
-          if(s?.firstPress?.name) return; // أول لاعب فقط
-          // اجلب اسمي/فريقي
-          const ps = (await get(child(playersRef, myId))).val();
-          const myName = ps?.name || name || "لاعب";
-          const myTeam = ps?.team || "green";
-          await update(stateRef, { firstPress: { name: myName, team: myTeam, frozen: (s?.firstPress?.frozen ?? false) } });
-        };
-      }
-
-      // Clicking cells (Host only)
-      overlaySvg.addEventListener("click", async (e)=>{
-        if(!isHost) return;
-        const poly = e.target;
-        if(!(poly instanceof SVGPolygonElement)) return;
-        const r = +poly.getAttribute("data-r");
-        const c = +poly.getAttribute("data-c");
-        const i = idx(r,c);
-
-        const s = (await get(stateRef)).val();
-        const cells = (s?.cells || Array(CELL_COUNT).fill(0)).slice();
-
-        // دورة الألوان: أبيض(0) -> أصفر(1) -> أخضر(2) -> برتقالي(3) -> أبيض(0)
-        const cur = cells[i] || 0;
-        const next = (cur + 1) % 4;
-        cells[i] = next;
-
-        await update(stateRef, { cells });
-      });
-
-      // Players list (Host team assign)
-      if(playersList && isHost){
-        onValue(playersRef, (snap)=>{
-          const players = snap.val() || {};
-          const ids = Object.keys(players).sort((a,b)=>(players[a].joinedAt||0)-(players[b].joinedAt||0));
-          playersList.innerHTML = "";
-          if(!ids.length){
-            playersList.innerHTML = `<div class="smallNote" style="opacity:.9;text-align:center">لا يوجد لاعبين</div>`;
-            return;
-          }
-          for(const pid of ids){
-            const p = players[pid];
-            const div = document.createElement("div");
-            div.style.margin = "6px 0";
-            div.style.padding = "10px 12px";
-            div.style.borderRadius = "16px";
-            div.style.border = "4px solid rgba(0,0,0,.85)";
-            div.style.background = (p.team === "green") ? "rgba(26,163,74,.75)" : "rgba(242,140,0,.75)";
-            div.style.color = "#fff";
-            div.style.fontWeight = "900";
-            div.style.cursor = "pointer";
-            div.textContent = p.name + " — " + (p.team==="green" ? "أخضر" : "برتقالي");
-            div.onclick = async ()=>{
-              const nextTeam = (p.team === "green") ? "orange" : "green";
-              await update(child(playersRef, pid), { team: nextTeam });
-            };
-            playersList.appendChild(div);
-          }
-        });
-      }
-
-      /* =========================
-         State listener (renders everything live)
-      ========================= */
-      let lastPulse = -1;
-      let timerTick = null;
-
-      function startTimerUiLoop(){
-        if(timerTick) return;
-        timerTick = setInterval(()=>{ /* trigger UI refresh via latestState */ }, 250);
-      }
-
-      let latestState = null;
-      onValue(stateRef, (snap)=>{
-        const s = snap.val();
-        if(!s) return;
-        latestState = s;
-
-        // Map image
-        const mi = s.mapIndex ?? 0;
-        mapImg.src = ["map1.jpeg","map2.jpeg","map3.jpeg"][mi] || "map1.jpeg";
-
-        // Zoom
-        const z = s.zoom ?? 1;
-        mapScale.style.setProperty("--zoom", z);
-        if(Math.abs(+zoomRange.value - z) > 0.001) zoomRange.value = z;
-
-        // Cells
-        const cells = (s.cells && s.cells.length === CELL_COUNT) ? s.cells : Array(CELL_COUNT).fill(0);
-
-        // نبض خفيف على آخر خلية صفراء (اختياري)
-        lastPulse = cells.lastIndexOf(1);
-
-        setHexStates(overlaySvg, cells, lastPulse);
-
-        // Q mode button color
-        const mode = s.qMode || "general";
-        if(mode === "private") btnQMode.classList.add("cyan");
-        else btnQMode.classList.remove("cyan");
-
-        // Scores
-        const sc = s.scores || {green:0, orange:0};
-        scoreGreenBtn.textContent = sc.green ?? 0;
-        scoreOrangeBtn.textContent = sc.orange ?? 0;
-
-        // First press bar
-        const fp = s.firstPress || {name:"", team:"", frozen:false};
-        if(fp.name){
-          firstPressEl.textContent = fp.name;
-          firstPressEl.classList.add("filled");
-          if(fp.team === "green") firstPressEl.style.background = "rgba(26,163,74,.85)";
-          else if(fp.team === "orange") firstPressEl.style.background = "rgba(242,140,0,.85)";
-          else firstPressEl.style.background = "rgba(255,255,255,.12)";
-        }else{
-          firstPressEl.textContent = "اسم اللاعب الذي يضغط أولاً";
-          firstPressEl.classList.remove("filled");
-          firstPressEl.style.background = "rgba(255,255,255,.10)";
-        }
-
-        // Freeze button label
-        const frozen = !!fp.frozen;
-        btnFreeze.textContent = frozen ? "إلغاء التجميد" : "تجميد الأزرار";
-
-        // Player button state
-        if(playerBuzz){
-          if(frozen) playerBuzz.classList.add("disabled");
-          else playerBuzz.classList.remove("disabled");
-        }
-
-        // Question
-        const q = s.q || {text:"", answer:"", shown:false};
-        qTextEl.textContent = q.text || "—";
-
-        // ✅ زر الجواب التفاعلي
-        if(!q.text){
-          answerBtn.textContent = isHost ? "اضغط للإجابة" : "اضغط للإجابة";
-          answerBtn.classList.remove("answerShown");
-          answerBtn.classList.add("answerHidden");
-          if(!isHost) answerBtn.classList.add("disabled");
-          else answerBtn.classList.remove("disabled");
-        }else{
-          if(q.shown){
-            answerBtn.textContent = q.answer || "—";
-            answerBtn.classList.remove("answerHidden");
-            answerBtn.classList.add("answerShown");
-          }else{
-            answerBtn.textContent = "اضغط للإجابة";
-            answerBtn.classList.remove("answerShown");
-            answerBtn.classList.add("answerHidden");
-          }
-          if(!isHost) answerBtn.classList.add("disabled");
-          else answerBtn.classList.remove("disabled");
-        }
-
-        // Winner celebration (show on change to winner)
-        if(s.winner && s.winner !== ""){
-          // نعرض الاحتفال عند أول وصول فقط (ثم يتوقف حتى تفريغ/تغيير الخريطة)
-          if(!winBackdrop._lastWinner || winBackdrop._lastWinner !== s.winner){
-            winBackdrop._lastWinner = s.winner;
-            showWin(s.winner);
-          }
-        }else{
-          winBackdrop._lastWinner = "";
-        }
-
-        // Timer UI render
-        startTimerUiLoop();
-        renderTimer(s.timer || {});
-      });
-
-      function renderTimer(timer){
-        const total = (typeof timer.total === "number" ? timer.total : TIMER_DEFAULT);
-        const left = computeTimerRemaining(timer);
-
-        // رقم
-        const prev = +timerNum.textContent || left;
-        timerNum.textContent = left;
-
-        // pop آخر 5 ثواني
-        timerNum.classList.remove("pop","red");
-        timerBtn.classList.remove("flash");
-
-        if(left <= 5 && left > 0){
-          timerNum.classList.add("red","pop");
-        }
-        if(left === 0 && timer.running){
-          timerBtn.classList.add("flash");
-          timerNum.classList.add("red");
-        }
-
-        // ring
-        const r = 44;
-        const C = 2 * Math.PI * r;
-        ringCircle.style.strokeDasharray = String(C);
-        timerRing.style.opacity = timer.running ? "1" : "0";
-        const frac = total > 0 ? (left/total) : 0;
-        const off = C * (1 - Math.max(0, Math.min(1, frac)));
-        ringCircle.style.strokeDashoffset = String(off);
-
-        // Host: click to start/stop (simple)
-        if(isHost){
-          timerBtn.onclick = async ()=>{
-            const s = (await get(stateRef)).val();
-            const t = s?.timer || {};
-            const running = !!t.running;
-
-            if(!running){
-              const dur = (typeof t.remaining === "number") ? t.remaining : total;
-              const endAtMs = nowMs() + dur*1000;
-              await update(stateRef, { timer: { running:true, total: dur, remaining: dur, endAtMs } });
-            }else{
-              const leftNow = computeTimerRemaining(t);
-              await update(stateRef, { timer: { running:false, total: t.total ?? total, remaining: leftNow, endAtMs: 0 } });
-            }
-          };
-        }else{
-          timerBtn.onclick = null;
-        }
-
-        // إذا المؤقت انتهى، نخليه يظل "منتهي" حتى المقدم يوقفه
-        if(isHost && timer.running && left === 0){
-          // نوقف تلقائيًا بعد 0 بثانية بسيطة عشان ما يطول الوميض
-          clearTimeout(timerBtn._stopT);
-          timerBtn._stopT = setTimeout(async ()=>{
-            const s = (await get(stateRef)).val();
-            const t = s?.timer || {};
-            if(!t.running) return;
-            const leftNow = computeTimerRemaining(t);
-            if(leftNow !== 0) return;
-            await update(stateRef, { timer: { running:false, total: t.total ?? total, remaining: 0, endAtMs: 0 } });
-          }, 900);
-        }
-      }
-
-      /* =========================
-         Winner detection trigger (Host runs it after each cell update)
-      ========================= */
-      if(isHost){
-        onValue(stateRef, async (snap)=>{
-          const s = snap.val();
-          if(!s) return;
-          const cells = (s.cells && s.cells.length === CELL_COUNT) ? s.cells : Array(CELL_COUNT).fill(0);
-
-          // إذا فيه فائز بالفعل، لا نكرر (إلى أن يتم تفريغ/تغيير الخريطة)
-          if(s.winner && s.winner !== "") return;
-
-          const gWin = hasGreenWin(cells);
-          const oWin = hasOrangeWin(cells);
-
-          if(gWin){
-            await update(stateRef, { winner: "green" });
-          }else if(oWin){
-            await update(stateRef, { winner: "orange" });
-          }
-        });
-      }
-    }
-
-    /* =========================
-       Boot
-    ========================= */
-    const p = qs();
-
-    // اسم اللعبة (من الـ localStorage اختياري)
-    try{
-      const savedName = localStorage.getItem("GAME_NAME") || "";
-      if(savedName.trim()){
-        $("gameName").innerHTML = `<div class="gnText">${safeText(savedName.trim())}</div>`;
-      }
-    }catch(e){}
-
-    if(!p.code){
-      renderLanding();
-    }else{
-      if(p.role !== "host" && p.role !== "player"){
-        // إذا ما جاء role نفترض لاعب
-        location.replace(location.pathname + "?code="+encodeURIComponent(p.code)+"&role=player&name="+encodeURIComponent(p.name||"لاعب"));
-      }else{
-        runRoom(p.code, p.role, p.name);
-      }
-    }
+    ensureCustomQuestionsModal();
+    ensureSettingsModal();
   </script>
 </body>
 </html>
