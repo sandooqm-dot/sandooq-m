@@ -22,10 +22,6 @@
 
       --white:#fff;
       --black:#111;
-      --softWhite:rgba(255,255,255,.86);
-
-      --pillBg: rgba(255,255,255,.10);
-      --pillBg2: rgba(255,255,255,.14);
 
       --orange:#f28c00;
       --green:#1aa34a;
@@ -33,8 +29,8 @@
 
       --hexGreen:  rgba(0, 140, 70, .42);
       --hexOrange: rgba(255, 140, 0, .42);
-      --hexPale:   rgba(255, 215, 80, .68);
-      --hexBorder: rgba(0,0,0,.10);
+      --hexPale:   rgba(255, 215, 80, .70);
+      --hexBorder: rgba(0,0,0,.12);
 
       --timerFill:#b43d69;
 
@@ -59,7 +55,7 @@
 
     a{color:inherit}
 
-    /* ✅ هيدر مثل الصورة */
+    /* ✅ هيدر */
     header{
       padding:16px 14px 6px;
     }
@@ -118,42 +114,81 @@
       font-size:18px;
     }
 
-    .wrap{width:95%;max-width:900px;margin:0 auto}
-
-    /* ✅ الكرت الأساسي شفاف */
-    .card{
-      background:transparent;
-      color:#fff;
-      width:100%;
-      margin:8px auto 0;
-      padding:0;
-      border-radius:0;
-    }
+    .wrap{width:95%;max-width:980px;margin:0 auto}
+    .card{background:transparent;color:#fff;width:100%;margin:8px auto 0;padding:0;border-radius:0}
 
     /* =========================
        Layout (Portrait/Landscape)
     ========================= */
     .gameLayout{
-      width:min(92vw, 820px);
+      width:min(92vw, 860px);
       margin:0 auto;
       display:flex;
       flex-direction:column;
       gap:10px;
-      direction:rtl; /* عشان اليمين/اليسار في الوضع الأفقي */
+      direction:rtl; /* عشان يمين/يسار في الوضع الأفقي */
     }
     .sideMap, .sideMain{ width:100%; }
 
+    /* ✅ الوضع الأفقي: الخريطة يمين + الأدوات تحتها، والباقي يسار */
     @media (orientation: landscape){
       .gameLayout{
-        width:min(96vw, 1040px);
-        max-width:1100px;
+        width:min(96vw, 1180px);
+        max-width:1200px;
         flex-direction:row;
         align-items:flex-start;
         gap:14px;
       }
-      .sideMap{ flex:0 0 52%; }
+      .sideMap{ flex:0 0 54%; }
       .sideMain{ flex:1 1 auto; }
     }
+
+    /* =========================
+       LANDING / LOBBY
+    ========================= */
+    .panel{
+      width:min(92vw, 760px);
+      margin:12px auto 0;
+      padding:16px;
+      border-radius:22px;
+      background:rgba(255,255,255,.10);
+      border:4px solid rgba(255,255,255,.35);
+      box-shadow:0 14px 28px rgba(0,0,0,.22);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      text-align:center;
+    }
+    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+    .in{
+      width:min(560px, 92%);
+      height:56px;
+      border-radius:18px;
+      border:4px solid rgba(0,0,0,.85);
+      outline:none;
+      padding:0 12px;
+      font-size:18px;
+      font-weight:900;
+      text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+    }
+    .btn{
+      padding:12px 14px;
+      font-size:20px;
+      border:none;
+      border-radius:18px;
+      cursor:pointer;
+      font-weight:900;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      box-shadow:0 10px 22px rgba(0,0,0,.22);
+      border:5px solid rgba(0,0,0,.85);
+      background:#fff;
+      color:#111;
+      min-width:180px;
+      height:62px;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .smallNote{font-size:14px;opacity:.9;margin-top:2px}
 
     /* =========================
        MAP
@@ -170,17 +205,15 @@
       border-radius:8px;
       overflow:hidden;
       background:transparent;
-      border:10px solid rgba(242,140,0,.95); /* إطار برتقالي مثل الصورة */
+      border:10px solid rgba(242,140,0,.95);
       box-shadow:0 14px 28px rgba(0,0,0,.25);
     }
     .mapBox img{
       width:100%;
       height:auto;
       display:block;
-      object-fit:unset;
       background:#0b7a2a;
     }
-
     .overlaySvg{
       position:absolute;
       inset:0;
@@ -208,9 +241,7 @@
     .overlaySvg .state1.pulse { animation: palePulse 0.9s ease-in-out infinite; }
 
     /* =========================
-       أدوات تحت الخريطة (مثل الصورة)
-       ترتيب من اليمين لليسار:
-       Zoom -> Map -> Clear -> QMode -> Settings
+       أدوات تحت الخريطة
     ========================= */
     .mapToolsRow{
       margin:12px auto 8px;
@@ -237,14 +268,15 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       border:3px solid rgba(0,0,0,.10);
-      position:relative; /* ✅ عشان علامة ? */
+      position:relative;
       overflow:visible;
+      font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    .toolBtn:active{ transform: translateY(1px); box-shadow:0 6px 16px rgba(0,0,0,.20); }
+    .toolBtn:active{ transform: translateY(1px); }
     .toolBtn svg{ width:28px;height:28px; fill:#111; }
     .toolBtn .txtIcon{ font-size:30px; font-weight:900; line-height:1; }
 
-    /* ✅ زر نوع الأسئلة: سماوي عند الأسئلة الخاصة */
+    /* ✅ سماوي عند الأسئلة الخاصة */
     .toolBtn.cyan{
       background: linear-gradient(180deg, var(--cyan) 0%, var(--cyan2) 100%);
       border-color: rgba(0,0,0,.18);
@@ -272,13 +304,10 @@
       box-shadow:0 6px 14px rgba(0,0,0,.18);
       user-select:none;
     }
-    .helpDot:active{ transform: translateY(1px); }
-
-    /* نافذة شرح */
     .helpPopover{
       position:fixed;
       z-index:99999;
-      max-width:min(280px, 86vw);
+      max-width:min(300px, 86vw);
       padding:10px 12px;
       border-radius:14px;
       background:rgba(255,255,255,.96);
@@ -301,8 +330,6 @@
       border-radius:14px;
       background:transparent;
     }
-
-    /* ✅ شكل السلايدر مثل الصورة (شريط أبيض + مقبض أسود مستطيل) */
     input[type="range"]{
       -webkit-appearance:none;
       appearance:none;
@@ -329,9 +356,6 @@
       background:#111;border:3px solid rgba(255,255,255,.80);
       cursor:pointer;
     }
-    input[type="range"]::-moz-range-track{
-      height:8px;border-radius:999px;background:rgba(255,255,255,.70);
-    }
 
     /* =========================
        لوحة النتائج (Scoreboard)
@@ -344,6 +368,7 @@
       justify-content:center;
       gap:10px;
       direction:rtl;
+      flex-wrap:wrap;
     }
     .teamPill{
       min-width:170px;
@@ -379,6 +404,7 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       user-select:none;
+      font-family:"AA-GALAXY", Arial, sans-serif;
     }
     button.scoreBox{ cursor:pointer; }
     .scoreBox.readonly{ opacity:.95; }
@@ -403,6 +429,7 @@
       box-shadow:0 18px 34px rgba(0,0,0,.30);
       padding:14px 14px 16px;
       text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
     }
     .scoreTitle{
       font-weight:900;
@@ -418,7 +445,7 @@
     .scorePick{
       height:56px;
       border-radius:16px;
-      border:5px solid rgba(0,0ڍ,0,.85);
+      border:5px solid rgba(0,0,0,.85);
       background:#fff;
       font-weight:900;
       font-size:24px;
@@ -429,7 +456,7 @@
     .scorePick:active{ transform: translateY(1px); }
 
     /* =========================
-       شريط اسم أول لاعب (مثل الصورة)
+       شريط اسم أول لاعب
     ========================= */
     .firstPressBar{
       margin:8px auto 10px;
@@ -449,7 +476,7 @@
     }
 
     /* =========================
-       صف الأزرار + المؤقت (مثل الصورة)
+       صف الأزرار + المؤقت
     ========================= */
     .controlRow{
       width:100%;
@@ -480,6 +507,7 @@
       font-family:"AA-GALAXY", Arial, sans-serif;
     }
     .pillBtn:active{ transform: translateY(1px); box-shadow:0 8px 18px rgba(0,0,0,.22); }
+    .pillBtn.disabled{opacity:.45; cursor:not-allowed}
 
     /* المؤقت وسط */
     .timerWrap{ flex:0 0 auto; display:flex; justify-content:center; align-items:center; }
@@ -495,7 +523,6 @@
       user-select:none;
       font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    /* حلقة خارجية بيضاء */
     .timerClockBtn::before{
       content:"";
       position:absolute;
@@ -504,7 +531,6 @@
       border:6px solid rgba(255,255,255,.85);
       box-shadow:0 12px 26px rgba(0,0,0,.28);
     }
-    /* تعبئة داخلية وردية */
     .timerClockBtn::after{
       content:"";
       position:absolute;
@@ -512,8 +538,6 @@
       border-radius:50%;
       background:var(--timerFill);
     }
-
-    /* حلقة التناقص (موجودة) */
     .timerRing{
       position:absolute;
       inset:0;
@@ -531,7 +555,6 @@
       stroke-linecap: round;
       transition: stroke-dashoffset .20s linear;
     }
-
     .timerNumber{
       position:absolute;
       inset:0;
@@ -544,10 +567,23 @@
       z-index:3;
       text-shadow:0 10px 24px rgba(0,0,0,.35);
     }
-    .timerPlayerView{ pointer-events:none; user-select:none; opacity:1; }
+    .timerNumber.red{ color:#ff2a2a; }
+    @keyframes pop {
+      0%{ transform:scale(1); }
+      50%{ transform:scale(1.12); }
+      100%{ transform:scale(1); }
+    }
+    .timerNumber.pop{ animation:pop .20s ease-in-out; }
+
+    @keyframes flash {
+      0%{ filter:brightness(1); }
+      50%{ filter:brightness(1.8); }
+      100%{ filter:brightness(1); }
+    }
+    .timerClockBtn.flash{ animation:flash .45s ease-in-out infinite; }
 
     /* =========================
-       بطاقة السؤال (مثل الصورة)
+       بطاقة السؤال
     ========================= */
     .questionCard{
       width:100%;
@@ -560,8 +596,7 @@
       padding:22px 16px 18px;
       text-align:center;
     }
-
-    /* ✅ لون السؤال أصبح أسود */
+    /* ✅ لون السؤال أسود */
     .qText{
       color:#111;
       font-size:34px;
@@ -572,7 +607,7 @@
 
     /* ✅ زر الجواب التفاعلي */
     .answerBtn{
-      width:min(360px, 92%);
+      width:min(380px, 92%);
       height:70px;
       border-radius:999px;
       border:none;
@@ -589,70 +624,15 @@
       text-overflow:ellipsis;
       font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    .answerBtn:active{ transform: translateY(1px); box-shadow:0 10px 20px rgba(0,0,0,.22); }
+    .answerBtn:active{ transform: translateY(1px); }
     .answerBtn.disabled{ opacity:.45; cursor:not-allowed; }
-
     .answerBtn.answerHidden{ background:#ff2a2a; }
     .answerBtn.answerShown{ background:rgba(26,163,74,.98); }
 
     /* =========================
-       صفحات الانتظار/اللوبي تبقى شغالة
+       Player big button
     ========================= */
-    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
-    .btn{padding:12px 14px;font-size:18px;border:none;border-radius:16px;cursor:pointer;font-family:"AA-GALAXY", Arial, sans-serif}
-    .btnYellow{background:#fff;color:#111;border:4px solid rgba(0,0,0,.85); box-shadow:0 10px 22px rgba(0,0,0,.22);}
-    .btnGreen{background:rgba(26,163,74,.95);color:#fff}
-    .btnRed{background:rgba(224,57,53,.95);color:#fff}
-    .btnOrange{background:rgba(242,140,0,.95);color:#fff}
-
-    .smallNote{font-size:14px;opacity:.9;margin-top:8px}
-    .codeBox{font-size:18px}
-    .codeNum{font-size:34px;font-weight:900;letter-spacing:2px}
-
-    .teams{display:flex;gap:10px;flex-wrap:wrap}
-    .teamCol{flex:1;min-width:240px;border-radius:16px;padding:10px;color:#fff}
-    .teamGreen{background:rgba(26,163,74,.65)}
-    .teamOrange{background:rgba(242,140,0,.65)}
-    .teamTitle{font-weight:900;margin-bottom:8px}
-    .playerItem{
-      background:rgba(255,255,255,.18);
-      padding:10px;border-radius:14px;margin:6px 0;cursor:pointer
-    }
-
-    .waitingLayout{
-      width:min(92vw, 760px);
-      margin:12px auto 0;
-      padding:16px;
-      border-radius:22px;
-      background:rgba(255,255,255,.10);
-      border:4px solid rgba(255,255,255,.35);
-      box-shadow:0 14px 28px rgba(0,0,0,.22);
-      display:flex;
-      flex-direction:column;
-      min-height:52vh;
-      justify-content:center;
-      gap:14px;
-    }
-
-    .buyNowWrap{display:flex;justify-content:center;margin-top:10px}
-    .buyNowBtn{
-      width:min(92vw, 520px);
-      padding:14px 16px;
-      border:none;
-      border-radius:18px;
-      background:rgba(255,255,255,.92);
-      color:#111;
-      font-size:20px;
-      font-weight:900;
-      cursor:pointer;
-      box-shadow:0 10px 22px rgba(0,0,0,.22);
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-      border:5px solid rgba(0,0,0,.85);
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-
-    .playerBtnWrap{margin-top:14px}
+    .playerBtnWrap{margin-top:10px}
     .playerBigBtn{
       width:min(92vw, 520px);
       height:110px;
@@ -663,18 +643,19 @@
       align-items:center;
       justify-content:center;
       color:#fff;
-      font-size:28px;
+      font-size:30px;
       font-weight:900;
-      letter-spacing:.2px;
       box-shadow:0 14px 28px rgba(0,0,0,.25);
       font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    .disabled{opacity:.5;cursor:not-allowed}
+    .playerBigBtn.disabled{opacity:.45; cursor:not-allowed}
 
-    /* ✅ أسفل الصفحة مثل الصورة */
+    /* =========================
+       أسفل الصفحة
+    ========================= */
     .bottomBar{
       width:95%;
-      max-width:900px;
+      max-width:980px;
       margin:18px auto 14px;
       display:flex;
       align-items:center;
@@ -697,131 +678,13 @@
       touch-action: manipulation;
       font-family:"AA-GALAXY", Arial, sans-serif;
     }
-    /* ✅ عبارة الحقوق (أصغر + أخف) */
+    /* ✅ عبارة الحقوق أصغر وأخف */
     .rightsTxt{
       font-size:13px;
       opacity:.55;
       text-align:right;
       padding-right:6px;
       white-space:nowrap;
-    }
-
-    /* مودالات المشاركة / أسئلة المقدم / الإعدادات (كما هي لكن لا نخرب التصميم) */
-    .shareBackdrop,.cqBackdrop,.settingsBackdrop{
-      position:fixed; inset:0; background:rgba(0,0,0,.45);
-      display:none; align-items:center; justify-content:center;
-      z-index:9999; padding:14px;
-    }
-    .shareModal,.cqModal{
-      width:min(92vw, 680px);
-      background:#fff; color:#111;
-      border-radius:18px; padding:14px; text-align:right; position:relative;
-      border:6px solid rgba(0,0,0,.85);
-      box-shadow:0 18px 34px rgba(0,0,0,.30);
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .shareClose{
-      position:absolute; left:10px; top:10px; border:none; background:transparent;
-      font-size:26px; cursor:pointer;
-    }
-    .shareTitle{font-weight:900;margin:0 0 10px;text-align:center}
-    .shareChoices{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 8px}
-    .sharePanel{
-      display:none;
-      background:rgba(0,0,0,.04);
-      border:2px solid rgba(0,0,0,.10);
-      border-radius:14px;
-      padding:12px;
-      text-align:center;
-    }
-    .shareCodeBig{font-size:34px;font-weight:900;letter-spacing:2px;text-align:center;margin:6px 0 0}
-    .qrImg{width:220px;height:220px;display:block;margin:0 auto;border-radius:12px;background:#fff}
-    .shareSmall{font-size:12px;opacity:.85;text-align:center;margin-top:8px;word-break:break-all}
-
-    .cqCloseRed{
-      position:absolute; left:10px; top:10px;
-      width:40px;height:40px;border:none;border-radius:12px;
-      background:rgba(224,57,53,.95);color:#fff;font-size:22px;font-weight:900;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .cqTitle{font-weight:900;margin:0 0 10px;text-align:center}
-    .cqHint{font-size:12px;opacity:.85;text-align:center;margin:0 0 12px}
-
-    .cqItem{border:2px solid rgba(0,0,0,.10);border-radius:14px;padding:8px 10px;margin:10px 0;background:rgba(0,0,0,.03)}
-    .cqItem summary{cursor:pointer;font-weight:900;list-style:none;outline:none}
-    .cqItem summary::-webkit-details-marker{display:none}
-
-    .cqPair{border:2px solid rgba(0,0,0,.10);border-radius:14px;padding:10px;background:#fff;margin-top:10px}
-    .cqLbl{font-weight:900;margin:0 0 6px;text-align:right}
-    .cqTA{
-      width:100%;
-      padding:10px 10px;
-      border-radius:14px;
-      border:2px solid rgba(0,0,0,.12);
-      font-size:15px;
-      line-height:1.5;
-      resize:none;
-      outline:none;
-      background:#fff;
-      margin:0 0 10px;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .cqAddBtn{
-      width:56px;height:48px;border:none;border-radius:14px;
-      background:rgba(180,61,105,.95);color:#fff;font-size:26px;font-weight:900;cursor:pointer;
-      box-shadow:0 10px 22px rgba(0,0,0,.22);
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .cqAddWrap{display:flex;justify-content:center;margin-top:2px}
-    .cqSaveFixed{
-      position:sticky; bottom:10px; margin:10px auto 0;
-      width:min(240px, 72%);
-      border-radius:14px;
-      font-weight:900;
-      box-shadow:0 10px 22px rgba(0,0,0,.22);
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .cqSavedMsg{font-size:12px;opacity:.9;text-align:center;margin-top:8px}
-
-    .settingsPanel{
-      width:min(78vw, 360px);
-      height:min(72vh, 560px);
-      background: rgba(255,255,255,.92);
-      border-radius:26px;
-      border:8px solid rgba(0,0,0,.85);
-      box-shadow:0 16px 30px rgba(0,0,0,.25);
-      padding:18px 14px;
-      display:flex;
-      flex-direction:column;
-      gap:18px;
-      color:#111;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    #settingsMenu{display:flex;flex-direction:column;gap:14px}
-    .settingsBtn{
-      width:100%;height:64px;border-radius:22px;border:4px solid rgba(0,0,0,.85);
-      background:#fff;color:#111;font-weight:900;font-size:28px;cursor:pointer;
-      box-shadow:0 6px 0 rgba(0,0,0,.18);
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .settingsView{
-      display:none;width:100%;height:100%;overflow:auto;background:#fff;border-radius:18px;
-      border:3px solid rgba(0,0,0,.25);padding:14px;color:#111;text-align:right
-    }
-    .settingsView h3{margin:0 0 10px;text-align:center}
-    .settingsBackMini{
-      width:100%;height:52px;border-radius:18px;border:3px solid rgba(0,0,0,.65);
-      background:#fff;font-weight:900;cursor:pointer;margin-top:10px;font-family:"AA-GALAXY", Arial, sans-serif;
-    }
-    .timerMiniPicker{
-      display:none;width:100%;border-radius:18px;border:3px solid rgba(0,0,0,.65);
-      background:#fff;padding:10px;
-    }
-    .timerMiniList{display:flex;flex-direction:column;gap:10px}
-    .timerMiniItem{
-      height:52px;border-radius:16px;border:3px solid rgba(0,0,0,.25);background:#fff;
-      font-weight:900;font-size:22px;cursor:pointer;font-family:"AA-GALAXY", Arial, sans-serif;
     }
 
     /* =========================
@@ -852,43 +715,46 @@
     }
     .winTitle{
       font-weight:900;
-      font-size:34px;
+      font-size:38px;
       line-height:1.2;
       margin:0 0 10px;
     }
     .winSub{
       font-weight:900;
-      font-size:20px;
+      font-size:22px;
       opacity:.85;
       margin:0;
-    }
-    .winRibbon{
-      position:absolute;
-      left:-20px;
-      top:-20px;
-      width:140px;
-      height:140px;
-      border-radius:50%;
-      opacity:.12;
     }
     .winConfetti{
       position:absolute;
       inset:-20px;
       pointer-events:none;
-      opacity:.75;
-      filter: blur(.2px);
+      opacity:.85;
     }
     .confettiPiece{
       position:absolute;
       width:10px;
       height:18px;
       border-radius:4px;
-      opacity:.9;
+      opacity:.95;
       animation: fall 1.6s linear infinite;
     }
     @keyframes fall{
-      0%{ transform: translateY(-40px) rotate(0deg); opacity:.9; }
-      100%{ transform: translateY(520px) rotate(260deg); opacity:.85; }
+      0%{ transform: translateY(-40px) rotate(0deg); opacity:.95; }
+      100%{ transform: translateY(520px) rotate(260deg); opacity:.90; }
+    }
+
+    /* رسالة صغيرة */
+    .toast{
+      width:min(92vw, 760px);
+      margin:10px auto 0;
+      background:rgba(255,255,255,.10);
+      border:3px solid rgba(255,255,255,.30);
+      border-radius:18px;
+      padding:10px 12px;
+      font-weight:900;
+      box-shadow:0 10px 22px rgba(0,0,0,.18);
+      display:none;
     }
   </style>
 </head>
@@ -903,9 +769,9 @@
   </header>
 
   <div class="wrap">
+    <div id="toast" class="toast"></div>
     <div id="main" class="card">جاري التحميل...</div>
 
-    <!-- ✅ أسفل الصفحة مثل الصورة -->
     <div class="bottomBar">
       <button class="homeBtn" onclick="location.href='index.html'">الرئيسية</button>
       <div class="rightsTxt">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
@@ -920,13 +786,13 @@
     <div class="scoreModal" role="dialog" aria-modal="true" aria-label="اختيار النقاط">
       <div id="scoreTitle" class="scoreTitle">اختر النقاط</div>
       <div id="scoreGrid" class="scoreGrid"></div>
+      <div class="smallNote" style="color:#111;opacity:.75;margin-top:10px">انقر خارج النافذة للإغلاق</div>
     </div>
   </div>
 
   <!-- ✅ احتفال الفوز -->
   <div id="winBackdrop" class="winBackdrop">
     <div class="winCard" role="dialog" aria-modal="true" aria-label="احتفال الفوز">
-      <div id="winRibbon" class="winRibbon"></div>
       <div id="winConfetti" class="winConfetti"></div>
       <div id="winTitle" class="winTitle">مبروك الفوز</div>
       <p id="winSub" class="winSub"></p>
@@ -935,8 +801,11 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, onValue, update, get, child, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
+    /* =========================
+       Firebase
+    ========================= */
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
       authDomain: "sabaq-alhorof.firebaseapp.com",
@@ -947,6 +816,12 @@
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
 
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    /* =========================
+       بيانات الخرائط (كما عندك)
+    ========================= */
     const MAPS = [
       [
         ["ش","أ","ث","د","هـ"],
@@ -971,13 +846,14 @@
       ]
     ];
 
+    /* =========================
+       الأسئلة
+       (ملاحظة: باقي الحروف placeholders — كما عندك)
+    ========================= */
     const QUESTIONS = {};
     const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
     for(const L of ALL_LETTERS){
-      QUESTIONS[L] = Array.from({length:25}, (_,i) => ({
-        q: `(${i+1}) سؤال لحرف ${L}`,
-        a: `${L}...`
-      }));
+      QUESTIONS[L] = Array.from({length:25}, (_,i) => ({ q:`(${i+1}) سؤال لحرف ${L}`, a:`${L}...` }));
     }
 
     QUESTIONS["هـ"] = [
@@ -1008,132 +884,940 @@
       { q: "هو ممر مائي ضيق يربط الخليج العربي بخليج عُمان يسمى مضيق ……..؟", a: "هرمز" }
     ];
 
-    QUESTIONS["د"] = [
-      { q: "هي قول يطلب به الإنسان إثبات حق على على الغير في المحاكم", a: "دعوى" },
-      { q: "من هو مخترع الاطارات المنفوخة للسيارات", a: "جون بويد دنلوب" },
-      { q: "هو القانون الأساسي الذي يحدد نظام الحكم في الدولة ويحدد حقوق وواجبات المواطنين", a: "دستور" },
-      { q: "يسمى النظام السياسي الذي يتميز بحكم الشعب …..", a: "ديمقراطية" },
-      { q: "ماهو اسم اول عملة اسلامية في التاريخ", a: "دينار" },
-      { q: "هو الزمن الطويل او مدة الحياة كلها", a: "دهر" },
-      { q: "ماهي عاصمة دولة السنغال", a: "داكار" },
-      { q: "هو سواد الليل وضلمته", a: "دجى" },
-      { q: "هو ماء لم يخرج من الارض ولم ينزل من السماء", a: "دموع" },
-      { q: "هو المخادع أو المحتال في أقواله وافعاله", a: "دجال" },
-      { q: "هو الاحتيال والخداع وتدبير الشر بمهارة", a: "هدير" },
-      { q: "هي صفه تمزج بين الفطنة والذكاء وإدراك الامور", a: "دهاء" },
-      { q: "ماهي عاصمة دولة تنزانيا", a: "دار السلام" },
-      { q: "من مدن جمهورية مصر العرب", a: "دمياط" },
-      { q: "هو صغير الدب", a: "ديسم" },
-      { q: "هو الطائر الذي يكنى بأبي اليقضات", a: "ديك" },
-      { q: "ماهي عاصمة ايرلندا", a: "دبلن" },
-      { q: "ماهو الشيء الذي الذي ليس له نقطة بداية ولايحتوي على نهاية", a: "دائرة" },
-      { q: "هو المرض و العلة", a: "داء" },
-      { q: "ماهو الحيوان البحري الذي وُصف بأنه اذكى مخلوقات البحر", a: "دولفين" },
-      { q: "هو عكس كلمة فاتح", a: "داكن" },
-      { q: "هي السحابة كثيرة المطر", a: "داجنة" },
-      { q: "اكمل المثل : من خرج من……..قل مقداره", a: "داره" },
-      { q: "اكمل المثل : لكل……..دواء", a: "داء" },
-      { q: "هي مرادف كلمة ……إشارة", a: "دلالة" }
-    ];
+    /* =========================
+       Helpers
+    ========================= */
+    const $ = (id)=>document.getElementById(id);
+    const main = $("main");
+    const toastEl = $("toast");
 
-    QUESTIONS["أ"] = [
-      { q: "وحدة لقياس شدة التيار الكهربائي", a: "أمبير" },
-      { q: "من هو اول من جمع القرآن الكريم بين لوحين", a: "ابو بكر الصديق" },
-      { q: "ماهو الكوكب الذي يُعرف بالكوكب الازرق", a: "الارض" },
-      { q: "ماهو النبي الذي الذي أُطلق عليه لقب نبي الصبر", a: "أيوب عليه السلام" },
-      { q: "هو غاز يتكون من ثلاثة ذرات أكسجين ويوجد في الغلاف الجوي للارض كطبقة مشهورة", a: "الاوزون" },
-      { q: "ماهي عاصمة دولة الإمارات", a: "أبو ظبي" },
-      { q: "من هو الرئيس الامريكي الذي اصدر اعلان التحرير", a: "أبراهام لينكولن" },
-      { q: "سورة في القران الكريم طلق عليها اسم اخت الطويلتين", a: "الأعراف" },
-      { q: "من هو الشاعر العربي الذي يعتبر أمير الشعراء", a: "أحمد شوقي" },
-      { q: "ماهو اطول نهر في العالم بعد نهر النيل", a: "الأمازون" },
-      { q: "ماهو الشخص الذي يرى صديقة وعدوه بعين واحدة", a: "الأعور" },
-      { q: "ماهو الاسم الذي يُطلق على اسبانيا قديماً", a: "الأندلس" },
-      { q: "ماهو الشيء الذي كلما تحرك خطوة فقد جزء من ذيله", a: "الإبرة" },
-      { q: "ما هو اسم الانسجة التي تقوم على ربط العضلات بالعظام", a: "أوتار" },
-      { q: "ماهو لون الزمرد", a: "أخضر" },
-      { q: "ماهي عاصمة تركيا", a: "أنقرة" },
-      { q: "ماهي الدولة التي فازت بأول نسخة لكأس العالم", a: "أوروغواي" },
-      { q: "ماهو اسم الكوكب الذي ترتيبه الثالث من الكواكب الشمسيه", a: "الارض" },
-      { q: "هي عاصمة اليونان", a: "أثينا" },
-      { q: "هي اصغر قارة في العالم من حيث المساحة", a: "اوروبا" },
-      { q: "ماهو اللون الناتج عن مزج اللون الاصفر والازرق", a: "اخضر" },
-      { q: "هو مجال يهتم بحماية الأنظمة والشبكات والبرامج من الهجمات الرقمية", a: "الامن السيبراني" },
-      { q: "اكمل المثل : القرد بعين ……..غزال", a: "أمه" },
-      { q: "هو علم يهتم بدارسة الطبيعة والكائنات الحية", a: "أحياء" },
-      { q: "ماهو معنى كلمة إماطة", a: "إزالة" }
-    ];
+    function toast(msg){
+      toastEl.textContent = msg;
+      toastEl.style.display = "block";
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(()=>toastEl.style.display="none", 2400);
+    }
 
-    QUESTIONS["ث"] = [
-      { q: "ماهو عدد الحروف في الأبجدية العربية", a: "ثمانية وعشرون حرفاً" },
-      { q: "صفة من أهم صفات الشجاعة", a: "ثبات" },
-      { q: "هو وصف يطلق على كثير الكلام", a: "ثرثار" },
-      { q: "كم عدد كواكب المجموعة الشمسية", a: "ثمانية" },
-      { q: "ماهو عدد اجزاء القرآن الكريم", a: "ثلاثون جزءً" },
-      { q: "من اول الخطباء المسلمين ولُقب بخطيب الرسول", a: "ثابت بن قيس" },
-      { q: "هو منطقة في الفضاء حيث الجاذبية قوية لدرجة انه لايستطيع احد الهروب منها ، حتى الضوء", a: "الثقب الاسود" },
-      { q: "ماهو عدد اللاعبين في لعبة الكرة الحديدية", a: "ثلاثة لاعبين" },
-      { q: "كم عدد فقرات العمود الفقري", a: "ثلاثة وثلاثون" },
-      { q: "يطلق في اللغة العربية الفصحى على الجماعة من الناس", a: "ثُلة" },
-      { q: "بلدة الرحالة العربي المشهور أحمد بن ماجد قرب الرياض (في السعودية)", a: "ثرمدا" },
-      { q: "ماهو اسم السبعة نجوم المتلاصقة في السماء", a: "ثريا" },
-      { q: "كم تستغرق الارض للدوران حول الشمس", a: "ثلاث مأئه وخمسة وستون يوماً" },
-      { q: "كلمة تستطيع أن تقرأها من اليمين و الشمال", a: "ثلث" },
-      { q: "هو مرض يصيب فروة شعر الانسان", a: "ثعلبة" },
-      { q: "هو الطائر الذي يكنى بأبي اليقضات", a: "ديك" },
-      { q: "اسم نبات يستخدم في الطب كمضاد للالتهاب", a: "ثوم" },
-      { q: "هي مدينة سعودية ساحلية على البحر الاحمر", a: "ثول" },
-      { q: "هو وفرة المال وكثرته", a: "ثراء" },
-      { q: "مرادف كلمة وزن", a: "ثقل" },
-      { q: "هو الماء المنهمر بغزارة و سيلانه شديد", a: "ثجاج" },
-      { q: "ماهو الصوت التي تصدرة الشاة او الخروف في اللغة العربية", a: "ثغاء" },
-      { q: "ماهو الاسم الاخير للحجاج بن يوسف", a: "الثقفي" },
-      { q: "هو عكس كلمة متحرك", a: "ثابت" }
-    ];
+    function qs(){
+      const p = new URLSearchParams(location.search);
+      return {
+        code: (p.get("code")||"").trim(),
+        role: (p.get("role")||"").trim(), // "host" | "player"
+        name: (p.get("name")||"").trim()
+      };
+    }
 
-    QUESTIONS["ش"] = [
-      { q: "هو يستعمل لتثبيت الشموع فيه للزينة", a: "شمعدان" },
-      { q: "هو الماء الجاري والمتساقط من الجبل", a: "شلال" },
-      { q: "ماهو اسم صغير الضفدع", a: "شرغوف" },
-      { q: "ماهي السورة التي تسمى الجامعة", a: "الشعراء" },
-      { q: "من هي المرأة التي حكمت مصر 80 يوماً بعد وفاة زوجها", a: "شجرة الدر" },
-      { q: "هو الخصام والقطيعة بين فرد أو جماعة أخرى", a: "شقاق" },
-      { q: "ماهو اسم السبت قبل الاسلام", a: "شيار" },
-      { q: "هي القطع الصغيرة المتطايرة من قنبلة ما", a: "شظايا" },
-      { q: "هو مايتطابر من النار", a: "شرارة" },
-      { q: "هو اسم للضوء الذي ينطلق من مكان واحد باستقامه", a: "شعاع" },
-      { q: "هو اسم من اسماء الصقور", a: "شاهين" },
-      { q: "هو اسم يُطلق على البخيل الحريص على المال", a: "شحيح" },
-      { q: "هي لعبة تُلعب على لوح يتكون من لونين فقط", a: "شطرنج" },
-      { q: "ما هي احدى مراحل تطور الفراشة", a: "شرنقة" },
-      { q: "هو اسم يُطلق على صغير الغزال", a: "شادن" },
-      { q: "هي اوعية تنقل الدم من القلب الى جميع انحاء الجسم", a: "شرايين" },
-      { q: "هو قطعة كبيرة من القماش يتم تعليقة في السفينة لصد الرياح", a: "شراع" },
-      { q: "هو عكس كلمة ضعيف", a: "شديد" },
-      { q: "هو عكس كلمة جبان", a: "شجاع" },
-      { q: "هو مرادف لكلمة قاسٍ", a: "شرس" },
-      { q: "هو اسم شارع في شهير في مدينة باريس", a: "شانزليزيه" },
-      { q: "هي مدينة ساحلية في مصر", a: "شرم الشيخ" },
-      { q: "هو مايطلق على الاخبار الكاذبة", a: "شائعات" },
-      { q: "ما هي المادة تفرزها الاذن لحمايتها", a: "شمع" },
-      { q: "هي مجموعة من العلوم الدينية التي تدرس وتفهم وتطبق أحكام الإسلام", a: "شريعة" }
-    ];
+    function genCode(){
+      return String(Math.floor(100000 + Math.random()*900000));
+    }
 
-    QUESTIONS["ك"] = [
-      { q: "ماهو العنصر الكيميائي الذي له الرمز C", a: "كربون" },
-      { q: "صفه اخرجت ابليس من الجنة", a: "الكبر" },
-      { q: "هو شيء له جناحان ولاكن لايطير", a: "كتاب" },
-      { q: "هو مجلس تصدر منه القرارات في الولايات المتحدة الامريكية", a: "كونغرس" },
-      { q: "هي اقصر سورة في القرآن الكريم", a: "الكوثر" },
-      { q: "هي وحدة قياس الكتلة", a: "كيلو" },
-      { q: "هي الرياضة الرسمية في دولة المانيا", a: "كرة القدم" },
-      { q: "هي اللعبة الاكثر تأثيراً وشعبية في دولة الهند", a: "كريكت" },
-      { q: "ماهو اسم ابن النبي نوح الذي غرق في الطوفان", a: "كنعان" },
-      { q: "هي عاصمة ماليزيا", a: "كوالالمبور" },
-      { q: "هي عمل أوجبه ديننا الحنيف لمحو ذنب معين", a: "كفارة" },
-      { q: "هو حبس الغضب الشديد وكتمه وعدم إظهاره", a: "كظم الغيظ" },
-      { q: "هي جعبة صغيرة توضع فيها النبال او الاسهم", a: "كنانه" },
-      { q: "هو قصد إيذاء الاخرين دون علمهم", a: "كيد" },
-      { q: "هو اسم نهر في الجنة", a: "كوثر" },
-      { q: "ما الحيوان الأليف الذي يُعَدّ وفيًّا ويُنعَت بأنّه أفضل صديق للإنسان؟", a: "كلب" },
-      { q: "يست
+    function safeText(s){ return (s||"").toString(); }
+
+    /* =========================
+       UI: Help Popover
+    ========================= */
+    const helpPopover = $("helpPopover");
+    let helpOpen = false;
+
+    function showHelp(anchorEl, text){
+      helpPopover.textContent = text;
+      helpPopover.style.display = "block";
+      helpOpen = true;
+
+      const r = anchorEl.getBoundingClientRect();
+      const x = Math.min(window.innerWidth - 16, Math.max(16, r.left + r.width/2));
+      const y = Math.min(window.innerHeight - 16, Math.max(16, r.top + r.height + 10));
+      helpPopover.style.left = x + "px";
+      helpPopover.style.top = y + "px";
+      helpPopover.style.transform = "translateX(-50%)";
+    }
+
+    function hideHelp(){
+      helpPopover.style.display = "none";
+      helpOpen = false;
+    }
+
+    document.addEventListener("click", (e)=>{
+      if(!helpOpen) return;
+      const t = e.target;
+      if(t.classList && t.classList.contains("helpDot")) return;
+      if(t === helpPopover || helpPopover.contains(t)) return;
+      hideHelp();
+    }, true);
+
+    /* =========================
+       UI: Score Modal
+    ========================= */
+    const scoreBackdrop = $("scoreBackdrop");
+    const scoreGrid = $("scoreGrid");
+    const scoreTitle = $("scoreTitle");
+    let scorePickCb = null;
+
+    function openScorePicker(title, cb){
+      scoreTitle.textContent = title;
+      scoreGrid.innerHTML = "";
+      scorePickCb = cb;
+
+      // أرقام 0 - 30
+      const nums = Array.from({length:31}, (_,i)=>i);
+      for(const n of nums){
+        const b = document.createElement("button");
+        b.className = "scorePick";
+        b.textContent = n;
+        b.onclick = ()=>{
+          closeScorePicker();
+          cb(n);
+        };
+        scoreGrid.appendChild(b);
+      }
+      scoreBackdrop.style.display = "flex";
+    }
+    function closeScorePicker(){
+      scoreBackdrop.style.display = "none";
+      scorePickCb = null;
+    }
+    scoreBackdrop.addEventListener("click", (e)=>{
+      if(e.target === scoreBackdrop) closeScorePicker();
+    });
+
+    /* =========================
+       UI: Winner Celebration
+    ========================= */
+    const winBackdrop = $("winBackdrop");
+    const winTitle = $("winTitle");
+    const winSub = $("winSub");
+    const winConfetti = $("winConfetti");
+
+    function buildConfetti(){
+      winConfetti.innerHTML = "";
+      const colors = ["#f28c00","#1aa34a","#b43d69","#7fe7ff","#ffffff","#111111"];
+      for(let i=0;i<36;i++){
+        const d = document.createElement("div");
+        d.className = "confettiPiece";
+        d.style.left = (Math.random()*100) + "%";
+        d.style.top = (-10 - Math.random()*40) + "px";
+        d.style.animationDelay = (Math.random()*0.8) + "s";
+        d.style.animationDuration = (1.2 + Math.random()*0.9) + "s";
+        d.style.background = colors[Math.floor(Math.random()*colors.length)];
+        winConfetti.appendChild(d);
+      }
+    }
+
+    function showWin(team){
+      buildConfetti();
+      winTitle.textContent = "مبروك الفوز";
+      if(team === "green"){
+        winSub.textContent = "الفوز للفريق الأخضر";
+      }else if(team === "orange"){
+        winSub.textContent = "الفوز للفريق البرتقالي";
+      }else{
+        winSub.textContent = "";
+      }
+      winBackdrop.style.display = "flex";
+      clearTimeout(winBackdrop._t);
+      winBackdrop._t = setTimeout(()=> winBackdrop.style.display="none", 2600);
+    }
+    winBackdrop.addEventListener("click", ()=>{ winBackdrop.style.display="none"; });
+
+    /* =========================
+       Hex grid geometry (25 خلايا)
+       (شبكة 5x5 — للتوافق مع خرائطك الحالية)
+    ========================= */
+    const ROWS = 5;
+    const COLS = 5;
+    const CELL_COUNT = ROWS * COLS;
+
+    // جيران سداسي (نمط offset)
+    function neighbors(r,c){
+      // even-r horizontal layout (flat-top)
+      const even = (r % 2 === 0);
+      const dirs = even
+        ? [[0,-1],[0,1],[-1,0],[-1,1],[1,0],[1,1]]
+        : [[0,-1],[0,1],[-1,-1],[-1,0],[1,-1],[1,0]];
+      const out = [];
+      for(const [dr,dc] of dirs){
+        const nr=r+dr, nc=c+dc;
+        if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS) out.push([nr,nc]);
+      }
+      return out;
+    }
+
+    function idx(r,c){ return r*COLS + c; }
+
+    /* =========================
+       Winner detection
+       الأخضر: وصل يسار -> يمين
+       البرتقالي: وصل أعلى -> أسفل
+    ========================= */
+    function hasGreenWin(states){
+      const q = [];
+      const seen = new Set();
+      // start: left edge cells that are green(state2)
+      for(let r=0;r<ROWS;r++){
+        if(states[idx(r,0)] === 2){
+          q.push([r,0]);
+          seen.add(r+","+0);
+        }
+      }
+      while(q.length){
+        const [r,c] = q.shift();
+        if(c === COLS-1) return true; // reached right edge
+        for(const [nr,nc] of neighbors(r,c)){
+          const key = nr+","+nc;
+          if(seen.has(key)) continue;
+          if(states[idx(nr,nc)] !== 2) continue;
+          seen.add(key);
+          q.push([nr,nc]);
+        }
+      }
+      return false;
+    }
+
+    function hasOrangeWin(states){
+      const q = [];
+      const seen = new Set();
+      // start: top edge cells that are orange(state3)
+      for(let c=0;c<COLS;c++){
+        if(states[idx(0,c)] === 3){
+          q.push([0,c]);
+          seen.add("0,"+c);
+        }
+      }
+      while(q.length){
+        const [r,c] = q.shift();
+        if(r === ROWS-1) return true; // reached bottom edge
+        for(const [nr,nc] of neighbors(r,c)){
+          const key = nr+","+nc;
+          if(seen.has(key)) continue;
+          if(states[idx(nr,nc)] !== 3) continue;
+          seen.add(key);
+          q.push([nr,nc]);
+        }
+      }
+      return false;
+    }
+
+    /* =========================
+       Question helpers
+    ========================= */
+    function pickRandomLetter(mapIndex){
+      const letters = MAPS[mapIndex].flat();
+      return letters[Math.floor(Math.random()*letters.length)];
+    }
+
+    function pickQuestion(letter, mode, privateBank){
+      const list = (mode === "private" && privateBank && privateBank[letter] && privateBank[letter].length)
+        ? privateBank[letter]
+        : (QUESTIONS[letter] || []);
+      if(!list.length) return { q:`سؤال لحرف ${letter}`, a:`${letter}...` };
+      return list[Math.floor(Math.random()*list.length)];
+    }
+
+    function loadPrivateQuestions(code){
+      try{
+        const raw = localStorage.getItem("PRIVATE_Q_"+code);
+        if(!raw) return {};
+        const obj = JSON.parse(raw);
+        return (obj && typeof obj === "object") ? obj : {};
+      }catch(e){ return {}; }
+    }
+    function savePrivateQuestions(code, obj){
+      localStorage.setItem("PRIVATE_Q_"+code, JSON.stringify(obj||{}));
+    }
+
+    /* =========================
+       Timer helpers (Host controls)
+    ========================= */
+    const TIMER_DEFAULT = 25;
+
+    function nowMs(){ return Date.now(); }
+
+    function computeTimerRemaining(timer){
+      // timer: {running, total, endAtMs, remaining}
+      if(!timer) return TIMER_DEFAULT;
+      if(!timer.running) return (typeof timer.remaining === "number" ? timer.remaining : TIMER_DEFAULT);
+      const left = Math.max(0, Math.ceil((timer.endAtMs - nowMs())/1000));
+      return left;
+    }
+
+    /* =========================
+       Render: Landing
+    ========================= */
+    function renderLanding(){
+      main.innerHTML = `
+        <div class="panel">
+          <div style="font-size:26px;font-weight:900">إنشاء / دخول</div>
+
+          <div class="row">
+            <button id="createBtn" class="btn">إنشاء لعبة</button>
+          </div>
+
+          <div class="row" style="margin-top:6px">
+            <input id="joinCode" class="in" inputmode="numeric" placeholder="اكتب كود اللعبة (6 أرقام)" maxlength="6" />
+            <input id="joinName" class="in" placeholder="اكتب اسمك" maxlength="18" />
+          </div>
+
+          <div class="row">
+            <button id="joinBtn" class="btn">دخول لاعب</button>
+          </div>
+
+          <div class="smallNote">المقدم ينشئ اللعبة ثم يشارك الكود مع اللاعبين</div>
+        </div>
+      `;
+
+      $("createBtn").onclick = async ()=>{
+        const code = genCode();
+        const roomRef = ref(db, "rooms/"+code);
+        const init = {
+          createdAt: nowMs(),
+          state: {
+            mapIndex: 0,
+            zoom: 1,
+            cells: Array(CELL_COUNT).fill(0),
+            qMode: "general",
+            q: { text:"", answer:"", letter:"", shown:false },
+            scores: { green:0, orange:0 },
+            firstPress: { name:"", team:"", frozen:false },
+            timer: { running:false, total:TIMER_DEFAULT, remaining:TIMER_DEFAULT, endAtMs:0 },
+            winner: "" // "green" | "orange" | ""
+          },
+          players: {}
+        };
+        await update(roomRef, init);
+        location.href = location.pathname + "?code="+code+"&role=host";
+      };
+
+      $("joinBtn").onclick = ()=>{
+        const code = $("joinCode").value.trim();
+        const name = $("joinName").value.trim();
+        if(code.length !== 6) return toast("اكتب كود صحيح (6 أرقام)");
+        if(!name) return toast("اكتب اسمك");
+        location.href = location.pathname + "?code="+encodeURIComponent(code)+"&role=player&name="+encodeURIComponent(name);
+      };
+    }
+
+    /* =========================
+       Render: Host / Player
+    ========================= */
+    function renderGameShell(role){
+      const isHost = (role === "host");
+
+      main.innerHTML = `
+        <div class="gameLayout">
+          <div class="sideMap">
+            <div class="mapOuter">
+              <div class="mapScale" id="mapScale" style="--zoom:1">
+                <div class="mapBox">
+                  <img id="mapImg" src="map1.jpeg" alt="الخريطة">
+                  <svg id="overlaySvg" class="overlaySvg" viewBox="0 0 1000 600" preserveAspectRatio="none"></svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="mapToolsRow">
+              <div class="zoomWrap">
+                <input id="zoomRange" type="range" min="0.8" max="1.6" step="0.05" value="1">
+              </div>
+
+              <button id="btnMap" class="toolBtn" title="تغيير الخريطة">
+                <span class="helpDot" data-help="تغيير الخريطة">?</span>
+                <span class="txtIcon">↻</span>
+              </button>
+
+              <button id="btnClear" class="toolBtn" title="تفريغ الخريطة">
+                <span class="helpDot" data-help="تفريغ الخريطة">?</span>
+                <span class="txtIcon">×</span>
+              </button>
+
+              <button id="btnQMode" class="toolBtn" title="تغيير نوع الأسئلة">
+                <span class="helpDot" data-help="تغيير نوع الأسئلة">?</span>
+                <span class="txtIcon">▣</span>
+              </button>
+
+              <button id="btnSettings" class="toolBtn" title="الإعدادات">
+                <span class="txtIcon">⚙</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="sideMain">
+            <div class="scoreBar">
+              <div class="teamPill orange">الفريق البرتقالي</div>
+              <button id="scoreOrange" class="scoreBox ${isHost ? "" : "readonly"}" ${isHost ? "" : "disabled"}>0</button>
+              <button id="scoreGreen" class="scoreBox ${isHost ? "" : "readonly"}" ${isHost ? "" : "disabled"}>0</button>
+              <div class="teamPill green">الفريق الأخضر</div>
+            </div>
+
+            <div id="firstPress" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+
+            <div class="controlRow">
+              <!-- ✅ تم تبديل مكان زر تجميد الأزرار مع زر تغيير السؤال -->
+              <button id="btnFreeze" class="pillBtn">تجميد الأزرار</button>
+
+              <div class="timerWrap">
+                <button id="timerBtn" class="timerClockBtn" ${isHost ? "" : "disabled"} aria-label="المؤقت">
+                  <svg id="timerRing" class="timerRing" viewBox="0 0 100 100">
+                    <circle id="ringCircle" cx="50" cy="50" r="44"></circle>
+                  </svg>
+                  <div id="timerNum" class="timerNumber">25</div>
+                </button>
+              </div>
+
+              <button id="btnNextQ" class="pillBtn">تغيير السؤال</button>
+            </div>
+
+            <div class="questionCard">
+              <div id="qText" class="qText">—</div>
+              <button id="answerBtn" class="answerBtn answerHidden">${isHost ? "اضغط للإجابة" : "اضغط للإجابة"}</button>
+            </div>
+
+            ${isHost ? `
+              <div class="panel" style="margin-top:10px">
+                <div style="font-size:20px;font-weight:900">اللاعبون</div>
+                <div id="playersList" style="text-align:right"></div>
+                <div class="smallNote">اضغط على اسم اللاعب لتبديل الفريق (أخضر / برتقالي)</div>
+              </div>
+            ` : `
+              <div class="playerBtnWrap">
+                <button id="playerBuzz" class="playerBigBtn">اضغط هنا</button>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    /* =========================
+       SVG overlay hexes (توليد 25 خلية)
+    ========================= */
+    function buildHexOverlay(svgEl){
+      svgEl.innerHTML = "";
+      // ضبط أبعاد السداسي في الـ viewBox
+      const W = 1000, H = 600;
+      const hexW = 150;
+      const hexH = 130;
+      const startX = 220;
+      const startY = 95;
+
+      // حساب نقاط سداسي flat-top
+      function hexPoints(cx, cy){
+        const a = hexW/2;
+        const b = hexH/2;
+        const pts = [
+          [cx-a*0.5, cy-b],
+          [cx+a*0.5, cy-b],
+          [cx+a,     cy],
+          [cx+a*0.5, cy+b],
+          [cx-a*0.5, cy+b],
+          [cx-a,     cy]
+        ];
+        return pts.map(p=>p.join(",")).join(" ");
+      }
+
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const shift = (r%2===0) ? 0 : (hexW*0.5);
+          const cx = startX + c*hexW*0.9 + shift;
+          const cy = startY + r*hexH*0.82;
+
+          const poly = document.createElementNS("http://www.w3.org/2000/svg","polygon");
+          poly.setAttribute("points", hexPoints(cx,cy));
+          poly.setAttribute("data-r", r);
+          poly.setAttribute("data-c", c);
+          poly.setAttribute("class", "cell state0");
+          svgEl.appendChild(poly);
+        }
+      }
+    }
+
+    function setHexStates(svgEl, states, pulseIdx){
+      const polys = svgEl.querySelectorAll("polygon.cell");
+      polys.forEach((p)=>{
+        const r = +p.getAttribute("data-r");
+        const c = +p.getAttribute("data-c");
+        const s = states[idx(r,c)] || 0;
+        p.classList.remove("state0","state1","state2","state3","pulse");
+        p.classList.add("state"+s);
+        if(s === 1 && pulseIdx === idx(r,c)) p.classList.add("pulse");
+      });
+    }
+
+    /* =========================
+       Main: connect to room
+    ========================= */
+    async function runRoom(code, role, name){
+      renderGameShell(role);
+      const isHost = (role === "host");
+
+      const roomRef = ref(db, "rooms/"+code);
+      const stateRef = ref(db, "rooms/"+code+"/state");
+      const playersRef = ref(db, "rooms/"+code+"/players");
+
+      // تحقق وجود الغرفة
+      const snap = await get(roomRef);
+      if(!snap.exists()){
+        toast("الكود غير موجود");
+        renderLanding();
+        return;
+      }
+
+      // تسجيل اللاعب
+      let myId = "";
+      if(!isHost){
+        myId = "p_" + Math.random().toString(16).slice(2,10);
+        // اختيار فريق تلقائي (يتبدل عند دخول لاعبين جدد)
+        await runTransaction(playersRef, (players)=>{
+          players = players || {};
+          const count = Object.keys(players).length;
+          const team = (count % 2 === 0) ? "green" : "orange";
+          players[myId] = { name: safeText(name||"لاعب"), team, joinedAt: nowMs() };
+          return players;
+        });
+      }
+
+      // private questions bank (على جهاز المقدم فقط)
+      const privateBank = loadPrivateQuestions(code);
+
+      // عناصر UI
+      const mapImg = $("mapImg");
+      const overlaySvg = $("overlaySvg");
+      const mapScale = $("mapScale");
+      const zoomRange = $("zoomRange");
+
+      const btnMap = $("btnMap");
+      const btnClear = $("btnClear");
+      const btnQMode = $("btnQMode");
+      const btnSettings = $("btnSettings");
+
+      const scoreOrangeBtn = $("scoreOrange");
+      const scoreGreenBtn = $("scoreGreen");
+
+      const firstPressEl = $("firstPress");
+
+      const btnFreeze = $("btnFreeze");
+      const btnNextQ = $("btnNextQ");
+
+      const timerBtn = $("timerBtn");
+      const timerRing = $("timerRing");
+      const ringCircle = $("ringCircle");
+      const timerNum = $("timerNum");
+
+      const qTextEl = $("qText");
+      const answerBtn = $("answerBtn");
+
+      const playersList = $("playersList");
+      const playerBuzz = $("playerBuzz");
+
+      buildHexOverlay(overlaySvg);
+
+      // Tooltips (?) — فقط للأزرار الثلاثة المطلوبة
+      main.querySelectorAll(".helpDot").forEach(dot=>{
+        dot.addEventListener("click",(e)=>{
+          e.stopPropagation();
+          const t = dot.getAttribute("data-help") || "";
+          let msg = "";
+          if(t === "تغيير الخريطة") msg = "يبدّل بين الخرائط الثلاثة ويعيد تفريغ الخلايا للجولة الجديدة.";
+          if(t === "تفريغ الخريطة") msg = "يعيد الخلايا للون الأبيض (تفريغ الجولة الحالية).";
+          if(t === "تغيير نوع الأسئلة") msg = "يبدّل بين الأسئلة العامة وأسئلة المقدم الخاصة.";
+          showHelp(dot, msg);
+        });
+      });
+
+      // إعدادات (بسيطة: تعديل اسم اللعبة + تعديل أسئلة خاصة على جهاز المقدم)
+      btnSettings.onclick = ()=>{
+        if(!isHost){
+          toast("الإعدادات للمقدم فقط");
+          return;
+        }
+        const g = prompt("اكتب اسم اللعبة (اختياري):", "");
+        if(g !== null){
+          const el = $("gameName");
+          el.innerHTML = g.trim() ? `<div class="gnText">${safeText(g.trim())}</div>` : "";
+        }
+        const want = confirm("هل تريد تعديل الأسئلة الخاصة على هذا الجهاز؟");
+        if(!want) return;
+
+        const letter = prompt("اكتب الحرف الذي تريد إضافة سؤال له (مثال: هـ):", "هـ");
+        if(!letter) return;
+        const q = prompt("اكتب نص السؤال:", "");
+        if(!q) return;
+        const a = prompt("اكتب الجواب:", "");
+        if(!a) return;
+        const L = letter.trim();
+        privateBank[L] = privateBank[L] || [];
+        privateBank[L].push({ q:q.trim(), a:a.trim() });
+        savePrivateQuestions(code, privateBank);
+        toast("تم حفظ السؤال الخاص على جهاز المقدم");
+      };
+
+      // Zoom
+      zoomRange.oninput = ()=>{
+        const z = +zoomRange.value;
+        mapScale.style.setProperty("--zoom", z);
+        if(isHost) update(stateRef, { zoom: z });
+      };
+
+      // Change map
+      btnMap.onclick = async ()=>{
+        if(!isHost){ toast("للمقدم فقط"); return; }
+        const s = (await get(stateRef)).val();
+        const next = ((s?.mapIndex ?? 0) + 1) % 3;
+        await update(stateRef, {
+          mapIndex: next,
+          cells: Array(CELL_COUNT).fill(0),
+          winner: "", // ✅ بدء جولة جديدة تلقائياً
+          firstPress: { name:"", team:"", frozen: (s?.firstPress?.frozen ?? false) }
+        });
+      };
+
+      // Clear map
+      btnClear.onclick = async ()=>{
+        if(!isHost){ toast("للمقدم فقط"); return; }
+        const s = (await get(stateRef)).val();
+        await update(stateRef, {
+          cells: Array(CELL_COUNT).fill(0),
+          winner: "", // ✅ بدء جولة جديدة تلقائياً
+          firstPress: { name:"", team:"", frozen: (s?.firstPress?.frozen ?? false) }
+        });
+      };
+
+      // Toggle Q Mode
+      btnQMode.onclick = async ()=>{
+        if(!isHost){ toast("للمقدم فقط"); return; }
+        const s = (await get(stateRef)).val();
+        const cur = s?.qMode || "general";
+        const next = (cur === "general") ? "private" : "general";
+        await update(stateRef, { qMode: next });
+      };
+
+      // Score pickers (Host only)
+      if(isHost){
+        scoreOrangeBtn.onclick = ()=> openScorePicker("نقاط الفريق البرتقالي", async (n)=>{
+          await update(stateRef, { "scores/orange": n });
+        });
+        scoreGreenBtn.onclick = ()=> openScorePicker("نقاط الفريق الأخضر", async (n)=>{
+          await update(stateRef, { "scores/green": n });
+        });
+      }
+
+      // Freeze buzzer
+      btnFreeze.onclick = async ()=>{
+        if(!isHost){ toast("للمقدم فقط"); return; }
+        const s = (await get(stateRef)).val();
+        const frozen = !!(s?.firstPress?.frozen);
+        await update(stateRef, { "firstPress/frozen": !frozen });
+      };
+
+      // Next Question
+      btnNextQ.onclick = async ()=>{
+        if(!isHost){ toast("للمقدم فقط"); return; }
+        const s = (await get(stateRef)).val();
+        const mapIndex = s?.mapIndex ?? 0;
+        const mode = s?.qMode ?? "general";
+
+        const letter = pickRandomLetter(mapIndex);
+        const qa = pickQuestion(letter, mode, privateBank);
+
+        await update(stateRef, {
+          q: { text: qa.q, answer: qa.a, letter, shown: false }
+        });
+      };
+
+      // Answer button (Host reveals only)
+      answerBtn.onclick = async ()=>{
+        if(!isHost) return; // اللاعب ما يكشف الجواب
+        const s = (await get(stateRef)).val();
+        const q = s?.q || {};
+        if(!q.text) return;
+        const shown = !!q.shown;
+        await update(stateRef, { "q/shown": !shown });
+      };
+
+      // Player buzz
+      if(playerBuzz){
+        playerBuzz.onclick = async ()=>{
+          const s = (await get(stateRef)).val();
+          if(s?.firstPress?.frozen) return;
+          if(s?.firstPress?.name) return; // أول لاعب فقط
+          // اجلب اسمي/فريقي
+          const ps = (await get(child(playersRef, myId))).val();
+          const myName = ps?.name || name || "لاعب";
+          const myTeam = ps?.team || "green";
+          await update(stateRef, { firstPress: { name: myName, team: myTeam, frozen: (s?.firstPress?.frozen ?? false) } });
+        };
+      }
+
+      // Clicking cells (Host only)
+      overlaySvg.addEventListener("click", async (e)=>{
+        if(!isHost) return;
+        const poly = e.target;
+        if(!(poly instanceof SVGPolygonElement)) return;
+        const r = +poly.getAttribute("data-r");
+        const c = +poly.getAttribute("data-c");
+        const i = idx(r,c);
+
+        const s = (await get(stateRef)).val();
+        const cells = (s?.cells || Array(CELL_COUNT).fill(0)).slice();
+
+        // دورة الألوان: أبيض(0) -> أصفر(1) -> أخضر(2) -> برتقالي(3) -> أبيض(0)
+        const cur = cells[i] || 0;
+        const next = (cur + 1) % 4;
+        cells[i] = next;
+
+        await update(stateRef, { cells });
+      });
+
+      // Players list (Host team assign)
+      if(playersList && isHost){
+        onValue(playersRef, (snap)=>{
+          const players = snap.val() || {};
+          const ids = Object.keys(players).sort((a,b)=>(players[a].joinedAt||0)-(players[b].joinedAt||0));
+          playersList.innerHTML = "";
+          if(!ids.length){
+            playersList.innerHTML = `<div class="smallNote" style="opacity:.9;text-align:center">لا يوجد لاعبين</div>`;
+            return;
+          }
+          for(const pid of ids){
+            const p = players[pid];
+            const div = document.createElement("div");
+            div.style.margin = "6px 0";
+            div.style.padding = "10px 12px";
+            div.style.borderRadius = "16px";
+            div.style.border = "4px solid rgba(0,0,0,.85)";
+            div.style.background = (p.team === "green") ? "rgba(26,163,74,.75)" : "rgba(242,140,0,.75)";
+            div.style.color = "#fff";
+            div.style.fontWeight = "900";
+            div.style.cursor = "pointer";
+            div.textContent = p.name + " — " + (p.team==="green" ? "أخضر" : "برتقالي");
+            div.onclick = async ()=>{
+              const nextTeam = (p.team === "green") ? "orange" : "green";
+              await update(child(playersRef, pid), { team: nextTeam });
+            };
+            playersList.appendChild(div);
+          }
+        });
+      }
+
+      /* =========================
+         State listener (renders everything live)
+      ========================= */
+      let lastPulse = -1;
+      let timerTick = null;
+
+      function startTimerUiLoop(){
+        if(timerTick) return;
+        timerTick = setInterval(()=>{ /* trigger UI refresh via latestState */ }, 250);
+      }
+
+      let latestState = null;
+      onValue(stateRef, (snap)=>{
+        const s = snap.val();
+        if(!s) return;
+        latestState = s;
+
+        // Map image
+        const mi = s.mapIndex ?? 0;
+        mapImg.src = ["map1.jpeg","map2.jpeg","map3.jpeg"][mi] || "map1.jpeg";
+
+        // Zoom
+        const z = s.zoom ?? 1;
+        mapScale.style.setProperty("--zoom", z);
+        if(Math.abs(+zoomRange.value - z) > 0.001) zoomRange.value = z;
+
+        // Cells
+        const cells = (s.cells && s.cells.length === CELL_COUNT) ? s.cells : Array(CELL_COUNT).fill(0);
+
+        // نبض خفيف على آخر خلية صفراء (اختياري)
+        lastPulse = cells.lastIndexOf(1);
+
+        setHexStates(overlaySvg, cells, lastPulse);
+
+        // Q mode button color
+        const mode = s.qMode || "general";
+        if(mode === "private") btnQMode.classList.add("cyan");
+        else btnQMode.classList.remove("cyan");
+
+        // Scores
+        const sc = s.scores || {green:0, orange:0};
+        scoreGreenBtn.textContent = sc.green ?? 0;
+        scoreOrangeBtn.textContent = sc.orange ?? 0;
+
+        // First press bar
+        const fp = s.firstPress || {name:"", team:"", frozen:false};
+        if(fp.name){
+          firstPressEl.textContent = fp.name;
+          firstPressEl.classList.add("filled");
+          if(fp.team === "green") firstPressEl.style.background = "rgba(26,163,74,.85)";
+          else if(fp.team === "orange") firstPressEl.style.background = "rgba(242,140,0,.85)";
+          else firstPressEl.style.background = "rgba(255,255,255,.12)";
+        }else{
+          firstPressEl.textContent = "اسم اللاعب الذي يضغط أولاً";
+          firstPressEl.classList.remove("filled");
+          firstPressEl.style.background = "rgba(255,255,255,.10)";
+        }
+
+        // Freeze button label
+        const frozen = !!fp.frozen;
+        btnFreeze.textContent = frozen ? "إلغاء التجميد" : "تجميد الأزرار";
+
+        // Player button state
+        if(playerBuzz){
+          if(frozen) playerBuzz.classList.add("disabled");
+          else playerBuzz.classList.remove("disabled");
+        }
+
+        // Question
+        const q = s.q || {text:"", answer:"", shown:false};
+        qTextEl.textContent = q.text || "—";
+
+        // ✅ زر الجواب التفاعلي
+        if(!q.text){
+          answerBtn.textContent = isHost ? "اضغط للإجابة" : "اضغط للإجابة";
+          answerBtn.classList.remove("answerShown");
+          answerBtn.classList.add("answerHidden");
+          if(!isHost) answerBtn.classList.add("disabled");
+          else answerBtn.classList.remove("disabled");
+        }else{
+          if(q.shown){
+            answerBtn.textContent = q.answer || "—";
+            answerBtn.classList.remove("answerHidden");
+            answerBtn.classList.add("answerShown");
+          }else{
+            answerBtn.textContent = "اضغط للإجابة";
+            answerBtn.classList.remove("answerShown");
+            answerBtn.classList.add("answerHidden");
+          }
+          if(!isHost) answerBtn.classList.add("disabled");
+          else answerBtn.classList.remove("disabled");
+        }
+
+        // Winner celebration (show on change to winner)
+        if(s.winner && s.winner !== ""){
+          // نعرض الاحتفال عند أول وصول فقط (ثم يتوقف حتى تفريغ/تغيير الخريطة)
+          if(!winBackdrop._lastWinner || winBackdrop._lastWinner !== s.winner){
+            winBackdrop._lastWinner = s.winner;
+            showWin(s.winner);
+          }
+        }else{
+          winBackdrop._lastWinner = "";
+        }
+
+        // Timer UI render
+        startTimerUiLoop();
+        renderTimer(s.timer || {});
+      });
+
+      function renderTimer(timer){
+        const total = (typeof timer.total === "number" ? timer.total : TIMER_DEFAULT);
+        const left = computeTimerRemaining(timer);
+
+        // رقم
+        const prev = +timerNum.textContent || left;
+        timerNum.textContent = left;
+
+        // pop آخر 5 ثواني
+        timerNum.classList.remove("pop","red");
+        timerBtn.classList.remove("flash");
+
+        if(left <= 5 && left > 0){
+          timerNum.classList.add("red","pop");
+        }
+        if(left === 0 && timer.running){
+          timerBtn.classList.add("flash");
+          timerNum.classList.add("red");
+        }
+
+        // ring
+        const r = 44;
+        const C = 2 * Math.PI * r;
+        ringCircle.style.strokeDasharray = String(C);
+        timerRing.style.opacity = timer.running ? "1" : "0";
+        const frac = total > 0 ? (left/total) : 0;
+        const off = C * (1 - Math.max(0, Math.min(1, frac)));
+        ringCircle.style.strokeDashoffset = String(off);
+
+        // Host: click to start/stop (simple)
+        if(isHost){
+          timerBtn.onclick = async ()=>{
+            const s = (await get(stateRef)).val();
+            const t = s?.timer || {};
+            const running = !!t.running;
+
+            if(!running){
+              const dur = (typeof t.remaining === "number") ? t.remaining : total;
+              const endAtMs = nowMs() + dur*1000;
+              await update(stateRef, { timer: { running:true, total: dur, remaining: dur, endAtMs } });
+            }else{
+              const leftNow = computeTimerRemaining(t);
+              await update(stateRef, { timer: { running:false, total: t.total ?? total, remaining: leftNow, endAtMs: 0 } });
+            }
+          };
+        }else{
+          timerBtn.onclick = null;
+        }
+
+        // إذا المؤقت انتهى، نخليه يظل "منتهي" حتى المقدم يوقفه
+        if(isHost && timer.running && left === 0){
+          // نوقف تلقائيًا بعد 0 بثانية بسيطة عشان ما يطول الوميض
+          clearTimeout(timerBtn._stopT);
+          timerBtn._stopT = setTimeout(async ()=>{
+            const s = (await get(stateRef)).val();
+            const t = s?.timer || {};
+            if(!t.running) return;
+            const leftNow = computeTimerRemaining(t);
+            if(leftNow !== 0) return;
+            await update(stateRef, { timer: { running:false, total: t.total ?? total, remaining: 0, endAtMs: 0 } });
+          }, 900);
+        }
+      }
+
+      /* =========================
+         Winner detection trigger (Host runs it after each cell update)
+      ========================= */
+      if(isHost){
+        onValue(stateRef, async (snap)=>{
+          const s = snap.val();
+          if(!s) return;
+          const cells = (s.cells && s.cells.length === CELL_COUNT) ? s.cells : Array(CELL_COUNT).fill(0);
+
+          // إذا فيه فائز بالفعل، لا نكرر (إلى أن يتم تفريغ/تغيير الخريطة)
+          if(s.winner && s.winner !== "") return;
+
+          const gWin = hasGreenWin(cells);
+          const oWin = hasOrangeWin(cells);
+
+          if(gWin){
+            await update(stateRef, { winner: "green" });
+          }else if(oWin){
+            await update(stateRef, { winner: "orange" });
+          }
+        });
+      }
+    }
+
+    /* =========================
+       Boot
+    ========================= */
+    const p = qs();
+
+    // اسم اللعبة (من الـ localStorage اختياري)
+    try{
+      const savedName = localStorage.getItem("GAME_NAME") || "";
+      if(savedName.trim()){
+        $("gameName").innerHTML = `<div class="gnText">${safeText(savedName.trim())}</div>`;
+      }
+    }catch(e){}
+
+    if(!p.code){
+      renderLanding();
+    }else{
+      if(p.role !== "host" && p.role !== "player"){
+        // إذا ما جاء role نفترض لاعب
+        location.replace(location.pathname + "?code="+encodeURIComponent(p.code)+"&role=player&name="+encodeURIComponent(p.name||"لاعب"));
+      }else{
+        runRoom(p.code, p.role, p.name);
+      }
+    }
+  </script>
+</body>
+</html>
