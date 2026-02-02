@@ -1,18 +1,18 @@
-export async function onRequestGet({ env }) {
-  try {
-    const r = await env.DB
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-      .all();
+export async function onRequestGet(context) {
+  const env = context?.env;
 
-    const tables = (r.results || []).map(x => x.name);
-
-    return new Response(JSON.stringify({ ok: true, tables }, null, 2), {
-      headers: { "content-type": "application/json; charset=utf-8" },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String(e) }, null, 2), {
-      status: 500,
-      headers: { "content-type": "application/json; charset=utf-8" },
-    });
-  }
+  return new Response(
+    JSON.stringify(
+      {
+        ok: true,
+        hasEnv: !!env,
+        hasDB: !!env?.DB,
+        dbType: env?.DB ? typeof env.DB : null,
+        envKeys: env ? Object.keys(env) : null,
+      },
+      null,
+      2
+    ),
+    { headers: { "content-type": "application/json; charset=utf-8" } }
+  );
 }
