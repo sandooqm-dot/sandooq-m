@@ -2,274 +2,307 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>لعبة سباق الحروف</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>تفعيل اللعبة - صندوق المسابقات</title>
+
   <style>
-    /* ✅ نفس خط اللعبة */
-    @font-face{
-      font-family:"AA-GALAXY";
-      src:url("AA-GALAXY.otf") format("opentype");
-      font-weight:400;
-      font-style:normal;
-      font-display:swap;
-    }
-
     :root{
-      /* ✅ نفس خلفية اللعبة */
-      --bg1:#7b1f63;
-      --bg2:#5f214f;
-      --bg3:#3a1234;
-
+      --bg1:#0e2f7a;
+      --bg2:#1f4fa3;
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
+      --muted:#6b7280;
+      --danger:#e11d48;
+      --success:#16a34a;
+      --shadow: 0 14px 35px rgba(0,0,0,.22);
+      --radius: 18px;
     }
 
+    *{box-sizing:border-box}
     body{
       margin:0;
-      color:#fff;
-      text-align:center;
-      font-family:"AA-GALAXY", Arial, sans-serif;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family: Arial, sans-serif;
       background:
-        radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
-        radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
-        linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
-      -webkit-font-smoothing:antialiased;
-      text-rendering:optimizeLegibility;
+        radial-gradient(1100px 500px at 15% 20%, rgba(244,196,0,.18), transparent 60%),
+        radial-gradient(900px 450px at 85% 80%, rgba(255,255,255,.10), transparent 60%),
+        linear-gradient(135deg, var(--bg1), var(--bg2));
+      padding: 18px;
+      color:#fff;
     }
 
-    button, input{
-      font-family:"AA-GALAXY", Arial, sans-serif;
+    .wrap{
+      width:min(520px, 100%);
+      position:relative;
     }
 
-    header{position:relative;padding:30px 16px 0}
     .logo{
-      position:absolute;left:14px;top:14px;
-      width:86px;height:86px;object-fit:contain;
-      pointer-events:none;
+      display:flex;
+      justify-content:center;
+      margin-bottom: 14px;
     }
-    h1{margin:18px 0 14px;color:var(--yellow);font-size:28px}
-    .wrap{width:92%;max-width:520px;margin:0 auto}
-    .card{background:var(--card);color:var(--text);border-radius:12px;padding:14px}
+    .logo img{
+      width:86px;
+      height:86px;
+      object-fit:contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
+    }
+
+    .card{
+      background: rgba(255,255,255,.96);
+      color: var(--text);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px 18px 18px;
+      border: 2px solid rgba(244,196,0,.35);
+    }
+
+    h1{
+      margin:0 0 8px;
+      font-size: 22px;
+      text-align:center;
+    }
+    p{
+      margin:0 0 16px;
+      color: var(--muted);
+      text-align:center;
+      line-height:1.7;
+      font-size: 14px;
+    }
+
+    .field{
+      margin-top: 10px;
+    }
+    label{
+      display:block;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color:#111;
+      font-weight:700;
+    }
     input{
-      width:100%;box-sizing:border-box;
-      padding:14px;margin:10px 0;
-      font-size:16px;border-radius:10px;border:0;
+      width:100%;
+      padding: 14px 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(31,79,163,.18);
+      outline:none;
+      background:#fff;
+      direction:ltr;
+      text-align:left;
     }
-    button{
-      width:100%;padding:16px;margin-top:10px;
-      font-size:18px;border:none;border-radius:12px;cursor:pointer;
-      background:var(--yellow);color:#000
+    input:focus{
+      border-color: rgba(31,79,163,.55);
+      box-shadow: 0 0 0 4px rgba(31,79,163,.12);
     }
-    .hint{font-size:13px;opacity:.9;margin-top:8px}
+
+    .btn{
+      width:100%;
+      margin-top: 14px;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border:none;
+      cursor:pointer;
+      background: var(--yellow);
+      color:#111;
+      font-weight: 900;
+      font-size: 16px;
+      transition: .15s transform ease, .15s filter ease;
+    }
+    .btn:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+    }
+    .btn:active{ transform: scale(.98); }
+
+    .msg{
+      margin-top: 12px;
+      padding: 12px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height:1.7;
+      display:none;
+    }
+    .msg.err{ background: rgba(225,29,72,.10); color: var(--danger); border:1px solid rgba(225,29,72,.25); }
+    .msg.ok{ background: rgba(22,163,74,.10); color: var(--success); border:1px solid rgba(22,163,74,.25); }
+
+    .mini{
+      margin-top: 12px;
+      text-align:center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .spinner{
+      display:inline-block;
+      width:16px;height:16px;
+      border: 3px solid rgba(17,17,17,.25);
+      border-top-color: rgba(17,17,17,.9);
+      border-radius:50%;
+      vertical-align: -3px;
+      margin-left:8px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin{ to{transform:rotate(360deg)} }
+
+    .footer{
+      text-align:center;
+      margin-top: 12px;
+      color: rgba(255,255,255,.85);
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
-
-  <!-- ====== 🔒 بوابة تفعيل للمقدّم فقط ====== -->
-  <div id="licenseGate" style="position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'AA-GALAXY', Arial, sans-serif;
-    background:
-      radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
-      radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
-      linear-gradient(135deg, #7b1f63 0%, #5f214f 48%, #3a1234 100%);">
-    <div style="width:min(520px,92%);background:rgba(255,255,255,.10);padding:18px;border-radius:12px;text-align:center">
-      <h2 style="margin:0 0 10px">تفعيل دخول المقدم</h2>
-      <p style="margin:0 0 12px;opacity:.9">أدخل كود التفعيل اللي وصلك بعد الشراء. سيتم ربطه بهذا الجهاز.</p>
-
-      <input id="licenseCode" placeholder="SNDQ-XXXX-XXXX-XXXX"
-        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;box-sizing:border-box;margin:8px 0;font-family:'AA-GALAXY', Arial, sans-serif;" />
-
-      <button id="licenseBtn"
-        style="width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;cursor:pointer;background:#f4c400;color:#000;font-family:'AA-GALAXY', Arial, sans-serif;">
-        تفعيل ودخول
-      </button>
-
-      <div id="licenseMsg" style="margin-top:10px;opacity:.95"></div>
+  <div class="wrap">
+    <div class="logo">
+      <!-- اسم اللوجو عندك: logo.PNG -->
+      <img src="logo.PNG" alt="Sandooq" />
     </div>
+
+    <div class="card">
+      <h1>تفعيل اللعبة</h1>
+      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. الكود يرتبط بجهازك تلقائيًا.</p>
+
+      <div class="field">
+        <label for="code">كود التفعيل</label>
+        <input id="code" type="text" inputmode="latin" autocomplete="one-time-code" placeholder="SNDQ-XXXX-XXXX-XXXX" />
+      </div>
+
+      <button id="btn" class="btn" disabled>تفعيل</button>
+
+      <div id="msg" class="msg"></div>
+
+      <div class="mini" id="mini"></div>
+    </div>
+
+    <div class="footer">© صندوق المسابقات</div>
   </div>
 
   <script>
-  (function(){
-    // ✅ Cloudflare Pages Function (بدون /functions)
-    const VERIFY_URL = "/api/verify";
+    // ====== إعدادات مهمة ======
+    const API_URL  = "https://script.google.com/macros/s/AKfycbwq1qWmLlEtO3GvzWGGOfXSKQhm6B-NPI1RkSIv4NjzXOYmR4DBz09uQzNK3aFLi6g2cw/exec";
+    const NEXT_URL = "index.html"; // غيرها لصفحة لعبتك بعد التفعيل (مثلاً: game.html)
+    // ==========================
 
-    const gate = document.getElementById('licenseGate');
-    const msgEl = document.getElementById('licenseMsg');
-    const input = document.getElementById('licenseCode');
-    const btn = document.getElementById('licenseBtn');
+    const LS_ACTIVATED = "sandooq_activated";
+    const LS_CODE      = "sandooq_code";
+    const LS_DEVICE    = "sandooq_device_id";
 
-    function setMsg(t){ msgEl.textContent = t || ""; }
+    const $code = document.getElementById("code");
+    const $btn  = document.getElementById("btn");
+    const $msg  = document.getElementById("msg");
+    const $mini = document.getElementById("mini");
 
-    function getDeviceId(){
-      let id = localStorage.getItem("deviceId");
-      if(!id){
-        id = "dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
-        localStorage.setItem("deviceId", id);
+    function showMsg(type, text){
+      $msg.className = "msg " + (type === "ok" ? "ok" : "err");
+      $msg.textContent = text;
+      $msg.style.display = "block";
+    }
+    function hideMsg(){ $msg.style.display = "none"; }
+
+    function normalizeCode(v){
+      return (v || "")
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g,"")
+        .replace(/–/g,"-");
+    }
+
+    function getOrCreateDeviceId(){
+      let id = localStorage.getItem(LS_DEVICE);
+      if (!id){
+        // deviceId بسيط وثابت على نفس الجهاز
+        id = "dev_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,10);
+        localStorage.setItem(LS_DEVICE, id);
       }
       return id;
     }
 
-    // ✅ تحقق عبر POST (JSON)
-    async function verify(code){
-      const res = await fetch(VERIFY_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          code: code,
-          deviceId: getDeviceId()
-        })
-      });
+    function redirect(){
+      window.location.href = NEXT_URL;
+    }
 
-      // لو رجع HTML أو أي شيء غير JSON → هذا كان سبب Bad response
-      const text = await res.text();
-      try{
-        return JSON.parse(text);
-      }catch(e){
-        return { ok:false, msg:"Bad response" };
+    // لو الجهاز مُفعّل من قبل
+    if (localStorage.getItem(LS_ACTIVATED) === "1"){
+      // يروح للعبة مباشرة
+      redirect();
+    }
+
+    const deviceId = getOrCreateDeviceId();
+    $mini.textContent = ""; // (لو تبي نظهر deviceId قلّي)
+
+    $code.addEventListener("input", () => {
+      hideMsg();
+      const v = normalizeCode($code.value);
+      $btn.disabled = v.length < 8;
+    });
+
+    $code.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !$btn.disabled) $btn.click();
+    });
+
+    $btn.addEventListener("click", async () => {
+      hideMsg();
+      const code = normalizeCode($code.value);
+
+      if (!code){
+        showMsg("err", "اكتب كود التفعيل.");
+        return;
       }
-    }
 
-    // دخول تلقائي بعد أول تفعيل (نفس الجهاز)
-    async function autoCheck(){
-      const saved = localStorage.getItem("activatedCode");
-      if(!saved) return;
+      $btn.disabled = true;
+      const oldText = $btn.textContent;
+      $btn.innerHTML = `جاري التفعيل <span class="spinner"></span>`;
+
       try{
-        const data = await verify(saved);
-        if(data && data.ok && data.valid){
-          gate.style.display = "none";
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ code, deviceId })
+        });
+
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch(e){}
+
+        if (!data || data.ok !== true || data.valid !== true){
+          const err = (data && (data.error || data.err)) ? String(data.error || data.err) : "UNKNOWN_ERROR";
+
+          if (err === "CODE_NOT_FOUND"){
+            showMsg("err", "هذا الكود غير موجود. تأكد من نسخه صح.");
+          } else if (err === "CODE_ALREADY_USED_ON_ANOTHER_DEVICE"){
+            showMsg("err", "هذا الكود مُفعّل على جهاز آخر.");
+          } else if (err === "MISSING_CODE"){
+            showMsg("err", "اكتب كود التفعيل.");
+          } else if (err === "MISSING_DEVICE"){
+            showMsg("err", "تعذر قراءة الجهاز. جرّب تحديث الصفحة.");
+          } else {
+            showMsg("err", "صار خطأ في التفعيل. جرّب مرة ثانية.");
+          }
+
+          $btn.disabled = false;
+          $btn.textContent = oldText;
+          return;
         }
-      }catch(e){}
-    }
-    autoCheck();
 
-    btn.addEventListener("click", async () => {
-      const code = (input.value || "").trim();
-      if(!code) return setMsg("اكتب الكود أولاً");
+        // نجاح ✅
+        localStorage.setItem(LS_ACTIVATED, "1");
+        localStorage.setItem(LS_CODE, code);
 
-      btn.disabled = true;
-      setMsg("جاري التحقق...");
-      try{
-        const data = await verify(code);
+        showMsg("ok", "تم التفعيل بنجاح ✅ سيتم نقلك للعبة الآن...");
+        setTimeout(redirect, 650);
 
-        if(!data || !data.ok){
-          btn.disabled = false;
-          return setMsg((data && data.msg) ? data.msg : "مرفوض");
-        }
-
-        if(data.valid !== true){
-          btn.disabled = false;
-          return setMsg(data.reason ? data.reason : "الكود غير صحيح");
-        }
-
-        localStorage.setItem("activatedCode", code);
-        setMsg("تم التفعيل ✅");
-        gate.style.display = "none";
-      }catch(e){
-        setMsg("تعذر الاتصال");
-      }finally{
-        btn.disabled = false;
+      } catch (e){
+        showMsg("err", "تعذر الاتصال بالسيرفر. تأكد من النت وجرب.");
+        $btn.disabled = false;
+        $btn.textContent = oldText;
       }
     });
-  })();
-  </script>
-  <!-- ====== نهاية بوابة التفعيل ====== -->
-
-  <header>
-    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
-    <h1>لعبة سباق الحروف</h1>
-  </header>
-
-  <div class="wrap">
-    <div class="card">
-      <input id="name" placeholder="ادخل اسم اللعبة">
-      <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
-      <button id="btn">انشئ اللعبة</button>
-      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
-    </div>
-  </div>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
-      authDomain: "sabaq-alhorof.firebaseapp.com",
-      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "sabaq-alhorof",
-      storageBucket: "sabaq-alhorof.firebasestorage.app",
-      messagingSenderId: "1053646928152",
-      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    function normalizeDigits(str){
-      const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
-      return String(str ?? "").trim().replace(/[٠-٩]/g, d => map[d]);
-    }
-
-    function random6(){
-      return String(Math.floor(100000 + Math.random()*900000));
-    }
-
-    function randomKey(){
-      return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    }
-
-    async function createRoom(){
-      const name = document.getElementById("name").value.trim();
-      const pRaw = document.getElementById("players").value;
-      const players = Number(normalizeDigits(pRaw));
-
-      if(!name){ alert("اكتب اسم اللعبة"); return; }
-
-      // ✅ بدون حد أعلى (1 أو أكثر)
-      if(!Number.isFinite(players) || players < 1){
-        alert("عدد اللاعبين لازم يكون 1 أو أكثر");
-        return;
-      }
-
-      const btn = document.getElementById("btn");
-      btn.disabled = true;
-
-      let code = "";
-      for(let i=0;i<10;i++){
-        const c = random6();
-        const exists = (await get(ref(db, `rooms/${c}`))).exists();
-        if(!exists){ code = c; break; }
-      }
-
-      if(!code){
-        btn.disabled = false;
-        alert("حاول مرة ثانية");
-        return;
-      }
-
-      const presenterKey = randomKey();
-
-      const room = {
-        code,
-        name,
-        maxPlayers: players,
-        presenterKey,
-        status: "lobby",
-        createdAt: Date.now(),
-        activeMap: 0,
-        freeze: false,
-        buzzer: null,
-        current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
-        players: {},
-        scores: { orange: 0, green: 0 }
-      };
-
-      await set(ref(db, `rooms/${code}`), room);
-
-      location.href = `game.html?role=host&code=${encodeURIComponent(code)}&key=${encodeURIComponent(presenterKey)}`;
-    }
-
-    document.getElementById("btn").addEventListener("click", createRoom);
   </script>
 </body>
 </html>
