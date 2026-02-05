@@ -90,7 +90,8 @@
 
   <script>
   (function(){
-    const VERIFY_URL = "https://script.google.com/macros/s/AKfycbwLgHE2stvtr8fgbWM2egbWzVKyjN0AW1Uwub2CW2JP6NG2YKxsR4ndX384Y8b9W35HAA/exec";
+    // ✅ Cloudflare Pages Functions endpoint (نفس الدومين)
+    const VERIFY_URL = "/functions/api/verify";
 
     const gate = document.getElementById('licenseGate');
     const msgEl = document.getElementById('licenseMsg');
@@ -108,32 +109,20 @@
       return id;
     }
 
-    // ✅ تحقق JSONP (بدون مشاكل CORS)
-    function verifyJsonp(code){
-      return new Promise((resolve, reject) => {
-        const cbName = "__verify_cb_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-        const script = document.createElement("script");
-        const timeout = setTimeout(() => { cleanup(); reject(new Error("timeout")); }, 12000);
-
-        function cleanup(){
-          clearTimeout(timeout);
-          try { delete window[cbName]; } catch(e){ window[cbName]=undefined; }
-          if (script && script.parentNode) script.parentNode.removeChild(script);
-        }
-
-        window[cbName] = (data) => { cleanup(); resolve(data); };
-
-        const url =
-          VERIFY_URL +
-          "?code=" + encodeURIComponent(code) +
-          "&deviceId=" + encodeURIComponent(getDeviceId()) +
-          "&callback=" + encodeURIComponent(cbName) +
-          "&_=" + Date.now();
-
-        script.src = url;
-        script.onerror = () => { cleanup(); reject(new Error("network")); };
-        document.body.appendChild(script);
+    async function verifyFetch(code){
+      const res = await fetch(VERIFY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, deviceId: getDeviceId() })
       });
+
+      // لو رجع JSON
+      const ct = res.headers.get("content-type") || "";
+      if(ct.includes("application/json")) return await res.json();
+
+      // fallback
+      const txt = await res.text();
+      try { return JSON.parse(txt); } catch(e){ return { ok:false, msg: txt || "Bad response" }; }
     }
 
     // دخول تلقائي بعد أول تفعيل (نفس الجهاز)
@@ -141,8 +130,8 @@
       const saved = localStorage.getItem("activatedCode");
       if(!saved) return;
       try{
-        const data = await verifyJsonp(saved);
-        if(data && data.ok){
+        const data = await verifyFetch(saved);
+        if(data && data.ok && (data.valid === true || data.ok === true)){
           gate.style.display = "none";
         }
       }catch(e){}
@@ -154,15 +143,23 @@
       if(!code) return setMsg("اكتب الكود أولاً");
 
       setMsg("جاري التحقق...");
-      try{
-        const data = await verifyJsonp(code);
-        if(!data || !data.ok) return setMsg((data && data.msg) ? data.msg : "مرفوض");
+      btn.disabled = true;
 
-        localStorage.setItem("activatedCode", code);
-        setMsg("تم التفعيل ✅");
-        gate.style.display = "none";
+      try{
+        const data = await verifyFetch(code);
+
+        // نتوقع من verify.js: ok + valid
+        if(data && data.ok && data.valid === true){
+          localStorage.setItem("activatedCode", code);
+          setMsg("تم التفعيل");
+          gate.style.display = "none";
+        }else{
+          setMsg((data && (data.msg || data.reason)) ? (data.msg || data.reason) : "الكود غير صحيح");
+        }
       }catch(e){
-        setMsg("تعذر الاتصال. تأكد من رابط التحقق");
+        setMsg("تعذر الاتصال. تأكد من الدومين");
+      }finally{
+        btn.disabled = false;
       }
     });
   })();
