@@ -90,8 +90,8 @@
 
   <script>
   (function(){
-    // ✅ Cloudflare Pages Functions endpoint (نفس الدومين)
-    const VERIFY_URL = "/functions/api/verify";
+    // ✅ Cloudflare Pages Function (بدون /functions)
+    const VERIFY_URL = "/api/verify";
 
     const gate = document.getElementById('licenseGate');
     const msgEl = document.getElementById('licenseMsg');
@@ -109,20 +109,24 @@
       return id;
     }
 
-    async function verifyFetch(code){
+    // ✅ تحقق عبر POST (JSON)
+    async function verify(code){
       const res = await fetch(VERIFY_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, deviceId: getDeviceId() })
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          code: code,
+          deviceId: getDeviceId()
+        })
       });
 
-      // لو رجع JSON
-      const ct = res.headers.get("content-type") || "";
-      if(ct.includes("application/json")) return await res.json();
-
-      // fallback
-      const txt = await res.text();
-      try { return JSON.parse(txt); } catch(e){ return { ok:false, msg: txt || "Bad response" }; }
+      // لو رجع HTML أو أي شيء غير JSON → هذا كان سبب Bad response
+      const text = await res.text();
+      try{
+        return JSON.parse(text);
+      }catch(e){
+        return { ok:false, msg:"Bad response" };
+      }
     }
 
     // دخول تلقائي بعد أول تفعيل (نفس الجهاز)
@@ -130,8 +134,8 @@
       const saved = localStorage.getItem("activatedCode");
       if(!saved) return;
       try{
-        const data = await verifyFetch(saved);
-        if(data && data.ok && (data.valid === true || data.ok === true)){
+        const data = await verify(saved);
+        if(data && data.ok && data.valid){
           gate.style.display = "none";
         }
       }catch(e){}
@@ -142,22 +146,26 @@
       const code = (input.value || "").trim();
       if(!code) return setMsg("اكتب الكود أولاً");
 
-      setMsg("جاري التحقق...");
       btn.disabled = true;
-
+      setMsg("جاري التحقق...");
       try{
-        const data = await verifyFetch(code);
+        const data = await verify(code);
 
-        // نتوقع من verify.js: ok + valid
-        if(data && data.ok && data.valid === true){
-          localStorage.setItem("activatedCode", code);
-          setMsg("تم التفعيل");
-          gate.style.display = "none";
-        }else{
-          setMsg((data && (data.msg || data.reason)) ? (data.msg || data.reason) : "الكود غير صحيح");
+        if(!data || !data.ok){
+          btn.disabled = false;
+          return setMsg((data && data.msg) ? data.msg : "مرفوض");
         }
+
+        if(data.valid !== true){
+          btn.disabled = false;
+          return setMsg(data.reason ? data.reason : "الكود غير صحيح");
+        }
+
+        localStorage.setItem("activatedCode", code);
+        setMsg("تم التفعيل ✅");
+        gate.style.display = "none";
       }catch(e){
-        setMsg("تعذر الاتصال. تأكد من الدومين");
+        setMsg("تعذر الاتصال");
       }finally{
         btn.disabled = false;
       }
@@ -253,13 +261,11 @@
         buzzer: null,
         current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
         players: {},
-        // (اختياري) ما يضر لو موجود
         scores: { orange: 0, green: 0 }
       };
 
       await set(ref(db, `rooms/${code}`), room);
 
-      // يودّي المقدم مباشرة لصفحة اختيار الفريقين (داخل game.html)
       location.href = `game.html?role=host&code=${encodeURIComponent(code)}&key=${encodeURIComponent(presenterKey)}`;
     }
 
