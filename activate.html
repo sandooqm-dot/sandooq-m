@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>تفعيل اللعبة - صندوق المسابقات</title>
+
+  <style>
+    :root{
+      --bg1:#0e2f7a;
+      --bg2:#1f4fa3;
+      --yellow:#f4c400;
+      --text:#111;
+      --muted:#6b7280;
+      --danger:#e11d48;
+      --success:#16a34a;
+      --shadow: 0 14px 35px rgba(0,0,0,.22);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(1100px 500px at 15% 20%, rgba(244,196,0,.18), transparent 60%),
+        radial-gradient(900px 450px at 85% 80%, rgba(255,255,255,.10), transparent 60%),
+        linear-gradient(135deg, var(--bg1), var(--bg2));
+      padding: 18px;
+      color:#fff;
+    }
+    .wrap{ width:min(520px, 100%); position:relative; }
+    .logo{ display:flex; justify-content:center; margin-bottom: 14px; }
+    .logo img{
+      width:86px; height:86px; object-fit:contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
+    }
+    .card{
+      background: rgba(255,255,255,.96);
+      color: var(--text);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px 18px 18px;
+      border: 2px solid rgba(244,196,0,.35);
+    }
+    h1{ margin:0 0 8px; font-size: 22px; text-align:center; }
+    p{
+      margin:0 0 16px;
+      color: var(--muted);
+      text-align:center;
+      line-height:1.7;
+      font-size: 14px;
+    }
+    .field{ margin-top: 10px; }
+    label{
+      display:block;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color:#111;
+      font-weight:700;
+    }
+    input{
+      width:100%;
+      padding: 14px 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(31,79,163,.18);
+      outline:none;
+      background:#fff;
+      direction:ltr;
+      text-align:left;
+    }
+    input:focus{
+      border-color: rgba(31,79,163,.55);
+      box-shadow: 0 0 0 4px rgba(31,79,163,.12);
+    }
+    .btn{
+      width:100%;
+      margin-top: 14px;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border:none;
+      cursor:pointer;
+      background: var(--yellow);
+      color:#111;
+      font-weight: 900;
+      font-size: 16px;
+    }
+    .btn:disabled{ opacity:.6; cursor:not-allowed; }
+    .msg{
+      margin-top: 12px;
+      padding: 12px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height:1.7;
+      display:none;
+    }
+    .msg.err{ background: rgba(225,29,72,.10); color: var(--danger); border:1px solid rgba(225,29,72,.25); }
+    .msg.ok{ background: rgba(22,163,74,.10); color: var(--success); border:1px solid rgba(22,163,74,.25); }
+    .spinner{
+      display:inline-block;
+      width:16px;height:16px;
+      border: 3px solid rgba(17,17,17,.25);
+      border-top-color: rgba(17,17,17,.9);
+      border-radius:50%;
+      vertical-align: -3px;
+      margin-left:8px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin{ to{transform:rotate(360deg)} }
+    .footer{
+      text-align:center;
+      margin-top: 12px;
+      color: rgba(255,255,255,.85);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">
+      <img src="logo.PNG" alt="Sandooq" />
+    </div>
+
+    <div class="card">
+      <h1>تفعيل اللعبة</h1>
+      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم نقلك تلقائيًا لواجهة اللعبة.</p>
+
+      <div class="field">
+        <label for="code">كود التفعيل</label>
+        <input id="code" type="text" inputmode="latin" autocomplete="one-time-code" placeholder="SNDQ-XXXX-XXXX-XXXX" />
+      </div>
+
+      <button id="btn" class="btn" disabled>تفعيل</button>
+      <div id="msg" class="msg"></div>
+    </div>
+
+    <div class="footer">© صندوق المسابقات</div>
+  </div>
+
+  <script>
+    const API_URL = "/api/verify";
+    const LS_ACTIVATED = "sandooq_activated";
+    const LS_CODE      = "sandooq_code";
+    const LS_DEVICE    = "sandooq_device_id";
+
+    const $code = document.getElementById("code");
+    const $btn  = document.getElementById("btn");
+    const $msg  = document.getElementById("msg");
+
+    function showMsg(type, text){
+      $msg.className = "msg " + (type === "ok" ? "ok" : "err");
+      $msg.textContent = text;
+      $msg.style.display = "block";
+    }
+    function hideMsg(){ $msg.style.display = "none"; }
+
+    function normalizeCode(v){
+      return (v || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[–—−]/g,"-")
+        .replace(/\s+/g,"");
+    }
+
+    function getOrCreateDeviceId(){
+      let id = localStorage.getItem(LS_DEVICE);
+      if (!id){
+        id = "dev_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,10);
+        localStorage.setItem(LS_DEVICE, id);
+      }
+      return id;
+    }
+
+    function getReturnUrl(){
+      // نرجع لصفحة اللعبة اللي كان يبغاها (لو جاي من تحويل)
+      const p = new URLSearchParams(location.search);
+      const r = p.get("r");
+      return r ? decodeURIComponent(r) : "index.html";
+    }
+
+    function goBack(){
+      location.replace(getReturnUrl());
+    }
+
+    // لو متفعل من قبل: رجّعه للعبة
+    if (localStorage.getItem(LS_ACTIVATED) === "1"){
+      goBack();
+    }
+
+    const deviceId = getOrCreateDeviceId();
+
+    $code.addEventListener("input", () => {
+      hideMsg();
+      const v = normalizeCode($code.value);
+      $btn.disabled = v.length < 8;
+    });
+
+    $btn.addEventListener("click", async () => {
+      hideMsg();
+      const code = normalizeCode($code.value);
+      if (!code){ showMsg("err","اكتب كود التفعيل."); return; }
+
+      $btn.disabled = true;
+      const oldText = $btn.textContent;
+      $btn.innerHTML = `جاري التفعيل <span class="spinner"></span>`;
+
+      try{
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, deviceId })
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (!data || data.ok !== true || data.valid !== true){
+          const reason = data && data.reason ? String(data.reason) : "";
+          const err    = data && data.error  ? String(data.error)  : "";
+
+          if (reason === "NOT_FOUND"){
+            showMsg("err","هذا الكود غير موجود. تأكد من نسخه صح.");
+          } else if (reason === "ALREADY_USED"){
+            showMsg("err","هذا الكود مُفعّل على جهاز آخر.");
+          } else if (err === "Missing code"){
+            showMsg("err","اكتب كود التفعيل.");
+          } else {
+            showMsg("err","صار خطأ في التفعيل. جرّب مرة ثانية.");
+          }
+
+          $btn.disabled = false;
+          $btn.textContent = oldText;
+          return;
+        }
+
+        // نجاح
+        localStorage.setItem(LS_ACTIVATED, "1");
+        localStorage.setItem(LS_CODE, code);
+
+        showMsg("ok","تم التفعيل بنجاح. سيتم نقلك الآن...");
+        setTimeout(goBack, 650);
+
+      }catch(e){
+        showMsg("err","تعذر الاتصال بالسيرفر. تأكد من النت وجرب.");
+        $btn.disabled = false;
+        $btn.textContent = oldText;
+      }
+    });
+  </script>
+</body>
+</html>
