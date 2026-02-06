@@ -122,13 +122,13 @@
 <body>
   <div class="wrap">
     <div class="logo">
-      <!-- ✅ عندك في المستودع logo.png -->
+      <!-- ✅ تعديل مهم: اسم الملف الصحيح عندك logo.png -->
       <img src="logo.png" alt="Sandooq" />
     </div>
 
     <div class="card">
       <h1>تفعيل اللعبة</h1>
-      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم نقلك تلقائيًا للعبة.</p>
+      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم نقلك تلقائيًا للواجهة.</p>
 
       <div class="field">
         <label for="code">كود التفعيل</label>
@@ -143,12 +143,7 @@
   </div>
 
   <script>
-    // API ثابت على Cloudflare Functions
     const API_URL = "/api/verify";
-
-    // ✅ نكسر حلقة الرجوع: بعد التفعيل نودّي المستخدم مباشرة للعبة
-    const DEFAULT_RETURN = "game.html";
-
     const LS_ACTIVATED = "sandooq_activated";
     const LS_CODE      = "sandooq_code";
     const LS_DEVICE    = "sandooq_device_id";
@@ -181,31 +176,51 @@
       return id;
     }
 
+    function safeReturnUrl(raw){
+      // يمنع أي Loop لو أحد مرر activate.html كرجوع
+      const fallback = "index.html";
+      if (!raw) return fallback;
+
+      const s = String(raw).trim();
+      if (!s) return fallback;
+
+      const lower = s.toLowerCase();
+      if (lower.includes("activate.html")) return fallback;
+
+      // منع البروتوكولات الغريبة
+      if (lower.startsWith("javascript:")) return fallback;
+
+      return s;
+    }
+
     function getReturnUrl(){
       const p = new URLSearchParams(location.search);
       const r = p.get("r");
-      return r ? decodeURIComponent(r) : DEFAULT_RETURN;
+      try{
+        return safeReturnUrl(r ? decodeURIComponent(r) : "index.html");
+      }catch(e){
+        return "index.html";
+      }
     }
 
     function goBack(){
       location.replace(getReturnUrl());
     }
 
-    // لو متفعل من قبل: رجّعه للعبة مباشرة
+    // لو متفعل من قبل: رجّعه للواجهة
     if (localStorage.getItem(LS_ACTIVATED) === "1"){
       goBack();
     }
 
     const deviceId = getOrCreateDeviceId();
 
+    // ✅ تحسين تجربة: فوكس تلقائي
+    setTimeout(() => { try{ $code.focus(); }catch(e){} }, 50);
+
     $code.addEventListener("input", () => {
       hideMsg();
       const v = normalizeCode($code.value);
       $btn.disabled = v.length < 8;
-    });
-
-    $code.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !$btn.disabled) $btn.click();
     });
 
     $btn.addEventListener("click", async () => {
@@ -214,7 +229,7 @@
       if (!code){ showMsg("err","اكتب كود التفعيل."); return; }
 
       $btn.disabled = true;
-      const oldText = $btn.textContent;
+      const oldHTML = $btn.innerHTML;
       $btn.innerHTML = `جاري التفعيل <span class="spinner"></span>`;
 
       try{
@@ -241,21 +256,21 @@
           }
 
           $btn.disabled = false;
-          $btn.textContent = oldText;
+          $btn.innerHTML = oldHTML;
           return;
         }
 
-        // نجاح ✅
+        // نجاح
         localStorage.setItem(LS_ACTIVATED, "1");
         localStorage.setItem(LS_CODE, code);
 
-        showMsg("ok","تم التفعيل بنجاح ✅ سيتم نقلك للعبة الآن...");
+        showMsg("ok","تم التفعيل بنجاح. سيتم نقلك الآن...");
         setTimeout(goBack, 650);
 
       }catch(e){
         showMsg("err","تعذر الاتصال بالسيرفر. تأكد من النت وجرب.");
         $btn.disabled = false;
-        $btn.textContent = oldText;
+        $btn.innerHTML = oldHTML;
       }
     });
   </script>
