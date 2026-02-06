@@ -88,11 +88,8 @@
       color:#111;
       font-weight: 900;
       font-size: 16px;
-      transition: .15s transform ease, .15s filter ease;
     }
     .btn:disabled{ opacity:.6; cursor:not-allowed; }
-    .btn:active{ transform: scale(.98); }
-
     .msg{
       margin-top: 12px;
       padding: 12px 12px;
@@ -103,7 +100,6 @@
     }
     .msg.err{ background: rgba(225,29,72,.10); color: var(--danger); border:1px solid rgba(225,29,72,.25); }
     .msg.ok{ background: rgba(22,163,74,.10); color: var(--success); border:1px solid rgba(22,163,74,.25); }
-
     .spinner{
       display:inline-block;
       width:16px;height:16px;
@@ -115,7 +111,6 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin{ to{transform:rotate(360deg)} }
-
     .footer{
       text-align:center;
       margin-top: 12px;
@@ -127,18 +122,17 @@
 <body>
   <div class="wrap">
     <div class="logo">
-      <!-- في مستودعك الاسم الظاهر: logo.png -->
+      <!-- ✅ عندك في المستودع logo.png -->
       <img src="logo.png" alt="Sandooq" />
     </div>
 
     <div class="card">
       <h1>تفعيل اللعبة</h1>
-      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم ربطه بجهازك ثم يتم نقلك تلقائيًا للعبة.</p>
+      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم نقلك تلقائيًا للعبة.</p>
 
       <div class="field">
         <label for="code">كود التفعيل</label>
-        <input id="code" type="text" inputmode="latin" autocomplete="one-time-code"
-               placeholder="SNDQ-XXXX-XXXX-XXXX" />
+        <input id="code" type="text" inputmode="latin" autocomplete="one-time-code" placeholder="SNDQ-XXXX-XXXX-XXXX" />
       </div>
 
       <button id="btn" class="btn" disabled>تفعيل</button>
@@ -149,10 +143,12 @@
   </div>
 
   <script>
-    // ✅ مهم: التفعيل الحقيقي لازم يروح لـ /api/activate (مو verify)
-    const API_URL = "/api/activate";
+    // API ثابت على Cloudflare Functions
+    const API_URL = "/api/verify";
 
-    // LocalStorage keys
+    // ✅ نكسر حلقة الرجوع: بعد التفعيل نودّي المستخدم مباشرة للعبة
+    const DEFAULT_RETURN = "game.html";
+
     const LS_ACTIVATED = "sandooq_activated";
     const LS_CODE      = "sandooq_code";
     const LS_DEVICE    = "sandooq_device_id";
@@ -172,8 +168,8 @@
       return (v || "")
         .trim()
         .toUpperCase()
-        .replace(/[–—−]/g,"-")   // أنواع شرطات ثانية
-        .replace(/\s+/g,"");     // إزالة المسافات
+        .replace(/[–—−]/g,"-")
+        .replace(/\s+/g,"");
     }
 
     function getOrCreateDeviceId(){
@@ -186,17 +182,16 @@
     }
 
     function getReturnUrl(){
-      // مثال: activate.html?r=index.html أو activate.html?r=game.html
       const p = new URLSearchParams(location.search);
       const r = p.get("r");
-      return r ? decodeURIComponent(r) : "index.html";
+      return r ? decodeURIComponent(r) : DEFAULT_RETURN;
     }
 
     function goBack(){
       location.replace(getReturnUrl());
     }
 
-    // لو الجهاز مفعل من قبل -> رجعه للعبة مباشرة
+    // لو متفعل من قبل: رجّعه للعبة مباشرة
     if (localStorage.getItem(LS_ACTIVATED) === "1"){
       goBack();
     }
@@ -216,10 +211,7 @@
     $btn.addEventListener("click", async () => {
       hideMsg();
       const code = normalizeCode($code.value);
-      if (!code){
-        showMsg("err","اكتب كود التفعيل.");
-        return;
-      }
+      if (!code){ showMsg("err","اكتب كود التفعيل."); return; }
 
       $btn.disabled = true;
       const oldText = $btn.textContent;
@@ -234,9 +226,7 @@
 
         const data = await res.json().catch(() => null);
 
-        // نتوقع من /api/activate يرجع مثلاً:
-        // { ok:true, activated:true } أو { ok:false, reason:"ALREADY_USED" } ...الخ
-        if (!data || data.ok !== true || data.activated !== true){
+        if (!data || data.ok !== true || data.valid !== true){
           const reason = data && data.reason ? String(data.reason) : "";
           const err    = data && data.error  ? String(data.error)  : "";
 
@@ -244,7 +234,7 @@
             showMsg("err","هذا الكود غير موجود. تأكد من نسخه صح.");
           } else if (reason === "ALREADY_USED"){
             showMsg("err","هذا الكود مُفعّل على جهاز آخر.");
-          } else if (err === "Missing code" || reason === "MISSING_CODE"){
+          } else if (err === "Missing code"){
             showMsg("err","اكتب كود التفعيل.");
           } else {
             showMsg("err","صار خطأ في التفعيل. جرّب مرة ثانية.");
@@ -255,11 +245,11 @@
           return;
         }
 
-        // ✅ نجاح
+        // نجاح ✅
         localStorage.setItem(LS_ACTIVATED, "1");
         localStorage.setItem(LS_CODE, code);
 
-        showMsg("ok","تم التفعيل بنجاح ✅ سيتم نقلك الآن...");
+        showMsg("ok","تم التفعيل بنجاح ✅ سيتم نقلك للعبة الآن...");
         setTimeout(goBack, 650);
 
       }catch(e){
