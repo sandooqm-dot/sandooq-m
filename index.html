@@ -160,7 +160,6 @@
 <body>
   <div class="wrap">
     <div class="logo">
-      <!-- اسم اللوجو عندك: logo.PNG -->
       <img src="logo.PNG" alt="Sandooq" />
     </div>
 
@@ -185,8 +184,10 @@
 
   <script>
     // ====== إعدادات مهمة ======
-    const API_URL  = "https://script.google.com/macros/s/AKfycbwq1qWmLlEtO3GvzWGGOfXSKQhm6B-NPI1RkSIv4NjzXOYmR4DBz09uQzNK3aFLi6g2cw/exec";
-    const NEXT_URL = "index.html"; // غيرها لصفحة لعبتك بعد التفعيل (مثلاً: game.html)
+    // هذا endpoint راح يشتغل من Cloudflare Pages Functions داخل نفس الدومين
+    const API_URL  = "/api/verify";
+    // بعد نجاح التفعيل ينقلك لصفحة اللعبة
+    const NEXT_URL = "game.html";
     // ==========================
 
     const LS_ACTIVATED = "sandooq_activated";
@@ -209,14 +210,13 @@
       return (v || "")
         .trim()
         .toUpperCase()
-        .replace(/\s+/g,"")
-        .replace(/–/g,"-");
+        .replace(/[–—−]/g,"-")
+        .replace(/\s+/g,"");
     }
 
     function getOrCreateDeviceId(){
       let id = localStorage.getItem(LS_DEVICE);
       if (!id){
-        // deviceId بسيط وثابت على نفس الجهاز
         id = "dev_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,10);
         localStorage.setItem(LS_DEVICE, id);
       }
@@ -227,14 +227,13 @@
       window.location.href = NEXT_URL;
     }
 
-    // لو الجهاز مُفعّل من قبل
+    // لو الجهاز مُفعّل من قبل: يدخل اللعبة مباشرة
     if (localStorage.getItem(LS_ACTIVATED) === "1"){
-      // يروح للعبة مباشرة
       redirect();
     }
 
     const deviceId = getOrCreateDeviceId();
-    $mini.textContent = ""; // (لو تبي نظهر deviceId قلّي)
+    $mini.textContent = "";
 
     $code.addEventListener("input", () => {
       hideMsg();
@@ -262,25 +261,24 @@
       try{
         const res = await fetch(API_URL, {
           method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code, deviceId })
         });
 
-        const text = await res.text();
-        let data = null;
-        try { data = JSON.parse(text); } catch(e){}
+        const data = await res.json().catch(() => null);
 
+        // Cloudflare verify.js يرجّع:
+        // { ok:true, valid:true, code:"..." } أو { ok:false, valid:false, reason:"NOT_FOUND" } أو { ok:false, valid:false, reason:"ALREADY_USED" }
         if (!data || data.ok !== true || data.valid !== true){
-          const err = (data && (data.error || data.err)) ? String(data.error || data.err) : "UNKNOWN_ERROR";
+          const reason = data && data.reason ? String(data.reason) : "";
+          const err    = data && data.error  ? String(data.error)  : "";
 
-          if (err === "CODE_NOT_FOUND"){
+          if (reason === "NOT_FOUND"){
             showMsg("err", "هذا الكود غير موجود. تأكد من نسخه صح.");
-          } else if (err === "CODE_ALREADY_USED_ON_ANOTHER_DEVICE"){
+          } else if (reason === "ALREADY_USED"){
             showMsg("err", "هذا الكود مُفعّل على جهاز آخر.");
-          } else if (err === "MISSING_CODE"){
+          } else if (err === "Missing code"){
             showMsg("err", "اكتب كود التفعيل.");
-          } else if (err === "MISSING_DEVICE"){
-            showMsg("err", "تعذر قراءة الجهاز. جرّب تحديث الصفحة.");
           } else {
             showMsg("err", "صار خطأ في التفعيل. جرّب مرة ثانية.");
           }
@@ -290,11 +288,11 @@
           return;
         }
 
-        // نجاح ✅
+        // نجاح
         localStorage.setItem(LS_ACTIVATED, "1");
         localStorage.setItem(LS_CODE, code);
 
-        showMsg("ok", "تم التفعيل بنجاح ✅ سيتم نقلك للعبة الآن...");
+        showMsg("ok", "تم التفعيل بنجاح. سيتم نقلك للعبة الآن...");
         setTimeout(redirect, 650);
 
       } catch (e){
