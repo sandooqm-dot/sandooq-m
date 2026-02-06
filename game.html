@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>سباق الحروف</title>
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .box{max-width:520px;padding:18px;text-align:center;line-height:1.8}
+    a{color:#ffd54a}
+  </style>
+</head>
+<body>
+  <div class="box" id="box">جاري التحميل…</div>
+
+  <script>
+    const LS_ACTIVATED = "sandooq_activated";
+
+    function go(url){ location.replace(url); }
+
+    // 1) لازم يكون مُفعّل
+    if (localStorage.getItem(LS_ACTIVATED) !== "1") {
+      const r = encodeURIComponent("game.html" + location.search + location.hash);
+      go("activate.html?r=" + r);
+    }
+
+    // 2) لازم يكون داخل ببيانات دخول (غرفة/دور/الخ..)
+    // إذا ما في أي باراميتر في الرابط -> اعتبره دخول مباشر وارجعه للواجهة
+    const hasQuery = !!location.search && location.search.length > 1;
+    if (!hasQuery) {
+      go("index.html");
+    }
+
+    // 3) كل شيء تمام: افتح اللعبة الحقيقية (الملف الكبير)
+    go("game_full.html" + location.search + location.hash);
+  </script>
+</body>
+</html>
