@@ -1,7 +1,6 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // CORS (إذا صفحتك نفس الدومين غالباً ما تحتاجه، بس نخليه آمن)
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -30,13 +29,14 @@ export async function onRequest(context) {
 
     const body = await request.json().catch(() => ({}));
     let code = (body.code || "").toString();
+    const deviceId = (body.deviceId || "").toString().trim();
 
-    // Normalize code (أهم جزء لحل مشكلة الشرطات والمسافات)
+    // Normalize code
     code = code
       .trim()
       .toUpperCase()
-      .replace(/[–—−]/g, "-")     // أنواع شرطات ثانية
-      .replace(/\s+/g, "");       // إزالة المسافات
+      .replace(/[–—−]/g, "-")
+      .replace(/\s+/g, "");
 
     if (!code) {
       return new Response(JSON.stringify({ ok: false, error: "Missing code" }), {
@@ -44,6 +44,16 @@ export async function onRequest(context) {
         headers: corsHeaders,
       });
     }
+
+    if (!deviceId) {
+      return new Response(JSON.stringify({ ok: false, error: "Missing deviceId" }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    // نستخدم used_by_email لتخزين deviceId مؤقتاً بصيغة dev:xxxx
+    const deviceTag = `dev:${deviceId}`;
 
     const row = await env.DB.prepare(
       "SELECT code, is_used, used_by_email, used_at FROM codes WHERE code = ? LIMIT 1"
@@ -58,16 +68,52 @@ export async function onRequest(context) {
       });
     }
 
+    // إذا الكود مستخدم:
     if (Number(row.is_used) === 1) {
-      return new Response(JSON.stringify({ ok: false, valid: false, reason: "ALREADY_USED" }), {
-        status: 200,
-        headers: corsHeaders,
-      });
+      // يسمح فقط لنفس الجهاز
+      if ((row.used_by_email || "") === deviceTag) {
+        return new Response(
+          JSON.stringify({ ok: true, valid: true, code: row.code, alreadyUsed: true }),
+          { status: 200, headers: corsHeaders }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ ok: false, valid: false, reason: "ALREADY_USED_OTHER_DEVICE" }),
+        { status: 200, headers: corsHeaders }
+      );
     }
 
-    // ✅ صالح (بدون ما نستهلكه هنا)
+    // إذا غير مستخدم -> "نستهلكه الآن" ونربطه بالجهاز
+    const res = await env.DB.prepare(
+      "UPDATE codes SET is_used = 1, used_by_email = ?, used_at = CURRENT_TIMESTAMP WHERE code = ? AND is_used = 0"
+    )
+      .bind(deviceTag, code)
+      .run();
+
+    // لو حصل Race condition (جهازين بنفس اللحظة)
+    if (!res?.meta || res.meta.changes !== 1) {
+      const row2 = await env.DB.prepare(
+        "SELECT code, is_used, used_by_email, used_at FROM codes WHERE code = ? LIMIT 1"
+      )
+        .bind(code)
+        .first();
+
+      if ((row2?.used_by_email || "") === deviceTag) {
+        return new Response(
+          JSON.stringify({ ok: true, valid: true, code: row2.code, alreadyUsed: true }),
+          { status: 200, headers: corsHeaders }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ ok: false, valid: false, reason: "ALREADY_USED_OTHER_DEVICE" }),
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, valid: true, code: row.code }),
+      JSON.stringify({ ok: true, valid: true, code: row.code, firstUse: true }),
       { status: 200, headers: corsHeaders }
     );
   } catch (e) {
