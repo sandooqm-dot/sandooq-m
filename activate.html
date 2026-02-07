@@ -122,13 +122,12 @@
 <body>
   <div class="wrap">
     <div class="logo">
-      <!-- ✅ اسم الملف عندك بالمستودع logo.png -->
       <img src="logo.png" alt="Sandooq" />
     </div>
 
     <div class="card">
       <h1>تفعيل اللعبة</h1>
-      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم نقلك تلقائيًا لواجهة اللعبة.</p>
+      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم نقلك تلقائيًا للعبة.</p>
 
       <div class="field">
         <label for="code">كود التفعيل</label>
@@ -143,12 +142,9 @@
   </div>
 
   <script>
-    // ✅ على GitHub Pages ما فيه /api/verify
-    // لذلك نستخدم رابط السيرفر الحقيقي
+    // ✅ GitHub Pages ما عنده /api/verify
+    // نستخدم PROD_API عندما نكون على github.io
     const PROD_API = "https://prof.sandooq-games.com/api/verify";
-
-    // إذا الصفحة شغالة على GitHub Pages -> استخدم PROD_API
-    // إذا شغالة على نفس الدومين اللي فيه السيرفر -> استخدم /api/verify
     const API_URL = (location.hostname.endsWith("github.io") ? PROD_API : "/api/verify");
 
     const LS_ACTIVATED = "sandooq_activated";
@@ -183,16 +179,21 @@
       return id;
     }
 
+    // ✅ أهم تعديل: إذا ما فيه r نرجّعك لـ game.html (بوابة اللعبة)
     function getReturnUrl(){
       const p = new URLSearchParams(location.search);
       const r = p.get("r");
-      return r ? decodeURIComponent(r) : "index.html";
+      if (r) {
+        try { return decodeURIComponent(r); } catch(e){ return r; }
+      }
+      return "game.html";
     }
 
     function goBack(){
       location.replace(getReturnUrl());
     }
 
+    // لو متفعل من قبل: ادخل اللعبة مباشرة
     if (localStorage.getItem(LS_ACTIVATED) === "1"){
       goBack();
     }
@@ -203,6 +204,10 @@
       hideMsg();
       const v = normalizeCode($code.value);
       $btn.disabled = v.length < 8;
+    });
+
+    $code.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !$btn.disabled) $btn.click();
     });
 
     $btn.addEventListener("click", async () => {
@@ -245,8 +250,8 @@
         localStorage.setItem(LS_ACTIVATED, "1");
         localStorage.setItem(LS_CODE, code);
 
-        showMsg("ok","تم التفعيل بنجاح. سيتم نقلك الآن...");
-        setTimeout(goBack, 650);
+        showMsg("ok","تم التفعيل بنجاح. بنفتح لك اللعبة الآن...");
+        setTimeout(goBack, 500);
 
       }catch(e){
         showMsg("err","تعذر الاتصال بسيرفر التفعيل. تأكد من النت وجرب.");
