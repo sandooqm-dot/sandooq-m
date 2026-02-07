@@ -5,34 +5,59 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>سباق الحروف</title>
   <style>
-    body{margin:0;font-family:Arial,sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh}
-    .box{max-width:520px;padding:18px;text-align:center;line-height:1.8}
-    a{color:#ffd54a}
+    body{
+      margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+      font-family:Arial, sans-serif;background:#1f4fa3;color:#fff;text-align:center;padding:18px
+    }
+    .box{
+      width:min(520px,100%);
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:16px;
+      padding:18px 16px;
+    }
+    .small{opacity:.9;font-size:14px;line-height:1.7}
+    .spin{
+      width:18px;height:18px;border:3px solid rgba(255,255,255,.35);
+      border-top-color:#fff;border-radius:50%;
+      display:inline-block;vertical-align:-4px;margin-left:8px;
+      animation: s 1s linear infinite
+    }
+    @keyframes s{to{transform:rotate(360deg)}}
   </style>
 </head>
 <body>
-  <div class="box" id="box">جاري التحميل…</div>
+  <div class="box">
+    <div style="font-size:18px;font-weight:800;margin-bottom:8px;">
+      جاري فتح اللعبة <span class="spin"></span>
+    </div>
+    <div class="small">
+      إذا ما اكتمل الدخول سيتم إعادتك تلقائيًا للصفحة الرئيسية.
+    </div>
+  </div>
 
   <script>
+    // ✅ نفس مفاتيح التفعيل عندك
     const LS_ACTIVATED = "sandooq_activated";
 
-    function go(url){ location.replace(url); }
-
-    // 1) لازم يكون مُفعّل
+    // 1) لو ما تفعل الجهاز → روح لصفحة التفعيل
     if (localStorage.getItem(LS_ACTIVATED) !== "1") {
-      const r = encodeURIComponent("game.html" + location.search + location.hash);
-      go("activate.html?r=" + r);
+      const here = location.pathname.split("/").pop() || "game.html";
+      const r = encodeURIComponent(here + location.search + location.hash);
+      location.replace("activate.html?r=" + r);
+      throw new Error("Not activated");
     }
 
-    // 2) لازم يكون داخل ببيانات دخول (غرفة/دور/الخ..)
-    // إذا ما في أي باراميتر في الرابط -> اعتبره دخول مباشر وارجعه للواجهة
-    const hasQuery = !!location.search && location.search.length > 1;
-    if (!hasQuery) {
-      go("index.html");
+    // 2) إذا داخل /game بدون أي بيانات → رجّعه للـ index
+    const hasAnyParams = location.search && location.search.length > 1;
+    if (!hasAnyParams) {
+      location.replace("index.html");
+      throw new Error("Missing params");
     }
 
-    // 3) كل شيء تمام: افتح اللعبة الحقيقية (الملف الكبير)
-    go("game_full.html" + location.search + location.hash);
+    // 3) مرّر نفس الرابط كامل للملف الثقيل
+    //    (نفس ? ونفس #)
+    location.replace("game_full.html" + location.search + location.hash);
   </script>
 </body>
 </html>
