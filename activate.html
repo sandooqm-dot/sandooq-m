@@ -122,7 +122,8 @@
 <body>
   <div class="wrap">
     <div class="logo">
-      <img src="logo.PNG" alt="Sandooq" />
+      <!-- ✅ اسم الملف عندك بالمستودع logo.png -->
+      <img src="logo.png" alt="Sandooq" />
     </div>
 
     <div class="card">
@@ -142,9 +143,13 @@
   </div>
 
   <script>
-    // ✅ استخدمنا GET عشان نتجنب مشاكل OPTIONS/CORS في بعض المتصفحات
-    const API_BASE = "https://prof.sandooq-games.com";
-    const VERIFY_URL = API_BASE + "/api/verify";
+    // ✅ على GitHub Pages ما فيه /api/verify
+    // لذلك نستخدم رابط السيرفر الحقيقي
+    const PROD_API = "https://prof.sandooq-games.com/api/verify";
+
+    // إذا الصفحة شغالة على GitHub Pages -> استخدم PROD_API
+    // إذا شغالة على نفس الدومين اللي فيه السيرفر -> استخدم /api/verify
+    const API_URL = (location.hostname.endsWith("github.io") ? PROD_API : "/api/verify");
 
     const LS_ACTIVATED = "sandooq_activated";
     const LS_CODE      = "sandooq_code";
@@ -188,12 +193,11 @@
       location.replace(getReturnUrl());
     }
 
-    // لو متفعل من قبل: رجّعه للعبة
     if (localStorage.getItem(LS_ACTIVATED) === "1"){
       goBack();
     }
 
-    getOrCreateDeviceId(); // نخليه موجود من بدري
+    const deviceId = getOrCreateDeviceId();
 
     $code.addEventListener("input", () => {
       hideMsg();
@@ -211,8 +215,11 @@
       $btn.innerHTML = `جاري التفعيل <span class="spinner"></span>`;
 
       try{
-        const url = VERIFY_URL + "?code=" + encodeURIComponent(code);
-        const res = await fetch(url, { method: "GET" });
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, deviceId })
+        });
 
         const data = await res.json().catch(() => null);
 
@@ -235,7 +242,6 @@
           return;
         }
 
-        // نجاح
         localStorage.setItem(LS_ACTIVATED, "1");
         localStorage.setItem(LS_CODE, code);
 
