@@ -1,246 +1,216 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>جاري فتح اللعبة - صندوق المسابقات</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>جاري فتح اللعبة</title>
   <style>
     :root{
-      --bg1:#0e2f7a;
+      --bg1:#123c8a;
       --bg2:#1f4fa3;
-      --yellow:#f4c400;
+      --card:#ffffff;
+      --border:#e6e6e6;
       --text:#111;
-      --muted:#6b7280;
-      --danger:#e11d48;
-      --shadow: 0 14px 35px rgba(0,0,0,.22);
-      --radius: 18px;
+      --muted:#666;
+      --yellow:#f4c400;
+      --btn:#1f4fa3;
     }
-    *{box-sizing:border-box}
     body{
       margin:0;
       min-height:100vh;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-family: Arial, sans-serif;
-      background:
-        radial-gradient(1100px 500px at 15% 20%, rgba(244,196,0,.18), transparent 60%),
-        radial-gradient(900px 450px at 85% 80%, rgba(255,255,255,.10), transparent 60%),
-        linear-gradient(135deg, var(--bg1), var(--bg2));
-      padding: 18px;
+      background: radial-gradient(1200px 700px at 20% 25%, rgba(255,255,255,.14), transparent 60%),
+                  radial-gradient(900px 600px at 70% 70%, rgba(255,255,255,.10), transparent 55%),
+                  linear-gradient(160deg, var(--bg2), var(--bg1));
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
       color:#fff;
+      padding:24px 14px;
+      box-sizing:border-box;
     }
-    .wrap{ width:min(520px, 100%); position:relative; }
-    .logo{ display:flex; justify-content:center; margin-bottom: 14px; }
-    .logo img{
-      width:86px; height:86px; object-fit:contain;
-      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
+    .wrap{ width:min(560px, 92vw); text-align:center; }
+    .logo{
+      width:64px; height:64px; object-fit:contain;
+      margin:0 auto 14px;
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
+      user-select:none;
+      pointer-events:none;
     }
     .card{
-      background: rgba(255,255,255,.96);
-      color: var(--text);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 22px 18px 18px;
-      border: 2px solid rgba(244,196,0,.35);
-      text-align:center;
+      background: rgba(255,255,255,.95);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:16px;
+      padding:22px 18px;
+      box-shadow: 0 18px 45px rgba(0,0,0,.20);
+      color:var(--text);
     }
-    h1{ margin:0 0 8px; font-size: 22px; }
-    p{
-      margin:0 0 14px;
-      color: var(--muted);
-      line-height:1.7;
-      font-size: 14px;
+    .title{
+      font-weight:800;
+      font-size:22px;
+      margin:0 0 6px;
+    }
+    .sub{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.6;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      margin-top:16px;
+      flex-wrap:wrap;
+    }
+    button{
+      border:none;
+      border-radius:12px;
+      padding:12px 16px;
+      font-weight:800;
+      cursor:pointer;
+      font-size:15px;
+      min-width:170px;
+    }
+    .btn-primary{ background: var(--yellow); color:#1b1b1b; }
+    .btn-secondary{ background: #e9eefc; color:#1f4fa3; }
+    .small{
+      margin-top:12px;
+      color:#fff;
+      opacity:.85;
+      font-size:12px;
     }
     .spinner{
       display:inline-block;
       width:18px;height:18px;
-      border: 3px solid rgba(17,17,17,.25);
-      border-top-color: rgba(17,17,17,.9);
+      border:3px solid rgba(0,0,0,.18);
+      border-top-color: rgba(0,0,0,.55);
       border-radius:50%;
-      vertical-align: -4px;
-      margin-left:8px;
-      animation: spin 1s linear infinite;
+      animation: spin 0.9s linear infinite;
+      vertical-align:-4px;
+      margin-left:6px;
     }
-    @keyframes spin{ to{transform:rotate(360deg)} }
-
-    .msg{
-      display:none;
-      margin-top: 10px;
-      padding: 12px 12px;
-      border-radius: 12px;
-      font-size: 14px;
-      line-height:1.7;
-      background: rgba(225,29,72,.10);
-      color: var(--danger);
-      border:1px solid rgba(225,29,72,.25);
-      text-align:center;
-    }
-
-    .btn{
-      width:100%;
-      margin-top: 10px;
-      padding: 14px 14px;
-      border-radius: 12px;
-      border:none;
-      cursor:pointer;
-      background: var(--yellow);
-      color:#111;
-      font-weight: 900;
-      font-size: 16px;
-      display:none;
-    }
-    .btn2{
-      width:100%;
-      margin-top: 10px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border:2px solid rgba(31,79,163,.25);
-      cursor:pointer;
-      background:#fff;
-      color:#111;
-      font-weight: 800;
-      font-size: 14px;
-      display:none;
-    }
-
-    .footer{
-      text-align:center;
-      margin-top: 12px;
-      color: rgba(255,255,255,.85);
-      font-size: 12px;
-    }
+    @keyframes spin{ to{ transform:rotate(360deg); } }
+    .hidden{ display:none !important; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="logo">
-      <img src="logo.png" alt="Sandooq" />
-    </div>
-
+    <img class="logo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
     <div class="card">
-      <h1 id="title">جاري فتح اللعبة <span class="spinner"></span></h1>
-      <p id="desc">لحظة… نتحقق من التفعيل.</p>
+      <div class="title"><span id="stateText">جاري فتح اللعبة</span><span class="spinner" id="sp"></span></div>
+      <p class="sub" id="stateSub">لحظة.. نتحقق من التفعيل.</p>
 
-      <div id="err" class="msg"></div>
-
-      <button id="openBtn" class="btn">فتح الوجهة</button>
-      <button id="changeBtn" class="btn2">تغيير / إعادة تفعيل الكود</button>
+      <div class="row hidden" id="actions">
+        <button class="btn-secondary" id="retryBtn">إعادة المحاولة</button>
+        <button class="btn-primary" id="goActivateBtn">اذهب لصفحة التفعيل</button>
+      </div>
     </div>
-
-    <div class="footer">© صندوق المسابقات</div>
+    <div class="small">© صندوق المسابقات</div>
   </div>
 
   <script>
-    const LS_ACTIVATED = "sandooq_activated";
-    const LS_CODE      = "sandooq_code";
-    const LS_DEVICE    = "sandooq_device_id";
+    (function(){
+      // ✅ نمنع حلقات الريفريش: ما فيه reload تلقائي نهائيًا
+      const qs = new URLSearchParams(location.search);
 
-    // ✅ Endpoint السيرفر داخل نفس مشروع Cloudflare Pages
-    const API_URL = "/api/verify";
+      // صفحة الهدف (game_full.html مثلاً)
+      let r = (qs.get("r") || "game_full.html").trim();
+      // تنظيف بسيط
+      r = r.replace(/^\/+/, ""); // بدون /
+      // لو أحد مرر رابط كامل بالغلط
+      if (r.startsWith("http://") || r.startsWith("https://")) {
+        try { r = new URL(r).pathname.replace(/^\/+/, ""); } catch(e){}
+      }
 
-    // ✅ الوجهة الافتراضية بعد التفعيل
-    const DEFAULT_TARGET = "create.html";
+      const stateText = document.getElementById("stateText");
+      const stateSub  = document.getElementById("stateSub");
+      const spinner   = document.getElementById("sp");
+      const actions   = document.getElementById("actions");
+      const retryBtn  = document.getElementById("retryBtn");
+      const goActBtn  = document.getElementById("goActivateBtn");
 
-    const $title = document.getElementById("title");
-    const $desc  = document.getElementById("desc");
-    const $err   = document.getElementById("err");
-    const $open  = document.getElementById("openBtn");
-    const $chg   = document.getElementById("changeBtn");
+      function showActions(msg, sub){
+        stateText.textContent = msg || "تعذر فتح اللعبة";
+        stateSub.textContent  = sub || "ما فيه تفعيل محفوظ على هذا المتصفح، أو الاتصال بطيء.";
+        spinner.classList.add("hidden");
+        actions.classList.remove("hidden");
+      }
 
-    const params = new URLSearchParams(location.search);
+      function gotoActivate(){
+        // نرسل المستخدم لصفحة التفعيل مع حفظ الهدف
+        const url = "activate.html?r=" + encodeURIComponent(r);
+        location.replace(url);
+      }
 
-    function showErr(text){
-      $err.textContent = text;
-      $err.style.display = "block";
-    }
+      async function pingSession(){
+        // نحاول أكثر من Endpoint (حسب الموجود عندك)
+        const endpoints = ["/api/me", "/api/session", "/api/auth/me"];
+        for (const ep of endpoints){
+          try{
+            const controller = new AbortController();
+            const t = setTimeout(()=>controller.abort(), 5000); // 5 ثواني فقط
+            const res = await fetch(ep, {
+              method: "GET",
+              credentials: "include",
+              cache: "no-store",
+              signal: controller.signal
+            });
+            clearTimeout(t);
 
-    function clearActivation(){
-      localStorage.removeItem(LS_ACTIVATED);
-      localStorage.removeItem(LS_CODE);
-      // نخلي deviceId موجود عادي (مفيد) — بس لو تبي نمسحه كمان قول لي
-    }
+            // 200 = عنده جلسة/تفعيل
+            if (res.ok) return { ok:true, endpoint: ep };
 
-    function goActivate(wanted){
-      const r = encodeURIComponent(wanted || DEFAULT_TARGET);
-      location.replace("activate.html?r=" + r);
-    }
+            // 401/403 = ما عنده جلسة
+            if (res.status === 401 || res.status === 403) return { ok:false, endpoint: ep };
 
-    // reset: يمسح التفعيل للتجربة من جديد
-    if (params.get("reset") === "1") {
-      localStorage.removeItem(LS_ACTIVATED);
-      localStorage.removeItem(LS_CODE);
-      localStorage.removeItem(LS_DEVICE);
-      goActivate(DEFAULT_TARGET);
-    }
+            // لو 404 أو غيره نجرب اللي بعده
+          }catch(e){
+            // نجرب اللي بعده
+          }
+        }
+        // إذا فشل كل شيء نعتبرها مشكلة شبكة/endpoint
+        return { ok:null };
+      }
 
-    // الوجهة المطلوبة: ?r=game_full.html أو ?r=create.html
-    const target = params.get("r") ? String(params.get("r")) : "";
-    const wanted = target || DEFAULT_TARGET;
+      async function openGame(){
+        actions.classList.add("hidden");
+        spinner.classList.remove("hidden");
+        stateText.textContent = "جاري فتح اللعبة";
+        stateSub.textContent  = "لحظة.. نتحقق من التفعيل.";
 
-    // إذا غير مفعّل محلياً -> روح للتفعيل مباشرة
-    const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
-    if (!activated) {
-      goActivate(wanted);
-    }
-
-    // مفعّل محلياً -> لازم نتأكد من السيرفر (الأقوى)
-    const code = (localStorage.getItem(LS_CODE) || "").trim();
-    const deviceId = (localStorage.getItem(LS_DEVICE) || "").trim();
-
-    // إذا ما عنده كود/جهازId -> اعتبره غير مفعّل
-    if (!code || !deviceId) {
-      clearActivation();
-      goActivate(wanted);
-    }
-
-    // تحقق سيرفري صامت
-    (async () => {
-      try{
-        const res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, deviceId })
-        });
-
-        const data = await res.json().catch(() => null);
-
-        if (data && data.ok === true && data.valid === true) {
-          // ✅ التفعيل صحيح (سيرفر)
-          location.replace(wanted);
+        // محاولة رقم 1
+        const r1 = await pingSession();
+        if (r1.ok === true){
+          location.replace(r);
+          return;
+        }
+        if (r1.ok === false){
+          gotoActivate();
           return;
         }
 
-        // ❌ التفعيل مو صحيح أو الكود تغيّر/انسرق/غير موجود
-        clearActivation();
-
-        const reason = data && data.reason ? String(data.reason) : "";
-        if (reason === "NOT_FOUND") {
-          showErr("الكود غير موجود بالسيرفر. لازم تعيد التفعيل.");
-        } else if (reason === "ALREADY_USED") {
-          showErr("الكود مُفعّل على جهاز آخر. لازم كود جديد أو إعادة التفعيل.");
-        } else {
-          showErr("تعذر التحقق من التفعيل. جرّب إعادة التفعيل.");
+        // محاولة احتياطية واحدة بعد 800ms (بدون أي reload)
+        await new Promise(res => setTimeout(res, 800));
+        const r2 = await pingSession();
+        if (r2.ok === true){
+          location.replace(r);
+          return;
+        }
+        if (r2.ok === false){
+          gotoActivate();
+          return;
         }
 
-        $title.textContent = "التفعيل غير صالح";
-        $desc.textContent  = "اضغط لإعادة تفعيل الكود ثم نفتح اللعبة.";
-
-        $open.style.display = "none";
-        $chg.style.display = "block";
-        $chg.onclick = () => goActivate(wanted);
-
-      }catch(e){
-        // لو النت/السيرفر طاح: لا نفتح اللعبة (عشان ما يكون bypass)
-        $title.textContent = "تعذر التحقق";
-        $desc.textContent  = "ما قدرنا نتأكد من التفعيل الآن. تأكد من الاتصال وحاول.";
-        showErr("تعذر الاتصال بسيرفر التفعيل.");
-
-        $open.style.display = "none";
-        $chg.style.display = "block";
-        $chg.textContent = "المحاولة مرة أخرى";
-        $chg.onclick = () => location.reload();
+        // لا جلسة ولا رد واضح = شبكة/حظر/بطء
+        showActions("تعذر فتح اللعبة", "يبدو أن الاتصال أو التحقق تعطل. جرّب إعادة المحاولة، أو افتح صفحة التفعيل.");
       }
+
+      retryBtn.addEventListener("click", openGame);
+      goActBtn.addEventListener("click", gotoActivate);
+
+      // تشغيل تلقائي
+      openGame();
     })();
   </script>
 </body>
