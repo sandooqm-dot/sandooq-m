@@ -20,7 +20,13 @@
       font-family:Arial, sans-serif;
       display:flex; align-items:center; justify-content:center;
       padding:16px;
+
+      /* ✅ نخفي الصفحة بالبداية عشان ما تطلع إلا إذا فيه مشكلة */
+      opacity:0;
+      transition:opacity .15s ease;
     }
+    body.show{ opacity:1; }
+
     .box{
       width:min(520px, 92vw);
       background:var(--card);
@@ -34,15 +40,8 @@
       width:54px;height:54px;object-fit:contain;
       display:block;margin:0 auto 10px;
     }
-    h2{
-      margin:6px 0 6px;
-      font-size:20px;color:#111;
-    }
-    p{
-      margin:0;
-      font-size:14px;
-      color:#444;
-    }
+    h2{ margin:6px 0 6px; font-size:20px; color:#111; }
+    p{ margin:0; font-size:14px; color:#444; }
     .row{
       display:flex; gap:10px; justify-content:center;
       margin-top:14px; flex-wrap:wrap;
@@ -53,12 +52,8 @@
       border-radius:12px;
       font-size:15px;
     }
-    .btnPrimary{
-      background:var(--yellow); color:#000; font-weight:700;
-    }
-    .btnGhost{
-      background:#eef2ff; color:#1f4fa3; font-weight:700;
-    }
+    .btnPrimary{ background:var(--yellow); color:#000; font-weight:700; }
+    .btnGhost{ background:#eef2ff; color:#1f4fa3; font-weight:700; }
     .spinner{
       width:18px;height:18px;border-radius:50%;
       border:3px solid #ddd;border-top-color:#1f4fa3;
@@ -67,11 +62,7 @@
       animation:spin .8s linear infinite;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
-    .small{
-      margin-top:10px;
-      font-size:12px;
-      color:#777;
-    }
+    .small{ margin-top:10px; font-size:12px; color:#777; }
   </style>
 </head>
 <body>
@@ -89,12 +80,10 @@
   </div>
 
   <script>
-    // ✅ غيّرها فقط إذا كان اسم صفحة التفعيل مختلف عندك
     const ACTIVATE_URL = "/activate.html";
     const GAME_URL = "/game_full.html";
 
     function getAnyToken(){
-      // نحاول نلقط التوكن من أي مفتاح محتمل (عشان ما نتوه إذا اختلف الاسم)
       const keys = [
         "JWT","jwt","token","access_token","AUTH_TOKEN",
         "SANDOOQ_JWT","SANDOOQ_TOKEN","sandooq_jwt","sandooq_token"
@@ -106,7 +95,15 @@
       return "";
     }
 
+    let revealTimer = null;
+    function revealIfNeeded(){
+      // ✅ ما نكشف الصفحة إلا إذا فعلاً احتجناها (بعد 0.4 ثانية)
+      if(revealTimer) return;
+      revealTimer = setTimeout(()=> document.body.classList.add("show"), 400);
+    }
+
     function showActions(text){
+      revealIfNeeded();
       document.getElementById("msg").textContent = text;
       document.getElementById("actions").style.display = "flex";
     }
@@ -121,9 +118,8 @@
         return;
       }
 
-      // ✅ نتحقق من /api/me (إذا عندك endpoint مختلف قلّي)
       const controller = new AbortController();
-      const t = setTimeout(()=>controller.abort(), 8000);
+      const t = setTimeout(()=>controller.abort(), 6000);
 
       try{
         const res = await fetch("/api/me", {
@@ -145,17 +141,18 @@
           return;
         }
 
-        // ✅ تمام: افتح اللعبة
+        // ✅ تمام: افتح اللعبة فوراً بدون ما تظهر صفحة التحميل
         location.replace(GAME_URL + "?v=" + Date.now());
       }catch(e){
         clearTimeout(t);
-        showActions("فيه مشكلة اتصال أو تحقق. جرّب إعادة المحاولة أو افتح صفحة التفعيل.");
+        showActions("فيه مشكلة اتصال/تحقق. جرّب إعادة المحاولة أو افتح صفحة التفعيل.");
       }
     }
 
     document.getElementById("goActivate").onclick = ()=> location.href = ACTIVATE_URL;
     document.getElementById("retry").onclick = ()=> check();
 
+    // ✅ ابدأ تحقق فوراً
     check();
   </script>
 </body>
