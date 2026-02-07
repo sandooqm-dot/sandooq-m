@@ -50,6 +50,13 @@
   </div>
 
   <script type="module">
+    // ✅ قفل الدخول: لازم يكون مفعل
+    const LS_ACTIVATED = "sandooq_activated";
+    if (localStorage.getItem(LS_ACTIVATED) !== "1") {
+      // يوديه لصفحة التفعيل ويرجع بعدها لـ create.html
+      location.replace("/activate.html?r=" + encodeURIComponent("create.html"));
+    }
+
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
