@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>جاري فتح اللعبة - صندوق المسابقات</title>
   <style>
     :root{
@@ -127,29 +127,66 @@
 
     const params = new URLSearchParams(location.search);
 
-    // ✅ reset
+    // reset: game.html?reset=1
     if (params.get("reset") === "1") {
       localStorage.removeItem(LS_ACTIVATED);
       localStorage.removeItem(LS_CODE);
       localStorage.removeItem(LS_DEVICE);
-      location.replace("activate.html?r=" + encodeURIComponent("game_full.html"));
+      location.replace("activate.html?r=" + encodeURIComponent("game.html"));
     }
 
-    // ✅ الوجهة الافتراضية (الملف الكبير)
-    const DEFAULT_TARGET = "game_full.html";
+    function normalizeReturnUrl(url){
+      // نخليها safe نسبياً
+      try{
+        // لو جاية "game_full.html?role=..." خله كما هو
+        return String(url || "").trim() || "game_full.html";
+      }catch(e){
+        return "game_full.html";
+      }
+    }
 
-    // الوجهة لو جاية بالرابط: index.html?r=...
-    const target = params.get("r") || DEFAULT_TARGET;
+    // ✅ إذا جايين من create.html فهذي أهم حالة:
+    // game.html?role=host&code=...&key=...
+    const hasRole = params.has("role");
+    const hasCode = params.has("code");
+
+    // ✅ إذا الصفحة انفتحت برابط هدف r (نستخدمه فقط لو موجود)
+    // مثل: game.html?r=game_full.html?role=...
+    const rParam = params.get("r");
+
+    // الوجهة النهائية:
+    // 1) لو عندنا role+code -> افتح game_full مع نفس الباراميترات
+    // 2) لو عندنا r -> افتحها كما هي
+    // 3) غير كذا -> افتح game_full (بدون باراميترات)
+    let target;
+    if (hasRole && hasCode){
+      target = "game_full.html" + location.search + location.hash;
+    } else if (rParam){
+      target = normalizeReturnUrl(rParam);
+    } else {
+      target = "game_full.html";
+    }
+
+    // ✅ رابط الرجعة للتفعيل لازم يكون نفس صفحة game.html الحالية بكل باراميتراتها
+    const returnToHere = location.pathname.split("/").pop() + location.search + location.hash;
 
     const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
 
     if (!activated) {
-      // غير مُفعّل -> فعّل ثم ارجع للوجهة
-      location.replace("activate.html?r=" + encodeURIComponent(target));
+      // غير مُفعّل -> فعّل ثم ارجع لنفس صفحة game.html (عشان ما نضيّع role/code)
+      location.replace("activate.html?r=" + encodeURIComponent(returnToHere));
     } else {
-      // مُفعّل -> افتح الوجهة مباشرة (بدون أي Loop)
+      // مُفعّل -> افتح الهدف
       location.replace(target);
     }
+
+    // أزرار احتياط لو احتجناها
+    $open.onclick = () => location.href = target;
+    $chg.onclick = () => {
+      localStorage.removeItem(LS_ACTIVATED);
+      localStorage.removeItem(LS_CODE);
+      location.href = "activate.html";
+    };
   </script>
 </body>
 </html>
