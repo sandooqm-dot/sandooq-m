@@ -1,63 +1,89 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>سباق الحروف</title>
   <style>
     body{
-      margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-      font-family:Arial, sans-serif;background:#1f4fa3;color:#fff;text-align:center;padding:18px
+      margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      font-family: Arial, sans-serif; background:#5a1d54; color:#fff; text-align:center;
     }
     .box{
-      width:min(520px,100%);
-      background:rgba(255,255,255,.10);
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:16px;
-      padding:18px 16px;
+      width:min(520px,92vw);
+      background: rgba(0,0,0,.22);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 16px;
+      padding: 18px 14px;
     }
-    .small{opacity:.9;font-size:14px;line-height:1.7}
-    .spin{
-      width:18px;height:18px;border:3px solid rgba(255,255,255,.35);
-      border-top-color:#fff;border-radius:50%;
-      display:inline-block;vertical-align:-4px;margin-left:8px;
-      animation: s 1s linear infinite
+    .spinner{
+      width:18px;height:18px; border:3px solid rgba(255,255,255,.35);
+      border-top-color:#fff; border-radius:50%;
+      display:inline-block; vertical-align:-4px;
+      animation:spin 1s linear infinite;
+      margin-left:8px;
     }
-    @keyframes s{to{transform:rotate(360deg)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .small{opacity:.85; font-size:13px; margin-top:10px; line-height:1.6}
+    .btn{
+      margin-top:14px;
+      display:inline-block;
+      padding:10px 14px;
+      border-radius:12px;
+      background:#fff;
+      color:#111;
+      text-decoration:none;
+      font-weight:800;
+    }
   </style>
 </head>
 <body>
   <div class="box">
-    <div style="font-size:18px;font-weight:800;margin-bottom:8px;">
-      جاري فتح اللعبة <span class="spin"></span>
+    <div style="font-weight:900;font-size:18px">
+      جاري فتح اللعبة <span class="spinner"></span>
     </div>
-    <div class="small">
-      إذا ما اكتمل الدخول سيتم إعادتك تلقائيًا للصفحة الرئيسية.
-    </div>
+    <div id="hint" class="small">لحظة واحدة…</div>
+    <a id="goHome" class="btn" href="index.html" style="display:none">العودة للرئيسية</a>
   </div>
 
-  <script>
-    // ✅ نفس مفاتيح التفعيل عندك
-    const LS_ACTIVATED = "sandooq_activated";
+<script>
+  // ✅ مفاتيح التفعيل (مثل activate.html)
+  const LS_ACTIVATED = "sandooq_activated";
 
-    // 1) لو ما تفعل الجهاز → روح لصفحة التفعيل
-    if (localStorage.getItem(LS_ACTIVATED) !== "1") {
-      const here = location.pathname.split("/").pop() || "game.html";
-      const r = encodeURIComponent(here + location.search + location.hash);
-      location.replace("activate.html?r=" + r);
-      throw new Error("Not activated");
+  // 1) إذا ما تم التفعيل: روح لصفحة التفعيل وارجع هنا بعده
+  if (localStorage.getItem(LS_ACTIVATED) !== "1") {
+    const r = encodeURIComponent("game.html" + location.search + location.hash);
+    location.replace("activate.html?r=" + r);
+  } else {
+    // 2) إذا تم التفعيل: لازم يكون فيه “بيانات دخول” (إما باراميتر بالرابط أو بيانات محفوظة)
+    // ملاحظة: لأننا ما نعرف بالضبط اسم المفاتيح داخل لعبتك، بنستخدم قواعد عامة:
+    // - إذا فيه أي query params: نعتبره دخول صحيح
+    // - أو إذا فيه أي شيء مهم في sessionStorage/localStorage (room/code/name…)
+    const qs = new URLSearchParams(location.search);
+    const hasQuery = Array.from(qs.keys()).length > 0;
+
+    const looksLikeHasSession =
+      !!sessionStorage.getItem("room") ||
+      !!sessionStorage.getItem("roomId") ||
+      !!sessionStorage.getItem("code") ||
+      !!sessionStorage.getItem("gameCode") ||
+      !!sessionStorage.getItem("host") ||
+      !!sessionStorage.getItem("playerName") ||
+      !!localStorage.getItem("room") ||
+      !!localStorage.getItem("roomId") ||
+      !!localStorage.getItem("gameCode");
+
+    if (!hasQuery && !looksLikeHasSession) {
+      // ما فيه بيانات دخول -> رجع للرئيسية بدل ما يعلق على رسالة “بيانات الدخول غير مكتملة”
+      document.getElementById("hint").textContent =
+        "ما لقينا بيانات دخول للجولة. بنرجعك للرئيسية…";
+      document.getElementById("goHome").style.display = "inline-block";
+      setTimeout(() => location.replace("index.html"), 650);
+    } else {
+      // 3) كل شيء تمام -> افتح اللعبة الكبيرة
+      location.replace("game_full.html" + location.search + location.hash);
     }
-
-    // 2) إذا داخل /game بدون أي بيانات → رجّعه للـ index
-    const hasAnyParams = location.search && location.search.length > 1;
-    if (!hasAnyParams) {
-      location.replace("index.html");
-      throw new Error("Missing params");
-    }
-
-    // 3) مرّر نفس الرابط كامل للملف الثقيل
-    //    (نفس ? ونفس #)
-    location.replace("game_full.html" + location.search + location.hash);
-  </script>
+  }
+</script>
 </body>
 </html>
