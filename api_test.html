@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>اختبار API</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#0b2c6b;color:#fff;margin:0;padding:18px}
+    .card{max-width:520px;margin:0 auto;background:#fff;color:#111;border-radius:14px;padding:14px}
+    h2{margin:0 0 10px}
+    label{display:block;margin:10px 0 6px;font-weight:bold}
+    input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px}
+    button{width:100%;padding:12px;border:0;border-radius:12px;background:#f4c400;color:#111;font-weight:800;font-size:16px;margin-top:12px;cursor:pointer}
+    pre{background:#111;color:#0f0;padding:12px;border-radius:12px;overflow:auto;font-size:12px}
+    .hint{font-size:12px;color:#444;margin-top:8px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>اختبار API (POST)</h2>
+
+    <label>اختر العملية</label>
+    <select id="op">
+      <option value="register">تسجيل جديد (register)</option>
+      <option value="login">تسجيل دخول (login)</option>
+      <option value="activate">تفعيل كود (activate)</option>
+      <option value="verify">تحقق/دخول (verify)</option>
+      <option value="ping">Ping (ping)</option>
+    </select>
+
+    <label>البريد</label>
+    <input id="email" type="email" placeholder="example@email.com" />
+
+    <label>كلمة المرور</label>
+    <input id="password" type="password" placeholder="********" />
+
+    <label>كود التفعيل</label>
+    <input id="code" type="text" placeholder="SNDQ-0000-0000-0000" />
+
+    <button id="btn">إرسال</button>
+
+    <div class="hint">
+      - هذا الملف فقط للاختبار.<br/>
+      - بيعرض لك رد الـ API كامل عشان نعرف وين المشكلة بالضبط.<br/>
+      - إذا op=ping ما يحتاج تعبئة شيء.
+    </div>
+
+    <h3 style="margin:14px 0 8px">النتيجة</h3>
+    <pre id="out">جاهز… اضغط "إرسال"</pre>
+  </div>
+
+<script>
+  const $ = (id)=>document.getElementById(id);
+
+  function baseUrl(){
+    // نفس الدومين (pages.dev أو الدومين الخاص)
+    return location.origin;
+  }
+
+  function endpoint(op){
+    // أسماء الملفات الموجودة عندك داخل functions/api:
+    // activate.js, verify.js, register.js, ping.js
+    if(op === "login") return "/api/verify";   // مؤقتاً نخليه على verify إذا هو اللي يسوي تسجيل دخول
+    if(op === "register") return "/api/register";
+    if(op === "activate") return "/api/activate";
+    if(op === "verify") return "/api/verify";
+    if(op === "ping") return "/api/ping";
+    return "/api/verify";
+  }
+
+  $("btn").addEventListener("click", async ()=>{
+    const op = $("op").value;
+    const url = baseUrl() + endpoint(op);
+
+    const payload = {
+      email: $("email").value.trim(),
+      password: $("password").value,
+      code: $("code").value.trim(),
+    };
+
+    $("out").textContent = "جارٍ الإرسال إلى:\n" + url + "\n\npayload:\n" + JSON.stringify(payload, null, 2);
+
+    try{
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let data;
+      try{ data = JSON.parse(text); } catch(e){ data = {raw:text}; }
+
+      $("out").textContent =
+        "STATUS: " + res.status + "\n\n" +
+        JSON.stringify(data, null, 2);
+
+    }catch(err){
+      $("out").textContent = "Fetch Error:\n" + (err && err.message ? err.message : String(err));
+    }
+  });
+</script>
+</body>
+</html>
