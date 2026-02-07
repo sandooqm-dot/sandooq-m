@@ -3,63 +3,169 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>صندوق المسابقات</title>
+  <title>جاري فتح اللعبة - صندوق المسابقات</title>
   <style>
+    :root{
+      --bg1:#0e2f7a;
+      --bg2:#1f4fa3;
+      --yellow:#f4c400;
+      --text:#111;
+      --muted:#6b7280;
+      --shadow: 0 14px 35px rgba(0,0,0,.22);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
     body{
-      margin:0; min-height:100vh;
-      display:flex; align-items:center; justify-content:center;
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       font-family: Arial, sans-serif;
-      background: linear-gradient(135deg,#0e2f7a,#1f4fa3);
+      background:
+        radial-gradient(1100px 500px at 15% 20%, rgba(244,196,0,.18), transparent 60%),
+        radial-gradient(900px 450px at 85% 80%, rgba(255,255,255,.10), transparent 60%),
+        linear-gradient(135deg, var(--bg1), var(--bg2));
+      padding: 18px;
       color:#fff;
     }
-    .box{
-      width:min(520px,92vw);
-      background: rgba(255,255,255,.10);
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:18px;
-      padding:22px 18px;
+    .wrap{ width:min(520px, 100%); position:relative; }
+    .logo{ display:flex; justify-content:center; margin-bottom: 14px; }
+    .logo img{
+      width:86px; height:86px; object-fit:contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
+    }
+    .card{
+      background: rgba(255,255,255,.96);
+      color: var(--text);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px 18px 18px;
+      border: 2px solid rgba(244,196,0,.35);
       text-align:center;
-      box-shadow: 0 14px 35px rgba(0,0,0,.22);
-      backdrop-filter: blur(10px);
     }
-    .logo img{ width:86px; height:86px; object-fit:contain; filter: drop-shadow(0 10px 18px rgba(0,0,0,.25)); }
-    .t{ margin:14px 0 6px; font-weight:900; font-size:20px; }
-    .s{ margin:0; opacity:.9; font-size:14px; line-height:1.8; }
-    .spin{
-      display:inline-block; width:16px;height:16px;
-      border:3px solid rgba(255,255,255,.35);
-      border-top-color:#fff;
+    h1{ margin:0 0 8px; font-size: 22px; }
+    p{
+      margin:0 0 14px;
+      color: var(--muted);
+      line-height:1.7;
+      font-size: 14px;
+    }
+    .spinner{
+      display:inline-block;
+      width:18px;height:18px;
+      border: 3px solid rgba(17,17,17,.25);
+      border-top-color: rgba(17,17,17,.9);
       border-radius:50%;
-      vertical-align:-3px;
+      vertical-align: -4px;
       margin-left:8px;
-      animation: sp 1s linear infinite;
+      animation: spin 1s linear infinite;
     }
-    @keyframes sp{ to{ transform:rotate(360deg) } }
+    @keyframes spin{ to{transform:rotate(360deg)} }
+
+    .btn{
+      width:100%;
+      margin-top: 10px;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border:none;
+      cursor:pointer;
+      background: var(--yellow);
+      color:#111;
+      font-weight: 900;
+      font-size: 16px;
+      display:none;
+    }
+    .btn2{
+      width:100%;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border:2px solid rgba(31,79,163,.25);
+      cursor:pointer;
+      background:#fff;
+      color:#111;
+      font-weight: 800;
+      font-size: 14px;
+      display:none;
+    }
+
+    .footer{
+      text-align:center;
+      margin-top: 12px;
+      color: rgba(255,255,255,.85);
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
-  <div class="box">
-    <div class="logo"><img src="logo.png" alt="Sandooq"></div>
-    <div class="t">جاري فتح اللعبة <span class="spin"></span></div>
-    <p class="s">لحظة… نتحقق من التفعيل.</p>
+  <div class="wrap">
+    <div class="logo">
+      <img src="logo.png" alt="Sandooq" />
+    </div>
+
+    <div class="card">
+      <h1 id="title">جاري فتح اللعبة <span class="spinner"></span></h1>
+      <p id="desc">لحظة… نتحقق من التفعيل.</p>
+
+      <button id="openBtn" class="btn">فتح الوجهة</button>
+      <button id="changeBtn" class="btn2">تغيير / إعادة تفعيل الكود</button>
+    </div>
+
+    <div class="footer">© صندوق المسابقات</div>
   </div>
 
   <script>
-    // مفاتيح التفعيل
     const LS_ACTIVATED = "sandooq_activated";
+    const LS_CODE      = "sandooq_code";
+    const LS_DEVICE    = "sandooq_device_id";
 
-    // صفحاتك
-    const ACTIVATE_PAGE = "activate.html";
-    const GAME_PAGE     = "game.html";
+    const $title = document.getElementById("title");
+    const $desc  = document.getElementById("desc");
+    const $open  = document.getElementById("openBtn");
+    const $chg   = document.getElementById("changeBtn");
 
-    // ارجاع المستخدم لنفس الصفحة بعد التفعيل
-    const returnTo = encodeURIComponent("index.html");
+    const params = new URLSearchParams(location.search);
 
-    // بوابة: إذا مفعل -> اللعبة، إذا لا -> صفحة التفعيل
-    if (localStorage.getItem(LS_ACTIVATED) === "1") {
-      location.replace(GAME_PAGE);
+    // خيار مفيد لو تبغى تمسح التفعيل وتجرب من جديد:
+    // index.html?reset=1
+    if (params.get("reset") === "1") {
+      localStorage.removeItem(LS_ACTIVATED);
+      localStorage.removeItem(LS_CODE);
+      localStorage.removeItem(LS_DEVICE);
+      location.replace("activate.html");
+    }
+
+    // الوجهة المطلوبة (لو جاية من صفحة لعبة): index.html?r=game.html
+    const target = params.get("r");
+
+    const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
+
+    if (!activated) {
+      // روح لصفحة التفعيل ومرر الوجهة لو موجودة
+      const url = target
+        ? `activate.html?r=${encodeURIComponent(target)}`
+        : "activate.html";
+      location.replace(url);
     } else {
-      location.replace(ACTIVATE_PAGE + "?r=" + returnTo);
+      // مُفعّل ✅
+      if (target) {
+        // فيه وجهة: افتحها
+        location.replace(target);
+      } else {
+        // ما فيه وجهة: لا تفتح أي "game.html" عشان ما يصير Loop
+        $title.innerHTML = "تم التفعيل ✅";
+        $desc.textContent = "جهازك مُفعّل. افتح رابط اللعبة المطلوب أو مرّر الوجهة عبر ?r=اسم_الصفحة";
+        $open.style.display = "none";
+
+        // زر لإعادة التفعيل/تغيير الكود
+        $chg.style.display = "block";
+        $chg.onclick = () => {
+          localStorage.removeItem(LS_ACTIVATED);
+          localStorage.removeItem(LS_CODE);
+          location.href = "activate.html";
+        };
+      }
     }
   </script>
 </body>
