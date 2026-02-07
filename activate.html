@@ -3,302 +3,710 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>تفعيل اللعبة - صندوق المسابقات</title>
+  <title>تفعيل اللعبة | صندوق المسابقات</title>
+
   <style>
     :root{
-      --bg1:#1f4fa3;
-      --bg2:#123b87;
-      --card:rgba(255,255,255,.12);
-      --card2:rgba(255,255,255,.18);
-      --stroke:rgba(255,255,255,.22);
+      --bg1:#6c2bd9;
+      --bg2:#ff3aa7;
+      --card: rgba(255,255,255,.16);
+      --card2: rgba(255,255,255,.10);
+      --stroke: rgba(255,255,255,.22);
       --text:#fff;
-      --muted:rgba(255,255,255,.75);
-      --yellow:#f4c400;
-      --danger:#ff5a5a;
-      --ok:#1fd27a;
+      --muted: rgba(255,255,255,.80);
+      --input: rgba(255,255,255,.14);
+      --btn: linear-gradient(90deg, #ff3aa7 0%, #6c2bd9 100%);
+      --btn2: rgba(255,255,255,.14);
+      --danger:#ff4d4d;
+      --ok:#2fe38c;
+      --shadow: 0 18px 50px rgba(0,0,0,.25);
     }
+
     html,body{height:100%}
     body{
       margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Tahoma, Arial;
+      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
       color:var(--text);
-      background: radial-gradient(1200px 700px at 20% 10%, rgba(255,255,255,.14), transparent 55%),
-                  radial-gradient(900px 600px at 90% 30%, rgba(244,196,0,.16), transparent 55%),
-                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      background:
+        radial-gradient(1200px 700px at 50% 25%, rgba(255,255,255,.12), transparent 55%),
+        linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 100%);
+      overflow:hidden;
+    }
+
+    /* خلفية سداسية خفيفة */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      background-image:
+        linear-gradient(30deg, rgba(255,255,255,.08) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.08) 87.5%, rgba(255,255,255,.08)),
+        linear-gradient(150deg, rgba(255,255,255,.08) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.08) 87.5%, rgba(255,255,255,.08)),
+        linear-gradient(90deg, rgba(255,255,255,.06) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.06) 87.5%, rgba(255,255,255,.06));
+      background-size: 86px 150px;
+      background-position: 0 0, 0 0, 43px 75px;
+      opacity:.45;
+      pointer-events:none;
+      filter: blur(.2px);
+    }
+
+    .page{
+      position:relative;
+      min-height:100%;
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:24px;
-      box-sizing:border-box;
+      padding:18px;
     }
-    .wrap{width:min(520px, 100%); text-align:center}
-    .logo{width:70px;height:70px;object-fit:contain; margin:0 auto 14px; display:block; filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));}
-    .card{
-      background:linear-gradient(180deg, var(--card), var(--card2));
+
+    .wrap{
+      width:min(560px, 92vw);
+      border-radius:26px;
+      background: var(--card);
+      border:1px solid var(--stroke);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      overflow:hidden;
+    }
+
+    .topLogo{
+      display:flex;
+      justify-content:center;
+      padding:18px 18px 0;
+    }
+    .topLogo img{
+      width:70px;height:70px;object-fit:contain;
+      filter: drop-shadow(0 10px 14px rgba(0,0,0,.25));
+    }
+
+    .content{ padding:14px 18px 18px; }
+
+    .title{
+      text-align:center;
+      margin:6px 0 6px;
+      font-size:26px;
+      font-weight:900;
+      letter-spacing:.2px;
+      text-shadow: 0 8px 18px rgba(0,0,0,.25);
+    }
+
+    .sub{
+      text-align:center;
+      margin:0 0 14px;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.8;
+    }
+
+    .panel{
+      background: var(--card2);
       border:1px solid var(--stroke);
       border-radius:18px;
-      padding:18px 16px;
-      box-shadow: 0 18px 45px rgba(0,0,0,.22);
-      backdrop-filter: blur(10px);
+      padding:14px;
     }
-    h1{margin:0 0 8px; font-size:22px}
-    p{margin:0 0 14px; color:var(--muted); font-size:14px}
-    .row{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap}
-    input{
+
+    .row{ margin:10px 0; }
+
+    .input{
       width:100%;
-      padding:12px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.22);
-      background:rgba(0,0,0,.15);
-      color:#fff;
-      outline:none;
-      font-size:15px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.20);
+      background: var(--input);
       box-sizing:border-box;
     }
-    input::placeholder{color:rgba(255,255,255,.55)}
+    .input span{
+      opacity:.85;
+      font-size:18px;
+      width:26px;
+      text-align:center;
+    }
+    .input input{
+      width:100%;
+      border:0;
+      outline:none;
+      background:transparent;
+      color:var(--text);
+      font-size:15px;
+    }
+    .input input::placeholder{ color: rgba(255,255,255,.65); }
+
     .btn{
       width:100%;
-      padding:12px 12px;
-      border-radius:12px;
-      border:none;
+      border:0;
       cursor:pointer;
+      padding:13px 14px;
+      border-radius:14px;
+      color:#fff;
       font-weight:800;
       font-size:15px;
-      transition:.15s transform ease, .15s opacity ease;
+      background: var(--btn);
+      box-shadow: 0 14px 26px rgba(0,0,0,.18);
+      transition: transform .12s ease, opacity .12s ease;
     }
-    .btn:active{transform:scale(.98)}
-    .btn.yellow{background:var(--yellow); color:#111}
-    .btn.ghost{background:rgba(0,0,0,.18); color:#fff; border:1px solid rgba(255,255,255,.22)}
-    .btn:disabled{opacity:.5; cursor:not-allowed}
-    .hint{margin-top:10px; font-size:12px; color:rgba(255,255,255,.7)}
-    .msg{
-      margin-top:12px;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.18);
-      background:rgba(0,0,0,.16);
-      text-align:right;
-      display:none;
-      font-size:13px;
-      line-height:1.55;
+    .btn:active{ transform: scale(.99); }
+    .btn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    .btnGhost{
+      width:100%;
+      border:1px solid rgba(255,255,255,.25);
+      cursor:pointer;
+      padding:12px 14px;
+      border-radius:14px;
+      color:#fff;
+      font-weight:800;
+      font-size:14px;
+      background: var(--btn2);
+      transition: transform .12s ease, opacity .12s ease;
     }
-    .msg.err{display:block; border-color:rgba(255,90,90,.35); background:rgba(255,90,90,.10)}
-    .msg.ok{display:block; border-color:rgba(31,210,122,.35); background:rgba(31,210,122,.10)}
-    .spinner{
-      display:none;
+    .btnGhost:active{ transform: scale(.99); }
+    .btnGhost[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    .sep{
+      display:flex;
       align-items:center;
-      justify-content:center;
       gap:10px;
-      margin-top:12px;
+      margin:14px 0 10px;
+      color:rgba(255,255,255,.7);
+      font-weight:700;
+      justify-content:center;
+    }
+    .sep::before,.sep::after{
+      content:"";
+      height:1px;
+      flex:1;
+      background: rgba(255,255,255,.25);
+    }
+
+    .miniLinks{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      margin-top:10px;
+      flex-wrap:wrap;
+    }
+    .miniLinks button{
+      background:transparent;
+      border:0;
       color:rgba(255,255,255,.85);
+      cursor:pointer;
+      font-weight:800;
       font-size:13px;
+      text-decoration: underline;
+      text-underline-offset: 4px;
     }
-    .dot{
-      width:8px;height:8px;border-radius:50%;
-      background:rgba(255,255,255,.8);
-      animation:b 1s infinite ease-in-out;
+
+    .msg{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.18);
+      font-weight:800;
+      text-align:center;
+      display:none;
     }
-    .dot:nth-child(2){animation-delay:.12s; opacity:.8}
-    .dot:nth-child(3){animation-delay:.24s; opacity:.6}
-    @keyframes b{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-    .topnote{
+    .msg.danger{ border-color: rgba(255,77,77,.6); color: #ffd7d7; }
+    .msg.ok{ border-color: rgba(47,227,140,.55); color: #d9ffe9; }
+
+    /* قسم الكود فوق */
+    .codeBox{
+      background: rgba(0,0,0,.12);
+      border:1px dashed rgba(255,255,255,.28);
+      border-radius:18px;
+      padding:12px;
       margin-bottom:12px;
+    }
+    .codeHeader{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .codeHeader .tag{
+      font-weight:900;
+      font-size:13px;
+      opacity:.92;
+    }
+    .badge{
+      font-weight:900;
       font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.10);
+      white-space:nowrap;
+    }
+    .badge.bad{ border-color: rgba(255,77,77,.6); color:#ffd0d0; }
+    .badge.good{ border-color: rgba(47,227,140,.55); color:#d9ffe9; }
+
+    .footer{
+      text-align:center;
+      padding:10px 0 14px;
       color:rgba(255,255,255,.75);
+      font-weight:800;
+      font-size:12px;
+    }
+
+    @media (max-width:420px){
+      .title{font-size:24px}
+      .wrap{border-radius:22px}
     }
   </style>
 </head>
+
 <body>
-  <div class="wrap">
-    <img class="logo" src="logo.png" alt="صندوق المسابقات" />
-    <div class="card">
-      <h1>تفعيل اللعبة</h1>
-      <p>سجّل دخولك أو فعّل كود الشراء لأول مرة. بعدها الدخول يصير تلقائي.</p>
-
-      <div class="topnote" id="retNote"></div>
-
-      <input id="email" type="email" autocomplete="email" placeholder="البريد الإلكتروني" />
-      <div class="row">
-        <input id="password" type="password" autocomplete="current-password" placeholder="كلمة المرور" />
+  <div class="page">
+    <div class="wrap">
+      <div class="topLogo">
+        <img src="logo.png" alt="logo">
       </div>
 
-      <div class="row">
-        <button class="btn yellow" id="btnLogin">دخول</button>
-        <button class="btn ghost" id="btnRegister">تسجيل جديد</button>
+      <div class="content">
+
+        <div class="title" id="pageTitle">تفعيل اللعبة</div>
+        <div class="sub" id="pageSub">
+          أول مرة فقط: أدخل كود الشراء لتفعيل اللعبة على هذا الجهاز.<br>
+          بعد التفعيل… الدخول يصير تلقائيًا.
+        </div>
+
+        <div class="panel">
+
+          <!-- ✅ قسم الكود (فوق) -->
+          <div class="codeBox" id="codeBox">
+            <div class="codeHeader">
+              <div class="tag">كود التفعيل (أول مرة فقط)</div>
+              <div class="badge bad" id="codeBadge">CODE_REQUIRED</div>
+            </div>
+
+            <div class="row">
+              <div class="input">
+                <span>🔑</span>
+                <input id="codeInput" inputmode="text" autocomplete="off" placeholder="SNDOQ-XXXX-XXXX-XXXX" />
+              </div>
+            </div>
+
+            <button class="btn" id="activateBtn" disabled>تفعيل الكود</button>
+
+            <div class="msg danger" id="codeErr"></div>
+            <div class="msg ok" id="codeOk"></div>
+          </div>
+
+          <!-- ✅ شاشة الدخول -->
+          <div id="viewLogin">
+            <div class="row">
+              <div class="input">
+                <span>👤</span>
+                <input id="loginEmail" type="email" autocomplete="email" placeholder="example@email.com" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="input">
+                <span>🔒</span>
+                <input id="loginPass" type="password" autocomplete="current-password" placeholder="كلمة المرور" />
+              </div>
+            </div>
+
+            <button class="btn" id="loginBtn" disabled>دخول</button>
+
+            <div class="sep">أو</div>
+
+            <button class="btnGhost" id="googleBtn">الدخول بواسطة حساب جوجل</button>
+
+            <div class="miniLinks">
+              <button type="button" id="goSignup">إنشاء حساب جديد</button>
+              <button type="button" id="goReset">نسيت كلمة المرور؟</button>
+            </div>
+
+            <div class="msg danger" id="loginErr"></div>
+            <div class="msg ok" id="loginOk"></div>
+          </div>
+
+          <!-- ✅ شاشة التسجيل -->
+          <div id="viewSignup" style="display:none">
+            <div class="title" style="font-size:22px;margin:4px 0 10px;">إنشاء حساب جديد</div>
+
+            <div class="row">
+              <div class="input">
+                <span>✉️</span>
+                <input id="suEmail" type="email" autocomplete="email" placeholder="example@email.com" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="input">
+                <span>🔒</span>
+                <input id="suPass" type="password" autocomplete="new-password" placeholder="كلمة المرور" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="input">
+                <span>🔒</span>
+                <input id="suPass2" type="password" autocomplete="new-password" placeholder="تأكيد كلمة المرور" />
+              </div>
+            </div>
+
+            <button class="btn" id="signupBtn" disabled>إنشاء حساب</button>
+
+            <div class="sep">أو</div>
+
+            <button class="btnGhost" id="googleBtn2">الدخول بواسطة حساب جوجل</button>
+
+            <div class="miniLinks">
+              <button type="button" id="backLogin1">لديك حساب بالفعل؟ سجل دخول</button>
+            </div>
+
+            <div class="msg danger" id="suErr"></div>
+            <div class="msg ok" id="suOk"></div>
+          </div>
+
+          <!-- ✅ شاشة نسيان كلمة المرور -->
+          <div id="viewReset" style="display:none">
+            <div class="title" style="font-size:22px;margin:4px 0 10px;">نسيتي كلمة المرور؟</div>
+            <div class="sub" style="margin-bottom:8px">أدخلي بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين</div>
+
+            <div class="row">
+              <div class="input">
+                <span>✉️</span>
+                <input id="rsEmail" type="email" autocomplete="email" placeholder="example@email.com" />
+              </div>
+            </div>
+
+            <button class="btn" id="resetBtn" disabled>إرسال رابط الاستعادة</button>
+
+            <div class="miniLinks">
+              <button type="button" id="backLogin2">العودة لتسجيل الدخول</button>
+            </div>
+
+            <div class="msg danger" id="rsErr"></div>
+            <div class="msg ok" id="rsOk"></div>
+          </div>
+
+        </div>
+
+        <div class="footer">© صندوق المسابقات</div>
       </div>
-
-      <hr style="border:none;border-top:1px solid rgba(255,255,255,.15); margin:14px 0">
-
-      <input id="code" inputmode="latin" placeholder="كود التفعيل (مثال: SNDQ-XXXX-XXXX)" />
-      <div class="row">
-        <button class="btn yellow" id="btnActivate">تفعيل الكود</button>
-      </div>
-
-      <div class="spinner" id="spinner">
-        <span>جاري التنفيذ</span>
-        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-      </div>
-
-      <div class="msg" id="msg"></div>
-      <div class="hint">© صندوق المسابقات</div>
     </div>
   </div>
 
 <script>
-(function(){
-  // ========= 1) تصحيح رابط الرجعة r لمنع https://https:// واللوب =========
-  function normalizeReturn(raw){
-    const fallback = "/game_full.html";
-    if(!raw) return fallback;
+  // =========================
+  // مفاتيح التخزين (ثابتة)
+  // =========================
+  const LS = {
+    activated: "sndq_activated_v1",
+    code: "sndq_code_v1",
+    email: "sndq_email_v1",
+    token: "sndq_token_v1"
+  };
 
-    raw = String(raw).trim();
+  // ✅ الصفحة المطلوبة بعد الدخول/التفعيل
+  const params = new URLSearchParams(location.search);
+  const returnTo = sanitizeReturn(params.get("r") || "play.html");
 
-    // لو جاء شيء مثل https://https://domain/...
-    raw = raw.replace(/^https?:\/\/https?:\/\//i, "https://");
-
-    // لو جاء رابط كامل، نخليه مسار داخل نفس الدومين فقط
+  function sanitizeReturn(v){
     try{
-      if(/^https?:\/\//i.test(raw)){
-        const u = new URL(raw);
-        // نرجع فقط pathname+search+hash داخل نفس الموقع
-        return (u.pathname || "/") + (u.search || "") + (u.hash || "");
-      }
-    }catch(e){}
-
-    // لو جاء ?r=game_full.html بدون /
-    if(!raw.startsWith("/")) raw = "/" + raw;
-
-    // حماية إضافية: ممنوع رجعة لخارج الموقع
-    if(raw.includes("://")) return fallback;
-
-    return raw;
+      v = (v || "").trim();
+      if(!v) return "play.html";
+      // منع روابط خارجية
+      if(v.startsWith("http://") || v.startsWith("https://")) return "play.html";
+      // منع مسارات غريبة
+      v = v.replace(/^\//, "");
+      return v;
+    }catch{ return "play.html"; }
   }
 
-  const url = new URL(location.href);
-  const rRaw = url.searchParams.get("r") || url.searchParams.get("return") || "";
-  const RETURN_TO = normalizeReturn(rRaw);
+  // =========================
+  // Helpers UI
+  // =========================
+  const $ = (id)=>document.getElementById(id);
 
-  const retNote = document.getElementById("retNote");
-  retNote.textContent = "بعد التفعيل سيتم تحويلك تلقائيًا للعبة.";
-
-  // ========= 2) تخزين جلسة (لو عندك توكن من الـ API) =========
-  const SESSION_KEY = "sandooq_session_v1";
-
-  function setLoading(on){
-    document.getElementById("spinner").style.display = on ? "flex" : "none";
-    document.getElementById("btnLogin").disabled = on;
-    document.getElementById("btnRegister").disabled = on;
-    document.getElementById("btnActivate").disabled = on;
-  }
-  function showMsg(text, type){
-    const el = document.getElementById("msg");
-    el.className = "msg " + (type || "");
+  function showMsg(el, text, type){
+    if(!el) return;
+    el.classList.remove("danger","ok");
+    el.classList.add(type);
     el.textContent = text;
     el.style.display = "block";
   }
-  function clearMsg(){
-    const el = document.getElementById("msg");
+  function hideMsg(el){
+    if(!el) return;
     el.style.display = "none";
     el.textContent = "";
-    el.className = "msg";
+    el.classList.remove("danger","ok");
   }
 
-  function safeRedirect(path){
-    // أهم نقطة: استخدام replace عشان مايرجع بنفس الصفحة ويسوي لوب
-    location.replace(path);
+  function setBadge(text, good=false){
+    const b = $("codeBadge");
+    b.textContent = text;
+    b.classList.toggle("good", !!good);
+    b.classList.toggle("bad", !good);
   }
 
-  // لو المستخدم أصلاً مسجّل (جلسة محفوظة) ما نعيد تحميل ولا نسوي لوب
-  try{
-    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
-    if(s && s.ok){
-      // جلسة موجودة -> روح للعبة فورًا
-      safeRedirect(RETURN_TO);
+  function isEmail(v){
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||"").trim());
+  }
+
+  function normalizeCode(v){
+    v = (v||"").trim().toUpperCase();
+    v = v.replace(/\s+/g,"");
+    return v;
+  }
+
+  function go(target){
+    // منع loop: نستخدم replace بدل assign
+    location.replace(target);
+  }
+
+  // =========================
+  // منع “حلقة” فتح الصفحة
+  // =========================
+  function boot(){
+    // إذا متفعل وعندنا token… نطلع فورًا
+    const activated = localStorage.getItem(LS.activated) === "1";
+    const token = localStorage.getItem(LS.token) || "";
+    const email = localStorage.getItem(LS.email) || "";
+
+    if(activated && token && email){
+      // دخول مباشر
+      go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(token));
       return;
     }
-  }catch(e){}
 
-  // ========= 3) نداءات API (عدّل المسارات لو مختلفة عندك) =========
-  async function api(path, body){
-    // افتراض: عندك Worker API تحت /api/...
-    const res = await fetch(path, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify(body || {}),
-    });
-    const text = await res.text();
-    let data;
-    try{ data = JSON.parse(text); }catch(e){ data = { ok:false, error:text || "Unknown" }; }
-    if(!res.ok && data && data.ok !== true){
-      data.ok = false;
-      data.error = data.error || ("HTTP " + res.status);
+    // لو متفعل بدون token (حالة قديمة) نخليه يطلب دخول
+    if(activated && !token){
+      setBadge("ACTIVATED", true);
+      $("codeBox").style.display = "none";
+      $("pageTitle").textContent = "تسجيل الدخول";
+      $("pageSub").innerHTML = "تم تفعيل الجهاز… سجّل دخولك لإكمال الدخول تلقائيًا.";
+    } else {
+      // غير مفعل: الكود لازم
+      setBadge("CODE_REQUIRED", false);
+      $("codeBox").style.display = "block";
     }
-    return data;
+
+    wire();
   }
 
-  // ========= 4) أزرار =========
-  const email = document.getElementById("email");
-  const password = document.getElementById("password");
-  const code = document.getElementById("code");
+  // =========================
+  // Wiring
+  // =========================
+  function wire(){
+    // ------- Code activation -------
+    const codeInput = $("codeInput");
+    const activateBtn = $("activateBtn");
+    const codeErr = $("codeErr");
+    const codeOk = $("codeOk");
 
-  document.getElementById("btnLogin").onclick = async () => {
-    clearMsg();
-    const e = email.value.trim();
-    const p = password.value.trim();
-    if(!e || !p) return showMsg("بيانات الدخول غير مكتملة.", "err");
-    setLoading(true);
-    try{
-      const out = await api("/api/login", { email:e, password:p });
-      if(!out.ok) throw new Error(out.error || "فشل الدخول");
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ ok:true, email:e, token: out.token || null, at: Date.now() }));
-      showMsg("تم تسجيل الدخول ✅ يتم تحويلك...", "ok");
-      setTimeout(()=> safeRedirect(RETURN_TO), 350);
-    }catch(err){
-      showMsg(String(err.message || err), "err");
-    }finally{
-      setLoading(false);
+    function refreshActivateState(){
+      const code = normalizeCode(codeInput.value);
+      activateBtn.disabled = (code.length < 8); // مرن
+      hideMsg(codeErr); hideMsg(codeOk);
     }
-  };
+    codeInput.addEventListener("input", refreshActivateState);
+    refreshActivateState();
 
-  document.getElementById("btnRegister").onclick = async () => {
-    clearMsg();
-    const e = email.value.trim();
-    const p = password.value.trim();
-    if(!e || !p) return showMsg("اكتب البريد وكلمة المرور للتسجيل.", "err");
-    setLoading(true);
-    try{
-      const out = await api("/api/register", { email:e, password:p });
-      if(!out.ok) throw new Error(out.error || "فشل التسجيل");
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ ok:true, email:e, token: out.token || null, at: Date.now() }));
-      showMsg("تم إنشاء الحساب ✅ يتم تحويلك...", "ok");
-      setTimeout(()=> safeRedirect(RETURN_TO), 350);
-    }catch(err){
-      showMsg(String(err.message || err), "err");
-    }finally{
-      setLoading(false);
-    }
-  };
+    activateBtn.addEventListener("click", async ()=>{
+      hideMsg(codeErr); hideMsg(codeOk);
+      activateBtn.disabled = true;
 
-  document.getElementById("btnActivate").onclick = async () => {
-    clearMsg();
-    const c = code.value.trim();
-    if(!c) return showMsg("اكتب كود التفعيل.", "err");
-    setLoading(true);
-    try{
-      // تفعيل الكود: يربطه بالحساب/الجهاز حسب نظامك
-      const out = await api("/api/activate", { code:c, returnTo: RETURN_TO });
-      if(!out.ok) throw new Error(out.error || "الكود غير صحيح أو مستخدم");
-      // خزّن الجلسة أو علامة التفعيل (حسب اللي يرجع من API)
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ ok:true, email: out.email || null, token: out.token || null, activated:true, at: Date.now() }));
-      showMsg("تم التفعيل ✅ يتم تحويلك...", "ok");
-      setTimeout(()=> safeRedirect(RETURN_TO), 350);
-    }catch(err){
-      showMsg(String(err.message || err), "err");
-    }finally{
-      setLoading(false);
+      const code = normalizeCode(codeInput.value);
+      if(!code){
+        showMsg(codeErr, "أدخل كود التفعيل أولاً", "danger");
+        activateBtn.disabled = false;
+        return;
+      }
+
+      try{
+        // 1) جرّب API في Cloudflare (لو موجود عندك)
+        const r = await fetch("/api/activate", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ code })
+        });
+
+        if(r.ok){
+          const data = await r.json().catch(()=>({}));
+          if(data && data.ok && data.token){
+            localStorage.setItem(LS.activated, "1");
+            localStorage.setItem(LS.code, code);
+            localStorage.setItem(LS.token, data.token);
+            if(data.email) localStorage.setItem(LS.email, data.email);
+
+            setBadge("ACTIVATED", true);
+            showMsg(codeOk, "تم تفعيل الكود ✅", "ok");
+            // بعد تفعيل الكود نخلي المستخدم يسجّل دخول أو لو رجّعنا token كامل نفتح مباشرة
+            go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(data.token));
+            return;
+          }
+          // لو رجع ok=false
+          showMsg(codeErr, (data && data.message) ? data.message : "تعذر تفعيل الكود", "danger");
+          setBadge("INVALID_CODE", false);
+          activateBtn.disabled = false;
+          return;
+        }
+
+        // 2) إذا API غير موجود… رسالة واضحة بدل تعليق
+        showMsg(codeErr, "واجهة التفعيل /api/activate غير متوفرة حالياً. لازم نربطها بباكند (Cloudflare Workers + D1) عشان يكون التفعيل عالمي وثابت.", "danger");
+        setBadge("BACKEND_REQUIRED", false);
+        activateBtn.disabled = false;
+
+      } catch (e){
+        showMsg(codeErr, "صار خطأ في الاتصال. جرّب مرة ثانية.", "danger");
+        setBadge("NETWORK_ERROR", false);
+        activateBtn.disabled = false;
+      }
+    });
+
+    // ------- Login / Signup / Reset views -------
+    function showView(name){
+      $("viewLogin").style.display  = (name==="login") ? "block" : "none";
+      $("viewSignup").style.display = (name==="signup") ? "block" : "none";
+      $("viewReset").style.display  = (name==="reset") ? "block" : "none";
+
+      hideMsg($("loginErr")); hideMsg($("loginOk"));
+      hideMsg($("suErr")); hideMsg($("suOk"));
+      hideMsg($("rsErr")); hideMsg($("rsOk"));
     }
-  };
-})();
+
+    $("goSignup").onclick = ()=>showView("signup");
+    $("goReset").onclick  = ()=>showView("reset");
+    $("backLogin1").onclick = ()=>showView("login");
+    $("backLogin2").onclick = ()=>showView("login");
+
+    // ------- Enable buttons -------
+    const loginEmail = $("loginEmail"), loginPass = $("loginPass");
+    const loginBtn = $("loginBtn");
+
+    function refreshLogin(){
+      loginBtn.disabled = !(isEmail(loginEmail.value) && (loginPass.value||"").length >= 6);
+      hideMsg($("loginErr")); hideMsg($("loginOk"));
+    }
+    loginEmail.addEventListener("input", refreshLogin);
+    loginPass.addEventListener("input", refreshLogin);
+    refreshLogin();
+
+    const suEmail=$("suEmail"), suPass=$("suPass"), suPass2=$("suPass2");
+    const signupBtn=$("signupBtn");
+    function refreshSignup(){
+      const ok = isEmail(suEmail.value) && suPass.value.length>=6 && suPass2.value.length>=6 && (suPass.value===suPass2.value);
+      signupBtn.disabled = !ok;
+      hideMsg($("suErr")); hideMsg($("suOk"));
+    }
+    suEmail.addEventListener("input", refreshSignup);
+    suPass.addEventListener("input", refreshSignup);
+    suPass2.addEventListener("input", refreshSignup);
+    refreshSignup();
+
+    const rsEmail=$("rsEmail"), resetBtn=$("resetBtn");
+    function refreshReset(){
+      resetBtn.disabled = !isEmail(rsEmail.value);
+      hideMsg($("rsErr")); hideMsg($("rsOk"));
+    }
+    rsEmail.addEventListener("input", refreshReset);
+    refreshReset();
+
+    // ------- Actions (تحتاج باكند) -------
+    $("loginBtn").onclick = async ()=>{
+      hideMsg($("loginErr")); hideMsg($("loginOk"));
+      loginBtn.disabled = true;
+
+      try{
+        const r = await fetch("/api/auth/login", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ email: loginEmail.value.trim(), password: loginPass.value })
+        });
+
+        const data = await r.json().catch(()=>({}));
+        if(r.ok && data && data.ok && data.token){
+          localStorage.setItem(LS.activated, "1");
+          localStorage.setItem(LS.email, loginEmail.value.trim());
+          localStorage.setItem(LS.token, data.token);
+          showMsg($("loginOk"), "تم تسجيل الدخول ✅", "ok");
+          go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(data.token));
+          return;
+        }
+
+        showMsg($("loginErr"), (data && data.message) ? data.message : "بيانات الدخول غير صحيحة", "danger");
+        loginBtn.disabled = false;
+
+      } catch{
+        showMsg($("loginErr"), "واجهنا مشكلة اتصال. تأكد من /api/auth/login في الباكند.", "danger");
+        loginBtn.disabled = false;
+      }
+    };
+
+    $("signupBtn").onclick = async ()=>{
+      hideMsg($("suErr")); hideMsg($("suOk"));
+      signupBtn.disabled = true;
+
+      try{
+        const r = await fetch("/api/auth/signup", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ email: suEmail.value.trim(), password: suPass.value })
+        });
+
+        const data = await r.json().catch(()=>({}));
+        if(r.ok && data && data.ok){
+          showMsg($("suOk"), "تم إنشاء الحساب ✅ الآن سجّل دخولك", "ok");
+          // ننقلك للدخول ونعبّي الإيميل
+          showView("login");
+          $("loginEmail").value = suEmail.value.trim();
+          $("loginPass").value = "";
+          refreshLogin();
+          return;
+        }
+
+        showMsg($("suErr"), (data && data.message) ? data.message : "تعذر إنشاء الحساب", "danger");
+        signupBtn.disabled = false;
+
+      } catch{
+        showMsg($("suErr"), "واجهنا مشكلة اتصال. تأكد من /api/auth/signup في الباكند.", "danger");
+        signupBtn.disabled = false;
+      }
+    };
+
+    $("resetBtn").onclick = async ()=>{
+      hideMsg($("rsErr")); hideMsg($("rsOk"));
+      resetBtn.disabled = true;
+
+      try{
+        const r = await fetch("/api/auth/reset", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ email: rsEmail.value.trim() })
+        });
+
+        const data = await r.json().catch(()=>({}));
+        if(r.ok && data && data.ok){
+          showMsg($("rsOk"), "تم إرسال رابط الاستعادة ✅", "ok");
+          resetBtn.disabled = false;
+          return;
+        }
+
+        showMsg($("rsErr"), (data && data.message) ? data.message : "تعذر إرسال رابط الاستعادة", "danger");
+        resetBtn.disabled = false;
+
+      } catch{
+        showMsg($("rsErr"), "واجهنا مشكلة اتصال. تأكد من /api/auth/reset في الباكند.", "danger");
+        resetBtn.disabled = false;
+      }
+    };
+
+    // Google (يحتاج OAuth في الباكند)
+    function googleStart(){
+      // لو عندك endpoint جاهز بيبدأ OAuth
+      // يرجعنا بعدها لـ /activate.html?r=...&token=...
+      location.href = "/api/auth/google?return=" + encodeURIComponent("/activate.html?r=" + returnTo);
+    }
+    $("googleBtn").onclick = googleStart;
+    $("googleBtn2").onclick = googleStart;
+  }
+
+  boot();
 </script>
 </body>
 </html>
