@@ -1,89 +1,155 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>سباق الحروف</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>جاري فتح اللعبة - صندوق المسابقات</title>
   <style>
-    body{
-      margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-      font-family: Arial, sans-serif; background:#5a1d54; color:#fff; text-align:center;
+    :root{
+      --bg1:#0e2f7a;
+      --bg2:#1f4fa3;
+      --yellow:#f4c400;
+      --text:#111;
+      --muted:#6b7280;
+      --shadow: 0 14px 35px rgba(0,0,0,.22);
+      --radius: 18px;
     }
-    .box{
-      width:min(520px,92vw);
-      background: rgba(0,0,0,.22);
-      border: 1px solid rgba(255,255,255,.18);
-      border-radius: 16px;
-      padding: 18px 14px;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(1100px 500px at 15% 20%, rgba(244,196,0,.18), transparent 60%),
+        radial-gradient(900px 450px at 85% 80%, rgba(255,255,255,.10), transparent 60%),
+        linear-gradient(135deg, var(--bg1), var(--bg2));
+      padding: 18px;
+      color:#fff;
+    }
+    .wrap{ width:min(520px, 100%); position:relative; }
+    .logo{ display:flex; justify-content:center; margin-bottom: 14px; }
+    .logo img{
+      width:86px; height:86px; object-fit:contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
+    }
+    .card{
+      background: rgba(255,255,255,.96);
+      color: var(--text);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px 18px 18px;
+      border: 2px solid rgba(244,196,0,.35);
+      text-align:center;
+    }
+    h1{ margin:0 0 8px; font-size: 22px; }
+    p{
+      margin:0 0 14px;
+      color: var(--muted);
+      line-height:1.7;
+      font-size: 14px;
     }
     .spinner{
-      width:18px;height:18px; border:3px solid rgba(255,255,255,.35);
-      border-top-color:#fff; border-radius:50%;
-      display:inline-block; vertical-align:-4px;
-      animation:spin 1s linear infinite;
-      margin-left:8px;
-    }
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .small{opacity:.85; font-size:13px; margin-top:10px; line-height:1.6}
-    .btn{
-      margin-top:14px;
       display:inline-block;
-      padding:10px 14px;
-      border-radius:12px;
+      width:18px;height:18px;
+      border: 3px solid rgba(17,17,17,.25);
+      border-top-color: rgba(17,17,17,.9);
+      border-radius:50%;
+      vertical-align: -4px;
+      margin-left:8px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin{ to{transform:rotate(360deg)} }
+
+    .btn{
+      width:100%;
+      margin-top: 10px;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border:none;
+      cursor:pointer;
+      background: var(--yellow);
+      color:#111;
+      font-weight: 900;
+      font-size: 16px;
+      display:none;
+    }
+    .btn2{
+      width:100%;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border:2px solid rgba(31,79,163,.25);
+      cursor:pointer;
       background:#fff;
       color:#111;
-      text-decoration:none;
-      font-weight:800;
+      font-weight: 800;
+      font-size: 14px;
+      display:none;
+    }
+
+    .footer{
+      text-align:center;
+      margin-top: 12px;
+      color: rgba(255,255,255,.85);
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <div class="box">
-    <div style="font-weight:900;font-size:18px">
-      جاري فتح اللعبة <span class="spinner"></span>
+  <div class="wrap">
+    <div class="logo">
+      <img src="logo.png" alt="Sandooq" />
     </div>
-    <div id="hint" class="small">لحظة واحدة…</div>
-    <a id="goHome" class="btn" href="index.html" style="display:none">العودة للرئيسية</a>
+
+    <div class="card">
+      <h1 id="title">جاري فتح اللعبة <span class="spinner"></span></h1>
+      <p id="desc">لحظة… نتحقق من التفعيل.</p>
+
+      <button id="openBtn" class="btn">فتح اللعبة</button>
+      <button id="changeBtn" class="btn2">تغيير / إعادة تفعيل الكود</button>
+    </div>
+
+    <div class="footer">© صندوق المسابقات</div>
   </div>
 
-<script>
-  // ✅ مفاتيح التفعيل (مثل activate.html)
-  const LS_ACTIVATED = "sandooq_activated";
+  <script>
+    const LS_ACTIVATED = "sandooq_activated";
+    const LS_CODE      = "sandooq_code";
+    const LS_DEVICE    = "sandooq_device_id";
 
-  // 1) إذا ما تم التفعيل: روح لصفحة التفعيل وارجع هنا بعده
-  if (localStorage.getItem(LS_ACTIVATED) !== "1") {
-    const r = encodeURIComponent("game.html" + location.search + location.hash);
-    location.replace("activate.html?r=" + r);
-  } else {
-    // 2) إذا تم التفعيل: لازم يكون فيه “بيانات دخول” (إما باراميتر بالرابط أو بيانات محفوظة)
-    // ملاحظة: لأننا ما نعرف بالضبط اسم المفاتيح داخل لعبتك، بنستخدم قواعد عامة:
-    // - إذا فيه أي query params: نعتبره دخول صحيح
-    // - أو إذا فيه أي شيء مهم في sessionStorage/localStorage (room/code/name…)
-    const qs = new URLSearchParams(location.search);
-    const hasQuery = Array.from(qs.keys()).length > 0;
+    const $title = document.getElementById("title");
+    const $desc  = document.getElementById("desc");
+    const $open  = document.getElementById("openBtn");
+    const $chg   = document.getElementById("changeBtn");
 
-    const looksLikeHasSession =
-      !!sessionStorage.getItem("room") ||
-      !!sessionStorage.getItem("roomId") ||
-      !!sessionStorage.getItem("code") ||
-      !!sessionStorage.getItem("gameCode") ||
-      !!sessionStorage.getItem("host") ||
-      !!sessionStorage.getItem("playerName") ||
-      !!localStorage.getItem("room") ||
-      !!localStorage.getItem("roomId") ||
-      !!localStorage.getItem("gameCode");
+    const params = new URLSearchParams(location.search);
 
-    if (!hasQuery && !looksLikeHasSession) {
-      // ما فيه بيانات دخول -> رجع للرئيسية بدل ما يعلق على رسالة “بيانات الدخول غير مكتملة”
-      document.getElementById("hint").textContent =
-        "ما لقينا بيانات دخول للجولة. بنرجعك للرئيسية…";
-      document.getElementById("goHome").style.display = "inline-block";
-      setTimeout(() => location.replace("index.html"), 650);
-    } else {
-      // 3) كل شيء تمام -> افتح اللعبة الكبيرة
-      location.replace("game_full.html" + location.search + location.hash);
+    // ✅ reset
+    if (params.get("reset") === "1") {
+      localStorage.removeItem(LS_ACTIVATED);
+      localStorage.removeItem(LS_CODE);
+      localStorage.removeItem(LS_DEVICE);
+      location.replace("activate.html?r=" + encodeURIComponent("game_full.html"));
     }
-  }
-</script>
+
+    // ✅ الوجهة الافتراضية (الملف الكبير)
+    const DEFAULT_TARGET = "game_full.html";
+
+    // الوجهة لو جاية بالرابط: index.html?r=...
+    const target = params.get("r") || DEFAULT_TARGET;
+
+    const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
+
+    if (!activated) {
+      // غير مُفعّل -> فعّل ثم ارجع للوجهة
+      location.replace("activate.html?r=" + encodeURIComponent(target));
+    } else {
+      // مُفعّل -> افتح الوجهة مباشرة (بدون أي Loop)
+      location.replace(target);
+    }
+  </script>
 </body>
 </html>
