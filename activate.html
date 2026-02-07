@@ -122,8 +122,7 @@
 <body>
   <div class="wrap">
     <div class="logo">
-      <!-- ✅ اسم الملف الصحيح عندك logo.png -->
-      <img src="logo.png" alt="Sandooq" />
+      <img src="logo.PNG" alt="Sandooq" />
     </div>
 
     <div class="card">
@@ -143,9 +142,9 @@
   </div>
 
   <script>
-    // ✅ مهم: GitHub Pages ما عنده /api
-    // API الحقيقي عندك على الدومين هذا:
-    const API_URL = "https://prof.sandooq-games.com/api/verify";
+    // ✅ استخدمنا GET عشان نتجنب مشاكل OPTIONS/CORS في بعض المتصفحات
+    const API_BASE = "https://prof.sandooq-games.com";
+    const VERIFY_URL = API_BASE + "/api/verify";
 
     const LS_ACTIVATED = "sandooq_activated";
     const LS_CODE      = "sandooq_code";
@@ -194,7 +193,7 @@
       goBack();
     }
 
-    const deviceId = getOrCreateDeviceId();
+    getOrCreateDeviceId(); // نخليه موجود من بدري
 
     $code.addEventListener("input", () => {
       hideMsg();
@@ -212,11 +211,8 @@
       $btn.innerHTML = `جاري التفعيل <span class="spinner"></span>`;
 
       try{
-        const res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, deviceId })
-        });
+        const url = VERIFY_URL + "?code=" + encodeURIComponent(code);
+        const res = await fetch(url, { method: "GET" });
 
         const data = await res.json().catch(() => null);
 
