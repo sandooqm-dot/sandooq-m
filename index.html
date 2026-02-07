@@ -120,6 +120,9 @@
     const LS_CODE      = "sandooq_code";
     const LS_DEVICE    = "sandooq_device_id";
 
+    // ✅ الصفحة اللي تبغى تفتح بعد التفعيل (صفحة إنشاء اللعبة)
+    const DEFAULT_TARGET = "create.html";
+
     const $title = document.getElementById("title");
     const $desc  = document.getElementById("desc");
     const $open  = document.getElementById("openBtn");
@@ -127,45 +130,27 @@
 
     const params = new URLSearchParams(location.search);
 
-    // خيار مفيد لو تبغى تمسح التفعيل وتجرب من جديد:
-    // index.html?reset=1
+    // reset: يمسح التفعيل للتجربة من جديد
     if (params.get("reset") === "1") {
       localStorage.removeItem(LS_ACTIVATED);
       localStorage.removeItem(LS_CODE);
       localStorage.removeItem(LS_DEVICE);
-      location.replace("activate.html");
+      location.replace("activate.html?r=" + encodeURIComponent(DEFAULT_TARGET));
     }
 
-    // الوجهة المطلوبة (لو جاية من صفحة لعبة): index.html?r=game.html
-    const target = params.get("r");
+    // لو جاية وجهة محددة: ?r=game_full.html أو ?r=game.html .. الخ
+    const target = params.get("r") ? String(params.get("r")) : "";
 
     const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
 
     if (!activated) {
-      // روح لصفحة التفعيل ومرر الوجهة لو موجودة
-      const url = target
-        ? `activate.html?r=${encodeURIComponent(target)}`
-        : "activate.html";
-      location.replace(url);
+      // غير مفعّل -> دايم روح للتفعيل ومرّر الوجهة
+      const wanted = target || DEFAULT_TARGET;
+      location.replace("activate.html?r=" + encodeURIComponent(wanted));
     } else {
-      // مُفعّل ✅
-      if (target) {
-        // فيه وجهة: افتحها
-        location.replace(target);
-      } else {
-        // ما فيه وجهة: لا تفتح أي "game.html" عشان ما يصير Loop
-        $title.innerHTML = "تم التفعيل ✅";
-        $desc.textContent = "جهازك مُفعّل. افتح رابط اللعبة المطلوب أو مرّر الوجهة عبر ?r=اسم_الصفحة";
-        $open.style.display = "none";
-
-        // زر لإعادة التفعيل/تغيير الكود
-        $chg.style.display = "block";
-        $chg.onclick = () => {
-          localStorage.removeItem(LS_ACTIVATED);
-          localStorage.removeItem(LS_CODE);
-          location.href = "activate.html";
-        };
-      }
+      // مفعّل ✅ -> افتح الوجهة (لو ما فيه وجهة افتح create.html تلقائياً)
+      const wanted = target || DEFAULT_TARGET;
+      location.replace(wanted);
     }
   </script>
 </body>
