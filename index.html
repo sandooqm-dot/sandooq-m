@@ -90,6 +90,15 @@
     }
     @keyframes spin{ to{ transform:rotate(360deg); } }
     .hidden{ display:none !important; }
+    .dbg{
+      margin-top:10px;
+      font-size:12px;
+      color:#000;
+      opacity:.55;
+      direction:ltr;
+      text-align:center;
+      display:none;
+    }
   </style>
 </head>
 <body>
@@ -103,6 +112,8 @@
         <button class="btn-secondary" id="retryBtn">إعادة المحاولة</button>
         <button class="btn-primary" id="goActivateBtn">اذهب لصفحة التفعيل</button>
       </div>
+
+      <div class="dbg" id="dbg"></div>
     </div>
     <div class="small">© صندوق المسابقات</div>
   </div>
@@ -111,11 +122,17 @@
     (function(){
       const qs = new URLSearchParams(location.search);
 
+      // هدف اللعبة
       let r = (qs.get("r") || "game_full.html").trim();
       r = r.replace(/^\/+/, "");
       if (r.startsWith("http://") || r.startsWith("https://")) {
         try { r = new URL(r).pathname.replace(/^\/+/, ""); } catch(e){}
       }
+
+      const DBG = qs.get("dbg") === "1";
+      const dbgEl = document.getElementById("dbg");
+      if (DBG) dbgEl.style.display = "block";
+      const dbg = (t)=>{ if(DBG){ dbgEl.textContent = t; } };
 
       const stateText = document.getElementById("stateText");
       const stateSub  = document.getElementById("stateSub");
@@ -126,19 +143,19 @@
 
       function showActions(msg, sub){
         stateText.textContent = msg || "تعذر فتح اللعبة";
-        stateSub.textContent  = sub || "ما فيه تفعيل محفوظ أو الاتصال بطيء.";
+        stateSub.textContent  = sub || "جرّب إعادة المحاولة.";
         spinner.classList.add("hidden");
         actions.classList.remove("hidden");
       }
 
-      function gotoActivate(){
+      function gotoActivate(reason){
+        dbg("gotoActivate: " + (reason || "unknown"));
         const url = "activate.html?r=" + encodeURIComponent(r);
         location.replace(url);
       }
 
-      async function checkActivation(){
-        // ✅ هذا المسار موجود عندك: functions/api/verify.js => /api/verify
-        const endpoint = "/api/verify";
+      async function checkActivationOnce(){
+        const endpoint = "/api/verify"; // الموجود عندك
 
         try{
           const controller = new AbortController();
@@ -153,51 +170,58 @@
 
           clearTimeout(t);
 
-          if (res.ok) return true;                 // 200 = مفعل
-          if (res.status === 401 || res.status === 403) return false; // غير مفعل
-          return null;                              // أي شيء ثاني
+          dbg(`verify status=${res.status}`);
+
+          // ✅ مفعل
+          if (res.ok) return { ok:true, status: res.status };
+
+          // ✅ غير مفعل
+          if (res.status === 401 || res.status === 403) return { ok:false, status: res.status };
+
+          // 404/405/500/… نعتبرها فشل تحقق (نوديه للتفعيل بدل ما نوقفه)
+          return { ok:null, status: res.status };
         }catch(e){
-          return null;
+          dbg("verify error=" + (e && e.name ? e.name : "fetch_error"));
+          return { ok:null, status: 0 };
         }
       }
 
-      async function openGame(){
+      async function openGate(){
         actions.classList.add("hidden");
         spinner.classList.remove("hidden");
         stateText.textContent = "جاري فتح اللعبة";
         stateSub.textContent  = "لحظة.. نتحقق من التفعيل.";
 
-        const s1 = await checkActivation();
-
-        if (s1 === true){
+        // محاولة واحدة + احتياطية (بدون reload)
+        const a1 = await checkActivationOnce();
+        if (a1.ok === true){
           location.replace(r);
           return;
         }
-        if (s1 === false){
-          gotoActivate();
+        if (a1.ok === false){
+          gotoActivate("not_activated");
           return;
         }
 
-        // محاولة احتياطية واحدة فقط
-        await new Promise(res => setTimeout(res, 700));
-        const s2 = await checkActivation();
-
-        if (s2 === true){
+        await new Promise(res => setTimeout(res, 600));
+        const a2 = await checkActivationOnce();
+        if (a2.ok === true){
           location.replace(r);
           return;
         }
-        if (s2 === false){
-          gotoActivate();
+        if (a2.ok === false){
+          gotoActivate("not_activated_2");
           return;
         }
 
-        showActions("تعذر فتح اللعبة", "التأكد من التفعيل تعطل (شبكة/منع كوكيز). جرّب إعادة المحاولة أو افتح صفحة التفعيل.");
+        // ✅ أهم تغيير: إذا التحقق تعطل، ما نوقف العميل.. نوديه للتفعيل
+        gotoActivate("verify_failed_or_missing");
       }
 
-      retryBtn.addEventListener("click", openGame);
-      goActBtn.addEventListener("click", gotoActivate);
+      retryBtn.addEventListener("click", openGate);
+      goActBtn.addEventListener("click", ()=>gotoActivate("manual"));
 
-      openGame();
+      openGate();
     })();
   </script>
 </body>
