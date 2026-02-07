@@ -9,11 +9,9 @@
       --bg1:#123c8a;
       --bg2:#1f4fa3;
       --card:#ffffff;
-      --border:#e6e6e6;
       --text:#111;
       --muted:#666;
       --yellow:#f4c400;
-      --btn:#1f4fa3;
     }
     body{
       margin:0;
@@ -111,14 +109,10 @@
 
   <script>
     (function(){
-      // ✅ نمنع حلقات الريفريش: ما فيه reload تلقائي نهائيًا
       const qs = new URLSearchParams(location.search);
 
-      // صفحة الهدف (game_full.html مثلاً)
       let r = (qs.get("r") || "game_full.html").trim();
-      // تنظيف بسيط
-      r = r.replace(/^\/+/, ""); // بدون /
-      // لو أحد مرر رابط كامل بالغلط
+      r = r.replace(/^\/+/, "");
       if (r.startsWith("http://") || r.startsWith("https://")) {
         try { r = new URL(r).pathname.replace(/^\/+/, ""); } catch(e){}
       }
@@ -132,45 +126,39 @@
 
       function showActions(msg, sub){
         stateText.textContent = msg || "تعذر فتح اللعبة";
-        stateSub.textContent  = sub || "ما فيه تفعيل محفوظ على هذا المتصفح، أو الاتصال بطيء.";
+        stateSub.textContent  = sub || "ما فيه تفعيل محفوظ أو الاتصال بطيء.";
         spinner.classList.add("hidden");
         actions.classList.remove("hidden");
       }
 
       function gotoActivate(){
-        // نرسل المستخدم لصفحة التفعيل مع حفظ الهدف
         const url = "activate.html?r=" + encodeURIComponent(r);
         location.replace(url);
       }
 
-      async function pingSession(){
-        // نحاول أكثر من Endpoint (حسب الموجود عندك)
-        const endpoints = ["/api/me", "/api/session", "/api/auth/me"];
-        for (const ep of endpoints){
-          try{
-            const controller = new AbortController();
-            const t = setTimeout(()=>controller.abort(), 5000); // 5 ثواني فقط
-            const res = await fetch(ep, {
-              method: "GET",
-              credentials: "include",
-              cache: "no-store",
-              signal: controller.signal
-            });
-            clearTimeout(t);
+      async function checkActivation(){
+        // ✅ هذا المسار موجود عندك: functions/api/verify.js => /api/verify
+        const endpoint = "/api/verify";
 
-            // 200 = عنده جلسة/تفعيل
-            if (res.ok) return { ok:true, endpoint: ep };
+        try{
+          const controller = new AbortController();
+          const t = setTimeout(()=>controller.abort(), 6000);
 
-            // 401/403 = ما عنده جلسة
-            if (res.status === 401 || res.status === 403) return { ok:false, endpoint: ep };
+          const res = await fetch(endpoint, {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            signal: controller.signal
+          });
 
-            // لو 404 أو غيره نجرب اللي بعده
-          }catch(e){
-            // نجرب اللي بعده
-          }
+          clearTimeout(t);
+
+          if (res.ok) return true;                 // 200 = مفعل
+          if (res.status === 401 || res.status === 403) return false; // غير مفعل
+          return null;                              // أي شيء ثاني
+        }catch(e){
+          return null;
         }
-        // إذا فشل كل شيء نعتبرها مشكلة شبكة/endpoint
-        return { ok:null };
       }
 
       async function openGame(){
@@ -179,37 +167,36 @@
         stateText.textContent = "جاري فتح اللعبة";
         stateSub.textContent  = "لحظة.. نتحقق من التفعيل.";
 
-        // محاولة رقم 1
-        const r1 = await pingSession();
-        if (r1.ok === true){
+        const s1 = await checkActivation();
+
+        if (s1 === true){
           location.replace(r);
           return;
         }
-        if (r1.ok === false){
+        if (s1 === false){
           gotoActivate();
           return;
         }
 
-        // محاولة احتياطية واحدة بعد 800ms (بدون أي reload)
-        await new Promise(res => setTimeout(res, 800));
-        const r2 = await pingSession();
-        if (r2.ok === true){
+        // محاولة احتياطية واحدة فقط
+        await new Promise(res => setTimeout(res, 700));
+        const s2 = await checkActivation();
+
+        if (s2 === true){
           location.replace(r);
           return;
         }
-        if (r2.ok === false){
+        if (s2 === false){
           gotoActivate();
           return;
         }
 
-        // لا جلسة ولا رد واضح = شبكة/حظر/بطء
-        showActions("تعذر فتح اللعبة", "يبدو أن الاتصال أو التحقق تعطل. جرّب إعادة المحاولة، أو افتح صفحة التفعيل.");
+        showActions("تعذر فتح اللعبة", "التأكد من التفعيل تعطل (شبكة/منع كوكيز). جرّب إعادة المحاولة أو افتح صفحة التفعيل.");
       }
 
       retryBtn.addEventListener("click", openGame);
       goActBtn.addEventListener("click", gotoActivate);
 
-      // تشغيل تلقائي
       openGame();
     })();
   </script>
