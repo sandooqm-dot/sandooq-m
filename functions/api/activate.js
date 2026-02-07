@@ -28,17 +28,27 @@ export async function onRequest(context) {
     }
 
     const body = await request.json().catch(() => ({}));
-    let code = (body.code || "").toString();
+    let codeRaw = (body.code || "").toString();
     const deviceId = (body.deviceId || "").toString().trim();
 
-    // Normalize code
-    code = code
+    // Normalize code (قوي)
+    // - حذف المسافات
+    // - توحيد الشرطات
+    // - uppercase
+    const normalized = codeRaw
       .trim()
       .toUpperCase()
       .replace(/[–—−]/g, "-")
       .replace(/\s+/g, "");
 
-    if (!code) {
+    // نسخة بدون أي شرطات (للمطابقة لو DB مخزّن كذا)
+    const compact = normalized.replace(/-/g, "");
+
+    // أحيانًا البعض ينسخ الكود ومعه رموز غريبة.. نخليه أحرف/أرقام/شرطة فقط
+    const safeNormalized = normalized.replace(/[^A-Z0-9-]/g, "");
+    const safeCompact = safeNormalized.replace(/-/g, "");
+
+    if (!safeNormalized) {
       return new Response(JSON.stringify({ ok: false, error: "MISSING_CODE" }), {
         status: 200,
         headers: corsHeaders,
@@ -52,22 +62,45 @@ export async function onRequest(context) {
       });
     }
 
-    // ملاحظة: نستخدم used_by_email لتخزين deviceId (نفس العمود الموجود عندك)
+    // نبحث بأكثر من طريقة:
+    // 1) code = ?
+    // 2) REPLACE(code,'-','') = ?  (يطابق لو القاعدة مخزنة بدون شرطات)
+    // 3) نفس الشيء مع safeNormalized/safeCompact (تنظيف أقوى)
     const row = await env.DB.prepare(
-      "SELECT code, is_used, used_by_email FROM codes WHERE code = ? LIMIT 1"
+      `
+      SELECT code, is_used, used_by_email
+      FROM codes
+      WHERE code = ?
+         OR REPLACE(code, '-', '') = ?
+         OR code = ?
+         OR REPLACE(code, '-', '') = ?
+      LIMIT 1
+      `
     )
-      .bind(code)
+      .bind(safeNormalized, safeCompact, normalized, compact)
       .first();
 
     if (!row) {
-      return new Response(JSON.stringify({ ok: false, valid: false, error: "CODE_NOT_FOUND" }), {
-        status: 200,
-        headers: corsHeaders,
-      });
+      // Debug سريع: هل جدول codes فاضي أو فيه بيانات؟
+      let total = null;
+      try {
+        const c = await env.DB.prepare("SELECT COUNT(1) as n FROM codes").first();
+        total = c?.n ?? null;
+      } catch (e) {}
+
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          valid: false,
+          error: "INVALID_CODE",
+          debug: { totalCodesInDB: total, tried: [safeNormalized, safeCompact, normalized, compact] },
+        }),
+        { status: 200, headers: corsHeaders }
+      );
     }
 
     const isUsed = Number(row.is_used) === 1;
-    const usedBy = (row.used_by_email || "").toString();
+    const usedBy = (row.used_by_email || "").toString(); // عندك نفس العمود
 
     // إذا مستخدم على جهاز ثاني
     if (isUsed && usedBy && usedBy !== deviceId) {
@@ -77,22 +110,22 @@ export async function onRequest(context) {
       );
     }
 
-    // إذا مستخدم على نفس الجهاز (تحديث صفحة/دخول مرة ثانية) => نسمح
+    // إذا مستخدم على نفس الجهاز (نسمح)
     if (isUsed && usedBy === deviceId) {
-      return new Response(JSON.stringify({ ok: true, valid: true, code }), {
+      return new Response(JSON.stringify({ ok: true, valid: true, code: row.code }), {
         status: 200,
         headers: corsHeaders,
       });
     }
 
-    // أول تفعيل: نربط الكود بالجهاز
+    // أول تفعيل: نربط الكود بالجهاز (نحدّث على "code" الحقيقي الموجود بالقاعدة)
     await env.DB.prepare(
       "UPDATE codes SET is_used = 1, used_by_email = ?, used_at = datetime('now') WHERE code = ?"
     )
-      .bind(deviceId, code)
+      .bind(deviceId, row.code)
       .run();
 
-    return new Response(JSON.stringify({ ok: true, valid: true, code }), {
+    return new Response(JSON.stringify({ ok: true, valid: true, code: row.code }), {
       status: 200,
       headers: corsHeaders,
     });
