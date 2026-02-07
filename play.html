@@ -20,13 +20,7 @@
       font-family:Arial, sans-serif;
       display:flex; align-items:center; justify-content:center;
       padding:16px;
-
-      /* ✅ نخفي الصفحة بالبداية عشان ما تطلع إلا إذا فيه مشكلة */
-      opacity:0;
-      transition:opacity .15s ease;
     }
-    body.show{ opacity:1; }
-
     .box{
       width:min(520px, 92vw);
       background:var(--card);
@@ -36,24 +30,9 @@
       text-align:center;
       box-shadow:0 12px 30px rgba(0,0,0,.18);
     }
-    .logo{
-      width:54px;height:54px;object-fit:contain;
-      display:block;margin:0 auto 10px;
-    }
+    .logo{ width:54px;height:54px;object-fit:contain; display:block;margin:0 auto 10px; }
     h2{ margin:6px 0 6px; font-size:20px; color:#111; }
     p{ margin:0; font-size:14px; color:#444; }
-    .row{
-      display:flex; gap:10px; justify-content:center;
-      margin-top:14px; flex-wrap:wrap;
-    }
-    .btn{
-      border:0; cursor:pointer;
-      padding:12px 14px;
-      border-radius:12px;
-      font-size:15px;
-    }
-    .btnPrimary{ background:var(--yellow); color:#000; font-weight:700; }
-    .btnGhost{ background:#eef2ff; color:#1f4fa3; font-weight:700; }
     .spinner{
       width:18px;height:18px;border-radius:50%;
       border:3px solid #ddd;border-top-color:#1f4fa3;
@@ -62,6 +41,16 @@
       animation:spin .8s linear infinite;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
+    .row{ display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+    .btn{
+      border:0; cursor:pointer;
+      padding:12px 14px;
+      border-radius:12px;
+      font-size:15px;
+      font-weight:700;
+    }
+    .btnPrimary{ background:var(--yellow); color:#000; }
+    .btnGhost{ background:#eef2ff; color:#1f4fa3; }
     .small{ margin-top:10px; font-size:12px; color:#777; }
   </style>
 </head>
@@ -69,11 +58,11 @@
   <div class="box">
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
     <h2>جاري فتح اللعبة <span class="spinner" aria-hidden="true"></span></h2>
-    <p id="msg">لحظة.. نتحقق من التفعيل</p>
+    <p id="msg">لحظة..</p>
 
-    <div class="row" style="display:none" id="actions">
+    <div class="row" id="actions" style="display:none">
       <button class="btn btnPrimary" id="goActivate">اذهب لصفحة التفعيل</button>
-      <button class="btn btnGhost" id="retry">إعادة المحاولة</button>
+      <button class="btn btnGhost" id="openGame">فتح اللعبة</button>
     </div>
 
     <div class="small">© صندوق المسابقات</div>
@@ -83,6 +72,7 @@
     const ACTIVATE_URL = "/activate.html";
     const GAME_URL = "/game_full.html";
 
+    // نجيب أي توكن محفوظ (حسب المفاتيح المحتملة)
     function getAnyToken(){
       const keys = [
         "JWT","jwt","token","access_token","AUTH_TOKEN",
@@ -95,65 +85,35 @@
       return "";
     }
 
-    let revealTimer = null;
-    function revealIfNeeded(){
-      // ✅ ما نكشف الصفحة إلا إذا فعلاً احتجناها (بعد 0.4 ثانية)
-      if(revealTimer) return;
-      revealTimer = setTimeout(()=> document.body.classList.add("show"), 400);
-    }
+    // ✅ منع اللوب: لو حاولنا نفتح اللعبة قبل أقل من 3 ثواني و رجعنا هنا، نوقف ونعرض أزرار
+    const lastTry = Number(sessionStorage.getItem("LAST_GAME_TRY") || "0");
+    const now = Date.now();
+
+    const token = getAnyToken();
 
     function showActions(text){
-      revealIfNeeded();
       document.getElementById("msg").textContent = text;
       document.getElementById("actions").style.display = "flex";
     }
 
-    async function check(){
-      document.getElementById("actions").style.display = "none";
-      document.getElementById("msg").textContent = "لحظة.. نتحقق من التفعيل";
+    document.getElementById("goActivate").onclick = ()=> location.href = ACTIVATE_URL;
+    document.getElementById("openGame").onclick = ()=> {
+      sessionStorage.setItem("LAST_GAME_TRY", String(Date.now()));
+      location.href = GAME_URL;
+    };
 
-      const token = getAnyToken();
-      if(!token){
-        showActions("ما فيه تفعيل محفوظ على هذا المتصفح. لازم تدخل صفحة التفعيل.");
-        return;
-      }
-
-      const controller = new AbortController();
-      const t = setTimeout(()=>controller.abort(), 6000);
-
-      try{
-        const res = await fetch("/api/me", {
-          method:"GET",
-          headers:{ "Authorization": `Bearer ${token}` },
-          cache:"no-store",
-          signal: controller.signal
-        });
-        clearTimeout(t);
-
-        if(!res.ok){
-          showActions("التفعيل غير صالح أو انتهت الجلسة. افتح صفحة التفعيل.");
-          return;
-        }
-
-        const data = await res.json().catch(()=> ({}));
-        if(!data || data.ok !== true){
-          showActions("تعذر التحقق من التفعيل. افتح صفحة التفعيل.");
-          return;
-        }
-
-        // ✅ تمام: افتح اللعبة فوراً بدون ما تظهر صفحة التحميل
-        location.replace(GAME_URL + "?v=" + Date.now());
-      }catch(e){
-        clearTimeout(t);
-        showActions("فيه مشكلة اتصال/تحقق. جرّب إعادة المحاولة أو افتح صفحة التفعيل.");
+    if(!token){
+      // ما فيه تفعيل
+      location.replace(ACTIVATE_URL);
+    }else{
+      // فيه تفعيل
+      if(now - lastTry < 3000){
+        showActions("واضح فيه تحويل رايح-جاي. اضغط (فتح اللعبة) وإذا رجعك هنا فالتشييك داخل game_full.html يحتاج ضبط.");
+      }else{
+        sessionStorage.setItem("LAST_GAME_TRY", String(Date.now()));
+        location.replace(GAME_URL);
       }
     }
-
-    document.getElementById("goActivate").onclick = ()=> location.href = ACTIVATE_URL;
-    document.getElementById("retry").onclick = ()=> check();
-
-    // ✅ ابدأ تحقق فوراً
-    check();
   </script>
 </body>
 </html>
