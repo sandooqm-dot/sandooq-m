@@ -33,7 +33,6 @@
       overflow:hidden;
     }
 
-    /* خلفية سداسية خفيفة */
     body::before{
       content:"";
       position:fixed; inset:0;
@@ -211,7 +210,6 @@
     .msg.danger{ border-color: rgba(255,77,77,.6); color: #ffd7d7; }
     .msg.ok{ border-color: rgba(47,227,140,.55); color: #d9ffe9; }
 
-    /* قسم الكود فوق */
     .codeBox{
       background: rgba(0,0,0,.12);
       border:1px dashed rgba(255,255,255,.28);
@@ -243,6 +241,14 @@
     .badge.bad{ border-color: rgba(255,77,77,.6); color:#ffd0d0; }
     .badge.good{ border-color: rgba(47,227,140,.55); color:#d9ffe9; }
 
+    .note{
+      margin-top:8px;
+      font-size:12px;
+      color:rgba(255,255,255,.78);
+      text-align:center;
+      line-height:1.6;
+    }
+
     .footer{
       text-align:center;
       padding:10px 0 14px;
@@ -270,7 +276,7 @@
         <div class="title" id="pageTitle">تفعيل اللعبة</div>
         <div class="sub" id="pageSub">
           أول مرة فقط: أدخل كود الشراء لتفعيل اللعبة على هذا الجهاز.<br>
-          بعد التفعيل… الدخول يصير تلقائيًا.
+          بعد التفعيل… تفتح اللعبة مباشرة.
         </div>
 
         <div class="panel">
@@ -285,7 +291,7 @@
             <div class="row">
               <div class="input">
                 <span>🔑</span>
-                <input id="codeInput" inputmode="text" autocomplete="off" placeholder="SNDOQ-XXXX-XXXX-XXXX" />
+                <input id="codeInput" inputmode="text" autocomplete="off" placeholder="SNDQ-XXXX-XXXX-XXXX" />
               </div>
             </div>
 
@@ -293,9 +299,11 @@
 
             <div class="msg danger" id="codeErr"></div>
             <div class="msg ok" id="codeOk"></div>
+
+            <div class="note" id="deviceNote"></div>
           </div>
 
-          <!-- ✅ شاشة الدخول -->
+          <!-- ✅ شاشة الدخول (مقفلة إلى أن نكمل APIs) -->
           <div id="viewLogin">
             <div class="row">
               <div class="input">
@@ -396,31 +404,24 @@
   // مفاتيح التخزين (ثابتة)
   // =========================
   const LS = {
-    activated: "sndq_activated_v1",
-    code: "sndq_code_v1",
-    email: "sndq_email_v1",
-    token: "sndq_token_v1"
+    activated: "sndq_activated_v2",
+    code: "sndq_code_v2",
+    device: "sndq_device_id_v2"
   };
 
-  // ✅ الصفحة المطلوبة بعد الدخول/التفعيل
   const params = new URLSearchParams(location.search);
-  const returnTo = sanitizeReturn(params.get("r") || "play.html");
+  const returnTo = sanitizeReturn(params.get("r") || "game_full.html");
 
   function sanitizeReturn(v){
     try{
       v = (v || "").trim();
-      if(!v) return "play.html";
-      // منع روابط خارجية
-      if(v.startsWith("http://") || v.startsWith("https://")) return "play.html";
-      // منع مسارات غريبة
-      v = v.replace(/^\//, "");
+      if(!v) return "game_full.html";
+      if(v.startsWith("http://") || v.startsWith("https://")) return "game_full.html";
+      v = v.replace(/^\/+/, "");
       return v;
-    }catch{ return "play.html"; }
+    }catch{ return "game_full.html"; }
   }
 
-  // =========================
-  // Helpers UI
-  // =========================
   const $ = (id)=>document.getElementById(id);
 
   function showMsg(el, text, type){
@@ -444,56 +445,62 @@
     b.classList.toggle("bad", !good);
   }
 
-  function isEmail(v){
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||"").trim());
-  }
-
   function normalizeCode(v){
-    v = (v||"").trim().toUpperCase();
-    v = v.replace(/\s+/g,"");
+    v = (v||"").toString().trim().toUpperCase();
+    v = v.replace(/[–—−]/g, "-").replace(/\s+/g,"");
     return v;
   }
 
   function go(target){
-    // منع loop: نستخدم replace بدل assign
     location.replace(target);
   }
 
-  // =========================
-  // منع “حلقة” فتح الصفحة
-  // =========================
-  function boot(){
-    // إذا متفعل وعندنا token… نطلع فورًا
-    const activated = localStorage.getItem(LS.activated) === "1";
-    const token = localStorage.getItem(LS.token) || "";
-    const email = localStorage.getItem(LS.email) || "";
+  function ensureDeviceId(){
+    let id = localStorage.getItem(LS.device);
+    if(id && id.length > 10) return id;
 
-    if(activated && token && email){
-      // دخول مباشر
-      go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(token));
+    try{
+      id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("dev-" + Math.random().toString(16).slice(2) + Date.now());
+    }catch{
+      id = "dev-" + Math.random().toString(16).slice(2) + Date.now();
+    }
+    localStorage.setItem(LS.device, id);
+    return id;
+  }
+
+  function explainVerifyError(err){
+    switch(err){
+      case "MISSING_CODE": return "أدخل كود التفعيل.";
+      case "MISSING_DEVICE": return "المتصفح لم ينشئ معرف الجهاز. حدّث الصفحة وجرب.";
+      case "CODE_NOT_FOUND": return "الكود غير موجود. تأكد من نسخه بدون مسافات.";
+      case "CODE_ALREADY_USED_ON_ANOTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
+      default: return err ? ("فشل التفعيل: " + err) : "تعذر تفعيل الكود.";
+    }
+  }
+
+  function boot(){
+    const deviceId = ensureDeviceId();
+    $("deviceNote").textContent = "معرّف الجهاز: " + deviceId.slice(0,8) + "… (ثابت لهذا المتصفح)";
+
+    // لو متفعل خلاص افتح اللعبة
+    const activated = localStorage.getItem(LS.activated) === "1";
+    const savedCode = localStorage.getItem(LS.code) || "";
+    if(activated && savedCode){
+      setBadge("ACTIVATED", true);
+      $("codeBox").style.display = "none";
+      $("pageTitle").textContent = "تم التفعيل";
+      $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>جاري فتح اللعبة…";
+      setTimeout(()=> go(returnTo), 450);
       return;
     }
 
-    // لو متفعل بدون token (حالة قديمة) نخليه يطلب دخول
-    if(activated && !token){
-      setBadge("ACTIVATED", true);
-      $("codeBox").style.display = "none";
-      $("pageTitle").textContent = "تسجيل الدخول";
-      $("pageSub").innerHTML = "تم تفعيل الجهاز… سجّل دخولك لإكمال الدخول تلقائيًا.";
-    } else {
-      // غير مفعل: الكود لازم
-      setBadge("CODE_REQUIRED", false);
-      $("codeBox").style.display = "block";
-    }
-
+    // غير مفعل
+    setBadge("CODE_REQUIRED", false);
+    $("codeBox").style.display = "block";
     wire();
   }
 
-  // =========================
-  // Wiring
-  // =========================
   function wire(){
-    // ------- Code activation -------
     const codeInput = $("codeInput");
     const activateBtn = $("activateBtn");
     const codeErr = $("codeErr");
@@ -501,65 +508,65 @@
 
     function refreshActivateState(){
       const code = normalizeCode(codeInput.value);
-      activateBtn.disabled = (code.length < 8); // مرن
+      activateBtn.disabled = (code.length < 8);
       hideMsg(codeErr); hideMsg(codeOk);
+      if(code.length >= 8) setBadge("READY", false);
+      else setBadge("CODE_REQUIRED", false);
     }
+
     codeInput.addEventListener("input", refreshActivateState);
     refreshActivateState();
 
     activateBtn.addEventListener("click", async ()=>{
       hideMsg(codeErr); hideMsg(codeOk);
-      activateBtn.disabled = true;
 
       const code = normalizeCode(codeInput.value);
       if(!code){
         showMsg(codeErr, "أدخل كود التفعيل أولاً", "danger");
-        activateBtn.disabled = false;
         return;
       }
 
+      activateBtn.disabled = true;
+      setBadge("CHECKING…", false);
+
+      const deviceId = ensureDeviceId();
+
       try{
-        // 1) جرّب API في Cloudflare (لو موجود عندك)
-        const r = await fetch("/api/activate", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ code })
+        // ✅ هذا هو الـ Endpoint الصحيح حسب verify.js
+        const res = await fetch("/api/verify", {
+          method: "POST",
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify({ code, deviceId }),
+          cache: "no-store",
+          credentials: "include"
         });
 
-        if(r.ok){
-          const data = await r.json().catch(()=>({}));
-          if(data && data.ok && data.token){
-            localStorage.setItem(LS.activated, "1");
-            localStorage.setItem(LS.code, code);
-            localStorage.setItem(LS.token, data.token);
-            if(data.email) localStorage.setItem(LS.email, data.email);
+        const data = await res.json().catch(()=> ({}));
 
-            setBadge("ACTIVATED", true);
-            showMsg(codeOk, "تم تفعيل الكود ✅", "ok");
-            // بعد تفعيل الكود نخلي المستخدم يسجّل دخول أو لو رجّعنا token كامل نفتح مباشرة
-            go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(data.token));
-            return;
-          }
-          // لو رجع ok=false
-          showMsg(codeErr, (data && data.message) ? data.message : "تعذر تفعيل الكود", "danger");
-          setBadge("INVALID_CODE", false);
-          activateBtn.disabled = false;
+        if(res.ok && data && data.ok && data.valid){
+          localStorage.setItem(LS.activated, "1");
+          localStorage.setItem(LS.code, code);
+
+          setBadge("ACTIVATED", true);
+          showMsg(codeOk, "تم تفعيل الكود ✅ جاري فتح اللعبة…", "ok");
+
+          setTimeout(()=> go(returnTo), 450);
           return;
         }
 
-        // 2) إذا API غير موجود… رسالة واضحة بدل تعليق
-        showMsg(codeErr, "واجهة التفعيل /api/activate غير متوفرة حالياً. لازم نربطها بباكند (Cloudflare Workers + D1) عشان يكون التفعيل عالمي وثابت.", "danger");
-        setBadge("BACKEND_REQUIRED", false);
+        const err = (data && (data.error || data.message)) || ("HTTP_" + res.status);
+        setBadge("INVALID_CODE", false);
+        showMsg(codeErr, explainVerifyError(err), "danger");
         activateBtn.disabled = false;
 
-      } catch (e){
-        showMsg(codeErr, "صار خطأ في الاتصال. جرّب مرة ثانية.", "danger");
+      }catch(e){
         setBadge("NETWORK_ERROR", false);
+        showMsg(codeErr, "مشكلة اتصال… جرّب مرة ثانية.", "danger");
         activateBtn.disabled = false;
       }
     });
 
-    // ------- Login / Signup / Reset views -------
+    // ===== باقي الشاشات (حالياً مجرد واجهة - سنربطها لاحقاً بـ APIs)
     function showView(name){
       $("viewLogin").style.display  = (name==="login") ? "block" : "none";
       $("viewSignup").style.display = (name==="signup") ? "block" : "none";
@@ -575,24 +582,32 @@
     $("backLogin1").onclick = ()=>showView("login");
     $("backLogin2").onclick = ()=>showView("login");
 
-    // ------- Enable buttons -------
-    const loginEmail = $("loginEmail"), loginPass = $("loginPass");
-    const loginBtn = $("loginBtn");
+    // Google الآن: نعطي رسالة واضحة بدل تعليق/رفرش
+    function googleStart(){
+      showMsg($("loginErr"), "تسجيل Google سنربطه بعد إنهاء التفعيل. حالياً هذا الزر واجهة فقط.", "danger");
+    }
+    $("googleBtn").onclick = googleStart;
+    $("googleBtn2").onclick = googleStart;
 
+    $("loginBtn").onclick = ()=> showMsg($("loginErr"), "تسجيل الدخول بالإيميل سنربطه بعد إنهاء التفعيل. حالياً واجهة.", "danger");
+    $("signupBtn").onclick = ()=> showMsg($("suErr"), "التسجيل سنربطه بعد إنهاء التفعيل. حالياً واجهة.", "danger");
+    $("resetBtn").onclick = ()=> showMsg($("rsErr"), "الاستعادة سنربطها لاحقاً. حالياً واجهة.", "danger");
+
+    // تفعيل/تعطيل الأزرار شكلياً فقط
+    const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||"").trim());
+
+    const loginEmail = $("loginEmail"), loginPass = $("loginPass"), loginBtn = $("loginBtn");
     function refreshLogin(){
       loginBtn.disabled = !(isEmail(loginEmail.value) && (loginPass.value||"").length >= 6);
-      hideMsg($("loginErr")); hideMsg($("loginOk"));
     }
     loginEmail.addEventListener("input", refreshLogin);
     loginPass.addEventListener("input", refreshLogin);
     refreshLogin();
 
-    const suEmail=$("suEmail"), suPass=$("suPass"), suPass2=$("suPass2");
-    const signupBtn=$("signupBtn");
+    const suEmail=$("suEmail"), suPass=$("suPass"), suPass2=$("suPass2"), signupBtn=$("signupBtn");
     function refreshSignup(){
       const ok = isEmail(suEmail.value) && suPass.value.length>=6 && suPass2.value.length>=6 && (suPass.value===suPass2.value);
       signupBtn.disabled = !ok;
-      hideMsg($("suErr")); hideMsg($("suOk"));
     }
     suEmail.addEventListener("input", refreshSignup);
     suPass.addEventListener("input", refreshSignup);
@@ -602,108 +617,9 @@
     const rsEmail=$("rsEmail"), resetBtn=$("resetBtn");
     function refreshReset(){
       resetBtn.disabled = !isEmail(rsEmail.value);
-      hideMsg($("rsErr")); hideMsg($("rsOk"));
     }
     rsEmail.addEventListener("input", refreshReset);
     refreshReset();
-
-    // ------- Actions (تحتاج باكند) -------
-    $("loginBtn").onclick = async ()=>{
-      hideMsg($("loginErr")); hideMsg($("loginOk"));
-      loginBtn.disabled = true;
-
-      try{
-        const r = await fetch("/api/auth/login", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ email: loginEmail.value.trim(), password: loginPass.value })
-        });
-
-        const data = await r.json().catch(()=>({}));
-        if(r.ok && data && data.ok && data.token){
-          localStorage.setItem(LS.activated, "1");
-          localStorage.setItem(LS.email, loginEmail.value.trim());
-          localStorage.setItem(LS.token, data.token);
-          showMsg($("loginOk"), "تم تسجيل الدخول ✅", "ok");
-          go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(data.token));
-          return;
-        }
-
-        showMsg($("loginErr"), (data && data.message) ? data.message : "بيانات الدخول غير صحيحة", "danger");
-        loginBtn.disabled = false;
-
-      } catch{
-        showMsg($("loginErr"), "واجهنا مشكلة اتصال. تأكد من /api/auth/login في الباكند.", "danger");
-        loginBtn.disabled = false;
-      }
-    };
-
-    $("signupBtn").onclick = async ()=>{
-      hideMsg($("suErr")); hideMsg($("suOk"));
-      signupBtn.disabled = true;
-
-      try{
-        const r = await fetch("/api/auth/signup", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ email: suEmail.value.trim(), password: suPass.value })
-        });
-
-        const data = await r.json().catch(()=>({}));
-        if(r.ok && data && data.ok){
-          showMsg($("suOk"), "تم إنشاء الحساب ✅ الآن سجّل دخولك", "ok");
-          // ننقلك للدخول ونعبّي الإيميل
-          showView("login");
-          $("loginEmail").value = suEmail.value.trim();
-          $("loginPass").value = "";
-          refreshLogin();
-          return;
-        }
-
-        showMsg($("suErr"), (data && data.message) ? data.message : "تعذر إنشاء الحساب", "danger");
-        signupBtn.disabled = false;
-
-      } catch{
-        showMsg($("suErr"), "واجهنا مشكلة اتصال. تأكد من /api/auth/signup في الباكند.", "danger");
-        signupBtn.disabled = false;
-      }
-    };
-
-    $("resetBtn").onclick = async ()=>{
-      hideMsg($("rsErr")); hideMsg($("rsOk"));
-      resetBtn.disabled = true;
-
-      try{
-        const r = await fetch("/api/auth/reset", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ email: rsEmail.value.trim() })
-        });
-
-        const data = await r.json().catch(()=>({}));
-        if(r.ok && data && data.ok){
-          showMsg($("rsOk"), "تم إرسال رابط الاستعادة ✅", "ok");
-          resetBtn.disabled = false;
-          return;
-        }
-
-        showMsg($("rsErr"), (data && data.message) ? data.message : "تعذر إرسال رابط الاستعادة", "danger");
-        resetBtn.disabled = false;
-
-      } catch{
-        showMsg($("rsErr"), "واجهنا مشكلة اتصال. تأكد من /api/auth/reset في الباكند.", "danger");
-        resetBtn.disabled = false;
-      }
-    };
-
-    // Google (يحتاج OAuth في الباكند)
-    function googleStart(){
-      // لو عندك endpoint جاهز بيبدأ OAuth
-      // يرجعنا بعدها لـ /activate.html?r=...&token=...
-      location.href = "/api/auth/google?return=" + encodeURIComponent("/activate.html?r=" + returnTo);
-    }
-    $("googleBtn").onclick = googleStart;
-    $("googleBtn2").onclick = googleStart;
   }
 
   boot();
