@@ -88,8 +88,11 @@
       color:#111;
       font-weight: 900;
       font-size: 16px;
+      transition: .15s transform ease;
     }
     .btn:disabled{ opacity:.6; cursor:not-allowed; }
+    .btn:active{ transform: scale(.98); }
+
     .msg{
       margin-top: 12px;
       padding: 12px 12px;
@@ -100,6 +103,7 @@
     }
     .msg.err{ background: rgba(225,29,72,.10); color: var(--danger); border:1px solid rgba(225,29,72,.25); }
     .msg.ok{ background: rgba(22,163,74,.10); color: var(--success); border:1px solid rgba(22,163,74,.25); }
+
     .spinner{
       display:inline-block;
       width:16px;height:16px;
@@ -111,6 +115,7 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin{ to{transform:rotate(360deg)} }
+
     .footer{
       text-align:center;
       margin-top: 12px;
@@ -142,7 +147,7 @@
   </div>
 
   <script>
-    // ✅ (Cloudflare Pages Functions)
+    // ✅ Cloudflare Pages Functions (نفس الدومين)
     const API_URL = "/api/verify";
 
     const LS_ACTIVATED = "sandooq_activated";
@@ -177,19 +182,19 @@
       return id;
     }
 
-    // ✅ أهم تعديل: إذا ما فيه r= نرجع المستخدم لواجهة البداية (create.html) عن طريق index.html?r=create.html
+    // ✅ نرجع للمكان المطلوب لكن عبر index عشان يسوي verify سيرفري
     function getReturnUrl(){
       const p = new URLSearchParams(location.search);
       const r = p.get("r");
-      if (r) return decodeURIComponent(r);
-      return "index.html?r=create.html";
+      const wanted = r ? decodeURIComponent(r) : "create.html";
+      return "index.html?r=" + encodeURIComponent(wanted);
     }
 
     function goBack(){
       location.replace(getReturnUrl());
     }
 
-    // إذا الجهاز مُفعّل من قبل → رجّعه لواجهة البداية
+    // ✅ لو متفعل من قبل -> رجّعه مباشرة
     if (localStorage.getItem(LS_ACTIVATED) === "1"){
       goBack();
     }
@@ -200,6 +205,11 @@
       hideMsg();
       const v = normalizeCode($code.value);
       $btn.disabled = v.length < 8;
+    });
+
+    // ✅ Enter
+    $code.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !$btn.disabled) $btn.click();
     });
 
     $btn.addEventListener("click", async () => {
@@ -239,6 +249,7 @@
           return;
         }
 
+        // ✅ حفظ التفعيل
         localStorage.setItem(LS_ACTIVATED, "1");
         localStorage.setItem(LS_CODE, code);
 
