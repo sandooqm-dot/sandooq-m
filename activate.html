@@ -122,7 +122,7 @@
 <body>
   <div class="wrap">
     <div class="logo">
-      <!-- ✅ مهم: عندك بالمستودع اسم الملف logo.png -->
+      <!-- ✅ اسم الملف الصحيح عندك logo.png -->
       <img src="logo.png" alt="Sandooq" />
     </div>
 
@@ -143,7 +143,10 @@
   </div>
 
   <script>
-    const API_URL = "/api/verify";
+    // ✅ مهم: GitHub Pages ما عنده /api
+    // API الحقيقي عندك على الدومين هذا:
+    const API_URL = "https://prof.sandooq-games.com/api/verify";
+
     const LS_ACTIVATED = "sandooq_activated";
     const LS_CODE      = "sandooq_code";
     const LS_DEVICE    = "sandooq_device_id";
@@ -186,6 +189,7 @@
       location.replace(getReturnUrl());
     }
 
+    // لو متفعل من قبل: رجّعه للعبة
     if (localStorage.getItem(LS_ACTIVATED) === "1"){
       goBack();
     }
@@ -235,6 +239,7 @@
           return;
         }
 
+        // نجاح
         localStorage.setItem(LS_ACTIVATED, "1");
         localStorage.setItem(LS_CODE, code);
 
@@ -242,7 +247,7 @@
         setTimeout(goBack, 650);
 
       }catch(e){
-        showMsg("err","تعذر الاتصال بالسيرفر. تأكد من النت وجرب.");
+        showMsg("err","تعذر الاتصال بسيرفر التفعيل. تأكد من النت وجرب.");
         $btn.disabled = false;
         $btn.textContent = oldText;
       }
