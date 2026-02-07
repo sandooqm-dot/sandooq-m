@@ -11,6 +11,7 @@
       --yellow:#f4c400;
       --text:#111;
       --muted:#6b7280;
+      --danger:#e11d48;
       --shadow: 0 14px 35px rgba(0,0,0,.22);
       --radius: 18px;
     }
@@ -63,6 +64,19 @@
     }
     @keyframes spin{ to{transform:rotate(360deg)} }
 
+    .msg{
+      display:none;
+      margin-top: 10px;
+      padding: 12px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height:1.7;
+      background: rgba(225,29,72,.10);
+      color: var(--danger);
+      border:1px solid rgba(225,29,72,.25);
+      text-align:center;
+    }
+
     .btn{
       width:100%;
       margin-top: 10px;
@@ -108,6 +122,8 @@
       <h1 id="title">جاري فتح اللعبة <span class="spinner"></span></h1>
       <p id="desc">لحظة… نتحقق من التفعيل.</p>
 
+      <div id="err" class="msg"></div>
+
       <button id="openBtn" class="btn">فتح الوجهة</button>
       <button id="changeBtn" class="btn2">تغيير / إعادة تفعيل الكود</button>
     </div>
@@ -120,38 +136,112 @@
     const LS_CODE      = "sandooq_code";
     const LS_DEVICE    = "sandooq_device_id";
 
-    // ✅ الصفحة اللي تبغى تفتح بعد التفعيل (صفحة إنشاء اللعبة)
+    // ✅ Endpoint السيرفر داخل نفس مشروع Cloudflare Pages
+    const API_URL = "/api/verify";
+
+    // ✅ الوجهة الافتراضية بعد التفعيل
     const DEFAULT_TARGET = "create.html";
 
     const $title = document.getElementById("title");
     const $desc  = document.getElementById("desc");
+    const $err   = document.getElementById("err");
     const $open  = document.getElementById("openBtn");
     const $chg   = document.getElementById("changeBtn");
 
     const params = new URLSearchParams(location.search);
+
+    function showErr(text){
+      $err.textContent = text;
+      $err.style.display = "block";
+    }
+
+    function clearActivation(){
+      localStorage.removeItem(LS_ACTIVATED);
+      localStorage.removeItem(LS_CODE);
+      // نخلي deviceId موجود عادي (مفيد) — بس لو تبي نمسحه كمان قول لي
+    }
+
+    function goActivate(wanted){
+      const r = encodeURIComponent(wanted || DEFAULT_TARGET);
+      location.replace("activate.html?r=" + r);
+    }
 
     // reset: يمسح التفعيل للتجربة من جديد
     if (params.get("reset") === "1") {
       localStorage.removeItem(LS_ACTIVATED);
       localStorage.removeItem(LS_CODE);
       localStorage.removeItem(LS_DEVICE);
-      location.replace("activate.html?r=" + encodeURIComponent(DEFAULT_TARGET));
+      goActivate(DEFAULT_TARGET);
     }
 
-    // لو جاية وجهة محددة: ?r=game_full.html أو ?r=game.html .. الخ
+    // الوجهة المطلوبة: ?r=game_full.html أو ?r=create.html
     const target = params.get("r") ? String(params.get("r")) : "";
+    const wanted = target || DEFAULT_TARGET;
 
+    // إذا غير مفعّل محلياً -> روح للتفعيل مباشرة
     const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
-
     if (!activated) {
-      // غير مفعّل -> دايم روح للتفعيل ومرّر الوجهة
-      const wanted = target || DEFAULT_TARGET;
-      location.replace("activate.html?r=" + encodeURIComponent(wanted));
-    } else {
-      // مفعّل ✅ -> افتح الوجهة (لو ما فيه وجهة افتح create.html تلقائياً)
-      const wanted = target || DEFAULT_TARGET;
-      location.replace(wanted);
+      goActivate(wanted);
     }
+
+    // مفعّل محلياً -> لازم نتأكد من السيرفر (الأقوى)
+    const code = (localStorage.getItem(LS_CODE) || "").trim();
+    const deviceId = (localStorage.getItem(LS_DEVICE) || "").trim();
+
+    // إذا ما عنده كود/جهازId -> اعتبره غير مفعّل
+    if (!code || !deviceId) {
+      clearActivation();
+      goActivate(wanted);
+    }
+
+    // تحقق سيرفري صامت
+    (async () => {
+      try{
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, deviceId })
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (data && data.ok === true && data.valid === true) {
+          // ✅ التفعيل صحيح (سيرفر)
+          location.replace(wanted);
+          return;
+        }
+
+        // ❌ التفعيل مو صحيح أو الكود تغيّر/انسرق/غير موجود
+        clearActivation();
+
+        const reason = data && data.reason ? String(data.reason) : "";
+        if (reason === "NOT_FOUND") {
+          showErr("الكود غير موجود بالسيرفر. لازم تعيد التفعيل.");
+        } else if (reason === "ALREADY_USED") {
+          showErr("الكود مُفعّل على جهاز آخر. لازم كود جديد أو إعادة التفعيل.");
+        } else {
+          showErr("تعذر التحقق من التفعيل. جرّب إعادة التفعيل.");
+        }
+
+        $title.textContent = "التفعيل غير صالح";
+        $desc.textContent  = "اضغط لإعادة تفعيل الكود ثم نفتح اللعبة.";
+
+        $open.style.display = "none";
+        $chg.style.display = "block";
+        $chg.onclick = () => goActivate(wanted);
+
+      }catch(e){
+        // لو النت/السيرفر طاح: لا نفتح اللعبة (عشان ما يكون bypass)
+        $title.textContent = "تعذر التحقق";
+        $desc.textContent  = "ما قدرنا نتأكد من التفعيل الآن. تأكد من الاتصال وحاول.";
+        showErr("تعذر الاتصال بسيرفر التفعيل.");
+
+        $open.style.display = "none";
+        $chg.style.display = "block";
+        $chg.textContent = "المحاولة مرة أخرى";
+        $chg.onclick = () => location.reload();
+      }
+    })();
   </script>
 </body>
 </html>
