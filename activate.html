@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>جاري فتح اللعبة - صندوق المسابقات</title>
+  <title>تفعيل اللعبة - صندوق المسابقات</title>
+
   <style>
     :root{
       --bg1:#0e2f7a;
@@ -11,6 +12,8 @@
       --yellow:#f4c400;
       --text:#111;
       --muted:#6b7280;
+      --danger:#e11d48;
+      --success:#16a34a;
       --shadow: 0 14px 35px rgba(0,0,0,.22);
       --radius: 18px;
     }
@@ -42,30 +45,41 @@
       box-shadow: var(--shadow);
       padding: 22px 18px 18px;
       border: 2px solid rgba(244,196,0,.35);
-      text-align:center;
     }
-    h1{ margin:0 0 8px; font-size: 22px; }
+    h1{ margin:0 0 8px; font-size: 22px; text-align:center; }
     p{
-      margin:0 0 14px;
+      margin:0 0 16px;
       color: var(--muted);
+      text-align:center;
       line-height:1.7;
       font-size: 14px;
     }
-    .spinner{
-      display:inline-block;
-      width:18px;height:18px;
-      border: 3px solid rgba(17,17,17,.25);
-      border-top-color: rgba(17,17,17,.9);
-      border-radius:50%;
-      vertical-align: -4px;
-      margin-left:8px;
-      animation: spin 1s linear infinite;
+    .field{ margin-top: 10px; }
+    label{
+      display:block;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color:#111;
+      font-weight:700;
     }
-    @keyframes spin{ to{transform:rotate(360deg)} }
-
+    input{
+      width:100%;
+      padding: 14px 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(31,79,163,.18);
+      outline:none;
+      background:#fff;
+      direction:ltr;
+      text-align:left;
+    }
+    input:focus{
+      border-color: rgba(31,79,163,.55);
+      box-shadow: 0 0 0 4px rgba(31,79,163,.12);
+    }
     .btn{
       width:100%;
-      margin-top: 10px;
+      margin-top: 14px;
       padding: 14px 14px;
       border-radius: 12px;
       border:none;
@@ -74,22 +88,29 @@
       color:#111;
       font-weight: 900;
       font-size: 16px;
-      display:none;
     }
-    .btn2{
-      width:100%;
-      margin-top: 10px;
-      padding: 12px 14px;
+    .btn:disabled{ opacity:.6; cursor:not-allowed; }
+    .msg{
+      margin-top: 12px;
+      padding: 12px 12px;
       border-radius: 12px;
-      border:2px solid rgba(31,79,163,.25);
-      cursor:pointer;
-      background:#fff;
-      color:#111;
-      font-weight: 800;
       font-size: 14px;
+      line-height:1.7;
       display:none;
     }
-
+    .msg.err{ background: rgba(225,29,72,.10); color: var(--danger); border:1px solid rgba(225,29,72,.25); }
+    .msg.ok{ background: rgba(22,163,74,.10); color: var(--success); border:1px solid rgba(22,163,74,.25); }
+    .spinner{
+      display:inline-block;
+      width:16px;height:16px;
+      border: 3px solid rgba(17,17,17,.25);
+      border-top-color: rgba(17,17,17,.9);
+      border-radius:50%;
+      vertical-align: -3px;
+      margin-left:8px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin{ to{transform:rotate(360deg)} }
     .footer{
       text-align:center;
       margin-top: 12px;
@@ -101,72 +122,138 @@
 <body>
   <div class="wrap">
     <div class="logo">
+      <!-- ✅ اسم الملف عندك بالمستودع logo.png -->
       <img src="logo.png" alt="Sandooq" />
     </div>
 
     <div class="card">
-      <h1 id="title">جاري فتح اللعبة <span class="spinner"></span></h1>
-      <p id="desc">لحظة… نتحقق من التفعيل.</p>
+      <h1>تفعيل اللعبة</h1>
+      <p>اكتب كود التفعيل الخاص بك لتشغيل اللعبة. بعد التفعيل يتم نقلك تلقائيًا لواجهة اللعبة.</p>
 
-      <button id="openBtn" class="btn">فتح الوجهة</button>
-      <button id="changeBtn" class="btn2">تغيير / إعادة تفعيل الكود</button>
+      <div class="field">
+        <label for="code">كود التفعيل</label>
+        <input id="code" type="text" inputmode="latin" autocomplete="one-time-code" placeholder="SNDQ-XXXX-XXXX-XXXX" />
+      </div>
+
+      <button id="btn" class="btn" disabled>تفعيل</button>
+      <div id="msg" class="msg"></div>
     </div>
 
     <div class="footer">© صندوق المسابقات</div>
   </div>
 
   <script>
+    // ✅ على GitHub Pages ما فيه /api/verify
+    // لذلك نستخدم رابط السيرفر الحقيقي
+    const PROD_API = "https://prof.sandooq-games.com/api/verify";
+
+    // إذا الصفحة شغالة على GitHub Pages -> استخدم PROD_API
+    // إذا شغالة على نفس الدومين اللي فيه السيرفر -> استخدم /api/verify
+    const API_URL = (location.hostname.endsWith("github.io") ? PROD_API : "/api/verify");
+
     const LS_ACTIVATED = "sandooq_activated";
     const LS_CODE      = "sandooq_code";
     const LS_DEVICE    = "sandooq_device_id";
 
-    const $title = document.getElementById("title");
-    const $desc  = document.getElementById("desc");
-    const $open  = document.getElementById("openBtn");
-    const $chg   = document.getElementById("changeBtn");
+    const $code = document.getElementById("code");
+    const $btn  = document.getElementById("btn");
+    const $msg  = document.getElementById("msg");
 
-    const params = new URLSearchParams(location.search);
+    function showMsg(type, text){
+      $msg.className = "msg " + (type === "ok" ? "ok" : "err");
+      $msg.textContent = text;
+      $msg.style.display = "block";
+    }
+    function hideMsg(){ $msg.style.display = "none"; }
 
-    // خيار مفيد لو تبغى تمسح التفعيل وتجرب من جديد:
-    // index.html?reset=1
-    if (params.get("reset") === "1") {
-      localStorage.removeItem(LS_ACTIVATED);
-      localStorage.removeItem(LS_CODE);
-      localStorage.removeItem(LS_DEVICE);
-      location.replace("activate.html");
+    function normalizeCode(v){
+      return (v || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[–—−]/g,"-")
+        .replace(/\s+/g,"");
     }
 
-    // الوجهة المطلوبة (لو جاية من صفحة لعبة): index.html?r=game.html
-    const target = params.get("r");
-
-    const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
-
-    if (!activated) {
-      // روح لصفحة التفعيل ومرر الوجهة لو موجودة
-      const url = target
-        ? `activate.html?r=${encodeURIComponent(target)}`
-        : "activate.html";
-      location.replace(url);
-    } else {
-      // مُفعّل ✅
-      if (target) {
-        // فيه وجهة: افتحها
-        location.replace(target);
-      } else {
-        // ما فيه وجهة: لا تفتح أي "game.html" عشان ما يصير Loop
-        $title.innerHTML = "تم التفعيل ✅";
-        $desc.textContent = "جهازك مُفعّل. افتح رابط اللعبة المطلوب أو مرّر الوجهة عبر ?r=اسم_الصفحة";
-        $open.style.display = "none";
-
-        // زر لإعادة التفعيل/تغيير الكود
-        $chg.style.display = "block";
-        $chg.onclick = () => {
-          localStorage.removeItem(LS_ACTIVATED);
-          localStorage.removeItem(LS_CODE);
-          location.href = "activate.html";
-        };
+    function getOrCreateDeviceId(){
+      let id = localStorage.getItem(LS_DEVICE);
+      if (!id){
+        id = "dev_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,10);
+        localStorage.setItem(LS_DEVICE, id);
       }
+      return id;
     }
+
+    function getReturnUrl(){
+      const p = new URLSearchParams(location.search);
+      const r = p.get("r");
+      return r ? decodeURIComponent(r) : "index.html";
+    }
+
+    function goBack(){
+      location.replace(getReturnUrl());
+    }
+
+    if (localStorage.getItem(LS_ACTIVATED) === "1"){
+      goBack();
+    }
+
+    const deviceId = getOrCreateDeviceId();
+
+    $code.addEventListener("input", () => {
+      hideMsg();
+      const v = normalizeCode($code.value);
+      $btn.disabled = v.length < 8;
+    });
+
+    $btn.addEventListener("click", async () => {
+      hideMsg();
+      const code = normalizeCode($code.value);
+      if (!code){ showMsg("err","اكتب كود التفعيل."); return; }
+
+      $btn.disabled = true;
+      const oldText = $btn.textContent;
+      $btn.innerHTML = `جاري التفعيل <span class="spinner"></span>`;
+
+      try{
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, deviceId })
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (!data || data.ok !== true || data.valid !== true){
+          const reason = data && data.reason ? String(data.reason) : "";
+          const err    = data && data.error  ? String(data.error)  : "";
+
+          if (reason === "NOT_FOUND"){
+            showMsg("err","هذا الكود غير موجود. تأكد من نسخه صح.");
+          } else if (reason === "ALREADY_USED"){
+            showMsg("err","هذا الكود مُفعّل على جهاز آخر.");
+          } else if (err === "Missing code"){
+            showMsg("err","اكتب كود التفعيل.");
+          } else {
+            showMsg("err","صار خطأ في التفعيل. جرّب مرة ثانية.");
+          }
+
+          $btn.disabled = false;
+          $btn.textContent = oldText;
+          return;
+        }
+
+        localStorage.setItem(LS_ACTIVATED, "1");
+        localStorage.setItem(LS_CODE, code);
+
+        showMsg("ok","تم التفعيل بنجاح. سيتم نقلك الآن...");
+        setTimeout(goBack, 650);
+
+      }catch(e){
+        showMsg("err","تعذر الاتصال بسيرفر التفعيل. تأكد من النت وجرب.");
+        $btn.disabled = false;
+        $btn.textContent = oldText;
+      }
+    });
   </script>
 </body>
 </html>
