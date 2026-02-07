@@ -1,1 +1,2 @@
-
+/game_full        /activate.html?r=game_full.html 302
+/game_full*       /activate.html?r=game_full.html 302
