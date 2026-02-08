@@ -206,6 +206,7 @@
       font-weight:800;
       text-align:center;
       display:none;
+      word-break: break-word;
     }
     .msg.danger{ border-color: rgba(255,77,77,.6); color: #ffd7d7; }
     .msg.ok{ border-color: rgba(47,227,140,.55); color: #d9ffe9; }
@@ -281,7 +282,7 @@
 
         <div class="panel">
 
-          <!-- ✅ قسم الكود (فوق) -->
+          <!-- ✅ قسم الكود -->
           <div class="codeBox" id="codeBox">
             <div class="codeHeader">
               <div class="tag">كود التفعيل (أول مرة فقط)</div>
@@ -301,6 +302,12 @@
             <div class="msg ok" id="codeOk"></div>
 
             <div class="note" id="deviceNote"></div>
+          </div>
+
+          <!-- ✅ زر رجوع/تغيير كود (مهم للاختبارات) -->
+          <div class="row" id="resetBox" style="display:none">
+            <button class="btnGhost" id="resetActivationBtn">تغيير الكود / إعادة التفعيل</button>
+            <div class="note">هذا الزر للاختبار فقط — بالمستقبل نخفيه عن العملاء.</div>
           </div>
 
           <!-- ✅ شاشة الدخول -->
@@ -400,9 +407,6 @@
   </div>
 
 <script>
-  // =========================
-  // مفاتيح التخزين (ثابتة)
-  // =========================
   const LS = {
     activated: "sndq_activated_v2",
     code: "sndq_code_v2",
@@ -450,6 +454,7 @@
   function normalizeCode(v){
     v = (v||"").toString().trim().toUpperCase();
     v = v.replace(/[–—−]/g, "-").replace(/\s+/g,"");
+    v = v.replace(/[^A-Z0-9-]/g, "");
     return v;
   }
 
@@ -460,7 +465,6 @@
   function ensureDeviceId(){
     let id = localStorage.getItem(LS.device);
     if(id && id.length > 10) return id;
-
     try{
       id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("dev-" + Math.random().toString(16).slice(2) + Date.now());
     }catch{
@@ -473,9 +477,12 @@
   function explainVerifyError(err){
     switch(err){
       case "MISSING_CODE": return "أدخل كود التفعيل.";
-      case "DEVICE_REQUIRED": return "المتصفح لم ينشئ معرف الجهاز. حدّث الصفحة وجرب.";
+      case "DEVICE_REQUIRED": return "تعذر قراءة معرف الجهاز… حدّث الصفحة وجرب.";
+      case "CODE_NOT_FOUND":
       case "INVALID_CODE": return "الكود غير موجود. تأكد من نسخه بدون مسافات.";
-      case "CODE_USED_OTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
+      case "CODE_USED_OTHER_DEVICE":
+      case "CODE_ALREADY_USED_ON_ANOTHER_DEVICE":
+      case "CODE_USED_OTHER_DEVICE_LOCK": return "هذا الكود مرتبط بجهاز آخر.";
       default: return err ? ("فشل التفعيل: " + err) : "تعذر تفعيل الكود.";
     }
   }
@@ -487,7 +494,8 @@
       case "CODE_REQUIRED": return "لازم تفعيل الكود أولاً.";
       case "ACTIVATE_FIRST": return "لازم تفعيل الكود أولاً.";
       case "CODE_NOT_FOUND": return "الكود غير موجود في النظام.";
-      case "CODE_ALREADY_USED_ON_ANOTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
+      case "CODE_ALREADY_USED_ON_ANOTHER_DEVICE":
+      case "CODE_USED_OTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
       case "EMAIL_EXISTS": return "هذا البريد مسجل مسبقاً.";
       case "DEVICE_REQUIRED": return "تعذر قراءة معرف الجهاز… حدّث الصفحة وجرب.";
       default: return err ? ("فشل التسجيل: " + err) : "تعذر إنشاء الحساب.";
@@ -496,6 +504,22 @@
 
   function isEmail(v){
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||"").trim());
+  }
+
+  function setActivatedUI(){
+    setBadge("ACTIVATED", true);
+    $("codeBox").style.display = "none";
+    $("resetBox").style.display = "block";
+    $("pageTitle").textContent = "تم التفعيل";
+    $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>الآن: أنشئ حساب أو سجّل دخول.";
+  }
+
+  function setNeedCodeUI(){
+    setBadge("CODE_REQUIRED", false);
+    $("codeBox").style.display = "block";
+    $("resetBox").style.display = "none";
+    $("pageTitle").textContent = "تفعيل اللعبة";
+    $("pageSub").innerHTML = "أول مرة فقط: أدخل كود الشراء لتفعيل اللعبة على هذا الجهاز.<br>بعد التفعيل… أنشئ حساب أو سجل دخول.";
   }
 
   function boot(){
@@ -512,16 +536,12 @@
     }
 
     if(activated && savedCode){
-      setBadge("ACTIVATED", true);
-      $("codeBox").style.display = "none";
-      $("pageTitle").textContent = "تم التفعيل";
-      $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>الآن: أنشئ حساب أو سجّل دخول.";
+      setActivatedUI();
       wire();
       return;
     }
 
-    setBadge("CODE_REQUIRED", false);
-    $("codeBox").style.display = "block";
+    setNeedCodeUI();
     wire();
   }
 
@@ -546,8 +566,8 @@
     activateBtn.addEventListener("click", async ()=>{
       hideMsg(codeErr); hideMsg(codeOk);
 
-      const code = normalizeCode(codeInput.value);
-      if(!code){
+      const codeTyped = normalizeCode(codeInput.value);
+      if(!codeTyped){
         showMsg(codeErr, "أدخل كود التفعيل أولاً", "danger");
         return;
       }
@@ -560,25 +580,26 @@
       try{
         const res = await fetch("/api/verify", {
           method: "POST",
-          headers: { "Content-Type":"application/json" },
-          body: JSON.stringify({ code, deviceId }),
+          headers: {
+            "Content-Type":"application/json",
+            "X-Device-Id": deviceId
+          },
+          body: JSON.stringify({ code: codeTyped, deviceId }),
           cache: "no-store",
           credentials: "include"
         });
 
         const data = await res.json().catch(()=> ({}));
 
-        // ✅ verify يرجع ok/status — مو valid
-        if(res.ok && data && data.ok){
+        // ✅ نجاح: نعتمد code الحقيقي الراجع من السيرفر
+        if(res.ok && data && data.ok && (data.valid === true || data.status)){
+          const realCode = normalizeCode(data.code || codeTyped);
+
           localStorage.setItem(LS.activated, "1");
-          localStorage.setItem(LS.code, code);
+          localStorage.setItem(LS.code, realCode);
 
-          setBadge("ACTIVATED", true);
           showMsg(codeOk, "تم تفعيل الكود ✅ الآن أنشئ حساب أو سجّل دخول.", "ok");
-
-          $("codeBox").style.display = "none";
-          $("pageTitle").textContent = "تم التفعيل";
-          $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>الآن: أنشئ حساب أو سجّل دخول.";
+          setActivatedUI();
 
           activateBtn.disabled = false;
           return;
@@ -595,6 +616,22 @@
         activateBtn.disabled = false;
       }
     });
+
+    // ===== زر تغيير كود (للاختبار) =====
+    $("resetActivationBtn").onclick = ()=>{
+      // نمسح التفعيل والتوكن عشان نقدر نجرب كود جديد
+      localStorage.removeItem(LS.activated);
+      localStorage.removeItem(LS.code);
+      localStorage.removeItem(LS.token);
+      localStorage.removeItem(LS.email);
+
+      // نرجع الواجهة
+      try{ $("codeInput").value = ""; }catch(e){}
+      hideMsg($("codeErr")); hideMsg($("codeOk"));
+      setNeedCodeUI();
+      setBadge("CODE_REQUIRED", false);
+      refreshActivateState();
+    };
 
     // ===== الشاشات =====
     function showView(name){
@@ -683,7 +720,6 @@
         return;
       }
 
-      // ✅✅ هذا هو المهم: deviceId لازم يروح مع التسجيل
       const deviceId = ensureDeviceId();
 
       try{
