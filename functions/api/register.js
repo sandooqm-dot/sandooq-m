@@ -4,10 +4,7 @@ export async function onRequest(context) {
 
   // ===== CORS =====
   const origin = request.headers.get("Origin") || "";
-  const allowed = (env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map(s => s.trim())
-    .filter(Boolean);
+  const allowed = (env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
@@ -23,30 +20,50 @@ export async function onRequest(context) {
     });
   }
 
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-  if (request.method !== "POST") return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (request.method !== "POST") {
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+  }
 
   // ===== Helpers =====
   function isValidEmail(email) {
     return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   }
+
   function isValidPassword(pw) {
     return typeof pw === "string" && pw.length >= 8;
   }
+
   function normEmail(email) {
     return email.trim().toLowerCase();
   }
+
   function nowISO() {
     return new Date().toISOString();
   }
+
   function base64url(bytes) {
     let str = btoa(String.fromCharCode(...bytes));
     return str.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
+
+  // (مهم) بعض النسخ القديمة كانت تخزن deviceId داخل used_by_email
+  // هنا نكتشفه ونعتبره "ليس ايميل"
+  function looksLikeLegacyDeviceId(v) {
+    if (!v || typeof v !== "string") return false;
+    const s = v.trim();
+    if (s.includes("@")) return false;        // ايميل غالباً
+    if (s.length < 16) return false;
+    // UUID-like: contains dashes and long
+    return s.includes("-") && s.length >= 20;
+  }
+
   async function pbkdf2Hash(password) {
     const enc = new TextEncoder();
     const saltBytes = crypto.getRandomValues(new Uint8Array(16));
-
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
       enc.encode(password),
@@ -67,6 +84,7 @@ export async function onRequest(context) {
     const hash = base64url(hashBytes);
     return `pbkdf2$${iterations}$${salt}$${hash}`;
   }
+
   async function newSessionToken() {
     const rnd = crypto.getRandomValues(new Uint8Array(32));
     return base64url(rnd);
@@ -96,17 +114,21 @@ export async function onRequest(context) {
 
   const db = env.DB;
 
-  // ===== Email exists? =====
+  // ===== Ensure activations table exists (safe) =====
+  await db.prepare(
+    "CREATE TABLE IF NOT EXISTS activations ( code TEXT PRIMARY KEY, device_id TEXT NOT NULL, activated_at TEXT NOT NULL )"
+  ).run();
+
+  // ===== 1) email exists? =====
   const existing = await db.prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
     .bind(email)
     .first();
-
   if (existing?.email) {
     return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
   }
 
-  // ===== Code exists? =====
-  const codeRow = await db.prepare("SELECT code, is_used, used_by_email FROM codes WHERE code = ? LIMIT 1")
+  // ===== 2) code exists? =====
+  const codeRow = await db.prepare("SELECT code, is_used, used_by_email, used_at FROM codes WHERE code = ? LIMIT 1")
     .bind(code)
     .first();
 
@@ -114,29 +136,39 @@ export async function onRequest(context) {
     return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
   }
 
-  // ===== Must be activated on THIS device first =====
-  const act = await db.prepare("SELECT code, device_id FROM activations WHERE code = ? LIMIT 1")
+  // ===== 3) code activated on which device? (source of truth) =====
+  const act = await db.prepare("SELECT code, device_id, activated_at FROM activations WHERE code = ? LIMIT 1")
     .bind(code)
     .first();
 
+  // لازم يكون فيه تفعيل قبل التسجيل (تفعيل = ربط كود بجهاز)
   if (!act?.code) {
-    return json({ ok: false, error: "CODE_NOT_ACTIVATED_ON_DEVICE" }, 409);
+    return json({ ok: false, error: "CODE_NOT_ACTIVATED" }, 409);
   }
 
+  // لو مفعل على جهاز ثاني -> ممنوع
   if (act.device_id !== deviceId) {
-    return json({ ok: false, error: "CODE_ACTIVATED_ON_OTHER_DEVICE" }, 409);
+    return json({ ok: false, error: "CODE_ALREADY_USED_ON_ANOTHER_DEVICE" }, 409);
   }
 
-  // ===== If code already bound to another email, block =====
-  if (codeRow.used_by_email && codeRow.used_by_email !== email) {
-    return json({ ok: false, error: "CODE_ALREADY_USED_BY_ANOTHER_EMAIL" }, 409);
+  // ===== 4) code already linked to another email? =====
+  let usedBy = codeRow.used_by_email;
+
+  // لو كان used_by_email فيه deviceId قديم، نتجاهله ونعتبره فارغ (وبنستبدله بإيميل الآن)
+  if (looksLikeLegacyDeviceId(usedBy)) {
+    usedBy = null;
   }
 
-  // ===== Create user + bind code to email + create session =====
+  if (Number(codeRow.is_used) === 1 && usedBy && usedBy !== email) {
+    return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
+  }
+
+  // ===== Create User + Link code to email + Create Session =====
   const createdAt = nowISO();
   const passHash = await pbkdf2Hash(password);
   const token = await newSessionToken();
 
+  // session 30 days
   const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const stmts = [
@@ -144,9 +176,9 @@ export async function onRequest(context) {
       "INSERT INTO users (email, provider, password_hash, code, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)"
     ).bind(email, "password", passHash, code, createdAt, createdAt),
 
-    // bind code to email (do not touch activations table)
+    // هنا ربط الإيميل بالكود (بدون أي علاقة بالـ deviceId)
     db.prepare(
-      "UPDATE codes SET used_by_email = ?, is_used = 1, used_at = COALESCE(used_at, ?) WHERE code = ? AND (used_by_email IS NULL OR used_by_email = ?)"
+      "UPDATE codes SET is_used = 1, used_by_email = ?, used_at = ? WHERE code = ? AND (used_by_email IS NULL OR used_by_email = ? OR used_by_email NOT LIKE '%@%')"
     ).bind(email, createdAt, code, email),
 
     db.prepare(
@@ -156,11 +188,13 @@ export async function onRequest(context) {
 
   try {
     const res = await db.batch(stmts);
-    const upd = res?.[1];
 
-    // if update didn't apply (someone else bound it)
-    if (upd && upd.success === false) {
-      return json({ ok: false, error: "CODE_BIND_FAILED" }, 500);
+    // تأكد أن تحديث الكود تم
+    const upd = res?.[1];
+    const changed = upd?.meta?.changes ?? upd?.changes ?? null;
+
+    if (changed === 0) {
+      return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
 
     return json({
@@ -175,3 +209,7 @@ export async function onRequest(context) {
     return json({ ok: false, error: "REGISTER_FAILED" }, 500);
   }
 }
+
+/*
+اسم النسخة: register.js – إصدار 2 (Fix legacy deviceId in used_by_email + use activations as device source)
+*/
