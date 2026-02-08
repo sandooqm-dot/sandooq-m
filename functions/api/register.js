@@ -2,79 +2,47 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // ===== CORS (يدعم الكوكيز) =====
+  // ===== CORS =====
   const origin = request.headers.get("Origin") || "";
   const allowed = (env.ALLOWED_ORIGINS || "")
     .split(",")
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean);
 
-  const allowOrigin =
-    (origin && (allowed.length === 0 || allowed.includes(origin))) ? origin : (allowed[0] || origin || "*");
-
   const corsHeaders = {
-    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
   };
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  function json(obj, status = 200, extraHeaders = {}) {
+  function json(obj, status = 200) {
     return new Response(JSON.stringify(obj), {
       status,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        ...corsHeaders,
-        ...extraHeaders,
-      },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
 
-  if (request.method !== "POST") {
-    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
-  }
-
-  if (!env?.DB) {
-    return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
-  }
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (request.method !== "POST") return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
 
   // ===== Helpers =====
   function isValidEmail(email) {
     return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   }
-
   function isValidPassword(pw) {
     return typeof pw === "string" && pw.length >= 8;
   }
-
   function normEmail(email) {
     return email.trim().toLowerCase();
   }
-
-  function normalizeCode(code) {
-    return (code || "")
-      .toString()
-      .trim()
-      .toUpperCase()
-      .replace(/[–—−]/g, "-")
-      .replace(/\s+/g, "");
-  }
-
   function nowISO() {
     return new Date().toISOString();
   }
-
   function base64url(bytes) {
     let str = btoa(String.fromCharCode(...bytes));
     return str.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
-
   async function pbkdf2Hash(password) {
     const enc = new TextEncoder();
     const saltBytes = crypto.getRandomValues(new Uint8Array(16));
@@ -99,17 +67,9 @@ export async function onRequest(context) {
     const hash = base64url(hashBytes);
     return `pbkdf2$${iterations}$${salt}$${hash}`;
   }
-
   async function newSessionToken() {
     const rnd = crypto.getRandomValues(new Uint8Array(32));
     return base64url(rnd);
-  }
-
-  function cookieHeader(token) {
-    // 30 يوم
-    const maxAge = 30 * 24 * 60 * 60;
-    // HttpOnly + Secure + SameSite=Lax ممتازة للدخول من نفس الموقع
-    return `sndq_session=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
   }
 
   // ===== Parse Body =====
@@ -123,17 +83,20 @@ export async function onRequest(context) {
   const emailRaw = body?.email ?? "";
   const password = body?.password ?? "";
   const codeRaw = body?.code ?? "";
+  const deviceIdRaw = body?.deviceId ?? "";
 
   const email = normEmail(emailRaw);
-  const code = normalizeCode(codeRaw);
+  const code = typeof codeRaw === "string" ? codeRaw.trim().toUpperCase() : "";
+  const deviceId = typeof deviceIdRaw === "string" ? deviceIdRaw.trim() : "";
 
   if (!isValidEmail(email)) return json({ ok: false, error: "INVALID_EMAIL" }, 400);
   if (!isValidPassword(password)) return json({ ok: false, error: "WEAK_PASSWORD" }, 400);
   if (!code) return json({ ok: false, error: "CODE_REQUIRED" }, 400);
+  if (!deviceId) return json({ ok: false, error: "DEVICE_REQUIRED" }, 400);
 
   const db = env.DB;
 
-  // ===== DB Checks =====
+  // ===== Email exists? =====
   const existing = await db.prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
     .bind(email)
     .first();
@@ -142,6 +105,7 @@ export async function onRequest(context) {
     return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
   }
 
+  // ===== Code exists? =====
   const codeRow = await db.prepare("SELECT code, is_used, used_by_email FROM codes WHERE code = ? LIMIT 1")
     .bind(code)
     .first();
@@ -150,12 +114,25 @@ export async function onRequest(context) {
     return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
   }
 
-  // إذا الكود مستخدم بإيميل ثاني
-  if (Number(codeRow.is_used) === 1 && codeRow.used_by_email && codeRow.used_by_email !== email) {
-    return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
+  // ===== Must be activated on THIS device first =====
+  const act = await db.prepare("SELECT code, device_id FROM activations WHERE code = ? LIMIT 1")
+    .bind(code)
+    .first();
+
+  if (!act?.code) {
+    return json({ ok: false, error: "CODE_NOT_ACTIVATED_ON_DEVICE" }, 409);
   }
 
-  // ===== Create user + mark code + session =====
+  if (act.device_id !== deviceId) {
+    return json({ ok: false, error: "CODE_ACTIVATED_ON_OTHER_DEVICE" }, 409);
+  }
+
+  // ===== If code already bound to another email, block =====
+  if (codeRow.used_by_email && codeRow.used_by_email !== email) {
+    return json({ ok: false, error: "CODE_ALREADY_USED_BY_ANOTHER_EMAIL" }, 409);
+  }
+
+  // ===== Create user + bind code to email + create session =====
   const createdAt = nowISO();
   const passHash = await pbkdf2Hash(password);
   const token = await newSessionToken();
@@ -167,8 +144,9 @@ export async function onRequest(context) {
       "INSERT INTO users (email, provider, password_hash, code, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)"
     ).bind(email, "password", passHash, code, createdAt, createdAt),
 
+    // bind code to email (do not touch activations table)
     db.prepare(
-      "UPDATE codes SET is_used = 1, used_by_email = ?, used_at = ? WHERE code = ? AND (is_used = 0 OR used_by_email = ?)"
+      "UPDATE codes SET used_by_email = ?, is_used = 1, used_at = COALESCE(used_at, ?) WHERE code = ? AND (used_by_email IS NULL OR used_by_email = ?)"
     ).bind(email, createdAt, code, email),
 
     db.prepare(
@@ -177,19 +155,22 @@ export async function onRequest(context) {
   ];
 
   try {
-    await db.batch(stmts);
+    const res = await db.batch(stmts);
+    const upd = res?.[1];
 
-    return json(
-      {
-        ok: true,
-        email,
-        code,
-        token, // نخليه مؤقتًا للواجهة، وبعد ما نرتب /api/me بنعتمد الكوكيز فقط
-        expires_at: expires,
-      },
-      200,
-      { "Set-Cookie": cookieHeader(token) }
-    );
+    // if update didn't apply (someone else bound it)
+    if (upd && upd.success === false) {
+      return json({ ok: false, error: "CODE_BIND_FAILED" }, 500);
+    }
+
+    return json({
+      ok: true,
+      email,
+      code,
+      token,
+      expires_at: expires,
+    });
+
   } catch (e) {
     return json({ ok: false, error: "REGISTER_FAILED" }, 500);
   }
