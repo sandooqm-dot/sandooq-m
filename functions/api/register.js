@@ -42,22 +42,16 @@ export async function onRequest(context) {
   }
 
   function normEmail(email) {
-    return (email || "").toString().trim().toLowerCase();
+    return email.trim().toLowerCase();
   }
 
-  function normCodeFull(code) {
-    // توحيد الشرطات + حذف مسافات + Uppercase + تنظيف أي رموز غريبة
+  function normCode(code) {
     return (code || "")
       .toString()
       .trim()
       .toUpperCase()
       .replace(/[–—−]/g, "-")
-      .replace(/\s+/g, "")
-      .replace(/[^A-Z0-9-]/g, "");
-  }
-
-  function compactCode(code) {
-    return (code || "").replace(/-/g, "");
+      .replace(/\s+/g, "");
   }
 
   function nowISO() {
@@ -98,6 +92,10 @@ export async function onRequest(context) {
     return base64url(rnd);
   }
 
+  // ===== DB Guard =====
+  if (!env?.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
+  const db = env.DB;
+
   // ===== Parse Body =====
   let body;
   try {
@@ -107,119 +105,107 @@ export async function onRequest(context) {
   }
 
   const email = normEmail(body?.email ?? "");
-  const password = (body?.password ?? "").toString();
-  const codeNorm = normCodeFull(body?.code ?? "");
-  const codeCompact = compactCode(codeNorm);
+  const password = body?.password ?? "";
+  const code = normCode(body?.code ?? "");
 
-  // deviceId من body أو من header
   const headerDeviceId = request.headers.get("X-Device-Id") || "";
   const deviceId = ((body?.deviceId ?? headerDeviceId) || "").toString().trim();
 
   if (!isValidEmail(email)) return json({ ok: false, error: "INVALID_EMAIL" }, 400);
   if (!isValidPassword(password)) return json({ ok: false, error: "WEAK_PASSWORD" }, 400);
-  if (!codeNorm) return json({ ok: false, error: "CODE_REQUIRED" }, 400);
+  if (!code) return json({ ok: false, error: "CODE_REQUIRED" }, 400);
   if (!deviceId) return json({ ok: false, error: "DEVICE_REQUIRED" }, 400);
-  if (!env?.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
-
-  const db = env.DB;
-
-  // ===== تأكد من وجود جدول activations =====
-  await db.prepare(`
-    CREATE TABLE IF NOT EXISTS activations (
-      code TEXT PRIMARY KEY,
-      device_id TEXT NOT NULL,
-      activated_at TEXT NOT NULL
-    );
-  `).run();
-
-  // ===== 1) لازم يكون الكود متفعل على نفس الجهاز =====
-  const act = await db.prepare(`
-    SELECT code, device_id
-    FROM activations
-    WHERE code = ?
-       OR REPLACE(code, '-', '') = ?
-    LIMIT 1
-  `).bind(codeNorm, codeCompact).first();
-
-  if (!act?.code) {
-    return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
-  }
-
-  if ((act.device_id || "") !== deviceId) {
-    return json({ ok: false, error: "CODE_ALREADY_USED_ON_ANOTHER_DEVICE" }, 409);
-  }
-
-  // ===== 2) الإيميل ما يكون موجود =====
-  const existing = await db
-    .prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
-    .bind(email)
-    .first();
-
-  if (existing?.email) {
-    return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
-  }
-
-  // ===== 3) الكود لازم يكون موجود في codes =====
-  const codeRow = await db.prepare(`
-    SELECT code, is_used, used_by_email
-    FROM codes
-    WHERE code = ?
-       OR REPLACE(code, '-', '') = ?
-    LIMIT 1
-  `).bind(codeNorm, codeCompact).first();
-
-  if (!codeRow?.code) {
-    return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
-  }
-
-  // إذا الكود مربوط بإيميل ثاني → ممنوع
-  if (codeRow.used_by_email && codeRow.used_by_email !== email) {
-    return json({ ok: false, error: "CODE_ALREADY_LINKED_TO_OTHER_EMAIL" }, 409);
-  }
-
-  // ===== Create user + link code-to-email + create session (بشكل آمن) =====
-  const createdAt = nowISO();
-  const passHash = await pbkdf2Hash(password);
-  const token = await newSessionToken();
-  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
-  // تحديث الكود لازم يكون مشروط: (غير مربوط) أو (مربوط لنفس الإيميل)
-  const updateStmt = db.prepare(`
-    UPDATE codes
-    SET is_used = 1, used_by_email = ?, used_at = ?
-    WHERE (code = ? OR REPLACE(code,'-','') = ?)
-      AND (used_by_email IS NULL OR used_by_email = ?)
-  `).bind(email, createdAt, codeNorm, codeCompact, email);
-
-  const stmts = [
-    db.prepare(
-      "INSERT INTO users (email, provider, password_hash, code, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(email, "password", passHash, codeRow.code, createdAt, createdAt),
-
-    updateStmt,
-
-    db.prepare(
-      "INSERT INTO sessions (token, email, created_at, expires_at) VALUES (?, ?, ?, ?)"
-    ).bind(token, email, createdAt, expires),
-  ];
 
   try {
-    const res = await db.batch(stmts);
+    // ✅ تأكد من وجود الجداول الأساسية (هذا كان سبب 500 غالبًا)
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS users (
+        email TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        password_hash TEXT,
+        code TEXT,
+        created_at TEXT NOT NULL,
+        last_login_at TEXT NOT NULL
+      );
+    `).run();
 
-    // نتأكد أن Update فعلاً اشتغل
-    const upd = res?.[1];
-    if (upd && typeof upd.changes === "number" && upd.changes < 1) {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+    `).run();
+
+    // ✅ جدول تفعيل الجهاز
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS activations (
+        code TEXT PRIMARY KEY,
+        device_id TEXT NOT NULL,
+        activated_at TEXT NOT NULL
+      );
+    `).run();
+
+    // ===== 1) لازم الكود يكون متفعّل على هذا الجهاز =====
+    const act = await db
+      .prepare("SELECT code, device_id FROM activations WHERE code = ? LIMIT 1")
+      .bind(code)
+      .first();
+
+    if (!act?.code) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
+    if ((act.device_id || "") !== deviceId) {
+      return json({ ok: false, error: "CODE_ALREADY_USED_ON_ANOTHER_DEVICE" }, 409);
+    }
+
+    // ===== 2) الإيميل موجود؟ =====
+    const existing = await db
+      .prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
+      .bind(email)
+      .first();
+
+    if (existing?.email) return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
+
+    // ===== 3) الكود موجود؟ =====
+    const codeRow = await db
+      .prepare("SELECT code, is_used, used_by_email FROM codes WHERE code = ? LIMIT 1")
+      .bind(code)
+      .first();
+
+    if (!codeRow?.code) return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
+
+    if (Number(codeRow.is_used) === 1 && codeRow.used_by_email && codeRow.used_by_email !== email) {
       return json({ ok: false, error: "CODE_ALREADY_LINKED_TO_OTHER_EMAIL" }, 409);
     }
 
-    return json({
-      ok: true,
-      email,
-      code: codeRow.code,
-      token,
-      expires_at: expires,
-    });
+    // ===== Create User + Link Code-to-Email + Create Session =====
+    const createdAt = nowISO();
+    const passHash = await pbkdf2Hash(password);
+    const token = await newSessionToken();
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const stmts = [
+      db.prepare(
+        "INSERT INTO users (email, provider, password_hash, code, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)"
+      ).bind(email, "password", passHash, code, createdAt, createdAt),
+
+      db.prepare(
+        "UPDATE codes SET is_used = 1, used_by_email = ?, used_at = COALESCE(used_at, ?) WHERE code = ?"
+      ).bind(email, createdAt, code),
+
+      db.prepare(
+        "INSERT INTO sessions (token, email, created_at, expires_at) VALUES (?, ?, ?, ?)"
+      ).bind(token, email, createdAt, expires),
+    ];
+
+    await db.batch(stmts);
+
+    return json({ ok: true, email, code, token, expires_at: expires }, 200);
   } catch (e) {
-    return json({ ok: false, error: "REGISTER_FAILED" }, 500);
+    // ✅ نعطيك سبب واضح بدل 500 مبهم (مفيد للتشخيص)
+    return json(
+      { ok: false, error: "REGISTER_FAILED", message: String(e?.message || e) },
+      500
+    );
   }
 }
