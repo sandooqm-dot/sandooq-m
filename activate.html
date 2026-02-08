@@ -276,7 +276,7 @@
         <div class="title" id="pageTitle">تفعيل اللعبة</div>
         <div class="sub" id="pageSub">
           أول مرة فقط: أدخل كود الشراء لتفعيل اللعبة على هذا الجهاز.<br>
-          بعد التفعيل… تفتح اللعبة مباشرة.
+          بعد التفعيل… أنشئ حساب أو سجل دخول.
         </div>
 
         <div class="panel">
@@ -303,7 +303,7 @@
             <div class="note" id="deviceNote"></div>
           </div>
 
-          <!-- ✅ شاشة الدخول (مقفلة إلى أن نكمل APIs) -->
+          <!-- ✅ شاشة الدخول -->
           <div id="viewLogin">
             <div class="row">
               <div class="input">
@@ -346,7 +346,7 @@
             <div class="row">
               <div class="input">
                 <span>🔒</span>
-                <input id="suPass" type="password" autocomplete="new-password" placeholder="كلمة المرور" />
+                <input id="suPass" type="password" autocomplete="new-password" placeholder="كلمة المرور (8+)" />
               </div>
             </div>
             <div class="row">
@@ -406,7 +406,9 @@
   const LS = {
     activated: "sndq_activated_v2",
     code: "sndq_code_v2",
-    device: "sndq_device_id_v2"
+    device: "sndq_device_id_v2",
+    email: "sndq_email_v2",
+    token: "sndq_token_v2"
   };
 
   const params = new URLSearchParams(location.search);
@@ -478,19 +480,44 @@
     }
   }
 
+  function explainRegisterError(err){
+    switch(err){
+      case "INVALID_EMAIL": return "البريد غير صحيح.";
+      case "WEAK_PASSWORD": return "كلمة المرور ضعيفة (لازم 8 أحرف أو أكثر).";
+      case "CODE_REQUIRED": return "لازم تفعيل الكود أولاً.";
+      case "CODE_NOT_FOUND": return "الكود غير موجود في النظام.";
+      case "CODE_ALREADY_USED": return "الكود مستخدم بحساب آخر.";
+      case "EMAIL_EXISTS": return "هذا البريد مسجل مسبقاً.";
+      case "REGISTER_FAILED": return "تعذر إنشاء الحساب. جرّب مرة ثانية.";
+      default: return err ? ("فشل التسجيل: " + err) : "تعذر إنشاء الحساب.";
+    }
+  }
+
+  function isEmail(v){
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||"").trim());
+  }
+
   function boot(){
     const deviceId = ensureDeviceId();
     $("deviceNote").textContent = "معرّف الجهاز: " + deviceId.slice(0,8) + "… (ثابت لهذا المتصفح)";
 
-    // لو متفعل خلاص افتح اللعبة
+    // لو عندنا token محفوظ (مستقبلاً بعد login/me) نفتح اللعبة مباشرة
+    const token = localStorage.getItem(LS.token) || "";
     const activated = localStorage.getItem(LS.activated) === "1";
     const savedCode = localStorage.getItem(LS.code) || "";
+
+    if(activated && token){
+      go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(token));
+      return;
+    }
+
+    // لو الجهاز متفعل (بدون token) => نخلي المستخدم يسجل/يدخل
     if(activated && savedCode){
       setBadge("ACTIVATED", true);
       $("codeBox").style.display = "none";
       $("pageTitle").textContent = "تم التفعيل";
-      $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>جاري فتح اللعبة…";
-      setTimeout(()=> go(returnTo), 450);
+      $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>الآن: أنشئ حساب أو سجّل دخول.";
+      wire();
       return;
     }
 
@@ -501,6 +528,7 @@
   }
 
   function wire(){
+    // ===== تفعيل الكود =====
     const codeInput = $("codeInput");
     const activateBtn = $("activateBtn");
     const codeErr = $("codeErr");
@@ -532,7 +560,6 @@
       const deviceId = ensureDeviceId();
 
       try{
-        // ✅ هذا هو الـ Endpoint الصحيح حسب verify.js
         const res = await fetch("/api/verify", {
           method: "POST",
           headers: { "Content-Type":"application/json" },
@@ -548,9 +575,15 @@
           localStorage.setItem(LS.code, code);
 
           setBadge("ACTIVATED", true);
-          showMsg(codeOk, "تم تفعيل الكود ✅ جاري فتح اللعبة…", "ok");
+          showMsg(codeOk, "تم تفعيل الكود ✅ الآن أنشئ حساب أو سجّل دخول.", "ok");
 
-          setTimeout(()=> go(returnTo), 450);
+          // بدل ما نفتح اللعبة مباشرة: نخفي صندوق الكود ونخليك تكمل تسجيل
+          $("codeBox").style.display = "none";
+          $("pageTitle").textContent = "تم التفعيل";
+          $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>الآن: أنشئ حساب أو سجّل دخول.";
+
+          // نرجّع التفعيل للأزرار
+          activateBtn.disabled = false;
           return;
         }
 
@@ -566,7 +599,7 @@
       }
     });
 
-    // ===== باقي الشاشات (حالياً مجرد واجهة - سنربطها لاحقاً بـ APIs)
+    // ===== الشاشات =====
     function showView(name){
       $("viewLogin").style.display  = (name==="login") ? "block" : "none";
       $("viewSignup").style.display = (name==="signup") ? "block" : "none";
@@ -582,23 +615,11 @@
     $("backLogin1").onclick = ()=>showView("login");
     $("backLogin2").onclick = ()=>showView("login");
 
-    // Google الآن: نعطي رسالة واضحة بدل تعليق/رفرش
-    function googleStart(){
-      showMsg($("loginErr"), "تسجيل Google سنربطه بعد إنهاء التفعيل. حالياً هذا الزر واجهة فقط.", "danger");
-    }
-    $("googleBtn").onclick = googleStart;
-    $("googleBtn2").onclick = googleStart;
-
-    $("loginBtn").onclick = ()=> showMsg($("loginErr"), "تسجيل الدخول بالإيميل سنربطه بعد إنهاء التفعيل. حالياً واجهة.", "danger");
-    $("signupBtn").onclick = ()=> showMsg($("suErr"), "التسجيل سنربطه بعد إنهاء التفعيل. حالياً واجهة.", "danger");
-    $("resetBtn").onclick = ()=> showMsg($("rsErr"), "الاستعادة سنربطها لاحقاً. حالياً واجهة.", "danger");
-
-    // تفعيل/تعطيل الأزرار شكلياً فقط
-    const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||"").trim());
-
+    // ===== أزرار شكلية + التفعيل =====
     const loginEmail = $("loginEmail"), loginPass = $("loginPass"), loginBtn = $("loginBtn");
     function refreshLogin(){
-      loginBtn.disabled = !(isEmail(loginEmail.value) && (loginPass.value||"").length >= 6);
+      loginBtn.disabled = !(isEmail(loginEmail.value) && (loginPass.value||"").length >= 8);
+      hideMsg($("loginErr")); hideMsg($("loginOk"));
     }
     loginEmail.addEventListener("input", refreshLogin);
     loginPass.addEventListener("input", refreshLogin);
@@ -606,8 +627,9 @@
 
     const suEmail=$("suEmail"), suPass=$("suPass"), suPass2=$("suPass2"), signupBtn=$("signupBtn");
     function refreshSignup(){
-      const ok = isEmail(suEmail.value) && suPass.value.length>=6 && suPass2.value.length>=6 && (suPass.value===suPass2.value);
+      const ok = isEmail(suEmail.value) && suPass.value.length>=8 && suPass2.value.length>=8 && (suPass.value===suPass2.value);
       signupBtn.disabled = !ok;
+      hideMsg($("suErr")); hideMsg($("suOk"));
     }
     suEmail.addEventListener("input", refreshSignup);
     suPass.addEventListener("input", refreshSignup);
@@ -617,9 +639,86 @@
     const rsEmail=$("rsEmail"), resetBtn=$("resetBtn");
     function refreshReset(){
       resetBtn.disabled = !isEmail(rsEmail.value);
+      hideMsg($("rsErr")); hideMsg($("rsOk"));
     }
     rsEmail.addEventListener("input", refreshReset);
     refreshReset();
+
+    // ===== Google/Reset/Login (مؤقتاً) =====
+    function googleStart(){
+      showMsg($("loginErr"), "تسجيل Google سنربطه بعد إنهاء APIs. حالياً هذا الزر واجهة فقط.", "danger");
+    }
+    $("googleBtn").onclick = googleStart;
+    $("googleBtn2").onclick = googleStart;
+
+    loginBtn.onclick = ()=> showMsg($("loginErr"), "تسجيل الدخول سنربطه بعد ما نخلص login API. حالياً واجهة.", "danger");
+    resetBtn.onclick = ()=> showMsg($("rsErr"), "استرجاع كلمة المرور سنربطه بعدين. حالياً واجهة.", "danger");
+
+    // ✅ التسجيل الحقيقي: /api/register
+    signupBtn.onclick = async ()=>{
+      hideMsg($("suErr")); hideMsg($("suOk"));
+      signupBtn.disabled = true;
+
+      const email = (suEmail.value || "").trim();
+      const password = suPass.value || "";
+      const password2 = suPass2.value || "";
+
+      if(!isEmail(email)){
+        showMsg($("suErr"), "البريد غير صحيح.", "danger");
+        signupBtn.disabled = false;
+        return;
+      }
+      if(password.length < 8){
+        showMsg($("suErr"), "كلمة المرور لازم 8 أحرف أو أكثر.", "danger");
+        signupBtn.disabled = false;
+        return;
+      }
+      if(password !== password2){
+        showMsg($("suErr"), "كلمتا المرور غير متطابقتين.", "danger");
+        signupBtn.disabled = false;
+        return;
+      }
+
+      const code = localStorage.getItem(LS.code) || "";
+      if(!code){
+        showMsg($("suErr"), "لازم تفعّل الكود أولاً.", "danger");
+        signupBtn.disabled = false;
+        return;
+      }
+
+      try{
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify({ email, password, code }),
+          cache: "no-store",
+          credentials: "include"
+        });
+
+        const data = await res.json().catch(()=> ({}));
+
+        if(res.ok && data && data.ok && data.token){
+          localStorage.setItem(LS.email, data.email || email);
+          localStorage.setItem(LS.token, data.token);
+
+          showMsg($("suOk"), "تم إنشاء الحساب ✅ جاري فتح اللعبة…", "ok");
+
+          // نفتح اللعبة مع التوكن (مؤقتاً) — لاحقاً بنعتمد /api/me
+          setTimeout(()=>{
+            go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(data.token));
+          }, 450);
+          return;
+        }
+
+        const err = (data && (data.error || data.message)) || ("HTTP_" + res.status);
+        showMsg($("suErr"), explainRegisterError(err), "danger");
+        signupBtn.disabled = false;
+
+      }catch(e){
+        showMsg($("suErr"), "مشكلة اتصال… جرّب مرة ثانية.", "danger");
+        signupBtn.disabled = false;
+      }
+    };
   }
 
   boot();
