@@ -2,19 +2,20 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // --- CORS ---
-  const origin = request.headers.get("Origin") || "*";
+  // --- CORS (Fix: لا نستخدم "*" مع Credentials) ---
+  const originHeader = request.headers.get("Origin");
+  const allowOrigin = originHeader && originHeader !== "null" ? originHeader : "*";
+
   const corsHeaders = {
-    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Device-Id",
-    "Access-Control-Allow-Credentials": "true",
     "Vary": "Origin",
   };
 
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
-    }
+  }
 
   if (request.method !== "POST") {
     return new Response(JSON.stringify({ ok: false, error: "METHOD_NOT_ALLOWED" }), {
@@ -58,9 +59,9 @@ export async function onRequest(context) {
       );
     `).run();
 
-    // 2) Check code exists in codes table
+    // 2) Ensure code exists
     const codeRow = await db
-      .prepare(`SELECT code, is_used FROM codes WHERE code = ? LIMIT 1;`)
+      .prepare(`SELECT code, is_used, used_at FROM codes WHERE code = ? LIMIT 1;`)
       .bind(code)
       .first();
 
@@ -71,29 +72,36 @@ export async function onRequest(context) {
       });
     }
 
-    // 3) Check if code already activated to a device
-    const actRow = await db
+    // 3) If already activated, enforce device lock
+    const existingAct = await db
       .prepare(`SELECT code, device_id, activated_at FROM activations WHERE code = ? LIMIT 1;`)
       .bind(code)
       .first();
 
-    // If already activated:
-    if (actRow) {
-      // Same device => ok
-      if (actRow.device_id === deviceId) {
+    if (existingAct) {
+      if (existingAct.device_id === deviceId) {
+        // Same device => ok
+        // (نضمن أيضًا أن codes.is_used=1)
+        if (Number(codeRow.is_used) !== 1) {
+          const nowFix = new Date().toISOString();
+          await db
+            .prepare(`UPDATE codes SET is_used = 1, used_at = COALESCE(used_at, ?) WHERE code = ?;`)
+            .bind(nowFix, code)
+            .run();
+        }
+
         return new Response(JSON.stringify({
           ok: true,
           status: "ALREADY_ACTIVATED",
           code,
           deviceId,
-          activatedAt: actRow.activated_at,
+          activatedAt: existingAct.activated_at,
         }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Different device => reject
       return new Response(JSON.stringify({
         ok: false,
         error: "CODE_USED_OTHER_DEVICE",
@@ -104,17 +112,53 @@ export async function onRequest(context) {
       });
     }
 
-    // 4) First activation: mark codes.is_used=1 + used_at only (NO used_by_email here)
+    // 4) First activation (Atomic-ish):
+    // - أول شيء نسجل activations
+    // - بعدها نعلّم codes is_used=1
     const now = new Date().toISOString();
-    await db
-      .prepare(`UPDATE codes SET is_used = 1, used_at = ? WHERE code = ?;`)
-      .bind(now, code)
-      .run();
 
-    // 5) Insert activation record
-    await db
+    // حاول ندخل سجل التفعيل. لو صار سباق طلبين، واحد فقط ينجح.
+    const insertRes = await db
       .prepare(`INSERT INTO activations (code, device_id, activated_at) VALUES (?, ?, ?);`)
       .bind(code, deviceId, now)
+      .run();
+
+    // لو فشل الإدخال لأي سبب، نعيد نقرأ ونحكم
+    // (D1 أحيانًا يرجع success=false أو خطأ constraint في exception)
+    // هنا نتحقق بحالتين: بعد الإدخال نقرأ السجل ونقارن الجهاز.
+    const actAfter = await db
+      .prepare(`SELECT code, device_id, activated_at FROM activations WHERE code = ? LIMIT 1;`)
+      .bind(code)
+      .first();
+
+    if (!actAfter) {
+      // هذا يعني الإدخال ما تم فعليًا
+      return new Response(JSON.stringify({
+        ok: false,
+        error: "ACTIVATION_NOT_SAVED",
+        code,
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (actAfter.device_id !== deviceId) {
+      // انحجز على جهاز ثاني (سباق)
+      return new Response(JSON.stringify({
+        ok: false,
+        error: "CODE_USED_OTHER_DEVICE",
+        code,
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 5) Mark code as used ONLY AFTER activation exists
+    await db
+      .prepare(`UPDATE codes SET is_used = 1, used_at = COALESCE(used_at, ?) WHERE code = ?;`)
+      .bind(now, code)
       .run();
 
     return new Response(JSON.stringify({
@@ -122,7 +166,7 @@ export async function onRequest(context) {
       status: "ACTIVATED",
       code,
       deviceId,
-      activatedAt: now,
+      activatedAt: actAfter.activated_at,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
