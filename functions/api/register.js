@@ -4,7 +4,10 @@ export async function onRequest(context) {
 
   // ===== CORS =====
   const origin = request.headers.get("Origin") || "";
-  const allowed = (env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+  const allowed = (env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
@@ -41,6 +44,15 @@ export async function onRequest(context) {
     return email.trim().toLowerCase();
   }
 
+  function normCode(code) {
+    return (code || "")
+      .toString()
+      .trim()
+      .toUpperCase()
+      .replace(/[–—−]/g, "-")
+      .replace(/\s+/g, "");
+  }
+
   function nowISO() {
     return new Date().toISOString();
   }
@@ -63,7 +75,12 @@ export async function onRequest(context) {
 
     const iterations = 210000;
     const bits = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
+      {
+        name: "PBKDF2",
+        hash: "SHA-256",
+        salt: saltBytes,
+        iterations,
+      },
       keyMaterial,
       256
     );
@@ -87,25 +104,46 @@ export async function onRequest(context) {
     return json({ ok: false, error: "INVALID_JSON" }, 400);
   }
 
-  const emailRaw = body?.email ?? "";
+  const email = normEmail(body?.email ?? "");
   const password = body?.password ?? "";
-  const deviceIdRaw = body?.deviceId ?? "";
-  const codeRaw = body?.code ?? ""; // اختياري (لو واجهتك حالة خاصة)
-
-  const email = normEmail(emailRaw);
-  const deviceId = typeof deviceIdRaw === "string" ? deviceIdRaw.trim() : "";
-  let code = typeof codeRaw === "string" ? codeRaw.trim().toUpperCase() : "";
+  const code = normCode(body?.code ?? "");
+  const deviceId = (body?.deviceId ?? "").toString().trim();
 
   if (!isValidEmail(email)) return json({ ok: false, error: "INVALID_EMAIL" }, 400);
   if (!isValidPassword(password)) return json({ ok: false, error: "WEAK_PASSWORD" }, 400);
-
-  // لازم يكون عندنا deviceId لأن التسجيل مربوط بالتفعيل على نفس الجهاز
+  if (!code) return json({ ok: false, error: "CODE_REQUIRED" }, 400);
   if (!deviceId) return json({ ok: false, error: "DEVICE_REQUIRED" }, 400);
 
   const db = env.DB;
 
-  // 1) هل الإيميل موجود؟
-  const existing = await db.prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
+  // ===== تأكد من وجود جدول activations (آمن لو موجود) =====
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS activations (
+      code TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      activated_at TEXT NOT NULL
+    );
+  `).run();
+
+  // ===== 1) هل هذا الجهاز فعّل هذا الكود؟ =====
+  const act = await db
+    .prepare("SELECT code, device_id FROM activations WHERE code = ? LIMIT 1")
+    .bind(code)
+    .first();
+
+  if (!act?.code) {
+    // ما صار تفعيل أصلاً
+    return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
+  }
+
+  if ((act.device_id || "") !== deviceId) {
+    // الكود متفعّل على جهاز ثاني
+    return json({ ok: false, error: "CODE_ALREADY_USED_ON_ANOTHER_DEVICE" }, 409);
+  }
+
+  // ===== 2) هل الإيميل موجود؟ =====
+  const existing = await db
+    .prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
     .bind(email)
     .first();
 
@@ -113,21 +151,9 @@ export async function onRequest(context) {
     return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
   }
 
-  // 2) لو ما انرسل code من الواجهة: نجيبه من activations حسب deviceId
-  if (!code) {
-    const act = await db.prepare("SELECT code FROM activations WHERE device_id = ? LIMIT 1")
-      .bind(deviceId)
-      .first();
-
-    if (!act?.code) {
-      // يعني الجهاز ما فعل كود أصلاً
-      return json({ ok: false, error: "CODE_REQUIRED" }, 400);
-    }
-    code = String(act.code).trim().toUpperCase();
-  }
-
-  // 3) هل الكود موجود؟
-  const codeRow = await db.prepare("SELECT code, is_used, used_by_email, used_at FROM codes WHERE code = ? LIMIT 1")
+  // ===== 3) هل الكود موجود بجدول codes؟ =====
+  const codeRow = await db
+    .prepare("SELECT code, is_used, used_by_email FROM codes WHERE code = ? LIMIT 1")
     .bind(code)
     .first();
 
@@ -135,43 +161,30 @@ export async function onRequest(context) {
     return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
   }
 
-  // 4) هل الكود مستخدم بإيميل آخر؟ (مهم: نتجاهل القيم القديمة اللي كانت deviceId)
-  const usedBy = (codeRow.used_by_email || "").toString().trim();
-  const looksLikeEmail = usedBy.includes("@");
-
-  if (Number(codeRow.is_used) === 1 && looksLikeEmail && usedBy !== email) {
-    return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
+  // إذا الكود مرتبط بإيميل مختلف (يعني تم ربطه بحساب ثاني سابقاً)
+  if (
+    Number(codeRow.is_used) === 1 &&
+    codeRow.used_by_email &&
+    codeRow.used_by_email !== email
+  ) {
+    return json({ ok: false, error: "CODE_ALREADY_LINKED_TO_OTHER_EMAIL" }, 409);
   }
 
-  // 5) Create User + Mark Code(email) + Create Session
+  // ===== Create User + Link Code-to-Email + Create Session =====
   const createdAt = nowISO();
   const passHash = await pbkdf2Hash(password);
   const token = await newSessionToken();
-
-  // جلسة 30 يوم
   const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  // تحديث codes:
-  // - يثبت is_used = 1
-  // - ويكتب used_by_email = email
-  // - ويسمح باستبدال القيم القديمة (deviceId) لأنها مو إيميل
   const stmts = [
     db.prepare(
       "INSERT INTO users (email, provider, password_hash, code, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)"
     ).bind(email, "password", passHash, code, createdAt, createdAt),
 
+    // هنا نربط الكود بالإيميل (ولا نكتب deviceId هنا نهائياً)
     db.prepare(
-      `UPDATE codes
-       SET is_used = 1, used_by_email = ?, used_at = ?
-       WHERE code = ?
-         AND (
-           is_used = 0
-           OR used_by_email IS NULL
-           OR used_by_email = ''
-           OR used_by_email = ?
-           OR used_by_email NOT LIKE '%@%'
-         )`
-    ).bind(email, createdAt, code, email),
+      "UPDATE codes SET is_used = 1, used_by_email = ?, used_at = ? WHERE code = ?"
+    ).bind(email, createdAt, code),
 
     db.prepare(
       "INSERT INTO sessions (token, email, created_at, expires_at) VALUES (?, ?, ?, ?)"
@@ -179,14 +192,7 @@ export async function onRequest(context) {
   ];
 
   try {
-    const res = await db.batch(stmts);
-
-    // نتأكد أن تحديث الكود تم فعلاً
-    const updateRes = res?.[1];
-    // في D1 غالباً يوجد changes؛ لو ما تغير شيء معناها الشرط ما انطبق (يعني الكود مربوط بإيميل آخر)
-    if (updateRes && typeof updateRes.changes === "number" && updateRes.changes < 1) {
-      return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
-    }
+    await db.batch(stmts);
 
     return json({
       ok: true,
@@ -195,7 +201,6 @@ export async function onRequest(context) {
       token,
       expires_at: expires,
     });
-
   } catch (e) {
     return json({ ok: false, error: "REGISTER_FAILED" }, 500);
   }
