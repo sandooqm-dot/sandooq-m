@@ -12,7 +12,8 @@ export async function onRequest(context) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    // ✅ أضفنا X-Device-Id
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
   };
 
@@ -107,7 +108,10 @@ export async function onRequest(context) {
   const email = normEmail(body?.email ?? "");
   const password = body?.password ?? "";
   const code = normCode(body?.code ?? "");
-  const deviceId = (body?.deviceId ?? "").toString().trim();
+
+  // ✅ deviceId من body أو من header
+  const headerDeviceId = request.headers.get("X-Device-Id") || "";
+  const deviceId = ((body?.deviceId ?? headerDeviceId) || "").toString().trim();
 
   if (!isValidEmail(email)) return json({ ok: false, error: "INVALID_EMAIL" }, 400);
   if (!isValidPassword(password)) return json({ ok: false, error: "WEAK_PASSWORD" }, 400);
