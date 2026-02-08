@@ -470,13 +470,16 @@
     return id;
   }
 
+  // ✅ (تعديل) رسائل الأخطاء لتطابق verify.js الحقيقي
   function explainVerifyError(err){
     switch(err){
       case "MISSING_CODE": return "أدخل كود التفعيل.";
-      case "MISSING_DEVICE": return "المتصفح لم ينشئ معرف الجهاز. حدّث الصفحة وجرب.";
-      case "CODE_NOT_FOUND": return "الكود غير موجود. تأكد من نسخه بدون مسافات.";
-      case "CODE_ALREADY_USED_ON_ANOTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
-      default: return err ? ("فشل التفعيل: " + err) : "تعذر تفعيل الكود.";
+      case "DEVICE_REQUIRED": return "هذا المتصفح لا يسمح بإنشاء معرف جهاز (جرّب متصفح عادي وليس خاص).";
+      case "INVALID_CODE": return "الكود غير موجود. تأكد من نسخه بدون مسافات.";
+      case "CODE_USED_OTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
+      case "HTTP_500": return "خطأ بالسيرفر. جرّب مرة ثانية.";
+      default:
+        return err ? ("فشل التفعيل: " + err) : "تعذر تفعيل الكود.";
     }
   }
 
@@ -501,7 +504,6 @@
     const deviceId = ensureDeviceId();
     $("deviceNote").textContent = "معرّف الجهاز: " + deviceId.slice(0,8) + "… (ثابت لهذا المتصفح)";
 
-    // لو عندنا token محفوظ (مستقبلاً بعد login/me) نفتح اللعبة مباشرة
     const token = localStorage.getItem(LS.token) || "";
     const activated = localStorage.getItem(LS.activated) === "1";
     const savedCode = localStorage.getItem(LS.code) || "";
@@ -511,7 +513,6 @@
       return;
     }
 
-    // لو الجهاز متفعل (بدون token) => نخلي المستخدم يسجل/يدخل
     if(activated && savedCode){
       setBadge("ACTIVATED", true);
       $("codeBox").style.display = "none";
@@ -521,14 +522,12 @@
       return;
     }
 
-    // غير مفعل
     setBadge("CODE_REQUIRED", false);
     $("codeBox").style.display = "block";
     wire();
   }
 
   function wire(){
-    // ===== تفعيل الكود =====
     const codeInput = $("codeInput");
     const activateBtn = $("activateBtn");
     const codeErr = $("codeErr");
@@ -568,22 +567,23 @@
           credentials: "include"
         });
 
+        // ✅ (تعديل) نتعامل مع JSON بأمان
         const data = await res.json().catch(()=> ({}));
 
-        if(res.ok && data && data.ok && data.valid){
+        // ✅ (التعديل المهم) نجاح التفعيل = data.ok === true فقط (بدون valid)
+        if(res.ok && data && data.ok === true){
           localStorage.setItem(LS.activated, "1");
           localStorage.setItem(LS.code, code);
 
           setBadge("ACTIVATED", true);
+
+          // لو كان Already Activated أو Activated نفس النتيجة للمستخدم
           showMsg(codeOk, "تم تفعيل الكود ✅ الآن أنشئ حساب أو سجّل دخول.", "ok");
 
-          // بدل ما نفتح اللعبة مباشرة: نخفي صندوق الكود ونخليك تكمل تسجيل
           $("codeBox").style.display = "none";
           $("pageTitle").textContent = "تم التفعيل";
           $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>الآن: أنشئ حساب أو سجّل دخول.";
 
-          // نرجّع التفعيل للأزرار
-          activateBtn.disabled = false;
           return;
         }
 
@@ -599,7 +599,6 @@
       }
     });
 
-    // ===== الشاشات =====
     function showView(name){
       $("viewLogin").style.display  = (name==="login") ? "block" : "none";
       $("viewSignup").style.display = (name==="signup") ? "block" : "none";
@@ -615,7 +614,6 @@
     $("backLogin1").onclick = ()=>showView("login");
     $("backLogin2").onclick = ()=>showView("login");
 
-    // ===== أزرار شكلية + التفعيل =====
     const loginEmail = $("loginEmail"), loginPass = $("loginPass"), loginBtn = $("loginBtn");
     function refreshLogin(){
       loginBtn.disabled = !(isEmail(loginEmail.value) && (loginPass.value||"").length >= 8);
@@ -644,7 +642,6 @@
     rsEmail.addEventListener("input", refreshReset);
     refreshReset();
 
-    // ===== Google/Reset/Login (مؤقتاً) =====
     function googleStart(){
       showMsg($("loginErr"), "تسجيل Google سنربطه بعد إنهاء APIs. حالياً هذا الزر واجهة فقط.", "danger");
     }
@@ -654,7 +651,6 @@
     loginBtn.onclick = ()=> showMsg($("loginErr"), "تسجيل الدخول سنربطه بعد ما نخلص login API. حالياً واجهة.", "danger");
     resetBtn.onclick = ()=> showMsg($("rsErr"), "استرجاع كلمة المرور سنربطه بعدين. حالياً واجهة.", "danger");
 
-    // ✅ التسجيل الحقيقي: /api/register
     signupBtn.onclick = async ()=>{
       hideMsg($("suErr")); hideMsg($("suOk"));
       signupBtn.disabled = true;
@@ -703,7 +699,6 @@
 
           showMsg($("suOk"), "تم إنشاء الحساب ✅ جاري فتح اللعبة…", "ok");
 
-          // نفتح اللعبة مع التوكن (مؤقتاً) — لاحقاً بنعتمد /api/me
           setTimeout(()=>{
             go(returnTo + (returnTo.includes("?") ? "&" : "?") + "t=" + encodeURIComponent(data.token));
           }, 450);
