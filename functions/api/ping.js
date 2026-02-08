@@ -1,5 +1,5 @@
 // functions/api/ping.js
-export async function onRequest({ request }) {
+export async function onRequest({ request, env }) {
   const origin = request.headers.get("Origin") || "*";
   const headers = {
     "Content-Type": "application/json; charset=utf-8",
@@ -15,10 +15,16 @@ export async function onRequest({ request }) {
     return new Response(null, { status: 204, headers });
   }
 
-  return new Response(JSON.stringify({
-    ok: true,
-    ping: "pong",
-    ts: new Date().toISOString(),
-    path: new URL(request.url).pathname,
-  }), { status: 200, headers });
+  const hasDB = !!env?.DB;
+
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      ping: "pong",
+      ts: new Date().toISOString(),
+      path: new URL(request.url).pathname,
+      hasDB,
+    }),
+    { status: 200, headers }
+  );
 }
