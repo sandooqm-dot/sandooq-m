@@ -470,16 +470,13 @@
     return id;
   }
 
-  // ✅ (تعديل) رسائل الأخطاء لتطابق verify.js الحقيقي
   function explainVerifyError(err){
     switch(err){
       case "MISSING_CODE": return "أدخل كود التفعيل.";
-      case "DEVICE_REQUIRED": return "هذا المتصفح لا يسمح بإنشاء معرف جهاز (جرّب متصفح عادي وليس خاص).";
+      case "DEVICE_REQUIRED": return "المتصفح لم ينشئ معرف الجهاز. حدّث الصفحة وجرب.";
       case "INVALID_CODE": return "الكود غير موجود. تأكد من نسخه بدون مسافات.";
       case "CODE_USED_OTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
-      case "HTTP_500": return "خطأ بالسيرفر. جرّب مرة ثانية.";
-      default:
-        return err ? ("فشل التفعيل: " + err) : "تعذر تفعيل الكود.";
+      default: return err ? ("فشل التفعيل: " + err) : "تعذر تفعيل الكود.";
     }
   }
 
@@ -488,10 +485,11 @@
       case "INVALID_EMAIL": return "البريد غير صحيح.";
       case "WEAK_PASSWORD": return "كلمة المرور ضعيفة (لازم 8 أحرف أو أكثر).";
       case "CODE_REQUIRED": return "لازم تفعيل الكود أولاً.";
+      case "ACTIVATE_FIRST": return "لازم تفعيل الكود أولاً.";
       case "CODE_NOT_FOUND": return "الكود غير موجود في النظام.";
-      case "CODE_ALREADY_USED": return "الكود مستخدم بحساب آخر.";
+      case "CODE_ALREADY_USED_ON_ANOTHER_DEVICE": return "هذا الكود مرتبط بجهاز آخر.";
       case "EMAIL_EXISTS": return "هذا البريد مسجل مسبقاً.";
-      case "REGISTER_FAILED": return "تعذر إنشاء الحساب. جرّب مرة ثانية.";
+      case "DEVICE_REQUIRED": return "تعذر قراءة معرف الجهاز… حدّث الصفحة وجرب.";
       default: return err ? ("فشل التسجيل: " + err) : "تعذر إنشاء الحساب.";
     }
   }
@@ -528,6 +526,7 @@
   }
 
   function wire(){
+    // ===== تفعيل الكود =====
     const codeInput = $("codeInput");
     const activateBtn = $("activateBtn");
     const codeErr = $("codeErr");
@@ -567,23 +566,21 @@
           credentials: "include"
         });
 
-        // ✅ (تعديل) نتعامل مع JSON بأمان
         const data = await res.json().catch(()=> ({}));
 
-        // ✅ (التعديل المهم) نجاح التفعيل = data.ok === true فقط (بدون valid)
-        if(res.ok && data && data.ok === true){
+        // ✅ verify يرجع ok/status — مو valid
+        if(res.ok && data && data.ok){
           localStorage.setItem(LS.activated, "1");
           localStorage.setItem(LS.code, code);
 
           setBadge("ACTIVATED", true);
-
-          // لو كان Already Activated أو Activated نفس النتيجة للمستخدم
           showMsg(codeOk, "تم تفعيل الكود ✅ الآن أنشئ حساب أو سجّل دخول.", "ok");
 
           $("codeBox").style.display = "none";
           $("pageTitle").textContent = "تم التفعيل";
           $("pageSub").innerHTML = "هذا الجهاز مُفعّل ✅<br>الآن: أنشئ حساب أو سجّل دخول.";
 
+          activateBtn.disabled = false;
           return;
         }
 
@@ -599,6 +596,7 @@
       }
     });
 
+    // ===== الشاشات =====
     function showView(name){
       $("viewLogin").style.display  = (name==="login") ? "block" : "none";
       $("viewSignup").style.display = (name==="signup") ? "block" : "none";
@@ -614,6 +612,7 @@
     $("backLogin1").onclick = ()=>showView("login");
     $("backLogin2").onclick = ()=>showView("login");
 
+    // ===== تفعيل أزرار الإدخال =====
     const loginEmail = $("loginEmail"), loginPass = $("loginPass"), loginBtn = $("loginBtn");
     function refreshLogin(){
       loginBtn.disabled = !(isEmail(loginEmail.value) && (loginPass.value||"").length >= 8);
@@ -642,6 +641,7 @@
     rsEmail.addEventListener("input", refreshReset);
     refreshReset();
 
+    // ===== Google/Reset/Login (مؤقتاً) =====
     function googleStart(){
       showMsg($("loginErr"), "تسجيل Google سنربطه بعد إنهاء APIs. حالياً هذا الزر واجهة فقط.", "danger");
     }
@@ -651,6 +651,7 @@
     loginBtn.onclick = ()=> showMsg($("loginErr"), "تسجيل الدخول سنربطه بعد ما نخلص login API. حالياً واجهة.", "danger");
     resetBtn.onclick = ()=> showMsg($("rsErr"), "استرجاع كلمة المرور سنربطه بعدين. حالياً واجهة.", "danger");
 
+    // ✅ التسجيل الحقيقي: /api/register
     signupBtn.onclick = async ()=>{
       hideMsg($("suErr")); hideMsg($("suOk"));
       signupBtn.disabled = true;
@@ -682,11 +683,17 @@
         return;
       }
 
+      // ✅✅ هذا هو المهم: deviceId لازم يروح مع التسجيل
+      const deviceId = ensureDeviceId();
+
       try{
         const res = await fetch("/api/register", {
           method: "POST",
-          headers: { "Content-Type":"application/json" },
-          body: JSON.stringify({ email, password, code }),
+          headers: {
+            "Content-Type":"application/json",
+            "X-Device-Id": deviceId
+          },
+          body: JSON.stringify({ email, password, code, deviceId }),
           cache: "no-store",
           credentials: "include"
         });
