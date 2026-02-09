@@ -82,12 +82,7 @@ export async function onRequest(context) {
     );
 
     const bits = await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt,
-        iterations: PBKDF2_ITER,
-        hash: "SHA-256",
-      },
+      { name: "PBKDF2", salt, iterations: PBKDF2_ITER, hash: "SHA-256" },
       keyMaterial,
       256
     );
@@ -100,52 +95,83 @@ export async function onRequest(context) {
     return toB64(salt);
   }
 
-  async function ensureTables() {
-    // ✅ Create tables if not exists (بدون exec)
-    await db.prepare(`
+  async function ensureTablesAndMigrations() {
+    // 1) create tables if not exists (safe)
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
-        password_hash TEXT,
-        salt_b64 TEXT,
-        created_at TEXT
+        provider TEXT NOT NULL DEFAULT 'email',
+        password_hash TEXT NOT NULL,
+        salt_b64 TEXT NOT NULL,
+        created_at TEXT NOT NULL
       );
-    `).run();
+    `);
 
-    await db.prepare(`
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS activations (
         code TEXT PRIMARY KEY,
         device_id TEXT NOT NULL,
         activated_at TEXT NOT NULL
       );
-    `).run();
+    `);
 
-    await db.prepare(`
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS code_ownership (
         code TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         linked_at TEXT NOT NULL
       );
-    `).run();
+    `);
 
-    // ✅ Migration: لو جدول users قديم وناقص أعمدة، نضيفها
-    const info = await db.prepare(`PRAGMA table_info(users);`).all();
-    const cols = (info?.results || []).map(r => String(r.name || "").toLowerCase());
+    // 2) migrate old users table (if it already existed with different columns)
+    let cols = [];
+    try {
+      const info = await db.prepare(`PRAGMA table_info(users);`).all();
+      cols = (info?.results || []).map(r => r.name);
+    } catch {
+      cols = []; // if PRAGMA fails, we continue without migrations
+    }
 
-    if (!cols.includes("password_hash")) {
-      await db.prepare(`ALTER TABLE users ADD COLUMN password_hash TEXT;`).run();
+    const has = (c) => cols.includes(c);
+
+    // Add missing columns if possible
+    async function addCol(sql) {
+      try { await db.exec(sql); } catch { /* ignore */ }
     }
-    if (!cols.includes("salt_b64")) {
-      await db.prepare(`ALTER TABLE users ADD COLUMN salt_b64 TEXT;`).run();
+
+    if (!has("provider")) {
+      await addCol(`ALTER TABLE users ADD COLUMN provider TEXT;`);
     }
-    if (!cols.includes("created_at")) {
-      await db.prepare(`ALTER TABLE users ADD COLUMN created_at TEXT;`).run();
+    if (!has("password_hash")) {
+      await addCol(`ALTER TABLE users ADD COLUMN password_hash TEXT;`);
+    }
+    if (!has("salt_b64")) {
+      await addCol(`ALTER TABLE users ADD COLUMN salt_b64 TEXT;`);
+    }
+    if (!has("created_at")) {
+      await addCol(`ALTER TABLE users ADD COLUMN created_at TEXT;`);
+    }
+
+    // Ensure provider is filled for old rows (if column exists now)
+    try {
+      await db.exec(`UPDATE users SET provider = 'email' WHERE provider IS NULL OR provider = '';`);
+    } catch { /* ignore */ }
+  }
+
+  async function getUserColumns() {
+    try {
+      const info = await db.prepare(`PRAGMA table_info(users);`).all();
+      return (info?.results || []).map(r => r.name);
+    } catch {
+      // fallback: assume modern schema
+      return ["email", "provider", "password_hash", "salt_b64", "created_at"];
     }
   }
 
   // ===== Main =====
   try {
-    await ensureTables();
+    await ensureTablesAndMigrations();
 
     const body = await request.json().catch(() => null);
     if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
@@ -161,31 +187,47 @@ export async function onRequest(context) {
     if (code) {
       if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
 
-      const act = await db.prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
-        .bind(code)
-        .first();
-
+      const act = await db.prepare(`SELECT code, device_id FROM activations WHERE code = ?`).bind(code).first();
       if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
 
+      // لازم نفس الجهاز اللي فَعّل الكود
       if (act.device_id !== deviceId) {
         return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
       }
     }
 
     // هل المستخدم موجود؟
-    const existing = await db.prepare(`SELECT email FROM users WHERE email = ?`)
-      .bind(email)
-      .first();
-
+    const existing = await db.prepare(`SELECT email FROM users WHERE email = ?`).bind(email).first();
     if (existing) return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
 
     const saltB64 = randomSaltB64();
     const passwordHash = await pbkdf2Hash(password, saltB64);
 
-    await db.prepare(`
-      INSERT INTO users (email, password_hash, salt_b64, created_at)
-      VALUES (?, ?, ?, ?)
-    `).bind(email, passwordHash, saltB64, nowISO()).run();
+    // Insert compatible with whatever columns exist
+    const cols = await getUserColumns();
+    const insertCols = [];
+    const insertVals = [];
+
+    // Always
+    insertCols.push("email"); insertVals.push(email);
+
+    if (cols.includes("provider")) {
+      insertCols.push("provider"); insertVals.push("email");
+    }
+    if (cols.includes("password_hash")) {
+      insertCols.push("password_hash"); insertVals.push(passwordHash);
+    }
+    if (cols.includes("salt_b64")) {
+      insertCols.push("salt_b64"); insertVals.push(saltB64);
+    }
+    if (cols.includes("created_at")) {
+      insertCols.push("created_at"); insertVals.push(nowISO());
+    }
+
+    const placeholders = insertCols.map(() => "?").join(", ");
+    const sql = `INSERT INTO users (${insertCols.join(", ")}) VALUES (${placeholders})`;
+
+    await db.prepare(sql).bind(...insertVals).run();
 
     // لو فيه كود، اربطه بالإيميل
     if (code) {
@@ -198,6 +240,7 @@ export async function onRequest(context) {
     return json({
       ok: true,
       email,
+      provider: "email",
       pbkdf2Iterations: PBKDF2_ITER,
       linkedCode: code || null
     }, 200);
