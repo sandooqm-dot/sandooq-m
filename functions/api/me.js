@@ -1,4 +1,5 @@
-v2-clean
+// functions/api/me.js
+export async function onRequest(context) {
 // functions/api/me.js
 export async function onRequest(context) {
   const { request, env } = context;
