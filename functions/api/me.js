@@ -1,8 +1,9 @@
+v2-clean
 // functions/api/me.js
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // ===== CORS =====
+  //  CORS 
   const origin = request.headers.get("Origin") || "";
   const allowed = (env.ALLOWED_ORIGINS || "")
     .split(",")
@@ -31,7 +32,7 @@ export async function onRequest(context) {
   if (!env?.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
   const db = env.DB;
 
-  // ===== Helpers =====
+  //  Helpers 
   function nowISO() {
     return new Date().toISOString();
   }
@@ -61,7 +62,7 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const deviceId = (headerDeviceId || url.searchParams.get("deviceId") || "").toString().trim();
 
-  // ===== Ensure tables =====
+  //  Ensure tables 
   try {
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS users (
@@ -97,7 +98,7 @@ export async function onRequest(context) {
     return json({ ok: false, error: "ME_TABLES_FAILED", message: String(e?.message || e) }, 500);
   }
 
-  // ===== Get token =====
+  //  Get token 
   const token =
     getBearerToken(request) ||
     getCookie(request, "sandooq_token") ||
@@ -105,7 +106,7 @@ export async function onRequest(context) {
 
   if (!token) return json({ ok: false, error: "NO_SESSION" }, 401);
 
-  // ===== Validate session =====
+  //  Validate session 
   try {
     const session = await db
       .prepare("SELECT token, email, expires_at FROM sessions WHERE token = ? LIMIT 1")
@@ -126,7 +127,7 @@ export async function onRequest(context) {
 
     if (!user?.email) return json({ ok: false, error: "USER_NOT_FOUND" }, 401);
 
-    // ===== Device limit (2 devices max) =====
+    //  Device limit (2 devices max) 
     // ملاحظة: المتصفح الخفي غالبًا يغيّر الـ deviceId عندكم، فهنا يظهر كجهاز جديد.
     // هذا بالضبط اللي يسبب "تجاوزت حد الأجهزة" لو شارك الإيميل.
     if (!deviceId) {
