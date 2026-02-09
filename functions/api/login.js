@@ -9,16 +9,13 @@ export async function onRequest(context) {
     .map(s => s.trim())
     .filter(Boolean);
 
-  const allowOrigin = allowed.includes(origin) ? origin : (allowed[0] || "*");
-
   const corsHeaders = {
-    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
+    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
-    // لو بتستخدم كوكي للسشن
-    "Access-Control-Allow-Credentials": "true",
   };
 
   function json(obj, status = 200, extraHeaders = {}) {
@@ -56,6 +53,7 @@ export async function onRequest(context) {
     return q || headerDeviceId(req);
   }
 
+  // PBKDF2 settings (must match register)
   const PBKDF2_ITER = 100000;
 
   function toB64(bytes) {
@@ -98,25 +96,15 @@ export async function onRequest(context) {
     return toB64(bits);
   }
 
-  function safeEqual(a, b) {
-    if (typeof a !== "string" || typeof b !== "string") return false;
-    if (a.length !== b.length) return false;
-    let out = 0;
-    for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
-    return out === 0;
-  }
-
-  function randomSid() {
-    // token قوي لسشن
-    const bytes = crypto.getRandomValues(new Uint8Array(24));
+  function randomId(len = 32) {
+    const bytes = crypto.getRandomValues(new Uint8Array(len));
     // base64url
-    let s = "";
-    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    return btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
 
   async function ensureTables() {
-    // users (لا نستخدم email_verified ولا provider هنا)
+    // users (same schema as register.js عندك الآن)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,34 +120,16 @@ export async function onRequest(context) {
       CREATE TABLE IF NOT EXISTS sessions (
         sid TEXT PRIMARY KEY,
         email TEXT NOT NULL,
-        device_id TEXT,
+        device_id TEXT NOT NULL,
         created_at TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
     `);
   }
 
-  async function migrateUsersTableIfNeeded() {
-    // لو كان عندك جدول قديم، نضيف الأعمدة الناقصة بدل ما نطيّح
-    const info = await db.prepare(`PRAGMA table_info(users);`).all();
-    const rows = info?.results || [];
-    const cols = new Set(rows.map(r => r.name));
-
-    async function addCol(name, type, defSql = "") {
-      if (!cols.has(name)) {
-        await db.exec(`ALTER TABLE users ADD COLUMN ${name} ${type} ${defSql};`);
-      }
-    }
-
-    await addCol("password_hash", "TEXT", ""); // NOTE: ما نقدر NOT NULL هنا لأن الجدول قديم
-    await addCol("salt_b64", "TEXT", "");
-    await addCol("created_at", "TEXT", "");
-  }
-
   // ===== Main =====
   try {
     await ensureTables();
-    await migrateUsersTableIfNeeded();
 
     const body = await request.json().catch(() => null);
     if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
@@ -169,6 +139,7 @@ export async function onRequest(context) {
     const deviceId = (body.deviceId || "").toString().trim() || readDeviceId(request);
 
     if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
+    if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
 
     const user = await db
       .prepare(`SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`)
@@ -177,33 +148,34 @@ export async function onRequest(context) {
 
     if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    if (!user.password_hash || !user.salt_b64) {
-      return json({ ok: false, error: "USER_SCHEMA_INVALID" }, 500);
-    }
-
-    const computed = await pbkdf2Hash(password, user.salt_b64);
-    if (!safeEqual(computed, user.password_hash)) {
+    const expected = await pbkdf2Hash(password, user.salt_b64);
+    if (expected !== user.password_hash) {
       return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
     }
 
-    // إنشاء سشن 30 يوم
-    const sid = randomSid();
-    const maxAge = 60 * 60 * 24 * 30;
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + maxAge * 1000).toISOString();
+    // create session (7 days)
+    const sid = randomId(32);
+    const createdAt = nowISO();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     await db.prepare(`
-      INSERT INTO sessions (sid, email, device_id, created_at, expires_at)
+      INSERT OR REPLACE INTO sessions (sid, email, device_id, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(sid, email, deviceId || null, nowISO(), expiresAt).run();
+    `).bind(sid, email, deviceId, createdAt, expiresAt).run();
 
-    const setCookie =
-      `sid=${sid}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+    const cookie = [
+      `sid=${sid}`,
+      "Path=/",
+      "HttpOnly",
+      "Secure",
+      "SameSite=Lax",
+      `Max-Age=${7 * 24 * 60 * 60}`,
+    ].join("; ");
 
     return json(
-      { ok: true, email, sid, expiresAt },
+      { ok: true, email },
       200,
-      { "Set-Cookie": setCookie }
+      { "Set-Cookie": cookie }
     );
 
   } catch (e) {
@@ -214,5 +186,3 @@ export async function onRequest(context) {
     }, 500);
   }
 }
-
-// login.js — إصدار 1 (Fix: remove email_verified dependency + sessions)
