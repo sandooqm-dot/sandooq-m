@@ -1,7 +1,5 @@
 // functions/api/me.js
 export async function onRequest(context) {
-// functions/api/me.js
-export async function onRequest(context) {
   const { request, env } = context;
 
   //  CORS 
@@ -129,10 +127,7 @@ export async function onRequest(context) {
     if (!user?.email) return json({ ok: false, error: "USER_NOT_FOUND" }, 401);
 
     //  Device limit (2 devices max) 
-    // ملاحظة: المتصفح الخفي غالبًا يغيّر الـ deviceId عندكم، فهنا يظهر كجهاز جديد.
-    // هذا بالضبط اللي يسبب "تجاوزت حد الأجهزة" لو شارك الإيميل.
     if (!deviceId) {
-      // نخليه خطأ واضح عشان نقدر نضبطه في الواجهة
       return json({ ok: false, error: "DEVICE_REQUIRED" }, 400);
     }
 
@@ -172,7 +167,6 @@ export async function onRequest(context) {
       ok: true,
       email: user.email,
       provider: user.provider,
-      // code هنا “اللي مرتبط بالحساب” (إذا ربطناه لاحقًا)
       code: user.code || null,
       device_limit: 2
     }, 200);
