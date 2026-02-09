@@ -11,7 +11,7 @@ export async function onRequest(context) {
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
@@ -28,19 +28,14 @@ export async function onRequest(context) {
     });
   }
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  if (request.method !== "POST") {
-    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
-  }
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (request.method !== "POST") return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
 
   if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
   const db = env.DB;
 
   // ===== Helpers =====
-  function nowISO() { return new Date().toISOString(); }
+  const nowISO = () => new Date().toISOString();
 
   function headerDeviceId(req) {
     return req.headers.get("X-Device-Id") || "";
@@ -56,8 +51,8 @@ export async function onRequest(context) {
   const PBKDF2_ITER = 100000;
 
   function toB64(bytes) {
+    const arr = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : new Uint8Array(bytes);
     let s = "";
-    const arr = new Uint8Array(bytes);
     for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
     return btoa(s);
   }
@@ -95,9 +90,36 @@ export async function onRequest(context) {
     return toB64(salt);
   }
 
-  async function ensureTablesAndMigrations() {
-    // 1) create tables if not exists (safe)
-    await db.exec(`
+  async function run(sql, binds = []) {
+    // نستخدم prepare().run() بدل exec عشان الثبات
+    const stmt = db.prepare(sql);
+    const bound = binds.length ? stmt.bind(...binds) : stmt;
+    return await bound.run();
+  }
+
+  async function all(sql, binds = []) {
+    const stmt = db.prepare(sql);
+    const bound = binds.length ? stmt.bind(...binds) : stmt;
+    return await bound.all();
+  }
+
+  async function tableColumns(table) {
+    // PRAGMA table_info(users) → يرجع rows فيها name
+    let r = await all(`PRAGMA table_info(${table});`).catch(() => null);
+    let rows = r?.results || [];
+
+    // fallback
+    if (!rows.length) {
+      r = await all(`SELECT name FROM pragma_table_info(?)`, [table]).catch(() => null);
+      rows = r?.results || [];
+    }
+
+    return new Set(rows.map(x => x.name));
+  }
+
+  async function ensureTablesAndMigrate() {
+    // 1) Create tables if not exists (أحدث مخطط)
+    await run(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
@@ -108,7 +130,7 @@ export async function onRequest(context) {
       );
     `);
 
-    await db.exec(`
+    await run(`
       CREATE TABLE IF NOT EXISTS activations (
         code TEXT PRIMARY KEY,
         device_id TEXT NOT NULL,
@@ -116,7 +138,7 @@ export async function onRequest(context) {
       );
     `);
 
-    await db.exec(`
+    await run(`
       CREATE TABLE IF NOT EXISTS code_ownership (
         code TEXT PRIMARY KEY,
         email TEXT NOT NULL,
@@ -124,54 +146,27 @@ export async function onRequest(context) {
       );
     `);
 
-    // 2) migrate old users table (if it already existed with different columns)
-    let cols = [];
-    try {
-      const info = await db.prepare(`PRAGMA table_info(users);`).all();
-      cols = (info?.results || []).map(r => r.name);
-    } catch {
-      cols = []; // if PRAGMA fails, we continue without migrations
-    }
+    // 2) Migrate users table if old schema موجود
+    const cols = await tableColumns("users");
 
-    const has = (c) => cols.includes(c);
-
-    // Add missing columns if possible
-    async function addCol(sql) {
-      try { await db.exec(sql); } catch { /* ignore */ }
+    // لو كان جدول قديم وما فيه بعض الأعمدة، نضيفها بدون ما نكسر شيء
+    if (!cols.has("provider")) {
+      await run(`ALTER TABLE users ADD COLUMN provider TEXT NOT NULL DEFAULT 'email';`).catch(() => {});
     }
-
-    if (!has("provider")) {
-      await addCol(`ALTER TABLE users ADD COLUMN provider TEXT;`);
+    if (!cols.has("password_hash")) {
+      await run(`ALTER TABLE users ADD COLUMN password_hash TEXT;`).catch(() => {});
     }
-    if (!has("password_hash")) {
-      await addCol(`ALTER TABLE users ADD COLUMN password_hash TEXT;`);
+    if (!cols.has("salt_b64")) {
+      await run(`ALTER TABLE users ADD COLUMN salt_b64 TEXT NOT NULL DEFAULT '';`).catch(() => {});
     }
-    if (!has("salt_b64")) {
-      await addCol(`ALTER TABLE users ADD COLUMN salt_b64 TEXT;`);
-    }
-    if (!has("created_at")) {
-      await addCol(`ALTER TABLE users ADD COLUMN created_at TEXT;`);
-    }
-
-    // Ensure provider is filled for old rows (if column exists now)
-    try {
-      await db.exec(`UPDATE users SET provider = 'email' WHERE provider IS NULL OR provider = '';`);
-    } catch { /* ignore */ }
-  }
-
-  async function getUserColumns() {
-    try {
-      const info = await db.prepare(`PRAGMA table_info(users);`).all();
-      return (info?.results || []).map(r => r.name);
-    } catch {
-      // fallback: assume modern schema
-      return ["email", "provider", "password_hash", "salt_b64", "created_at"];
+    if (!cols.has("created_at")) {
+      await run(`ALTER TABLE users ADD COLUMN created_at TEXT NOT NULL DEFAULT '';`).catch(() => {});
     }
   }
 
   // ===== Main =====
   try {
-    await ensureTablesAndMigrations();
+    await ensureTablesAndMigrate();
 
     const body = await request.json().catch(() => null);
     if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
@@ -183,73 +178,102 @@ export async function onRequest(context) {
 
     if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
-    // لو أرسل كود، لازم يكون مُفعل أولاً على جهاز (activate) قبل الربط بالحساب
+    // لو أرسل كود، لازم يكون مُفعل أولاً على نفس الجهاز
     if (code) {
       if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
 
-      const act = await db.prepare(`SELECT code, device_id FROM activations WHERE code = ?`).bind(code).first();
+      const act = await db.prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
+        .bind(code)
+        .first();
+
       if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
 
-      // لازم نفس الجهاز اللي فَعّل الكود
       if (act.device_id !== deviceId) {
         return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
       }
     }
 
     // هل المستخدم موجود؟
-    const existing = await db.prepare(`SELECT email FROM users WHERE email = ?`).bind(email).first();
+    const existing = await db.prepare(`SELECT id FROM users WHERE email = ?`).bind(email).first();
     if (existing) return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
 
     const saltB64 = randomSaltB64();
     const passwordHash = await pbkdf2Hash(password, saltB64);
 
-    // Insert compatible with whatever columns exist
-    const cols = await getUserColumns();
-    const insertCols = [];
-    const insertVals = [];
+    // نقرأ أعمدة users الفعلية ونبني INSERT على الموجود (عشان أي مخطط قديم ما يكسرنا)
+    const cols = await tableColumns("users");
 
-    // Always
-    insertCols.push("email"); insertVals.push(email);
+    const insertCols = ["email"];
+    const vals = [email];
+    const qs = ["?"];
 
-    if (cols.includes("provider")) {
-      insertCols.push("provider"); insertVals.push("email");
-    }
-    if (cols.includes("password_hash")) {
-      insertCols.push("password_hash"); insertVals.push(passwordHash);
-    }
-    if (cols.includes("salt_b64")) {
-      insertCols.push("salt_b64"); insertVals.push(saltB64);
-    }
-    if (cols.includes("created_at")) {
-      insertCols.push("created_at"); insertVals.push(nowISO());
+    // provider لو موجود
+    if (cols.has("provider")) {
+      insertCols.push("provider");
+      vals.push("email"); // provider = email/password
+      qs.push("?");
     }
 
-    const placeholders = insertCols.map(() => "?").join(", ");
-    const sql = `INSERT INTO users (${insertCols.join(", ")}) VALUES (${placeholders})`;
+    // password_hash لو موجود وإلا نحاول password (احتياط قديم)
+    if (cols.has("password_hash")) {
+      insertCols.push("password_hash");
+      vals.push(passwordHash);
+      qs.push("?");
+    } else if (cols.has("password")) {
+      insertCols.push("password");
+      vals.push(passwordHash);
+      qs.push("?");
+    } else {
+      // لو شيء غريب جدًا
+      return json({ ok: false, error: "USERS_SCHEMA_INVALID" }, 500);
+    }
 
-    await db.prepare(sql).bind(...insertVals).run();
+    // salt_b64 لو موجود
+    if (cols.has("salt_b64")) {
+      insertCols.push("salt_b64");
+      vals.push(saltB64);
+      qs.push("?");
+    }
+
+    // created_at لو موجود
+    if (cols.has("created_at")) {
+      insertCols.push("created_at");
+      vals.push(nowISO());
+      qs.push("?");
+    }
+
+    await run(
+      `INSERT INTO users (${insertCols.join(", ")}) VALUES (${qs.join(", ")})`,
+      vals
+    );
 
     // لو فيه كود، اربطه بالإيميل
     if (code) {
-      await db.prepare(`
-        INSERT OR REPLACE INTO code_ownership (code, email, linked_at)
-        VALUES (?, ?, ?)
-      `).bind(code, email, nowISO()).run();
+      await run(
+        `INSERT OR REPLACE INTO code_ownership (code, email, linked_at) VALUES (?, ?, ?)`,
+        [code, email, nowISO()]
+      );
     }
 
-    return json({
-      ok: true,
-      email,
-      provider: "email",
-      pbkdf2Iterations: PBKDF2_ITER,
-      linkedCode: code || null
-    }, 200);
-
+    return json(
+      {
+        ok: true,
+        email,
+        pbkdf2Iterations: PBKDF2_ITER,
+        linkedCode: code || null,
+      },
+      200
+    );
   } catch (e) {
-    return json({
-      ok: false,
-      error: "REGISTER_FAILED",
-      message: String(e?.message || e)
-    }, 500);
+    return json(
+      {
+        ok: false,
+        error: "REGISTER_FAILED",
+        message: String(e?.message || e),
+      },
+      500
+    );
   }
 }
+
+// register.js – إصدار 3
