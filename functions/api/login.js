@@ -32,7 +32,7 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // GET للتأكد إن الكود الجديد اننشر فعلاً
+  // GET health/version
   if (request.method === "GET") {
     return json({ ok: true, version: "login-v2" }, 200);
   }
@@ -57,7 +57,7 @@ export async function onRequest(context) {
     return q || headerDeviceId(req);
   }
 
-  // PBKDF2 settings
+  // PBKDF2 settings (Cloudflare cap: 100000)
   const PBKDF2_ITER = 100000;
 
   function toB64(bytes) {
@@ -87,7 +87,12 @@ export async function onRequest(context) {
     );
 
     const bits = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt, iterations: PBKDF2_ITER, hash: "SHA-256" },
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: PBKDF2_ITER,
+        hash: "SHA-256",
+      },
       keyMaterial,
       256
     );
@@ -95,8 +100,14 @@ export async function onRequest(context) {
     return toB64(bits);
   }
 
+  function randomTokenUrlSafe() {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const b64 = toB64(bytes);
+    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
   async function ensureTables() {
-    // لازم تكون نفس register.js
+    // users (اعتمدنا هذا الشكل بعد ما ضبطنا register)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +118,25 @@ export async function onRequest(context) {
       );
     `);
 
+    // code/device activations
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS activations (
+        code TEXT PRIMARY KEY,
+        device_id TEXT NOT NULL,
+        activated_at TEXT NOT NULL
+      );
+    `);
+
+    // code ownership per account
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS code_ownership (
+        code TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        linked_at TEXT NOT NULL
+      );
+    `);
+
+    // sessions
     await db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
@@ -116,17 +146,6 @@ export async function onRequest(context) {
         expires_at TEXT NOT NULL
       );
     `);
-  }
-
-  function randomToken() {
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
-    return toB64(bytes).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-  }
-
-  function addDaysISO(days) {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return d.toISOString();
   }
 
   // ===== Main =====
@@ -143,39 +162,67 @@ export async function onRequest(context) {
     if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
     if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
 
-    const user = await db.prepare(`
-      SELECT email, password_hash, salt_b64
-      FROM users
-      WHERE email = ?
-    `).bind(email).first();
+    // اجلب بيانات المستخدم (بدون أي أعمدة قديمة مثل email_verified/provider)
+    const user = await db
+      .prepare(`SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`)
+      .bind(email)
+      .first();
 
     if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
     const hash = await pbkdf2Hash(password, user.salt_b64);
-    if (hash !== user.password_hash) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
+    if (hash !== user.password_hash) {
+      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
+    }
 
-    const token = randomToken();
-    const now = nowISO();
-    const expires = addDaysISO(30);
+    // لو الحساب مرتبط بكود، لازم نفس الجهاز اللي فعّل الكود
+    const owned = await db
+      .prepare(`SELECT code FROM code_ownership WHERE email = ? LIMIT 1`)
+      .bind(email)
+      .first();
+
+    let linkedCode = owned?.code || null;
+
+    if (linkedCode) {
+      const act = await db
+        .prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
+        .bind(linkedCode)
+        .first();
+
+      if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
+      if (act.device_id !== deviceId) {
+        return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
+      }
+    }
+
+    // اصنع Session
+    const token = randomTokenUrlSafe();
+    const createdAt = nowISO();
+
+    // 30 يوم
+    const maxAgeSec = 60 * 60 * 24 * 30;
+    const expiresAt = new Date(Date.now() + maxAgeSec * 1000).toISOString();
 
     await db.prepare(`
-      INSERT OR REPLACE INTO sessions (token, email, device_id, created_at, expires_at)
+      INSERT INTO sessions (token, email, device_id, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(token, email, deviceId, now, expires).run();
+    `).bind(token, email, deviceId, createdAt, expiresAt).run();
 
-    // Cookie
-    const cookie = [
-      `sandooq_session=${token}`,
-      "Path=/",
-      "HttpOnly",
-      "SameSite=Lax",
-      "Secure",
-      `Max-Age=${30 * 24 * 60 * 60}`
-    ].join("; ");
+    const setCookie = `sandooq_session=${token}; Path=/; Max-Age=${maxAgeSec}; HttpOnly; Secure; SameSite=Lax`;
 
-    return json({ ok: true, email, expiresAt: expires }, 200, { "Set-Cookie": cookie });
+    return json({
+      ok: true,
+      email,
+      token,
+      linkedCode,
+      expiresInSec: maxAgeSec
+    }, 200, { "Set-Cookie": setCookie });
 
   } catch (e) {
-    return json({ ok: false, error: "LOGIN_FAILED", message: String(e?.message || e) }, 500);
+    return json({
+      ok: false,
+      error: "LOGIN_FAILED",
+      message: String(e?.message || e)
+    }, 500);
   }
 }
