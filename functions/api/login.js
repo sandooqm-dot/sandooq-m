@@ -11,167 +11,218 @@ export async function onRequest(context) {
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
 
-  function json(obj, status = 200) {
+  function json(obj, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(obj), {
       status,
-      headers: { "Content-Type": "application/json; charset=utf-8", ...corsHeaders },
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        ...corsHeaders,
+        ...extraHeaders,
+      },
     });
   }
 
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
+
+  // GET health/version
+  if (request.method === "GET") {
+    return json({ ok: true, version: "login-v2" }, 200);
+  }
+
   if (request.method !== "POST") {
     return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   }
 
+  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
+  const db = env.DB;
+
   // ===== Helpers =====
-  function isValidEmail(email) {
-    return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  }
-  function normEmail(email) {
-    return (email || "").toString().trim().toLowerCase();
+  function nowISO() { return new Date().toISOString(); }
+
+  function headerDeviceId(req) {
+    return req.headers.get("X-Device-Id") || "";
   }
 
-  function base64urlToBytes(s) {
-    s = (s || "").replace(/-/g, "+").replace(/_/g, "/");
-    while (s.length % 4) s += "=";
-    const bin = atob(s);
+  function readDeviceId(req) {
+    const u = new URL(req.url);
+    const q = (u.searchParams.get("deviceId") || "").toString().trim();
+    return q || headerDeviceId(req);
+  }
+
+  // PBKDF2 settings (Cloudflare cap: 100000)
+  const PBKDF2_ITER = 100000;
+
+  function toB64(bytes) {
+    let s = "";
+    const arr = new Uint8Array(bytes);
+    for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+    return btoa(s);
+  }
+
+  function fromB64(b64) {
+    const bin = atob(b64);
     const out = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
   }
 
-  function timingSafeEqual(a, b) {
-    if (a.length !== b.length) return false;
-    let diff = 0;
-    for (let i = 0; i < a.length; i++) diff |= (a[i] ^ b[i]);
-    return diff === 0;
-  }
-
-  async function verifyPbkdf2(password, stored) {
-    // stored format: pbkdf2$<iters>$<saltB64url>$<hashB64url>
-    if (!stored || typeof stored !== "string") return false;
-    const parts = stored.split("$");
-    if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-
-    const iterations = Number(parts[1]);
-    if (!Number.isFinite(iterations) || iterations < 1000) return false;
-
-    const saltBytes = base64urlToBytes(parts[2]);
-    const expectedHash = base64urlToBytes(parts[3]);
-
+  async function pbkdf2Hash(password, saltB64) {
     const enc = new TextEncoder();
+    const salt = fromB64(saltB64);
+
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
       enc.encode(password),
-      "PBKDF2",
+      { name: "PBKDF2" },
       false,
       ["deriveBits"]
     );
 
     const bits = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: PBKDF2_ITER,
+        hash: "SHA-256",
+      },
       keyMaterial,
-      expectedHash.length * 8
+      256
     );
 
-    const got = new Uint8Array(bits);
-    return timingSafeEqual(got, expectedHash);
+    return toB64(bits);
   }
 
-  function nowISO() {
-    return new Date().toISOString();
+  function randomTokenUrlSafe() {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const b64 = toB64(bytes);
+    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
 
-  function base64url(bytes) {
-    let str = btoa(String.fromCharCode(...bytes));
-    return str.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  }
-
-  async function newSessionToken() {
-    const rnd = crypto.getRandomValues(new Uint8Array(32));
-    return base64url(rnd);
-  }
-
-  // ===== DB Guard =====
-  if (!env?.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
-  const db = env.DB;
-
-  // ===== Parse Body =====
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ ok: false, error: "INVALID_JSON" }, 400);
-  }
-
-  const email = normEmail(body?.email ?? "");
-  const password = (body?.password ?? "").toString();
-
-  if (!isValidEmail(email)) return json({ ok: false, error: "INVALID_EMAIL" }, 400);
-  if (!password || password.length < 8) return json({ ok: false, error: "WEAK_PASSWORD" }, 400);
-
-  try {
-    // ===== Ensure tables (fresh start friendly) =====
-    await db.prepare(`
+  async function ensureTables() {
+    // users (اعتمدنا هذا الشكل بعد ما ضبطنا register)
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
-        email TEXT PRIMARY KEY,
-        password_hash TEXT,
-        email_verified INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        last_login_at TEXT NOT NULL
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        salt_b64 TEXT NOT NULL,
+        created_at TEXT NOT NULL
       );
-    `).run();
+    `);
 
-    await db.prepare(`
+    // code/device activations
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS activations (
+        code TEXT PRIMARY KEY,
+        device_id TEXT NOT NULL,
+        activated_at TEXT NOT NULL
+      );
+    `);
+
+    // code ownership per account
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS code_ownership (
+        code TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        linked_at TEXT NOT NULL
+      );
+    `);
+
+    // sessions
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
         email TEXT NOT NULL,
+        device_id TEXT NOT NULL,
         created_at TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
-    `).run();
+    `);
+  }
 
-    // ===== Lookup user =====
+  // ===== Main =====
+  try {
+    await ensureTables();
+
+    const body = await request.json().catch(() => null);
+    if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
+
+    const email = (body.email || "").toString().trim().toLowerCase();
+    const password = (body.password || "").toString();
+    const deviceId = (body.deviceId || "").toString().trim() || readDeviceId(request);
+
+    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
+    if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
+
+    // اجلب بيانات المستخدم (بدون أي أعمدة قديمة مثل email_verified/provider)
     const user = await db
-      .prepare("SELECT email, password_hash, email_verified FROM users WHERE email = ? LIMIT 1")
+      .prepare(`SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`)
       .bind(email)
       .first();
 
-    if (!user?.email) {
-      // لا نوضح هل الإيميل موجود أو لا (أمان)
-      return json({ ok: false, error: "INVALID_LOGIN" }, 401);
+    if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
+
+    const hash = await pbkdf2Hash(password, user.salt_b64);
+    if (hash !== user.password_hash) {
+      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
     }
 
-    const passOk = await verifyPbkdf2(password, user.password_hash || "");
-    if (!passOk) return json({ ok: false, error: "INVALID_LOGIN" }, 401);
+    // لو الحساب مرتبط بكود، لازم نفس الجهاز اللي فعّل الكود
+    const owned = await db
+      .prepare(`SELECT code FROM code_ownership WHERE email = ? LIMIT 1`)
+      .bind(email)
+      .first();
 
-    if (Number(user.email_verified) !== 1) {
-      return json({ ok: false, error: "EMAIL_NOT_VERIFIED" }, 403);
+    let linkedCode = owned?.code || null;
+
+    if (linkedCode) {
+      const act = await db
+        .prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
+        .bind(linkedCode)
+        .first();
+
+      if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
+      if (act.device_id !== deviceId) {
+        return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
+      }
     }
 
-    // ===== Create session =====
-    const token = await newSessionToken();
+    // اصنع Session
+    const token = randomTokenUrlSafe();
     const createdAt = nowISO();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    await db.batch([
-      db.prepare("UPDATE users SET last_login_at = ? WHERE email = ?")
-        .bind(createdAt, email),
+    // 30 يوم
+    const maxAgeSec = 60 * 60 * 24 * 30;
+    const expiresAt = new Date(Date.now() + maxAgeSec * 1000).toISOString();
 
-      db.prepare("INSERT INTO sessions (token, email, created_at, expires_at) VALUES (?, ?, ?, ?)")
-        .bind(token, email, createdAt, expiresAt),
-    ]);
+    await db.prepare(`
+      INSERT INTO sessions (token, email, device_id, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(token, email, deviceId, createdAt, expiresAt).run();
 
-    return json({ ok: true, email, token, expires_at: expiresAt }, 200);
+    const setCookie = `sandooq_session=${token}; Path=/; Max-Age=${maxAgeSec}; HttpOnly; Secure; SameSite=Lax`;
+
+    return json({
+      ok: true,
+      email,
+      token,
+      linkedCode,
+      expiresInSec: maxAgeSec
+    }, 200, { "Set-Cookie": setCookie });
+
   } catch (e) {
-    return json({ ok: false, error: "LOGIN_FAILED", message: String(e?.message || e) }, 500);
+    return json({
+      ok: false,
+      error: "LOGIN_FAILED",
+      message: String(e?.message || e)
+    }, 500);
   }
 }
