@@ -2,8 +2,6 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  const VERSION = "login-v3-debug-stage";
-
   // ===== CORS =====
   const origin = request.headers.get("Origin") || "";
   const allowed = (env.ALLOWED_ORIGINS || "")
@@ -34,16 +32,16 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // GET = fingerprint (يعلمنا 100% وش الملف اللي شغال)
+  // GET ping (عشان تتأكد إن الملف الصحيح متطبق)
   if (request.method === "GET") {
-    return json({ ok: true, version: VERSION }, 200);
+    return json({ ok: true, version: "login-v4-clean" }, 200);
   }
 
   if (request.method !== "POST") {
-    return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: VERSION }, 405);
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: "login-v4-clean" }, 405);
   }
 
-  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND", version: VERSION }, 500);
+  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND", version: "login-v4-clean" }, 500);
   const db = env.DB;
 
   // ===== Helpers =====
@@ -59,7 +57,7 @@ export async function onRequest(context) {
     return q || headerDeviceId(req);
   }
 
-  // PBKDF2 settings (Cloudflare cap: 100000)
+  // نفس إعداد register
   const PBKDF2_ITER = 100000;
 
   function toB64(bytes) {
@@ -102,13 +100,30 @@ export async function onRequest(context) {
     return toB64(bits);
   }
 
-  function randomTokenUrlSafe() {
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
+  function safeEqual(a, b) {
+    if (typeof a !== "string" || typeof b !== "string") return false;
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return diff === 0;
+  }
+
+  function b64url(bytes) {
     const b64 = toB64(bytes);
     return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
 
+  async function sha256Hex(str) {
+    const enc = new TextEncoder();
+    const digest = await crypto.subtle.digest("SHA-256", enc.encode(str));
+    const arr = new Uint8Array(digest);
+    let hex = "";
+    for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
+    return hex;
+  }
+
   async function ensureTables() {
+    // users (نفس register.js)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,14 +134,18 @@ export async function onRequest(context) {
       );
     `);
 
+    // sessions (توكِن جلسة)
     await db.exec(`
-      CREATE TABLE IF NOT EXISTS activations (
-        code TEXT PRIMARY KEY,
+      CREATE TABLE IF NOT EXISTS sessions (
+        token_hash TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
         device_id TEXT NOT NULL,
-        activated_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
       );
     `);
 
+    // code_ownership (اختياري، بس مفيد لاحقاً لـ me)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS code_ownership (
         code TEXT PRIMARY KEY,
@@ -134,102 +153,69 @@ export async function onRequest(context) {
         linked_at TEXT NOT NULL
       );
     `);
-
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        token TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        device_id TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        expires_at TEXT NOT NULL
-      );
-    `);
   }
 
-  // ===== Main with stage debugging =====
-  let stage = "start";
   try {
-    stage = "ensureTables";
     await ensureTables();
 
-    stage = "parseBody";
     const body = await request.json().catch(() => null);
-    if (!body) return json({ ok: false, error: "BAD_JSON", version: VERSION, stage }, 400);
+    if (!body) return json({ ok: false, error: "BAD_JSON", version: "login-v4-clean" }, 400);
 
-    stage = "readFields";
     const email = (body.email || "").toString().trim().toLowerCase();
     const password = (body.password || "").toString();
     const deviceId = (body.deviceId || "").toString().trim() || readDeviceId(request);
 
-    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS", version: VERSION, stage }, 400);
-    if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE", version: VERSION, stage }, 400);
-
-    stage = "selectUser";
-    const user = await db
-      .prepare(`SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`)
-      .bind(email)
-      .first();
-
-    if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS", version: VERSION, stage }, 401);
-
-    stage = "hashPassword";
-    const hash = await pbkdf2Hash(password, user.salt_b64);
-    if (hash !== user.password_hash) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS", version: VERSION, stage }, 401);
+    if (!email || !password) {
+      return json({ ok: false, error: "MISSING_FIELDS", version: "login-v4-clean" }, 400);
+    }
+    if (!deviceId) {
+      return json({ ok: false, error: "MISSING_DEVICE", version: "login-v4-clean" }, 400);
     }
 
-    stage = "codeOwnership";
-    const owned = await db
-      .prepare(`SELECT code FROM code_ownership WHERE email = ? LIMIT 1`)
-      .bind(email)
-      .first();
+    const user = await db.prepare(
+      `SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`
+    ).bind(email).first();
 
-    const linkedCode = owned?.code || null;
-
-    if (linkedCode) {
-      stage = "checkActivation";
-      const act = await db
-        .prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
-        .bind(linkedCode)
-        .first();
-
-      if (!act) return json({ ok: false, error: "ACTIVATE_FIRST", version: VERSION, stage }, 409);
-      if (act.device_id !== deviceId) {
-        return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE", version: VERSION, stage }, 409);
-      }
+    if (!user) {
+      return json({ ok: false, error: "INVALID_CREDENTIALS", version: "login-v4-clean" }, 401);
     }
 
-    stage = "makeSession";
-    const token = randomTokenUrlSafe();
+    const computed = await pbkdf2Hash(password, user.salt_b64);
+    if (!safeEqual(computed, user.password_hash)) {
+      return json({ ok: false, error: "INVALID_CREDENTIALS", version: "login-v4-clean" }, 401);
+    }
+
+    // اصنع توكن (نرجعه للعميل) ونخزن هاش فقط
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    const token = b64url(raw);
+    const tokenHash = await sha256Hex(token);
+
+    // صلاحية 30 يوم
     const createdAt = nowISO();
-    const maxAgeSec = 60 * 60 * 24 * 30;
-    const expiresAt = new Date(Date.now() + maxAgeSec * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    stage = "insertSession";
     await db.prepare(`
-      INSERT INTO sessions (token, email, device_id, created_at, expires_at)
+      INSERT OR REPLACE INTO sessions (token_hash, email, device_id, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(token, email, deviceId, createdAt, expiresAt).run();
+    `).bind(tokenHash, email, deviceId, createdAt, expiresAt).run();
 
-    stage = "done";
-    const setCookie = `sandooq_session=${token}; Path=/; Max-Age=${maxAgeSec}; HttpOnly; Secure; SameSite=Lax`;
+    // (اختياري) رجّع له هل فيه كود مرتبط
+    const owned = await db.prepare(`SELECT code FROM code_ownership WHERE email = ?`).bind(email).first();
 
     return json({
       ok: true,
-      version: VERSION,
-      stage,
+      version: "login-v4-clean",
       email,
       token,
-      linkedCode,
-      expiresInSec: maxAgeSec
-    }, 200, { "Set-Cookie": setCookie });
+      expiresAt,
+      linkedCode: owned?.code || null
+    }, 200);
 
   } catch (e) {
     return json({
       ok: false,
       error: "LOGIN_FAILED",
-      version: VERSION,
-      stage,
+      version: "login-v4-clean",
       message: String(e?.message || e)
     }, 500);
   }
