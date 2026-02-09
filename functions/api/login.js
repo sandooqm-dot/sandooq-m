@@ -9,13 +9,19 @@ export async function onRequest(context) {
     .map(s => s.trim())
     .filter(Boolean);
 
+  const allowOrigin = allowed.includes(origin) ? origin : (allowed[0] || "*");
+
   const corsHeaders = {
-    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
+
+  if (allowOrigin !== "*") {
+    corsHeaders["Access-Control-Allow-Credentials"] = "true";
+  }
 
   function json(obj, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(obj), {
@@ -32,16 +38,16 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // GET ping (عشان تتأكد إن الملف الصحيح متطبق)
+  // GET = فحص سريع إن الملف نازل صح
   if (request.method === "GET") {
-    return json({ ok: true, version: "login-v4-clean" }, 200);
+    return json({ ok: true, version: "login-v5-no-duration" }, 200);
   }
 
   if (request.method !== "POST") {
-    return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: "login-v4-clean" }, 405);
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   }
 
-  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND", version: "login-v4-clean" }, 500);
+  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
   const db = env.DB;
 
   // ===== Helpers =====
@@ -57,7 +63,7 @@ export async function onRequest(context) {
     return q || headerDeviceId(req);
   }
 
-  // نفس إعداد register
+  // PBKDF2 settings (Cloudflare cap ~100000)
   const PBKDF2_ITER = 100000;
 
   function toB64(bytes) {
@@ -74,6 +80,14 @@ export async function onRequest(context) {
     return out;
   }
 
+  function timingSafeEqual(a, b) {
+    if (typeof a !== "string" || typeof b !== "string") return false;
+    if (a.length !== b.length) return false;
+    let r = 0;
+    for (let i = 0; i < a.length; i++) r |= (a.charCodeAt(i) ^ b.charCodeAt(i));
+    return r === 0;
+  }
+
   async function pbkdf2Hash(password, saltB64) {
     const enc = new TextEncoder();
     const salt = fromB64(saltB64);
@@ -87,12 +101,7 @@ export async function onRequest(context) {
     );
 
     const bits = await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt,
-        iterations: PBKDF2_ITER,
-        hash: "SHA-256",
-      },
+      { name: "PBKDF2", salt, iterations: PBKDF2_ITER, hash: "SHA-256" },
       keyMaterial,
       256
     );
@@ -100,26 +109,12 @@ export async function onRequest(context) {
     return toB64(bits);
   }
 
-  function safeEqual(a, b) {
-    if (typeof a !== "string" || typeof b !== "string") return false;
-    if (a.length !== b.length) return false;
-    let diff = 0;
-    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-    return diff === 0;
-  }
-
-  function b64url(bytes) {
-    const b64 = toB64(bytes);
-    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  }
-
-  async function sha256Hex(str) {
-    const enc = new TextEncoder();
-    const digest = await crypto.subtle.digest("SHA-256", enc.encode(str));
-    const arr = new Uint8Array(digest);
-    let hex = "";
-    for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
-    return hex;
+  function randomIdB64url(byteLen = 32) {
+    const bytes = crypto.getRandomValues(new Uint8Array(byteLen));
+    // base64url
+    let s = "";
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
 
   async function ensureTables() {
@@ -134,18 +129,7 @@ export async function onRequest(context) {
       );
     `);
 
-    // sessions (توكِن جلسة)
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        token_hash TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        device_id TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        expires_at TEXT NOT NULL
-      );
-    `);
-
-    // code_ownership (اختياري، بس مفيد لاحقاً لـ me)
+    // code ownership (اختياري)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS code_ownership (
         code TEXT PRIMARY KEY,
@@ -153,23 +137,34 @@ export async function onRequest(context) {
         linked_at TEXT NOT NULL
       );
     `);
+
+    // sessions
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        sid TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        device_id TEXT,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+    `);
+
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_email ON sessions(email);`);
   }
 
+  // ===== Main =====
   try {
     await ensureTables();
 
     const body = await request.json().catch(() => null);
-    if (!body) return json({ ok: false, error: "BAD_JSON", version: "login-v4-clean" }, 400);
+    if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
 
     const email = (body.email || "").toString().trim().toLowerCase();
     const password = (body.password || "").toString();
     const deviceId = (body.deviceId || "").toString().trim() || readDeviceId(request);
 
     if (!email || !password) {
-      return json({ ok: false, error: "MISSING_FIELDS", version: "login-v4-clean" }, 400);
-    }
-    if (!deviceId) {
-      return json({ ok: false, error: "MISSING_DEVICE", version: "login-v4-clean" }, 400);
+      return json({ ok: false, error: "MISSING_FIELDS" }, 400);
     }
 
     const user = await db.prepare(
@@ -177,45 +172,49 @@ export async function onRequest(context) {
     ).bind(email).first();
 
     if (!user) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS", version: "login-v4-clean" }, 401);
+      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
     }
 
     const computed = await pbkdf2Hash(password, user.salt_b64);
-    if (!safeEqual(computed, user.password_hash)) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS", version: "login-v4-clean" }, 401);
+    if (!timingSafeEqual(computed, user.password_hash)) {
+      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
     }
 
-    // اصنع توكن (نرجعه للعميل) ونخزن هاش فقط
-    const raw = crypto.getRandomValues(new Uint8Array(32));
-    const token = b64url(raw);
-    const tokenHash = await sha256Hex(token);
-
-    // صلاحية 30 يوم
+    // جلسة دخول
+    const sid = randomIdB64url(32);
     const createdAt = nowISO();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(); // 30 يوم
 
     await db.prepare(`
-      INSERT OR REPLACE INTO sessions (token_hash, email, device_id, created_at, expires_at)
+      INSERT INTO sessions (sid, email, device_id, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(tokenHash, email, deviceId, createdAt, expiresAt).run();
+    `).bind(sid, email, deviceId || null, createdAt, expiresAt).run();
 
-    // (اختياري) رجّع له هل فيه كود مرتبط
-    const owned = await db.prepare(`SELECT code FROM code_ownership WHERE email = ?`).bind(email).first();
+    const owned = await db.prepare(
+      `SELECT code FROM code_ownership WHERE email = ? LIMIT 1`
+    ).bind(email).first();
+
+    const cookie = [
+      `sid=${sid}`,
+      "Path=/",
+      "HttpOnly",
+      "Secure",
+      "SameSite=Lax",
+      `Max-Age=${60 * 60 * 24 * 30}`,
+    ].join("; ");
 
     return json({
       ok: true,
-      version: "login-v4-clean",
       email,
-      token,
-      expiresAt,
+      session: { sid, expiresAt },
       linkedCode: owned?.code || null
-    }, 200);
+    }, 200, { "Set-Cookie": cookie });
 
   } catch (e) {
     return json({
       ok: false,
       error: "LOGIN_FAILED",
-      version: "login-v4-clean",
+      version: "login-v5-no-duration",
       message: String(e?.message || e)
     }, 500);
   }
