@@ -11,16 +11,20 @@ export async function onRequest(context) {
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
 
-  function json(obj, status = 200) {
+  function json(obj, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(obj), {
       status,
-      headers: { "Content-Type": "application/json; charset=utf-8", ...corsHeaders },
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        ...corsHeaders,
+        ...extraHeaders,
+      },
     });
   }
 
@@ -32,180 +36,160 @@ export async function onRequest(context) {
     return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   }
 
+  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
+  const db = env.DB;
+
   // ===== Helpers =====
-  function isValidEmail(email) {
-    return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  function nowISO() { return new Date().toISOString(); }
+
+  function headerDeviceId(req) {
+    return req.headers.get("X-Device-Id") || "";
   }
 
-  function isValidPassword(pw) {
-    return typeof pw === "string" && pw.length >= 8;
+  function readDeviceId(req) {
+    const u = new URL(req.url);
+    const q = (u.searchParams.get("deviceId") || "").toString().trim();
+    return q || headerDeviceId(req);
   }
 
-  function normEmail(email) {
-    return email.trim().toLowerCase();
+  // PBKDF2 settings (Cloudflare cap: 100000)
+  const PBKDF2_ITER = 100000;
+
+  function toB64(bytes) {
+    let s = "";
+    const arr = new Uint8Array(bytes);
+    for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+    return btoa(s);
   }
 
-  function normCode(code) {
-    return (code || "")
-      .toString()
-      .trim()
-      .toUpperCase()
-      .replace(/[–—−]/g, "-")
-      .replace(/\s+/g, "");
+  function fromB64(b64) {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
   }
 
-  function nowISO() {
-    return new Date().toISOString();
-  }
-
-  function base64url(bytes) {
-    let str = btoa(String.fromCharCode(...bytes));
-    return str.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  }
-
-  async function pbkdf2Hash(password) {
+  async function pbkdf2Hash(password, saltB64) {
     const enc = new TextEncoder();
-    const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+    const salt = fromB64(saltB64);
+
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
       enc.encode(password),
-      "PBKDF2",
+      { name: "PBKDF2" },
       false,
       ["deriveBits"]
     );
 
-    const iterations = 210000;
     const bits = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: PBKDF2_ITER,
+        hash: "SHA-256",
+      },
       keyMaterial,
       256
     );
 
-    const hashBytes = new Uint8Array(bits);
-    const salt = base64url(saltBytes);
-    const hash = base64url(hashBytes);
-    return `pbkdf2$${iterations}$${salt}$${hash}`;
+    return toB64(bits);
   }
 
-  async function newSessionToken() {
-    const rnd = crypto.getRandomValues(new Uint8Array(32));
-    return base64url(rnd);
+  function randomSaltB64() {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    return toB64(salt);
   }
 
-  // ===== DB Guard =====
-  if (!env?.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
-  const db = env.DB;
-
-  // ===== Parse Body =====
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ ok: false, error: "INVALID_JSON" }, 400);
-  }
-
-  const email = normEmail(body?.email ?? "");
-  const password = body?.password ?? "";
-  const code = normCode(body?.code ?? "");
-
-  const headerDeviceId = request.headers.get("X-Device-Id") || "";
-  const deviceId = ((body?.deviceId ?? headerDeviceId) || "").toString().trim();
-
-  if (!isValidEmail(email)) return json({ ok: false, error: "INVALID_EMAIL" }, 400);
-  if (!isValidPassword(password)) return json({ ok: false, error: "WEAK_PASSWORD" }, 400);
-  if (!code) return json({ ok: false, error: "CODE_REQUIRED" }, 400);
-  if (!deviceId) return json({ ok: false, error: "DEVICE_REQUIRED" }, 400);
-
-  try {
-    // ✅ تأكد من وجود الجداول الأساسية (هذا كان سبب 500 غالبًا)
-    await db.prepare(`
+  async function ensureTables() {
+    // users
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
-        email TEXT PRIMARY KEY,
-        provider TEXT NOT NULL,
-        password_hash TEXT,
-        code TEXT,
-        created_at TEXT NOT NULL,
-        last_login_at TEXT NOT NULL
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        salt_b64 TEXT NOT NULL,
+        created_at TEXT NOT NULL
       );
-    `).run();
+    `);
 
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        token TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        expires_at TEXT NOT NULL
-      );
-    `).run();
-
-    // ✅ جدول تفعيل الجهاز
-    await db.prepare(`
+    // activations: code <-> device_id
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS activations (
         code TEXT PRIMARY KEY,
         device_id TEXT NOT NULL,
         activated_at TEXT NOT NULL
       );
-    `).run();
+    `);
 
-    // ===== 1) لازم الكود يكون متفعّل على هذا الجهاز =====
-    const act = await db
-      .prepare("SELECT code, device_id FROM activations WHERE code = ? LIMIT 1")
-      .bind(code)
-      .first();
+    // code ownership per account (optional but handy)
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS code_ownership (
+        code TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        linked_at TEXT NOT NULL
+      );
+    `);
+  }
 
-    if (!act?.code) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
-    if ((act.device_id || "") !== deviceId) {
-      return json({ ok: false, error: "CODE_ALREADY_USED_ON_ANOTHER_DEVICE" }, 409);
+  // ===== Main =====
+  try {
+    await ensureTables();
+
+    const body = await request.json().catch(() => null);
+    if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
+
+    const email = (body.email || "").toString().trim().toLowerCase();
+    const password = (body.password || "").toString();
+    const code = (body.code || "").toString().trim();
+    const deviceId = (body.deviceId || "").toString().trim() || readDeviceId(request);
+
+    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
+
+    // لو أرسل كود، لازم يكون مُفعل أولاً على جهاز (activate) قبل الربط بالحساب
+    if (code) {
+      if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
+
+      const act = await db.prepare(`SELECT code, device_id FROM activations WHERE code = ?`).bind(code).first();
+      if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
+
+      // لازم نفس الجهاز اللي فَعّل الكود
+      if (act.device_id !== deviceId) {
+        return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
+      }
     }
 
-    // ===== 2) الإيميل موجود؟ =====
-    const existing = await db
-      .prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
-      .bind(email)
-      .first();
+    // هل المستخدم موجود؟
+    const existing = await db.prepare(`SELECT email FROM users WHERE email = ?`).bind(email).first();
+    if (existing) return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
 
-    if (existing?.email) return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
+    const saltB64 = randomSaltB64();
+    const passwordHash = await pbkdf2Hash(password, saltB64);
 
-    // ===== 3) الكود موجود؟ =====
-    const codeRow = await db
-      .prepare("SELECT code, is_used, used_by_email FROM codes WHERE code = ? LIMIT 1")
-      .bind(code)
-      .first();
+    await db.prepare(`
+      INSERT INTO users (email, password_hash, salt_b64, created_at)
+      VALUES (?, ?, ?, ?)
+    `).bind(email, passwordHash, saltB64, nowISO()).run();
 
-    if (!codeRow?.code) return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
-
-    if (Number(codeRow.is_used) === 1 && codeRow.used_by_email && codeRow.used_by_email !== email) {
-      return json({ ok: false, error: "CODE_ALREADY_LINKED_TO_OTHER_EMAIL" }, 409);
+    // لو فيه كود، اربطه بالإيميل
+    if (code) {
+      await db.prepare(`
+        INSERT OR REPLACE INTO code_ownership (code, email, linked_at)
+        VALUES (?, ?, ?)
+      `).bind(code, email, nowISO()).run();
     }
 
-    // ===== Create User + Link Code-to-Email + Create Session =====
-    const createdAt = nowISO();
-    const passHash = await pbkdf2Hash(password);
-    const token = await newSessionToken();
-    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    return json({
+      ok: true,
+      email,
+      pbkdf2Iterations: PBKDF2_ITER,
+      linkedCode: code || null
+    }, 200);
 
-    const stmts = [
-      db.prepare(
-        "INSERT INTO users (email, provider, password_hash, code, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)"
-      ).bind(email, "password", passHash, code, createdAt, createdAt),
-
-      db.prepare(
-        "UPDATE codes SET is_used = 1, used_by_email = ?, used_at = COALESCE(used_at, ?) WHERE code = ?"
-      ).bind(email, createdAt, code),
-
-      db.prepare(
-        "INSERT INTO sessions (token, email, created_at, expires_at) VALUES (?, ?, ?, ?)"
-      ).bind(token, email, createdAt, expires),
-    ];
-
-    await db.batch(stmts);
-
-    return json({ ok: true, email, code, token, expires_at: expires }, 200);
   } catch (e) {
-    // ✅ نعطيك سبب واضح بدل 500 مبهم (مفيد للتشخيص)
-    return json(
-      { ok: false, error: "REGISTER_FAILED", message: String(e?.message || e) },
-      500
-    );
+    return json({
+      ok: false,
+      error: "REGISTER_FAILED",
+      message: String(e?.message || e)
+    }, 500);
   }
 }
