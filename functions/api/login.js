@@ -2,6 +2,8 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
+  const VERSION = "login-v3-debug-stage";
+
   // ===== CORS =====
   const origin = request.headers.get("Origin") || "";
   const allowed = (env.ALLOWED_ORIGINS || "")
@@ -32,16 +34,16 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // GET health/version
+  // GET = fingerprint (يعلمنا 100% وش الملف اللي شغال)
   if (request.method === "GET") {
-    return json({ ok: true, version: "login-v2" }, 200);
+    return json({ ok: true, version: VERSION }, 200);
   }
 
   if (request.method !== "POST") {
-    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: VERSION }, 405);
   }
 
-  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
+  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND", version: VERSION }, 500);
   const db = env.DB;
 
   // ===== Helpers =====
@@ -107,7 +109,6 @@ export async function onRequest(context) {
   }
 
   async function ensureTables() {
-    // users (اعتمدنا هذا الشكل بعد ما ضبطنا register)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,7 +119,6 @@ export async function onRequest(context) {
       );
     `);
 
-    // code/device activations
     await db.exec(`
       CREATE TABLE IF NOT EXISTS activations (
         code TEXT PRIMARY KEY,
@@ -127,7 +127,6 @@ export async function onRequest(context) {
       );
     `);
 
-    // code ownership per account
     await db.exec(`
       CREATE TABLE IF NOT EXISTS code_ownership (
         code TEXT PRIMARY KEY,
@@ -136,7 +135,6 @@ export async function onRequest(context) {
       );
     `);
 
-    // sessions
     await db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
@@ -148,70 +146,78 @@ export async function onRequest(context) {
     `);
   }
 
-  // ===== Main =====
+  // ===== Main with stage debugging =====
+  let stage = "start";
   try {
+    stage = "ensureTables";
     await ensureTables();
 
+    stage = "parseBody";
     const body = await request.json().catch(() => null);
-    if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
+    if (!body) return json({ ok: false, error: "BAD_JSON", version: VERSION, stage }, 400);
 
+    stage = "readFields";
     const email = (body.email || "").toString().trim().toLowerCase();
     const password = (body.password || "").toString();
     const deviceId = (body.deviceId || "").toString().trim() || readDeviceId(request);
 
-    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
-    if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
+    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS", version: VERSION, stage }, 400);
+    if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE", version: VERSION, stage }, 400);
 
-    // اجلب بيانات المستخدم (بدون أي أعمدة قديمة مثل email_verified/provider)
+    stage = "selectUser";
     const user = await db
       .prepare(`SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`)
       .bind(email)
       .first();
 
-    if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
+    if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS", version: VERSION, stage }, 401);
 
+    stage = "hashPassword";
     const hash = await pbkdf2Hash(password, user.salt_b64);
     if (hash !== user.password_hash) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
+      return json({ ok: false, error: "INVALID_CREDENTIALS", version: VERSION, stage }, 401);
     }
 
-    // لو الحساب مرتبط بكود، لازم نفس الجهاز اللي فعّل الكود
+    stage = "codeOwnership";
     const owned = await db
       .prepare(`SELECT code FROM code_ownership WHERE email = ? LIMIT 1`)
       .bind(email)
       .first();
 
-    let linkedCode = owned?.code || null;
+    const linkedCode = owned?.code || null;
 
     if (linkedCode) {
+      stage = "checkActivation";
       const act = await db
         .prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
         .bind(linkedCode)
         .first();
 
-      if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
+      if (!act) return json({ ok: false, error: "ACTIVATE_FIRST", version: VERSION, stage }, 409);
       if (act.device_id !== deviceId) {
-        return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
+        return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE", version: VERSION, stage }, 409);
       }
     }
 
-    // اصنع Session
+    stage = "makeSession";
     const token = randomTokenUrlSafe();
     const createdAt = nowISO();
-
-    // 30 يوم
     const maxAgeSec = 60 * 60 * 24 * 30;
     const expiresAt = new Date(Date.now() + maxAgeSec * 1000).toISOString();
 
+    stage = "insertSession";
     await db.prepare(`
       INSERT INTO sessions (token, email, device_id, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)
     `).bind(token, email, deviceId, createdAt, expiresAt).run();
 
+    stage = "done";
     const setCookie = `sandooq_session=${token}; Path=/; Max-Age=${maxAgeSec}; HttpOnly; Secure; SameSite=Lax`;
 
     return json({
       ok: true,
+      version: VERSION,
+      stage,
       email,
       token,
       linkedCode,
@@ -222,6 +228,8 @@ export async function onRequest(context) {
     return json({
       ok: false,
       error: "LOGIN_FAILED",
+      version: VERSION,
+      stage,
       message: String(e?.message || e)
     }, 500);
   }
