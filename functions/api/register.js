@@ -101,14 +101,14 @@ export async function onRequest(context) {
   }
 
   async function ensureTables() {
-    // ✅ نستخدم prepare().run بدل exec (عشان نكسر مشكلة duration)
+    // ✅ Create tables if not exists (بدون exec)
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        salt_b64 TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        password_hash TEXT,
+        salt_b64 TEXT,
+        created_at TEXT
       );
     `).run();
 
@@ -127,6 +127,20 @@ export async function onRequest(context) {
         linked_at TEXT NOT NULL
       );
     `).run();
+
+    // ✅ Migration: لو جدول users قديم وناقص أعمدة، نضيفها
+    const info = await db.prepare(`PRAGMA table_info(users);`).all();
+    const cols = (info?.results || []).map(r => String(r.name || "").toLowerCase());
+
+    if (!cols.includes("password_hash")) {
+      await db.prepare(`ALTER TABLE users ADD COLUMN password_hash TEXT;`).run();
+    }
+    if (!cols.includes("salt_b64")) {
+      await db.prepare(`ALTER TABLE users ADD COLUMN salt_b64 TEXT;`).run();
+    }
+    if (!cols.includes("created_at")) {
+      await db.prepare(`ALTER TABLE users ADD COLUMN created_at TEXT;`).run();
+    }
   }
 
   // ===== Main =====
@@ -153,7 +167,6 @@ export async function onRequest(context) {
 
       if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
 
-      // لازم نفس الجهاز اللي فَعّل الكود
       if (act.device_id !== deviceId) {
         return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
       }
