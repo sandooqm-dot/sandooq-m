@@ -13,7 +13,6 @@ export async function onRequest(context) {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
-    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
@@ -31,6 +30,11 @@ export async function onRequest(context) {
 
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  // GET للتأكد إن الكود الجديد اننشر فعلاً
+  if (request.method === "GET") {
+    return json({ ok: true, version: "login-v2" }, 200);
   }
 
   if (request.method !== "POST") {
@@ -53,7 +57,7 @@ export async function onRequest(context) {
     return q || headerDeviceId(req);
   }
 
-  // PBKDF2 settings (must match register)
+  // PBKDF2 settings
   const PBKDF2_ITER = 100000;
 
   function toB64(bytes) {
@@ -83,12 +87,7 @@ export async function onRequest(context) {
     );
 
     const bits = await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt,
-        iterations: PBKDF2_ITER,
-        hash: "SHA-256",
-      },
+      { name: "PBKDF2", salt, iterations: PBKDF2_ITER, hash: "SHA-256" },
       keyMaterial,
       256
     );
@@ -96,15 +95,8 @@ export async function onRequest(context) {
     return toB64(bits);
   }
 
-  function randomId(len = 32) {
-    const bytes = crypto.getRandomValues(new Uint8Array(len));
-    // base64url
-    return btoa(String.fromCharCode(...bytes))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  }
-
   async function ensureTables() {
-    // users (same schema as register.js عندك الآن)
+    // لازم تكون نفس register.js
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,16 +107,26 @@ export async function onRequest(context) {
       );
     `);
 
-    // sessions
     await db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
-        sid TEXT PRIMARY KEY,
+        token TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         device_id TEXT NOT NULL,
         created_at TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
     `);
+  }
+
+  function randomToken() {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    return toB64(bytes).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  }
+
+  function addDaysISO(days) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString();
   }
 
   // ===== Main =====
@@ -141,48 +143,39 @@ export async function onRequest(context) {
     if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
     if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
 
-    const user = await db
-      .prepare(`SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`)
-      .bind(email)
-      .first();
+    const user = await db.prepare(`
+      SELECT email, password_hash, salt_b64
+      FROM users
+      WHERE email = ?
+    `).bind(email).first();
 
     if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    const expected = await pbkdf2Hash(password, user.salt_b64);
-    if (expected !== user.password_hash) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    const hash = await pbkdf2Hash(password, user.salt_b64);
+    if (hash !== user.password_hash) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    // create session (7 days)
-    const sid = randomId(32);
-    const createdAt = nowISO();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const token = randomToken();
+    const now = nowISO();
+    const expires = addDaysISO(30);
 
     await db.prepare(`
-      INSERT OR REPLACE INTO sessions (sid, email, device_id, created_at, expires_at)
+      INSERT OR REPLACE INTO sessions (token, email, device_id, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(sid, email, deviceId, createdAt, expiresAt).run();
+    `).bind(token, email, deviceId, now, expires).run();
 
+    // Cookie
     const cookie = [
-      `sid=${sid}`,
+      `sandooq_session=${token}`,
       "Path=/",
       "HttpOnly",
-      "Secure",
       "SameSite=Lax",
-      `Max-Age=${7 * 24 * 60 * 60}`,
+      "Secure",
+      `Max-Age=${30 * 24 * 60 * 60}`
     ].join("; ");
 
-    return json(
-      { ok: true, email },
-      200,
-      { "Set-Cookie": cookie }
-    );
+    return json({ ok: true, email, expiresAt: expires }, 200, { "Set-Cookie": cookie });
 
   } catch (e) {
-    return json({
-      ok: false,
-      error: "LOGIN_FAILED",
-      message: String(e?.message || e)
-    }, 500);
+    return json({ ok: false, error: "LOGIN_FAILED", message: String(e?.message || e) }, 500);
   }
 }
