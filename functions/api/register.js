@@ -101,8 +101,8 @@ export async function onRequest(context) {
   }
 
   async function ensureTables() {
-    // users
-    await db.exec(`
+    // ✅ نستخدم prepare().run بدل exec (عشان نكسر مشكلة duration)
+    await db.prepare(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
@@ -110,25 +110,23 @@ export async function onRequest(context) {
         salt_b64 TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
-    `);
+    `).run();
 
-    // activations: code <-> device_id
-    await db.exec(`
+    await db.prepare(`
       CREATE TABLE IF NOT EXISTS activations (
         code TEXT PRIMARY KEY,
         device_id TEXT NOT NULL,
         activated_at TEXT NOT NULL
       );
-    `);
+    `).run();
 
-    // code ownership per account (optional but handy)
-    await db.exec(`
+    await db.prepare(`
       CREATE TABLE IF NOT EXISTS code_ownership (
         code TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         linked_at TEXT NOT NULL
       );
-    `);
+    `).run();
   }
 
   // ===== Main =====
@@ -149,7 +147,10 @@ export async function onRequest(context) {
     if (code) {
       if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE" }, 400);
 
-      const act = await db.prepare(`SELECT code, device_id FROM activations WHERE code = ?`).bind(code).first();
+      const act = await db.prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
+        .bind(code)
+        .first();
+
       if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
 
       // لازم نفس الجهاز اللي فَعّل الكود
@@ -159,7 +160,10 @@ export async function onRequest(context) {
     }
 
     // هل المستخدم موجود؟
-    const existing = await db.prepare(`SELECT email FROM users WHERE email = ?`).bind(email).first();
+    const existing = await db.prepare(`SELECT email FROM users WHERE email = ?`)
+      .bind(email)
+      .first();
+
     if (existing) return json({ ok: false, error: "EMAIL_EXISTS" }, 409);
 
     const saltB64 = randomSaltB64();
