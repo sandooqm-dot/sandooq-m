@@ -1,4 +1,4 @@
-// functions/api2/me.js
+// /functions/api2/me.js
 export async function onRequest(context) {
   const { request, env } = context;
   const VERSION = "api2-me-v1";
@@ -14,82 +14,61 @@ export async function onRequest(context) {
   }
 
   if (!env?.DB) {
-    return json(
-      { ok: false, error: "DB_NOT_BOUND", version: VERSION, message: "Bind D1 as DB in Pages Settings -> Bindings" },
-      500,
-      cors
-    );
+    return json({ ok: false, error: "DB_NOT_BOUND", version: VERSION }, 500, cors);
   }
 
-  const token = readToken(request);
-  if (!token) {
+  if (!env?.JWT_SECRET) {
+    return json({ ok: false, error: "MISSING_JWT_SECRET", version: VERSION }, 500, cors);
+  }
+
+  // Token from Authorization OR Cookie
+  const auth = request.headers.get("Authorization") || "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const cookie = request.headers.get("Cookie") || "";
+  const cookieTok = getCookie(cookie, "sandooq_token_v1");
+  const token = bearer || cookieTok || "";
+
+  const payload = token ? await verifyJwtHS256(env.JWT_SECRET, token) : null;
+  const email = String(payload?.email || "").trim().toLowerCase();
+
+  if (!email) {
     return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
   }
 
-  const tokenHash = await sha256Hex(new TextEncoder().encode(token));
-  const now = Date.now();
-
-  const s = await env.DB.prepare(
-    "SELECT email, expires_at, revoked_at FROM auth_sessions WHERE token_hash = ? LIMIT 1"
-  )
-    .bind(tokenHash)
-    .first();
-
-  if (!s) {
-    return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
-  }
-
-  if (s.revoked_at) {
-    return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
-  }
-
-  if (Number(s.expires_at) <= now) {
-    return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
-  }
-
-  // جلب المستخدم
+  // Verified?
   const u = await env.DB.prepare(
-    "SELECT email, provider, email_verified, created_at FROM auth_users WHERE email = ? LIMIT 1"
-  )
-    .bind(s.email)
-    .first();
+    `SELECT email, provider, email_verified
+     FROM users
+     WHERE email = ?
+     LIMIT 1`
+  ).bind(email).first();
 
   if (!u) {
     return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
   }
 
-  // هل مفعل اللعبة؟ (وجود سجل في auth_code_links لنفس game_id)
-  const gameId = String(env?.GAME_ID || "horof").trim();
-  const link = await env.DB.prepare(
-    "SELECT code, activated_at FROM auth_code_links WHERE game_id = ? AND email = ? LIMIT 1"
-  )
-    .bind(gameId, u.email)
-    .first();
+  const verified = Number(u.email_verified || 0) === 1;
+
+  // Activated? (based on activations table)
+  const act = await env.DB.prepare(
+    `SELECT 1 FROM activations WHERE email = ? LIMIT 1`
+  ).bind(email).first();
+
+  const activated = !!act;
 
   return json(
-    {
-      ok: true,
-      version: VERSION,
-      email: u.email,
-      provider: u.provider,
-      email_verified: Number(u.email_verified || 0) === 1,
-      activated: !!link,
-      game_id: gameId,
-      code: link ? link.code : null,
-      activated_at: link ? link.activated_at : null,
-    },
+    { ok: true, version: VERSION, email, verified, activated },
     200,
     cors
   );
 }
 
-/* ---------------- helpers ---------------- */
+/* ---------- helpers ---------- */
 
-function json(obj, status, corsHeaders, extraHeaders = {}) {
+function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
-  for (const [k, v] of Object.entries(extraHeaders || {})) headers.set(k, v);
   return new Response(JSON.stringify(obj), { status, headers });
 }
 
@@ -109,25 +88,11 @@ function makeCorsHeaders(request, env) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Vary": "Origin",
+    Vary: "Origin",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
-}
-
-function readToken(request) {
-  // 1) Authorization: Bearer
-  const auth = request.headers.get("Authorization") || "";
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (m && m[1]) return m[1].trim();
-
-  // 2) Cookie
-  const cookie = request.headers.get("Cookie") || "";
-  const token = getCookie(cookie, "sandooq_token_v1");
-  if (token) return token;
-
-  return "";
 }
 
 function getCookie(cookieHeader, name) {
@@ -143,12 +108,62 @@ function getCookie(cookieHeader, name) {
   return "";
 }
 
-async function sha256Hex(bytes) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = new Uint8Array(digest);
-  let hex = "";
-  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
-  return hex;
+function base64UrlToBytes(b64url) {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64url.length + 3) % 4);
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function bytesToBase64Url(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function strToBytes(s) {
+  return new TextEncoder().encode(s);
+}
+function safeEqual(a, b) {
+  a = String(a || "");
+  b = String(b || "");
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
+}
+async function hmacSha256(secret, dataBytes) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    strToBytes(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, dataBytes);
+  return new Uint8Array(sig);
 }
 
-// functions/api2/me.js – إصدار 1
+async function verifyJwtHS256(secret, token) {
+  try {
+    const parts = String(token || "").split(".");
+    if (parts.length !== 3) return null;
+
+    const [h, p, s] = parts;
+    const toSign = `${h}.${p}`;
+
+    const sigBytes = await hmacSha256(secret, strToBytes(toSign));
+    const expected = bytesToBase64Url(sigBytes);
+
+    if (!safeEqual(expected, s)) return null;
+
+    const payloadJson = new TextDecoder().decode(base64UrlToBytes(p));
+    const payload = JSON.parse(payloadJson);
+
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload?.exp || now >= Number(payload.exp)) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
