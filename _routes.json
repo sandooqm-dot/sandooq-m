@@ -1,5 +1,21 @@
 {
   "version": 1,
-  "include": ["/*"],
-  "exclude": []
+  "include": ["/app*", "/api2*", "/activate*", "/__mw"],
+  "exclude": [
+    "/*.png",
+    "/*.jpg",
+    "/*.jpeg",
+    "/*.webp",
+    "/*.svg",
+    "/*.ico",
+    "/*.css",
+    "/*.js",
+    "/*.mjs",
+    "/*.map",
+    "/*.otf",
+    "/*.ttf",
+    "/*.woff",
+    "/*.woff2",
+    "/maps/*"
+  ]
 }
