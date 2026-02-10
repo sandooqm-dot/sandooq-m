@@ -90,18 +90,6 @@
       line-height:1.6;
     }
 
-    .sectionTitle{
-      text-align:center;
-      font-weight:900;
-      font-size:22px;
-      margin:14px 0 12px;
-    }
-
-    .row{
-      display:flex;
-      gap:10px;
-    }
-
     .field{
       position:relative;
       width:100%;
@@ -391,7 +379,7 @@
 
   <script>
     // =========================
-    //   API base (المهم)
+    //   API base
     // =========================
     const API_BASE = "/api2";
 
@@ -419,7 +407,7 @@
       return (v||"").toString().trim().toUpperCase().replace(/\s+/g,"").replace(/[–—−]/g,"-");
     }
 
-    // Device ID ثابت لكل جهاز (مو آمن 100% لكن السيرفر بيحسب الأجهزة)
+    // Device ID ثابت لكل جهاز
     function getDeviceId(){
       const k="sandooq_device_id_v1";
       let v = localStorage.getItem(k);
@@ -430,7 +418,7 @@
       return v;
     }
 
-    // Session token
+    // Session token (للواجهة فقط) + السيرفر يعتمد على Cookie للحماية
     function setToken(t){
       if(t) localStorage.setItem("sandooq_token_v1", t);
       else localStorage.removeItem("sandooq_token_v1");
@@ -439,14 +427,17 @@
       return localStorage.getItem("sandooq_token_v1") || "";
     }
 
+    async function logout(){
+      try { await api("/logout", {}, {auth:false}); } catch {}
+      setToken("");
+      boot();
+    }
+
     function apiUrl(path){
       let p = String(path||"");
       if(!p.startsWith("/")) p = "/" + p;
-      // لو جاك /api2/... خلاص
       if(p.startsWith("/api2/")) return p;
-      // لو جاك /api/... نخليه زي ما هو
       if(p.startsWith("/api/")) return p;
-      // غير كذا نركّبه على /api2
       return API_BASE + p;
     }
 
@@ -473,6 +464,7 @@
     // =========================
     $("goCreate").onclick = (e)=>{ e.preventDefault(); show("view-create"); msg($("authMsg"),""); };
     $("haveAccount").onclick = (e)=>{ e.preventDefault(); show("view-auth"); msg($("createMsg"),""); };
+
     $("goForgot").onclick = async (e)=>{
       e.preventDefault();
       msg($("authMsg"), "ميزة (نسيت كلمة المرور) بنضيفها بالخطوة الجاية.", "err");
@@ -482,8 +474,8 @@
       msg($("authMsg"), "زر Google جاهز بالواجهة. بنفعّله بالخطوة الخاصة بـ Google OAuth.", "err");
     };
 
-    $("btnLogout").onclick = (e)=>{ e.preventDefault(); setToken(""); boot(); };
-    $("btnLogout2").onclick = ()=>{ setToken(""); boot(); };
+    $("btnLogout").onclick = async (e)=>{ e.preventDefault(); await logout(); };
+    $("btnLogout2").onclick = async ()=>{ await logout(); };
 
     $("btnEnterGame").onclick = ()=>{
       // ندخل عبر /app عشان الرابط يصير قصير وهاشتاق (#)
@@ -517,13 +509,11 @@
       if(pw1.length < 8) return msg($("createMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
       if(pw1 !== pw2) return msg($("createMsg"), "كلمتا المرور غير متطابقتين", "err");
 
-      // 1) إنشاء الحساب (يرسل OTP)
       const r = await api("/register", { email, password: pw1 }, {auth:false});
       if(!r?.ok){
         return msg($("createMsg"), translateErr(r), "err");
       }
 
-      // ينتقل لصفحة التحقق
       sessionStorage.setItem("pending_email", email);
       $("vEmail").textContent = email;
       show("view-verify");
@@ -542,7 +532,6 @@
         return msg($("verifyMsg"), translateErr(r), "err");
       }
 
-      // بعد التحقق: يدخل تلقائي (يعطينا token)
       if(r.token) setToken(r.token);
       sessionStorage.removeItem("pending_email");
       await boot();
@@ -573,47 +562,40 @@
     };
 
     // =========================
-    //   Boot: decides which screen to show
+    //   Boot
     // =========================
     async function boot(){
-      // إذا ما عنده توكن: شاشة الدخول
       if(!getToken()){
         show("view-auth");
         return;
       }
 
-      // استعلام حالة الحساب
       const me = await api("/me", {});
       if(!me?.ok){
-        // توكن منتهي/غير صالح
         setToken("");
         show("view-auth");
         msg($("authMsg"), "انتهت الجلسة. سجل دخول من جديد.", "err");
         return;
       }
 
-      // حساب موجود
       const email = me.email || "";
       $("who").textContent = email;
       $("readyEmail").textContent = email;
 
-      // إذا ما فعل الكود بعد
       if(!me.activated){
         show("view-activate");
         return;
       }
 
-      // مفعل
       show("view-ready");
     }
 
     // =========================
-    //   Error translation (واجهة عربية واضحة)
+    //   Error translation
     // =========================
     function translateErr(r){
       const e = (r && (r.error || r.code)) ? String(r.error || r.code) : "UNKNOWN_ERROR";
 
-      // رسائل عامة
       if(e === "SERVICE_UNAVAILABLE") return "الخدمة غير متاحة الآن. جرّب بعد قليل.";
       if(e === "BAD_RESPONSE") return "صار خطأ في الاتصال بالسيرفر.";
       if(e === "INVALID_EMAIL") return "البريد الإلكتروني غير صحيح.";
@@ -629,7 +611,6 @@
       if(e === "ACTIVATE_REQUIRED") return "لازم تفعّل اللعبة بالكود أول مرة.";
       if(e === "METHOD_NOT_ALLOWED") return "طلب غير صالح.";
 
-      // fallback
       return "حدث خطأ: " + e;
     }
 
@@ -639,4 +620,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v3 (api2) -->
+<!-- activate.html – نظام التفعيل الجديد v4 (api2 + logout cookie) -->
