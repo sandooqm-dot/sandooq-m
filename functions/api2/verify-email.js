@@ -1,4 +1,4 @@
-// /functions/api2/verify-email.js
+// functions/api2/verify-email.js
 export async function onRequest(context) {
   const { request, env } = context;
   const VERSION = "api2-verify-email-v1";
@@ -17,10 +17,6 @@ export async function onRequest(context) {
     return json({ ok: false, error: "DB_NOT_BOUND", version: VERSION }, 500, cors);
   }
 
-  if (!env?.JWT_SECRET) {
-    return json({ ok: false, error: "MISSING_JWT_SECRET", version: VERSION }, 500, cors);
-  }
-
   let body;
   try {
     body = await request.json();
@@ -35,12 +31,20 @@ export async function onRequest(context) {
     return json({ ok: false, error: "MISSING_FIELDS", version: VERSION }, 400, cors);
   }
 
-  // Get latest unused otp
+  // otp لازم يكون أرقام فقط (6)
+  if (!/^\d{4,8}$/.test(otp)) {
+    return json({ ok: false, error: "OTP_INVALID", version: VERSION }, 400, cors);
+  }
+
+  // ---- ensure schema (safe) ----
+  await ensureUsersColumns(env.DB);
+  await ensureOtpTable(env.DB);
+
+  // ---- fetch otp row ----
   const row = await env.DB.prepare(
-    `SELECT id, otp, expires_at, used
+    `SELECT email, otp_hash, expires_at, used_at, attempts
      FROM email_otps
      WHERE email = ?
-     ORDER BY id DESC
      LIMIT 1`
   ).bind(email).first();
 
@@ -48,50 +52,52 @@ export async function onRequest(context) {
     return json({ ok: false, error: "OTP_INVALID", version: VERSION }, 400, cors);
   }
 
-  if (Number(row.used || 0) === 1) {
+  if (row.used_at) {
     return json({ ok: false, error: "OTP_INVALID", version: VERSION }, 400, cors);
   }
 
-  const expiresAt = Date.parse(String(row.expires_at || ""));
-  if (!expiresAt || Date.now() > expiresAt) {
+  const now = Date.now();
+  const exp = Date.parse(String(row.expires_at || ""));
+  if (!exp || exp < now) {
     return json({ ok: false, error: "OTP_EXPIRED", version: VERSION }, 400, cors);
   }
 
-  if (String(row.otp || "") !== otp) {
+  const attempts = Number(row.attempts || 0);
+  if (attempts >= 8) {
+    return json({ ok: false, error: "OTP_LOCKED", version: VERSION }, 429, cors);
+  }
+
+  const pepper = String(env.OTP_PEPPER || "otp_pepper_v1");
+  const wanted = String(row.otp_hash || "");
+  const got = await sha256Hex(`${email}|${otp}|${pepper}`);
+
+  if (!timingSafeEqualHex(wanted, got)) {
+    // increase attempts
+    await env.DB.prepare(
+      `UPDATE email_otps SET attempts = attempts + 1 WHERE email = ?`
+    ).bind(email).run();
+
     return json({ ok: false, error: "OTP_INVALID", version: VERSION }, 400, cors);
   }
 
-  const now = new Date().toISOString();
+  const isoNow = new Date().toISOString();
 
-  // Mark otp used
-  await env.DB.prepare(`UPDATE email_otps SET used = 1, used_at = ? WHERE id = ?`)
-    .bind(now, row.id)
-    .run();
+  // mark otp used + mark user verified
+  await env.DB.prepare(
+    `UPDATE email_otps SET used_at = ?, attempts = attempts WHERE email = ?`
+  ).bind(isoNow, email).run();
 
-  // Mark user verified
-  await env.DB.prepare(`UPDATE users SET email_verified = 1, email_verified_at = ? WHERE email = ?`)
-    .bind(now, email)
-    .run();
+  await env.DB.prepare(
+    `UPDATE users
+     SET is_email_verified = 1,
+         email_verified_at = COALESCE(email_verified_at, ?)
+     WHERE email = ?`
+  ).bind(isoNow, email).run();
 
-  // Issue token + cookie
-  const token = await signToken(env.JWT_SECRET, { email }, 60 * 60 * 24 * 30);
-
-  const headers = new Headers(cors);
-  headers.set("Content-Type", "application/json; charset=utf-8");
-  headers.set("Cache-Control", "no-store");
-  headers.append("Set-Cookie", makeAuthCookie(token));
-
-  return new Response(
-    JSON.stringify({ ok: true, version: VERSION, email, token }),
-    { status: 200, headers }
-  );
+  return json({ ok: true, version: VERSION }, 200, cors);
 }
 
 /* ---------- helpers ---------- */
-
-function makeAuthCookie(token) {
-  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; Secure; HttpOnly; SameSite=Lax`;
-}
 
 function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
@@ -102,11 +108,11 @@ function json(obj, status, corsHeaders) {
 
 function makeCorsHeaders(request, env) {
   const origin = request.headers.get("Origin") || "";
-  const allowedRaw = (env?.ALLOWED_ORIGINS || "").trim();
+  const allowedRaw = String(env?.ALLOWED_ORIGINS || "").trim();
   let allowOrigin = "*";
 
   if (allowedRaw) {
-    const allowed = allowedRaw.split(",").map((s) => s.trim()).filter(Boolean);
+    const allowed = allowedRaw.split(",").map(s => s.trim()).filter(Boolean);
     if (allowed.includes("*")) allowOrigin = "*";
     else if (origin && allowed.includes(origin)) allowOrigin = origin;
     else allowOrigin = allowed[0] || "*";
@@ -116,44 +122,47 @@ function makeCorsHeaders(request, env) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    Vary: "Origin",
+    "Vary": "Origin",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
-function base64UrlFromBytes(bytes) {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  const b64 = btoa(bin);
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+async function ensureOtpTable(DB) {
+  await DB.prepare(
+    `CREATE TABLE IF NOT EXISTS email_otps (
+      email TEXT PRIMARY KEY,
+      otp_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      attempts INTEGER DEFAULT 0,
+      last_sent_at TEXT
+    )`
+  ).run();
 }
-function bytesFromString(str) {
-  return new TextEncoder().encode(str);
-}
-async function hmacSha256(secret, dataBytes) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    bytesFromString(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, dataBytes);
-  return new Uint8Array(sig);
-}
-async function signToken(secret, payloadObj, ttlSeconds) {
-  const header = { alg: "HS256", typ: "JWT" };
-  const iat = Math.floor(Date.now() / 1000);
-  const exp = iat + Math.max(60, Number(ttlSeconds || 0));
-  const payload = { ...payloadObj, iat, exp, v: 1 };
 
-  const encHeader = base64UrlFromBytes(bytesFromString(JSON.stringify(header)));
-  const encPayload = base64UrlFromBytes(bytesFromString(JSON.stringify(payload)));
-  const toSign = bytesFromString(`${encHeader}.${encPayload}`);
-  const sigBytes = await hmacSha256(secret, toSign);
-  const encSig = base64UrlFromBytes(sigBytes);
+async function ensureUsersColumns(DB) {
+  // users table expected موجود، لكن نضيف أعمدة التحقق لو ناقصة
+  await DB.prepare(`ALTER TABLE users ADD COLUMN is_email_verified INTEGER DEFAULT 0`).run().catch(() => {});
+  await DB.prepare(`ALTER TABLE users ADD COLUMN email_verified_at TEXT`).run().catch(() => {});
+}
 
-  return `${encHeader}.${encPayload}.${encSig}`;
+async function sha256Hex(str) {
+  const bytes = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = new Uint8Array(digest);
+  let hex = "";
+  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
+  return hex;
+}
+
+// مقارنة آمنة (تقريبية) للهكس
+function timingSafeEqualHex(a, b) {
+  a = String(a || "");
+  b = String(b || "");
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
 }
