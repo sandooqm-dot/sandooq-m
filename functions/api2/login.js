@@ -1,7 +1,7 @@
-// /functions/api2/login.js
+// functions/api2/login.js
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "api2-login-v2-cookie";
+  const VERSION = "api2-login-v2-verify-gate+session";
 
   const cors = makeCorsHeaders(request, env);
 
@@ -13,27 +13,9 @@ export async function onRequest(context) {
     return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: VERSION }, 405, cors);
   }
 
-  if (!env || !env.DB) {
+  if (!env?.DB) {
     return json(
-      {
-        ok: false,
-        error: "DB_NOT_BOUND",
-        version: VERSION,
-        message: "env.DB is missing. Pages -> Settings -> Bindings -> D1 must be bound as DB",
-      },
-      500,
-      cors
-    );
-  }
-
-  if (!env.JWT_SECRET) {
-    return json(
-      {
-        ok: false,
-        error: "MISSING_JWT_SECRET",
-        version: VERSION,
-        message: "Set JWT_SECRET in Cloudflare Pages environment variables.",
-      },
+      { ok: false, error: "DB_NOT_BOUND", version: VERSION, message: "Bind D1 as DB" },
       500,
       cors
     );
@@ -49,90 +31,133 @@ export async function onRequest(context) {
   const email = String(body?.email || "").trim().toLowerCase();
   const password = String(body?.password || "");
   const deviceId =
-    String(request.headers.get("X-Device-Id") || body?.deviceId || "").trim();
+    String(body?.deviceId || "").trim() ||
+    String(request.headers.get("X-Device-Id") || "").trim();
 
   if (!email || !password) {
     return json({ ok: false, error: "MISSING_FIELDS", version: VERSION }, 400, cors);
   }
+  if (!isValidEmail(email)) {
+    return json({ ok: false, error: "INVALID_EMAIL", version: VERSION }, 400, cors);
+  }
 
+  // ---- ensure schema ----
+  await ensureUsersColumns(env.DB);
+  await ensureSessionsTable(env.DB);
+  await ensureUserDevicesTable(env.DB);
+
+  // ---- load user ----
   const user = await env.DB.prepare(
-    `SELECT email, provider, password_hash, salt_b64, email_verified
+    `SELECT email, provider, password_hash, salt_b64, is_email_verified
      FROM users
      WHERE email = ?
      LIMIT 1`
-  )
-    .bind(email)
-    .first();
+  ).bind(email).first();
 
   if (!user) {
-    return json({ ok: false, error: "INVALID_LOGIN", version: VERSION }, 401, cors);
+    return json({ ok: false, error: "USER_NOT_FOUND", version: VERSION }, 404, cors);
   }
 
-  if (String(user.provider || "") !== "email") {
-    return json({ ok: false, error: "USE_GOOGLE_LOGIN", version: VERSION }, 403, cors);
+  const provider = String(user.provider || "email");
+
+  // لو حساب ايميل لازم يكون متحقق قبل السماح بالدخول
+  if (provider === "email" && Number(user.is_email_verified || 0) !== 1) {
+    return json(
+      { ok: false, error: "EMAIL_NOT_VERIFIED", version: VERSION, email },
+      403,
+      cors
+    );
   }
 
-  if (Number(user.email_verified || 0) !== 1) {
-    return json({ ok: false, error: "EMAIL_NOT_VERIFIED", version: VERSION }, 403, cors);
+  // ---- verify password (provider=email فقط) ----
+  if (provider !== "email") {
+    // لو حساب Google بيجي من /api2/google (لاحقاً)
+    return json(
+      { ok: false, error: "WRONG_PROVIDER", version: VERSION, provider },
+      409,
+      cors
+    );
   }
 
-  // Verify password: sha256(saltBytes + passwordBytes) base64 === password_hash
-  const saltBytes = base64ToBytes(String(user.salt_b64 || ""));
+  const saltB64 = String(user.salt_b64 || "");
+  const storedHash = String(user.password_hash || "");
+
+  if (!saltB64 || !storedHash) {
+    return json({ ok: false, error: "ACCOUNT_NO_PASSWORD", version: VERSION }, 409, cors);
+  }
+
+  const saltBytes = base64ToBytes(saltB64);
   const pwBytes = new TextEncoder().encode(password);
-  const hashB64 = await sha256Base64(concatBytes(saltBytes, pwBytes));
+  const calcHash = await sha256Base64(concatBytes(saltBytes, pwBytes));
 
-  if (!safeEqualB64(hashB64, String(user.password_hash || ""))) {
-    return json({ ok: false, error: "INVALID_LOGIN", version: VERSION }, 401, cors);
+  if (calcHash !== storedHash) {
+    return json({ ok: false, error: "BAD_PASSWORD", version: VERSION }, 401, cors);
   }
 
-  const now = new Date().toISOString();
+  // ---- create session ----
+  const token = randomTokenB64Url(32); // raw token (we store hash only)
+  const tokenHash = await sha256Hex(token + "|" + String(env.SESSION_PEPPER || "sess_pepper_v1"));
 
-  // Update last login
-  try {
-    await env.DB.prepare(`UPDATE users SET last_login_at = ? WHERE email = ?`)
-      .bind(now, email)
-      .run();
-  } catch {}
+  const nowIso = new Date().toISOString();
+  const expiresIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
 
-  // Upsert device (optional)
+  await env.DB.prepare(
+    `INSERT INTO sessions (token_hash, email, created_at, expires_at, device_id)
+     VALUES (?, ?, ?, ?, ?)`
+  ).bind(tokenHash, email, nowIso, expiresIso, deviceId || null).run();
+
+  // ---- upsert device ----
   if (deviceId) {
     try {
       await env.DB.prepare(
         `INSERT OR IGNORE INTO user_devices (email, device_id, first_seen_at, last_seen_at)
          VALUES (?, ?, ?, ?)`
-      )
-        .bind(email, deviceId, now, now)
-        .run();
+      ).bind(email, deviceId, nowIso, nowIso).run();
 
       await env.DB.prepare(
         `UPDATE user_devices SET last_seen_at = ? WHERE email = ? AND device_id = ?`
-      )
-        .bind(now, email, deviceId)
-        .run();
+      ).bind(nowIso, email, deviceId).run();
     } catch {}
   }
 
-  const token = await signToken(env.JWT_SECRET, { email }, 60 * 60 * 24 * 30); // 30 days
+  // ---- set cookies ----
+  const cookieName = String(env.SESSION_COOKIE_NAME || "sandooq_session_v1");
+  const cookie = buildCookie(cookieName, token, {
+    maxAge: 30 * 24 * 60 * 60,
+    path: "/",
+    secure: true,
+    httpOnly: true,
+    sameSite: "Lax",
+  });
 
-  // ✅ الكوكي اللي تعتمد عليه الحماية
+  // كوكي إضافي احتياطي (لو عندك كود قديم يقرأ هذا الاسم)
+  const legacyCookie = buildCookie("sandooq_token_v1", token, {
+    maxAge: 30 * 24 * 60 * 60,
+    path: "/",
+    secure: true,
+    httpOnly: true,
+    sameSite: "Lax",
+  });
+
   const headers = new Headers(cors);
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
-  headers.append("Set-Cookie", makeAuthCookie(token));
+  headers.append("Set-Cookie", cookie);
+  headers.append("Set-Cookie", legacyCookie);
 
   return new Response(
-    JSON.stringify({ ok: true, version: VERSION, email, token }),
+    JSON.stringify({
+      ok: true,
+      version: VERSION,
+      email,
+      provider,
+      expiresAt: expiresIso,
+    }),
     { status: 200, headers }
   );
 }
 
 /* ---------- helpers ---------- */
-
-function makeAuthCookie(token) {
-  // ملاحظة: Secure يشتغل لأننا على HTTPS
-  // Lax ممتاز للتصفح الطبيعي. (No third-party)
-  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; Secure; HttpOnly; SameSite=Lax`;
-}
 
 function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
@@ -143,7 +168,7 @@ function json(obj, status, corsHeaders) {
 
 function makeCorsHeaders(request, env) {
   const origin = request.headers.get("Origin") || "";
-  const allowedRaw = (env?.ALLOWED_ORIGINS || "").trim();
+  const allowedRaw = String(env?.ALLOWED_ORIGINS || "").trim();
   let allowOrigin = "*";
 
   if (allowedRaw) {
@@ -157,11 +182,15 @@ function makeCorsHeaders(request, env) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    Vary: "Origin",
+    "Vary": "Origin",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function concatBytes(a, b) {
@@ -179,61 +208,70 @@ async function sha256Base64(bytes) {
   return btoa(bin);
 }
 
+async function sha256Hex(str) {
+  const bytes = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = new Uint8Array(digest);
+  let hex = "";
+  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
+  return hex;
+}
+
 function base64ToBytes(b64) {
-  try {
-    const bin = atob(b64);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  } catch {
-    return new Uint8Array(0);
-  }
+  const bin = atob(String(b64));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
-function safeEqualB64(a, b) {
-  a = String(a || "");
-  b = String(b || "");
-  if (a.length !== b.length) return false;
-  let out = 0;
-  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return out === 0;
-}
-
-function base64UrlFromBytes(bytes) {
+function randomTokenB64Url(byteLen) {
+  const bytes = new Uint8Array(byteLen);
+  crypto.getRandomValues(bytes);
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   const b64 = btoa(bin);
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function bytesFromString(str) {
-  return new TextEncoder().encode(str);
+function buildCookie(name, value, opts) {
+  const parts = [`${name}=${value}`];
+
+  if (opts?.maxAge != null) parts.push(`Max-Age=${opts.maxAge}`);
+  if (opts?.path) parts.push(`Path=${opts.path}`);
+  if (opts?.secure) parts.push("Secure");
+  if (opts?.httpOnly) parts.push("HttpOnly");
+  if (opts?.sameSite) parts.push(`SameSite=${opts.sameSite}`);
+
+  return parts.join("; ");
 }
 
-async function hmacSha256(secret, dataBytes) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    bytesFromString(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, dataBytes);
-  return new Uint8Array(sig);
+async function ensureUsersColumns(DB) {
+  await DB.prepare(`ALTER TABLE users ADD COLUMN is_email_verified INTEGER DEFAULT 0`).run().catch(() => {});
+  await DB.prepare(`ALTER TABLE users ADD COLUMN email_verified_at TEXT`).run().catch(() => {});
 }
 
-async function signToken(secret, payloadObj, ttlSeconds) {
-  const header = { alg: "HS256", typ: "JWT" };
-  const iat = Math.floor(Date.now() / 1000);
-  const exp = iat + Math.max(60, Number(ttlSeconds || 0));
+async function ensureSessionsTable(DB) {
+  await DB.prepare(
+    `CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      device_id TEXT
+    )`
+  ).run();
+  await DB.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_email ON sessions(email)`).run().catch(() => {});
+  await DB.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`).run().catch(() => {});
+}
 
-  const payload = { ...payloadObj, iat, exp, v: 1 };
-
-  const encHeader = base64UrlFromBytes(bytesFromString(JSON.stringify(header)));
-  const encPayload = base64UrlFromBytes(bytesFromString(JSON.stringify(payload)));
-  const toSign = bytesFromString(`${encHeader}.${encPayload}`);
-  const sigBytes = await hmacSha256(secret, toSign);
-  const encSig = base64UrlFromBytes(sigBytes);
-
-  return `${encHeader}.${encPayload}.${encSig}`;
+async function ensureUserDevicesTable(DB) {
+  await DB.prepare(
+    `CREATE TABLE IF NOT EXISTS user_devices (
+      email TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      first_seen_at TEXT,
+      last_seen_at TEXT,
+      PRIMARY KEY (email, device_id)
+    )`
+  ).run();
 }
