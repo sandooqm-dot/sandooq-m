@@ -1,9 +1,8 @@
-// /functions/api/login.js
+// /functions/api/register.js
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "login-v10-rewrite";
+  const VERSION = "register-v3-match-login";
 
-  // --- CORS helpers ---
   const cors = makeCorsHeaders(request, env);
 
   if (request.method === "OPTIONS") {
@@ -11,38 +10,27 @@ export async function onRequest(context) {
   }
 
   if (request.method !== "POST") {
-    return json(
-      { ok: false, error: "METHOD_NOT_ALLOWED", version: VERSION },
-      405,
-      cors
-    );
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: VERSION }, 405, cors);
   }
 
-  // --- Validate DB binding ---
   if (!env || !env.DB) {
     return json(
       {
         ok: false,
         error: "DB_NOT_BOUND",
         version: VERSION,
-        message:
-          "env.DB is missing. Check Pages -> Settings -> Bindings -> D1 database name must be DB.",
+        message: "env.DB is missing. Pages -> Settings -> Bindings -> D1 must be bound as DB",
       },
       500,
       cors
     );
   }
 
-  // --- Parse body safely ---
   let body;
   try {
     body = await request.json();
   } catch {
-    return json(
-      { ok: false, error: "BAD_JSON", version: VERSION },
-      400,
-      cors
-    );
+    return json({ ok: false, error: "BAD_JSON", version: VERSION }, 400, cors);
   }
 
   const email = String(body?.email || "").trim().toLowerCase();
@@ -50,77 +38,37 @@ export async function onRequest(context) {
   const deviceId = String(body?.deviceId || "").trim();
 
   if (!email || !password) {
-    return json(
-      { ok: false, error: "MISSING_FIELDS", version: VERSION },
-      400,
-      cors
-    );
+    return json({ ok: false, error: "MISSING_FIELDS", version: VERSION }, 400, cors);
   }
 
-  // --- Fetch user ---
-  let user;
-  try {
-    user = await env.DB.prepare(
-      "SELECT email, provider, password_hash, salt_b64 FROM users WHERE email = ? LIMIT 1"
-    )
-      .bind(email)
-      .first();
-  } catch (e) {
-    return json(
-      { ok: false, error: "DB_QUERY_FAILED", version: VERSION, message: String(e?.message || e) },
-      500,
-      cors
-    );
+  // Check existing
+  const exists = await env.DB.prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
+    .bind(email)
+    .first();
+
+  if (exists) {
+    return json({ ok: false, error: "EMAIL_EXISTS", version: VERSION }, 409, cors);
   }
 
-  if (!user) {
-    return json(
-      { ok: false, error: "INVALID_CREDENTIALS", version: VERSION },
-      401,
-      cors
-    );
-  }
+  // Create salt (16 bytes -> base64 length 24)
+  const saltBytes = new Uint8Array(16);
+  crypto.getRandomValues(saltBytes);
+  const saltB64 = bytesToBase64(saltBytes);
 
-  if (user.provider && user.provider !== "email") {
-    return json(
-      { ok: false, error: "USE_PROVIDER_LOGIN", version: VERSION, provider: user.provider },
-      401,
-      cors
-    );
-  }
-
-  const storedHash = String(user.password_hash || "");
-  const saltB64 = String(user.salt_b64 || "");
-  if (!storedHash || !saltB64) {
-    return json(
-      { ok: false, error: "BROKEN_USER_RECORD", version: VERSION },
-      500,
-      cors
-    );
-  }
-
-  // --- Verify password (try both salt+pw and pw+salt, with base64/base64url normalization) ---
-  const saltBytes = base64ToBytesFlexible(saltB64);
+  // Hash = sha256(saltBytes + passwordBytes) -> base64 length 44
   const pwBytes = new TextEncoder().encode(password);
+  const hashB64 = await sha256Base64(concatBytes(saltBytes, pwBytes));
 
-  const cand1 = await sha256Base64(concatBytes(saltBytes, pwBytes)); // salt + pw
-  const cand2 = await sha256Base64(concatBytes(pwBytes, saltBytes)); // pw + salt
-  const ok =
-    normalizeHash(cand1) === normalizeHash(storedHash) ||
-    normalizeHash(cand2) === normalizeHash(storedHash) ||
-    normalizeHash(toBase64UrlNoPad(cand1)) === normalizeHash(storedHash) ||
-    normalizeHash(toBase64UrlNoPad(cand2)) === normalizeHash(storedHash);
-
-  if (!ok) {
-    return json(
-      { ok: false, error: "INVALID_CREDENTIALS", version: VERSION },
-      401,
-      cors
-    );
-  }
-
-  // --- Upsert device (optional) ---
   const now = new Date().toISOString();
+
+  // Insert user
+  await env.DB.prepare(
+    "INSERT INTO users (email, provider, password_hash, salt_b64, created_at) VALUES (?, 'email', ?, ?, ?)"
+  )
+    .bind(email, hashB64, saltB64, now)
+    .run();
+
+  // Optional: upsert device
   if (deviceId) {
     try {
       await env.DB.prepare(
@@ -134,49 +82,13 @@ export async function onRequest(context) {
       )
         .bind(now, email, deviceId)
         .run();
-    } catch {
-      // device logging is non-blocking
-    }
+    } catch {}
   }
 
-  // --- Create session ---
-  const token = randomToken();
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(); // 30 days
-
-  try {
-    await env.DB.prepare(
-      "INSERT INTO sessions (token, email, created_at, expires_at) VALUES (?, ?, ?, ?)"
-    )
-      .bind(token, email, now, expiresAt)
-      .run();
-  } catch (e) {
-    return json(
-      { ok: false, error: "SESSION_CREATE_FAILED", version: VERSION, message: String(e?.message || e) },
-      500,
-      cors
-    );
-  }
-
-  // Cookie (useful for browser)
-  const cookie = buildCookie("session", token, {
-    maxAge: 60 * 60 * 24 * 30,
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax",
-    path: "/",
-  });
-
-  const headers = new Headers(cors);
-  headers.set("Content-Type", "application/json; charset=utf-8");
-  headers.append("Set-Cookie", cookie);
-
-  return new Response(
-    JSON.stringify({ ok: true, version: VERSION, email, token, expiresAt }),
-    { status: 200, headers }
-  );
+  return json({ ok: true, version: VERSION, email }, 200, cors);
 }
 
-/* ---------------- helpers ---------------- */
+/* ---------- helpers ---------- */
 
 function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
@@ -190,21 +102,11 @@ function makeCorsHeaders(request, env) {
   let allowOrigin = "*";
 
   if (allowedRaw) {
-    const allowed = allowedRaw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    if (allowed.includes("*")) {
-      allowOrigin = "*";
-    } else if (origin && allowed.includes(origin)) {
-      allowOrigin = origin;
-    } else {
-      // fallback: first allowed origin (prevents wild access)
-      allowOrigin = allowed[0] || "*";
-    }
+    const allowed = allowedRaw.split(",").map((s) => s.trim()).filter(Boolean);
+    if (allowed.includes("*")) allowOrigin = "*";
+    else if (origin && allowed.includes(origin)) allowOrigin = origin;
+    else allowOrigin = allowed[0] || "*";
   } else if (origin) {
-    // dev-friendly default if not configured
     allowOrigin = origin;
   }
 
@@ -215,40 +117,6 @@ function makeCorsHeaders(request, env) {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
-}
-
-function randomToken() {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return bytesToBase64Url(bytes);
-}
-
-function bytesToBase64Url(bytes) {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  const b64 = btoa(bin);
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function toBase64UrlNoPad(b64) {
-  return String(b64)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function normalizeHash(h) {
-  return toBase64UrlNoPad(String(h || "").trim());
-}
-
-function base64ToBytesFlexible(b64) {
-  let s = String(b64 || "").trim();
-  s = s.replace(/-/g, "+").replace(/_/g, "/");
-  while (s.length % 4) s += "=";
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
 }
 
 function concatBytes(a, b) {
@@ -263,15 +131,11 @@ async function sha256Base64(bytes) {
   const arr = new Uint8Array(digest);
   let bin = "";
   for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
-  return btoa(bin); // standard base64 with padding
+  return btoa(bin);
 }
 
-function buildCookie(name, value, opts = {}) {
-  const parts = [`${name}=${value}`];
-  if (opts.maxAge) parts.push(`Max-Age=${opts.maxAge}`);
-  if (opts.path) parts.push(`Path=${opts.path}`);
-  if (opts.httpOnly) parts.push("HttpOnly");
-  if (opts.secure) parts.push("Secure");
-  if (opts.sameSite) parts.push(`SameSite=${opts.sameSite}`);
-  return parts.join("; ");
+function bytesToBase64(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
 }
