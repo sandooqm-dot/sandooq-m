@@ -1,7 +1,7 @@
-// /functions/api2/register.js
+// functions/api2/register.js
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "api2-register-v1-otp";
+  const VERSION = "api2-register-v2-otp-mailchannels";
 
   const cors = makeCorsHeaders(request, env);
 
@@ -14,11 +14,7 @@ export async function onRequest(context) {
   }
 
   if (!env?.DB) {
-    return json(
-      { ok: false, error: "DB_NOT_BOUND", version: VERSION },
-      500,
-      cors
-    );
+    return json({ ok: false, error: "DB_NOT_BOUND", version: VERSION }, 500, cors);
   }
 
   let body;
@@ -30,86 +26,92 @@ export async function onRequest(context) {
 
   const email = String(body?.email || "").trim().toLowerCase();
   const password = String(body?.password || "");
-  const deviceId = String(request.headers.get("X-Device-Id") || "").trim();
 
   if (!email || !password) {
     return json({ ok: false, error: "MISSING_FIELDS", version: VERSION }, 400, cors);
   }
-
-  if (!isEmail(email)) {
+  if (!isValidEmail(email)) {
     return json({ ok: false, error: "INVALID_EMAIL", version: VERSION }, 400, cors);
   }
-
   if (password.length < 8) {
     return json({ ok: false, error: "WEAK_PASSWORD", version: VERSION }, 400, cors);
   }
 
-  // Check existing
-  const exists = await env.DB.prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
-    .bind(email)
-    .first();
+  // ---- ensure schema ----
+  await ensureUsersColumns(env.DB);
+  await ensureEmailOtpsTable(env.DB);
+
+  // Existing?
+  const exists = await env.DB.prepare(
+    `SELECT email FROM users WHERE email = ? LIMIT 1`
+  ).bind(email).first();
 
   if (exists) {
     return json({ ok: false, error: "EMAIL_EXISTS", version: VERSION }, 409, cors);
   }
 
-  // Create salt
+  // ---- password hash (salt + sha256) ----
   const saltBytes = new Uint8Array(16);
   crypto.getRandomValues(saltBytes);
   const saltB64 = bytesToBase64(saltBytes);
 
-  // Hash = sha256(saltBytes + passwordBytes)
   const pwBytes = new TextEncoder().encode(password);
   const hashB64 = await sha256Base64(concatBytes(saltBytes, pwBytes));
 
-  const now = new Date().toISOString();
+  const nowIso = new Date().toISOString();
 
-  // Insert user (email not verified yet)
+  // Insert user (غير متحقق)
   await env.DB.prepare(
-    `INSERT INTO users
-      (email, provider, password_hash, salt_b64, created_at, email_verified, activated)
-     VALUES
-      (?, 'email', ?, ?, ?, 0, 0)`
-  )
-    .bind(email, hashB64, saltB64, now)
-    .run();
+    `INSERT INTO users (email, provider, password_hash, salt_b64, created_at, is_email_verified)
+     VALUES (?, 'email', ?, ?, ?, 0)`
+  ).bind(email, hashB64, saltB64, nowIso).run();
 
-  // Optional: device table
-  if (deviceId) {
-    try {
-      await env.DB.prepare(
-        `INSERT OR IGNORE INTO user_devices (email, device_id, first_seen_at, last_seen_at)
-         VALUES (?, ?, ?, ?)`
-      )
-        .bind(email, deviceId, now, now)
-        .run();
+  // ---- create OTP ----
+  const otp = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+  const pepper = String(env.OTP_PEPPER || "otp_pepper_v1");
+  const otpHash = await sha256Hex(otp + "|" + pepper);
 
-      await env.DB.prepare(
-        `UPDATE user_devices SET last_seen_at = ? WHERE email = ? AND device_id = ?`
-      )
-        .bind(now, email, deviceId)
-        .run();
-    } catch {}
+  const expIso = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+
+  await env.DB.prepare(
+    `INSERT INTO email_otps (email, otp_hash, created_at, expires_at, used_at, attempts)
+     VALUES (?, ?, ?, ?, NULL, 0)`
+  ).bind(email, otpHash, nowIso, expIso).run();
+
+  // ---- send email via MailChannels ----
+  const fromEmail = String(env.MAIL_FROM || "").trim();      // مثال: no-reply@yourdomain.com
+  const fromName  = String(env.MAIL_FROM_NAME || "صندوق المسابقات").trim();
+  const subject   = String(env.OTP_SUBJECT || "رمز التحقق").trim();
+
+  // لو البريد غير مضبوط: نسمح بالاختبار عبر OTP_DEBUG
+  if (!fromEmail) {
+    const out = { ok: true, version: VERSION, email, mail: "NOT_CONFIGURED" };
+    if (String(env.OTP_DEBUG || "0") === "1") out.debugOtp = otp; // للاختبار فقط
+    return json(out, 200, cors);
   }
 
-  // Generate OTP (6 digits)
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
-  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+  const html = buildHtml(fromName, otp);
+  const text = `رمز التحقق: ${otp}\n\nمدة صلاحية الرمز 10 دقائق. إذا ما طلبت الرمز تجاهل الرسالة.`;
 
-  // Store OTP
-  await env.DB.prepare(
-    `INSERT INTO email_otps (email, otp, expires_at, created_at, used)
-     VALUES (?, ?, ?, ?, 0)`
-  )
-    .bind(email, otp, otpExpiresAt, now)
-    .run();
+  const sendRes = await sendMailchannels({
+    to: email,
+    fromEmail,
+    fromName,
+    subject,
+    html,
+    text,
+  });
 
-  // Send email (إذا ما ضبطنا البريد للحين نخليه ERROR واضح)
-  // ملاحظة: بنضيف خطوة إرسال البريد الفعلي بعد ما نثبت الوظائف.
-  // الآن نخليه يرجّع ok true (عشان الواجهة تتقدم) + السيرفر جاهز.
-  // لكن إذا تبي تخليه يفشل لين نضبط الإرسال: رجّعه EMAIL_SEND_FAILED.
-  // حالياً: نعتبره نجاح مؤقت.
-  return json({ ok: true, version: VERSION, email }, 200, cors);
+  if (!sendRes.ok) {
+    // ما نخرب إنشاء الحساب — لكن نرجع خطأ واضح عشان تعرف أنه الإرسال فشل
+    const out = { ok: false, error: "MAIL_SEND_FAILED", version: VERSION, detail: sendRes.detail };
+    if (String(env.OTP_DEBUG || "0") === "1") out.debugOtp = otp;
+    return json(out, 502, cors);
+  }
+
+  const out = { ok: true, version: VERSION, email };
+  if (String(env.OTP_DEBUG || "0") === "1") out.debugOtp = otp;
+  return json(out, 200, cors);
 }
 
 /* ---------- helpers ---------- */
@@ -123,7 +125,7 @@ function json(obj, status, corsHeaders) {
 
 function makeCorsHeaders(request, env) {
   const origin = request.headers.get("Origin") || "";
-  const allowedRaw = (env?.ALLOWED_ORIGINS || "").trim();
+  const allowedRaw = String(env?.ALLOWED_ORIGINS || "").trim();
   let allowOrigin = "*";
 
   if (allowedRaw) {
@@ -137,11 +139,15 @@ function makeCorsHeaders(request, env) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    Vary: "Origin",
+    "Vary": "Origin",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function concatBytes(a, b) {
@@ -165,6 +171,79 @@ function bytesToBase64(bytes) {
   return btoa(bin);
 }
 
-function isEmail(v) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || ""));
+async function sha256Hex(str) {
+  const bytes = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = new Uint8Array(digest);
+  let hex = "";
+  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
+  return hex;
 }
+
+async function ensureUsersColumns(DB) {
+  await DB.prepare(`ALTER TABLE users ADD COLUMN is_email_verified INTEGER DEFAULT 0`).run().catch(() => {});
+  await DB.prepare(`ALTER TABLE users ADD COLUMN email_verified_at TEXT`).run().catch(() => {});
+}
+
+async function ensureEmailOtpsTable(DB) {
+  await DB.prepare(
+    `CREATE TABLE IF NOT EXISTS email_otps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      otp_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      attempts INTEGER DEFAULT 0
+    )`
+  ).run();
+  await DB.prepare(`CREATE INDEX IF NOT EXISTS idx_email_otps_email ON email_otps(email)`).run().catch(() => {});
+}
+
+function buildHtml(brand, otp) {
+  return `
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;line-height:1.8">
+    <h2 style="margin:0 0 10px">${escapeHtml(brand)}</h2>
+    <p style="margin:0 0 10px">رمز التحقق الخاص بك هو:</p>
+    <div style="font-size:28px;font-weight:900;letter-spacing:3px;background:#f2f2f2;padding:10px 14px;border-radius:10px;display:inline-block">
+      ${escapeHtml(otp)}
+    </div>
+    <p style="margin:14px 0 0;color:#666">مدة صلاحية الرمز 10 دقائق. إذا ما طلبت الرمز تجاهل الرسالة.</p>
+  </div>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+async function sendMailchannels({ to, fromEmail, fromName, subject, html, text }) {
+  try {
+    const payload = {
+      personalizations: [{ to: [{ email: to }] }],
+      from: { email: fromEmail, name: fromName },
+      subject,
+      content: [
+        { type: "text/plain", value: text },
+        { type: "text/html", value: html },
+      ],
+    };
+
+    const r = await fetch("https://api.mailchannels.net/tx/v1/send", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      return { ok: false, detail: `HTTP_${r.status}:${t.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, detail: String(e?.message || e) };
+  }
+}
+
+// functions/api2/register.js – api2-register-v2-otp-mailchannels
