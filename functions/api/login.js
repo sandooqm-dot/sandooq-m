@@ -2,15 +2,16 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // ===== CORS =====
   const origin = request.headers.get("Origin") || "";
   const allowed = (env.ALLOWED_ORIGINS || "")
     .split(",")
     .map(s => s.trim())
     .filter(Boolean);
 
+  const allowOrigin = allowed.includes(origin) ? origin : (allowed[0] || "*");
+
   const corsHeaders = {
-    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : (allowed[0] || "*"),
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
@@ -32,9 +33,9 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // Health check (يفيدك تتأكد أن آخر نسخة نزلت)
+  // GET = فحص سريع فقط
   if (request.method === "GET") {
-    return json({ ok: true, version: "login-v7-session" }, 200);
+    return json({ ok: true, version: "login-v8-fixed-no-duration" }, 200);
   }
 
   if (request.method !== "POST") {
@@ -44,22 +45,19 @@ export async function onRequest(context) {
   if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
   const db = env.DB;
 
-  // ===== Helpers =====
   function nowISO() { return new Date().toISOString(); }
 
   function headerDeviceId(req) {
     return req.headers.get("X-Device-Id") || "";
   }
 
-  function readDeviceId(req, body) {
-    const fromBody = (body?.deviceId || "").toString().trim();
-    if (fromBody) return fromBody;
+  function readDeviceId(req) {
     const u = new URL(req.url);
     const q = (u.searchParams.get("deviceId") || "").toString().trim();
     return q || headerDeviceId(req);
   }
 
-  // PBKDF2 settings (Cloudflare cap: 100000)
+  // PBKDF2 settings
   const PBKDF2_ITER = 100000;
 
   function toB64(bytes) {
@@ -102,34 +100,8 @@ export async function onRequest(context) {
     return toB64(bits);
   }
 
-  function randId(len = 32) {
-    const b = crypto.getRandomValues(new Uint8Array(len));
-    // base64url
-    let s = "";
-    for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  }
-
-  function addDaysISO(days) {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return d.toISOString();
-  }
-
-  function cookieHeader(name, value, maxAgeSeconds) {
-    const parts = [
-      `${name}=${value}`,
-      `Max-Age=${maxAgeSeconds}`,
-      "Path=/",
-      "HttpOnly",
-      "Secure",
-      "SameSite=Lax",
-    ];
-    return parts.join("; ");
-  }
-
   async function ensureTables() {
-    // users (نفس register)
+    // نفس سكيمة register.js (بدون أي duration/meta)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -140,7 +112,6 @@ export async function onRequest(context) {
       );
     `);
 
-    // activations: code <-> device_id
     await db.exec(`
       CREATE TABLE IF NOT EXISTS activations (
         code TEXT PRIMARY KEY,
@@ -149,7 +120,6 @@ export async function onRequest(context) {
       );
     `);
 
-    // code ownership
     await db.exec(`
       CREATE TABLE IF NOT EXISTS code_ownership (
         code TEXT PRIMARY KEY,
@@ -158,7 +128,7 @@ export async function onRequest(context) {
       );
     `);
 
-    // sessions (لـ /api/me بعدين)
+    // (اختياري لاحقًا) جلسات
     await db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         session_id TEXT PRIMARY KEY,
@@ -170,7 +140,18 @@ export async function onRequest(context) {
     `);
   }
 
-  // ===== Main =====
+  function randomIdB64Url(lenBytes = 32) {
+    const bytes = crypto.getRandomValues(new Uint8Array(lenBytes));
+    let s = "";
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  function makeCookie(name, value, maxAgeSeconds) {
+    // HttpOnly + Secure (https) + SameSite=Lax
+    return `${name}=${value}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Lax`;
+  }
+
   try {
     await ensureTables();
 
@@ -179,71 +160,50 @@ export async function onRequest(context) {
 
     const email = (body.email || "").toString().trim().toLowerCase();
     const password = (body.password || "").toString();
-    const deviceId = readDeviceId(request, body);
+    const deviceId = (body.deviceId || "").toString().trim() || readDeviceId(request);
 
-    if (!email || !password) {
-      return json({ ok: false, error: "MISSING_FIELDS" }, 400);
-    }
-    if (!deviceId) {
-      return json({ ok: false, error: "MISSING_DEVICE" }, 400);
-    }
+    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
-    const user = await db
-      .prepare(`SELECT email, password_hash, salt_b64 FROM users WHERE email = ?`)
-      .bind(email)
-      .first();
+    const user = await db.prepare(`
+      SELECT email, password_hash, salt_b64
+      FROM users
+      WHERE email = ?
+    `).bind(email).first();
 
-    if (!user) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    if (!user) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
     const calc = await pbkdf2Hash(password, user.salt_b64);
-    if (calc !== user.password_hash) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
+    if (calc !== user.password_hash) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
+
+    // لو الحساب مرتبط بكود، وتوفر deviceId، نتحقق أنه نفس جهاز التفعيل
+    const ownership = await db.prepare(`
+      SELECT code FROM code_ownership WHERE email = ? LIMIT 1
+    `).bind(email).first();
+
+    let linkedCode = ownership?.code || null;
+
+    if (linkedCode && deviceId) {
+      const act = await db.prepare(`SELECT device_id FROM activations WHERE code = ?`)
+        .bind(linkedCode).first();
+
+      if (!act) return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
+      if (act.device_id !== deviceId) return json({ ok: false, error: "CODE_BOUND_TO_OTHER_DEVICE" }, 409);
     }
 
-    // لو الحساب مرتبط بكود → لازم نفس جهاز التفعيل
-    const owned = await db
-      .prepare(`SELECT code FROM code_ownership WHERE email = ? LIMIT 1`)
-      .bind(email)
-      .first();
-
-    let linkedCode = owned?.code || null;
-
-    if (linkedCode) {
-      const act = await db
-        .prepare(`SELECT code, device_id FROM activations WHERE code = ?`)
-        .bind(linkedCode)
-        .first();
-
-      if (!act) {
-        return json({ ok: false, error: "ACTIVATE_FIRST" }, 409);
-      }
-      if (act.device_id !== deviceId) {
-        return json({ ok: false, error: "ACCOUNT_BOUND_TO_OTHER_DEVICE" }, 409);
-      }
-    }
-
-    // Create session
-    const sessionId = randId(32);
+    // إنشاء Session (30 يوم)
+    const sessionId = randomIdB64Url(32);
     const createdAt = nowISO();
-    const expiresAt = addDaysISO(30);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     await db.prepare(`
       INSERT INTO sessions (session_id, email, device_id, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(sessionId, email, deviceId, createdAt, expiresAt).run();
+    `).bind(sessionId, email, deviceId || "", createdAt, expiresAt).run();
 
-    const setCookie = cookieHeader("sandooq_session", sessionId, 30 * 24 * 60 * 60);
+    const setCookie = makeCookie("sdq_session", sessionId, 30 * 24 * 60 * 60);
 
     return json(
-      {
-        ok: true,
-        email,
-        token: sessionId,         // للتجربة في Hoppscotch إذا احتجته
-        linkedCode,
-        version: "login-v7-session",
-      },
+      { ok: true, email, linkedCode, expiresAt, version: "login-v8-fixed-no-duration" },
       200,
       { "Set-Cookie": setCookie }
     );
@@ -253,7 +213,7 @@ export async function onRequest(context) {
       ok: false,
       error: "LOGIN_FAILED",
       message: String(e?.message || e),
-      version: "login-v7-session",
+      version: "login-v8-fixed-no-duration"
     }, 500);
   }
 }
