@@ -1,1 +1,7 @@
-/api/*  /api/:splat  200
+# API passthrough (اختياري لكنه مفيد)
+ /api2/*  /api2/:splat  200
+ /api/*   /api/:splat   200
+
+# Root -> activate
+ /        /activate     302
+ /index.html  /activate 302
