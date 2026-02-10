@@ -1,10 +1,25 @@
-// /functions/_middleware.js
+// functions/_middleware.js
 export async function onRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
   const path = url.pathname;
 
+  const VERSION = "mw-v3-debug-root-redirect";
   const TOKEN_COOKIE = "sandooq_token_v1";
+
+  // ✅ صفحة فحص (عشان نتأكد أن الميدلوير شغال فعلاً)
+  if (path === "/__mw") {
+    return new Response(
+      JSON.stringify({ ok: true, version: VERSION, path, time: Date.now() }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  }
 
   // ✅ مسارات عامة لا تتقفل
   if (
@@ -20,8 +35,7 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅ مهم: الدومين الرئيسي / (أو /index.html) لا يفتح صفحة اللعبة القديمة
-  // يروح للتفعيل مباشرة (وبكذا نقتل لوب الريفرش)
+  // ✅ الدومين الرئيسي / (أو /index.html) لا يفتح صفحة اللعبة القديمة
   if (path === "/" || path === "/index.html") {
     return redirect(url, "/activate?next=%2Fapp");
   }
@@ -67,4 +81,4 @@ function redirect(currentUrl, toPath) {
   });
 }
 
-// functions/_middleware.js – إصدار 2 (منع لوب الصفحة الرئيسية + حماية /app)
+// functions/_middleware.js – إصدار 3 (Debug /__mw + تحويل / إلى /activate + حماية /app)
