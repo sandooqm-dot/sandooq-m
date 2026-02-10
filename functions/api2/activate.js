@@ -1,7 +1,7 @@
 // /functions/api2/activate.js
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "api2-activate-v1";
+  const VERSION = "api2-activate-v2-cookie-auth";
 
   const cors = makeCorsHeaders(request, env);
 
@@ -14,28 +14,31 @@ export async function onRequest(context) {
   }
 
   if (!env?.DB) {
-    return json(
-      { ok: false, error: "DB_NOT_BOUND", version: VERSION },
-      500,
-      cors
-    );
+    return json({ ok: false, error: "DB_NOT_BOUND", version: VERSION }, 500, cors);
   }
 
   if (!env?.JWT_SECRET) {
-    return json(
-      { ok: false, error: "MISSING_JWT_SECRET", version: VERSION },
-      500,
-      cors
-    );
+    return json({ ok: false, error: "MISSING_JWT_SECRET", version: VERSION }, 500, cors);
   }
 
-  // Auth
+  // Auth: Authorization OR Cookie
   const auth = request.headers.get("Authorization") || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookieTok = getCookie(cookieHeader, "sandooq_token_v1");
+  const token = bearer || cookieTok || "";
+
   const payload = token ? await verifyToken(env.JWT_SECRET, token) : null;
   const email = String(payload?.email || "").trim().toLowerCase();
   if (!email) {
-    return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
+    const headers = new Headers(cors);
+    headers.set("Content-Type", "application/json; charset=utf-8");
+    headers.set("Cache-Control", "no-store");
+    headers.append("Set-Cookie", clearAuthCookie());
+    return new Response(JSON.stringify({ ok: false, error: "UNAUTHORIZED", version: VERSION }), {
+      status: 401,
+      headers,
+    });
   }
 
   const deviceId = String(request.headers.get("X-Device-Id") || "").trim();
@@ -71,28 +74,31 @@ export async function onRequest(context) {
 
   const usedBy = String(codeRow.used_by_email || "").trim().toLowerCase();
 
-  // If code already used by someone else -> blocked
+  // Code already used by another email
   if (usedBy && usedBy !== email) {
     return json({ ok: false, error: "CODE_ALREADY_USED", version: VERSION }, 409, cors);
   }
 
-  // 2) Ensure activations table exists in your schema (we assume it does).
-  //    We rely on it for "2 devices only".
-  //    activations(email, device_id, code, activated_at)
-  //    UNIQUE(email, device_id) + UNIQUE(code) recommended.
-
-  // Already activated on this device?
+  // Already activated on this device? (idempotent)
   const alreadyOnDevice = await env.DB.prepare(
     `SELECT 1 FROM activations WHERE email = ? AND device_id = ? LIMIT 1`
   ).bind(email, deviceId).first();
 
   if (alreadyOnDevice) {
-    // Make sure user marked activated (best-effort)
     await bestEffortMarkUserActivated(env.DB, email, now);
-    return json({ ok: true, version: VERSION, activated: true }, 200, cors);
+
+    const headers = new Headers(cors);
+    headers.set("Content-Type", "application/json; charset=utf-8");
+    headers.set("Cache-Control", "no-store");
+    // ✅ نثبت الكوكي مرة ثانية (يساعد الميدلوير مباشرة)
+    headers.append("Set-Cookie", makeAuthCookie(token));
+    return new Response(JSON.stringify({ ok: true, version: VERSION, activated: true }), {
+      status: 200,
+      headers,
+    });
   }
 
-  // Device limit (2 devices)
+  // Device limit (2 devices) — (موجود لكن نظامنا يسمح بالدخول بعد أول تفعيل على مستوى الحساب)
   const cntRow = await env.DB.prepare(
     `SELECT COUNT(DISTINCT device_id) AS c FROM activations WHERE email = ?`
   ).bind(email).first();
@@ -102,7 +108,7 @@ export async function onRequest(context) {
     return json({ ok: false, error: "DEVICE_LIMIT_REACHED", version: VERSION }, 409, cors);
   }
 
-  // 3) Claim code for this email if not yet claimed
+  // 2) Claim code for this email (if not claimed yet)
   if (!usedBy) {
     const upd = await env.DB.prepare(
       `UPDATE codes
@@ -111,7 +117,6 @@ export async function onRequest(context) {
     ).bind(email, now, code).run();
 
     if ((upd?.meta?.changes || 0) === 0) {
-      // Someone claimed it between our checks
       const again = await env.DB.prepare(
         `SELECT used_by_email FROM codes WHERE code = ? LIMIT 1`
       ).bind(code).first();
@@ -122,14 +127,13 @@ export async function onRequest(context) {
     }
   }
 
-  // 4) Insert activation for this device
+  // 3) Insert activation record
   try {
     await env.DB.prepare(
       `INSERT INTO activations (email, device_id, code, activated_at)
        VALUES (?, ?, ?, ?)`
     ).bind(email, deviceId, code, now).run();
-  } catch (e) {
-    // If duplicate due to race, re-check
+  } catch {
     const okNow = await env.DB.prepare(
       `SELECT 1 FROM activations WHERE email = ? AND device_id = ? LIMIT 1`
     ).bind(email, deviceId).first();
@@ -139,10 +143,18 @@ export async function onRequest(context) {
     }
   }
 
-  // 5) Mark user activated (best effort)
   await bestEffortMarkUserActivated(env.DB, email, now);
 
-  return json({ ok: true, version: VERSION, activated: true }, 200, cors);
+  // ✅ ثبت الكوكي مرة ثانية
+  const headers = new Headers(cors);
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+  headers.append("Set-Cookie", makeAuthCookie(token));
+
+  return new Response(JSON.stringify({ ok: true, version: VERSION, activated: true }), {
+    status: 200,
+    headers,
+  });
 }
 
 /* ---------- helpers ---------- */
@@ -185,6 +197,27 @@ function normCode(v) {
     .replace(/[–—−]/g, "-");
 }
 
+function getCookie(cookieHeader, name) {
+  const parts = String(cookieHeader || "").split(";").map((s) => s.trim());
+  for (const p of parts) {
+    if (!p) continue;
+    const eq = p.indexOf("=");
+    if (eq === -1) continue;
+    const k = p.slice(0, eq).trim();
+    const v = p.slice(eq + 1).trim();
+    if (k === name) return decodeURIComponent(v);
+  }
+  return "";
+}
+
+function makeAuthCookie(token) {
+  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; Secure; HttpOnly; SameSite=Lax`;
+}
+
+function clearAuthCookie() {
+  return `sandooq_token_v1=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`;
+}
+
 /* ---------- JWT verify (HS256) ---------- */
 
 function base64UrlToBytes(b64url) {
@@ -210,7 +243,6 @@ function safeEqual(a, b) {
   for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return out === 0;
 }
-
 async function hmacSha256(secret, dataBytes) {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -225,7 +257,7 @@ async function hmacSha256(secret, dataBytes) {
 
 async function verifyToken(secret, token) {
   try {
-    const parts = token.split(".");
+    const parts = String(token || "").split(".");
     if (parts.length !== 3) return null;
 
     const [h, p, s] = parts;
@@ -250,7 +282,6 @@ async function verifyToken(secret, token) {
 /* ---------- best-effort activated flag ---------- */
 
 async function bestEffortMarkUserActivated(DB, email, now) {
-  // بعض السكيمات فيها activated / activated_at وبعضها لا — نخليه Best-effort بدون ما يكسر.
   try {
     await DB.prepare(`UPDATE users SET activated = 1 WHERE email = ?`).bind(email).run();
   } catch {}
@@ -258,3 +289,5 @@ async function bestEffortMarkUserActivated(DB, email, now) {
     await DB.prepare(`UPDATE users SET activated_at = ? WHERE email = ?`).bind(now, email).run();
   } catch {}
 }
+
+// functions/api2/activate.js – api2-activate-v2-cookie-auth
