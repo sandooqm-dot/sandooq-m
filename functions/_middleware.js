@@ -4,10 +4,10 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  const VERSION = "mw-v3-debug-root-redirect";
+  const VERSION = "mw-v4-root-to-activate";
   const TOKEN_COOKIE = "sandooq_token_v1";
 
-  // ✅ صفحة فحص (عشان نتأكد أن الميدلوير شغال فعلاً)
+  // ✅ صفحة فحص (اختياري) للتأكد أن الميدلوير شغال
   if (path === "/__mw") {
     return new Response(
       JSON.stringify({ ok: true, version: VERSION, path, time: Date.now() }),
@@ -35,16 +35,17 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅ الدومين الرئيسي / (أو /index.html) لا يفتح صفحة اللعبة القديمة
+  // ✅ الأهم: أي أحد يدخل الموقع على / أو /index.html -> يتحول لـ /activate
   if (path === "/" || path === "/index.html") {
     return redirect(url, "/activate?next=%2Fapp");
   }
 
-  // ✅ نقفل /app فقط
+  // ✅ حماية /app (المرحلة الجاية بنخلي اللعبة هناك)
   if (path === "/app" || path.startsWith("/app/")) {
     const cookieHeader = request.headers.get("Cookie") || "";
     const token = getCookie(cookieHeader, TOKEN_COOKIE);
 
+    // إذا ما عنده جلسة -> يرجع للتفعيل
     if (!token) {
       const nextPath = path + (url.search || "");
       const to = "/activate?next=" + encodeURIComponent(nextPath);
@@ -81,4 +82,4 @@ function redirect(currentUrl, toPath) {
   });
 }
 
-// functions/_middleware.js – إصدار 3 (Debug /__mw + تحويل / إلى /activate + حماية /app)
+// functions/_middleware.js – إصدار 4
