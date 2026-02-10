@@ -1,207 +1,132 @@
-// functions/api2/resend-otp.js
-// api2-resend-otp-v1 (Resend OTP via Resend)
-
-function json(obj, status = 200, corsHeaders, extraHeaders = {}) {
-  const headers = new Headers(corsHeaders || {});
-  headers.set("Content-Type", "application/json; charset=utf-8");
-  headers.set("Cache-Control", "no-store");
-  for (const [k, v] of Object.entries(extraHeaders || {})) headers.set(k, v);
-  return new Response(JSON.stringify(obj), { status, headers });
-}
-
-function makeCorsHeaders(request, env) {
-  const origin = request.headers.get("Origin") || "";
-  const allowedRaw = (env.ALLOWED_ORIGINS || "").trim();
-
-  let allowOrigin = "";
-  if (!allowedRaw) {
-    allowOrigin = origin || "";
-  } else {
-    const allowed = allowedRaw.split(",").map(s => s.trim()).filter(Boolean);
-    if (allowed.includes("*")) allowOrigin = "*";
-    else if (origin && allowed.includes(origin)) allowOrigin = origin;
-    else allowOrigin = "";
-  }
-
-  return {
-    "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
-    "Access-Control-Allow-Credentials": "true",
-    "Vary": "Origin",
-  };
-}
-
-function b64(bytes) {
-  let bin = "";
-  bytes.forEach(b => (bin += String.fromCharCode(b)));
-  return btoa(bin);
-}
-
-function bytesFromString(s) {
-  return new TextEncoder().encode(s);
-}
-
-async function sha256Hex(bytes) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = new Uint8Array(digest);
-  let hex = "";
-  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
-  return hex;
-}
-
-function normalizeEmail(email) {
-  return String(email || "").trim().toLowerCase();
-}
-
-function makeOtp6() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
-async function sendOtpEmail({ env, toEmail, otp }) {
-  const apiKey = (env.RESEND_API_KEY || "").trim();
-  const from = (env.RESEND_FROM || "").trim(); // مثال: "صندوق المسابقات <support@sandooq-games.com>"
-  const replyTo = (env.RESEND_REPLY_TO || "").trim(); // اختياري
-
-  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
-  if (!from) throw new Error("Missing RESEND_FROM");
-
-  const subject = "رمز التحقق - صندوق المسابقات";
-  const text = `رمز التحقق الخاص بك هو: ${otp}\nصلاحية الرمز: 10 دقائق.\nإذا لم تطلب هذا الرمز تجاهل الرسالة.`;
-
-  const html = `
-  <div dir="rtl" style="font-family:Arial, Tahoma, sans-serif; line-height:1.8">
-    <div style="max-width:520px;margin:0 auto;padding:18px;border-radius:14px;background:#ffffff">
-      <div style="text-align:center;margin-bottom:8px">
-        <div style="font-size:18px;font-weight:700;color:#111">صندوق المسابقات</div>
-        <div style="font-size:12px;color:#666">تأكيد البريد الإلكتروني</div>
-      </div>
-
-      <div style="margin-top:12px;color:#111">
-        هذا هو رمز التحقق الخاص بك:
-      </div>
-
-      <div style="margin:16px 0;padding:14px;border-radius:12px;background:#f5f7ff;text-align:center">
-        <div style="font-size:34px;font-weight:800;letter-spacing:6px;color:#1a1a1a">${otp}</div>
-      </div>
-
-      <div style="font-size:13px;color:#444">
-        صلاحية الرمز <b>10 دقائق</b>. إذا لم تطلب هذا الرمز تجاهل الرسالة.
-      </div>
-
-      <hr style="border:none;border-top:1px solid #eee;margin:16px 0" />
-      <div style="font-size:12px;color:#777;text-align:center">© صندوق المسابقات</div>
-    </div>
-  </div>`.trim();
-
-  const payload = { from, to: toEmail, subject, html, text };
-  if (replyTo) payload.reply_to = replyTo;
-
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    const msg = data?.message || data?.error || `Resend error ${r.status}`;
-    throw new Error(msg);
-  }
-  return data;
-}
-
 export async function onRequest(context) {
   const { request, env } = context;
-  const cors = makeCorsHeaders(request, env);
-
-  if (cors["Access-Control-Allow-Origin"] === "" && (request.headers.get("Origin") || "")) {
-    return json({ ok: false, error: "CORS_NOT_ALLOWED" }, 403, cors);
-  }
-
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: cors });
-  }
 
   if (request.method !== "POST") {
-    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405, cors);
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   }
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ ok: false, error: "BAD_JSON" }, 400, cors);
+    return json({ ok: false, error: "BAD_JSON" }, 400);
   }
 
-  const email = normalizeEmail(body.email);
-  if (!email || !email.includes("@")) {
-    return json({ ok: false, error: "INVALID_EMAIL" }, 400, cors);
+  const email = String(body.email || "").trim().toLowerCase();
+  const otp = String(body.otp || body.code || "").trim();
+
+  if (!email || !otp) {
+    return json({ ok: false, error: "MISSING_FIELDS" }, 400);
   }
 
-  const db = env.DB;
-  if (!db) return json({ ok: false, error: "NO_DB_BINDING" }, 500, cors);
+  const DB =
+    env.DB || env.AUTH_DB || env.DATABASE || env.AUTH_DATABASE || null;
 
-  const now = Date.now();
+  if (!DB) {
+    return json({ ok: false, error: "DB_BINDING_MISSING" }, 500);
+  }
 
-  // جيب المستخدم
-  let user;
   try {
-    user = await db
-      .prepare("SELECT id, email_verified_at, otp_last_sent_at FROM users WHERE email = ? LIMIT 1")
+    // نجيب آخر OTP لهذا الإيميل من جدول email_otps (حسب سكيمتك اللي بالصورة)
+    const row = await DB.prepare(
+      `SELECT id, otp_hash, expires_at, used_at, attempts
+       FROM email_otps
+       WHERE email = ?
+       ORDER BY id DESC
+       LIMIT 1`
+    )
       .bind(email)
       .first();
-  } catch (e) {
-    return json({ ok: false, error: "DB_SCHEMA_ERROR", detail: String(e?.message || e) }, 500, cors);
-  }
 
-  if (!user?.id) {
-    // ما نكشف كثير للعميل، لكن نخليه واضح
-    return json({ ok: false, error: "USER_NOT_FOUND" }, 404, cors);
-  }
+    if (!row) return json({ ok: false, error: "OTP_NOT_FOUND" }, 400);
 
-  if (user.email_verified_at) {
-    return json({ ok: false, error: "ALREADY_VERIFIED" }, 409, cors);
-  }
+    const nowIso = new Date().toISOString();
 
-  // Rate limit: 60 ثانية
-  if (user.otp_last_sent_at && now - Number(user.otp_last_sent_at) < 60_000) {
-    const leftMs = 60_000 - (now - Number(user.otp_last_sent_at));
-    return json(
-      { ok: false, error: "OTP_RATE_LIMIT", retryAfterSec: Math.ceil(leftMs / 1000) },
-      429,
-      cors
-    );
-  }
+    if (row.used_at) return json({ ok: false, error: "OTP_ALREADY_USED" }, 400);
 
-  const otp = makeOtp6();
-  const otpSecret = (env.OTP_SECRET || env.JWT_SECRET || "otp_secret").toString();
-  const otpHash = await sha256Hex(bytesFromString(`${email}|${otp}|${otpSecret}`));
-  const otpExpiresAt = now + 10 * 60 * 1000;
+    const expMs = Date.parse(row.expires_at || "");
+    if (!row.expires_at || Number.isNaN(expMs) || Date.now() > expMs) {
+      return json({ ok: false, error: "OTP_EXPIRED" }, 400);
+    }
 
-  // حدّث OTP في DB
-  try {
-    await db
-      .prepare(
-        "UPDATE users SET otp_hash = ?, otp_expires_at = ?, otp_last_sent_at = ? WHERE email = ?"
-      )
-      .bind(otpHash, otpExpiresAt, now, email)
+    const attempts = Number(row.attempts || 0);
+    if (attempts >= 10) return json({ ok: false, error: "OTP_LOCKED" }, 400);
+
+    // لازم نفس طريقة الهاش تكون ثابتة بين register و verify-email
+    const secret = env.OTP_SECRET || env.AUTH_SECRET || env.JWT_SECRET || "sandooq";
+    const computed = await sha256Hex(`${secret}|${email}|${otp}`);
+    const stored = String(row.otp_hash || "");
+
+    const match = timingSafeEqualHex(computed, stored);
+
+    if (!match) {
+      await DB.prepare(`UPDATE email_otps SET attempts = ? WHERE id = ?`)
+        .bind(attempts + 1, row.id)
+        .run();
+      return json({ ok: false, error: "OTP_INVALID" }, 400);
+    }
+
+    // نجاح: نعلّم الـ OTP كمستخدم + نوثق الإيميل
+    await DB.prepare(`UPDATE email_otps SET used_at = ? WHERE id = ?`)
+      .bind(nowIso, row.id)
       .run();
-  } catch (e) {
-    return json({ ok: false, error: "DB_WRITE_FAILED", detail: String(e?.message || e) }, 500, cors);
-  }
 
-  // أرسل البريد
-  try {
-    await sendOtpEmail({ env, toEmail: email, otp });
-  } catch (e) {
-    return json({ ok: false, error: "EMAIL_SEND_FAILED", detail: String(e?.message || e) }, 502, cors);
-  }
+    await DB.prepare(
+      `UPDATE users
+       SET is_email_verified = 1,
+           email_verified = 1,
+           email_verified_at = ?
+       WHERE email = ?`
+    )
+      .bind(nowIso, email)
+      .run();
 
-  return json({ ok: true }, 200, cors);
+    // نسوي Session Token (عشان /api2/me يشتغل مباشرة)
+    const token = makeToken();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+
+    await DB.prepare(
+      `INSERT INTO sessions (token, email, created_at, expires_at)
+       VALUES (?, ?, ?, ?)`
+    )
+      .bind(token, email, nowIso, expiresAt)
+      .run();
+
+    return json({ ok: true, token, email }, 200);
+  } catch (err) {
+    console.error("verify-email error:", err);
+    return json({ ok: false, error: "DB_SCHEMA_ERROR" }, 500);
+  }
 }
 
-// functions/api2/resend-otp.js — إصدار 1
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+function makeToken() {
+  // توكن طويل عشوائي
+  return (
+    crypto.randomUUID().replaceAll("-", "") +
+    crypto.randomUUID().replaceAll("-", "")
+  );
+}
+
+async function sha256Hex(input) {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function timingSafeEqualHex(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
+}
