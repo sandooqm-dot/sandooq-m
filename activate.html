@@ -414,7 +414,7 @@
       return (v||"").toString().trim().toUpperCase().replace(/\s+/g,"").replace(/[–—−]/g,"-");
     }
 
-    // Device ID ثابت لكل جهاز (مو آمن 100% لكن السيرفر بيحسب الأجهزة)
+    // Device ID ثابت لكل جهاز
     function getDeviceId(){
       const k="sandooq_device_id_v1";
       let v = localStorage.getItem(k);
@@ -425,13 +425,80 @@
       return v;
     }
 
-    // Session token
-    function setToken(t){
-      if(t) localStorage.setItem("sandooq_token_v1", t);
-      else localStorage.removeItem("sandooq_token_v1");
+    // =========================
+    //   NEXT (بعد التسجيل نرجع للمسار المطلوب)
+    // =========================
+    const NEXT_KEY = "sandooq_next_path_v1";
+
+    function sanitizeNext(n){
+      if(!n) return "";
+      try{
+        const s = String(n).trim();
+        // نسمح فقط بمسارات داخلية تبدأ بـ /
+        if(!s.startsWith("/")) return "";
+        if(s.startsWith("//")) return "";
+        if(s.toLowerCase().startsWith("/api/")) return "";
+        return s;
+      }catch{
+        return "";
+      }
     }
+
+    (function captureNext(){
+      const u = new URL(location.href);
+      const n = sanitizeNext(u.searchParams.get("next"));
+      if(n) sessionStorage.setItem(NEXT_KEY, n);
+    })();
+
+    function getNextPath(){
+      return sanitizeNext(sessionStorage.getItem(NEXT_KEY) || "");
+    }
+
+    // =========================
+    //   Session token (LocalStorage + Cookie) ✅
+    //   (عشان middleware يقدر يقفل /app)
+    // =========================
+    const TOKEN_KEY = "sandooq_token_v1";
+    const TOKEN_COOKIE = "sandooq_token_v1";
+    const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 يوم
+
+    function setCookie(name, value, maxAgeSec){
+      const secure = location.protocol === "https:" ? " Secure;" : "";
+      document.cookie =
+        name + "=" + encodeURIComponent(value) +
+        "; Path=/; Max-Age=" + String(maxAgeSec) +
+        "; SameSite=Lax;" + secure;
+    }
+    function clearCookie(name){
+      const secure = location.protocol === "https:" ? " Secure;" : "";
+      document.cookie = name + "=; Path=/; Max-Age=0; SameSite=Lax;" + secure;
+    }
+    function getCookie(name){
+      const parts = (document.cookie || "").split(";").map(s => s.trim());
+      for(const p of parts){
+        if(!p) continue;
+        const eq = p.indexOf("=");
+        if(eq === -1) continue;
+        const k = p.slice(0, eq).trim();
+        const v = p.slice(eq + 1).trim();
+        if(k === name) return decodeURIComponent(v);
+      }
+      return "";
+    }
+
+    function setToken(t){
+      if(t){
+        localStorage.setItem(TOKEN_KEY, t);
+        setCookie(TOKEN_COOKIE, t, COOKIE_MAX_AGE_SEC); // ✅ أهم تعديل
+      }else{
+        localStorage.removeItem(TOKEN_KEY);
+        clearCookie(TOKEN_COOKIE); // ✅ مسح الكوكي
+      }
+    }
+
     function getToken(){
-      return localStorage.getItem("sandooq_token_v1") || "";
+      // لو localStorage فاضي لكن الكوكي موجود (احتياط)
+      return localStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_COOKIE) || "";
     }
 
     async function api(path, body, {auth=true}={}){
@@ -464,9 +531,14 @@
     $("btnLogout2").onclick = ()=>{ setToken(""); boot(); };
 
     $("btnEnterGame").onclick = ()=>{
-      // هنا وجهة اللعبة بعد اعتماد حماية /api/me
-      // تقدر تغيّرها لاحقاً للملف الأساسي
-      window.location.href = "index.html";
+      // ✅ الآن: نحاول نرجع للمسار اللي دخل منه (مثل /app)
+      // مؤقتًا لو ما فيه next، ندخل index.html عشان ما نخرب شغلك قبل تجهيز /app بالكامل
+      const next = getNextPath();
+      if(next){
+        window.location.href = next;
+      }else{
+        window.location.href = "index.html";
+      }
     };
 
     // =========================
@@ -483,7 +555,7 @@
       if(!r?.ok){
         return msg($("authMsg"), translateErr(r), "err");
       }
-      setToken(r.token);
+      setToken(r.token); // ✅ صار يحفظ كوكي + LocalStorage
       await boot();
     };
 
@@ -522,7 +594,7 @@
       }
 
       // بعد التحقق: يدخل تلقائي (يعطينا token)
-      if(r.token) setToken(r.token);
+      if(r.token) setToken(r.token); // ✅ كوكي + LocalStorage
       sessionStorage.removeItem("pending_email");
       await boot();
     };
@@ -555,6 +627,12 @@
     //   Boot: decides which screen to show
     // =========================
     async function boot(){
+      // ✅ لو الكوكي موجود لكن localStorage فاضي، نزامنهم
+      const cookieTok = getCookie(TOKEN_COOKIE);
+      if(cookieTok && !localStorage.getItem(TOKEN_KEY)){
+        localStorage.setItem(TOKEN_KEY, cookieTok);
+      }
+
       // إذا ما عنده توكن: شاشة الدخول
       if(!getToken()){
         show("view-auth");
@@ -592,7 +670,6 @@
     function translateErr(r){
       const e = (r && (r.error || r.code)) ? String(r.error || r.code) : "UNKNOWN_ERROR";
 
-      // رسائل عامة
       if(e === "SERVICE_UNAVAILABLE") return "الخدمة غير متاحة الآن. جرّب بعد قليل.";
       if(e === "BAD_RESPONSE") return "صار خطأ في الاتصال بالسيرفر.";
       if(e === "INVALID_EMAIL") return "البريد الإلكتروني غير صحيح.";
@@ -608,7 +685,6 @@
       if(e === "ACTIVATE_REQUIRED") return "لازم تفعّل اللعبة بالكود أول مرة.";
       if(e === "METHOD_NOT_ALLOWED") return "طلب غير صالح.";
 
-      // fallback
       return "حدث خطأ: " + e;
     }
 
@@ -618,4 +694,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v2 (واجهة فقط) -->
+<!-- activate.html – إصدار 2 (Token Cookie لدعم حماية /app + next) -->
