@@ -1,7 +1,7 @@
 // /functions/api2/login.js
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "api2-login-v1";
+  const VERSION = "api2-login-v2-cookie";
 
   const cors = makeCorsHeaders(request, env);
 
@@ -114,10 +114,25 @@ export async function onRequest(context) {
 
   const token = await signToken(env.JWT_SECRET, { email }, 60 * 60 * 24 * 30); // 30 days
 
-  return json({ ok: true, version: VERSION, email, token }, 200, cors);
+  // ✅ الكوكي اللي تعتمد عليه الحماية
+  const headers = new Headers(cors);
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+  headers.append("Set-Cookie", makeAuthCookie(token));
+
+  return new Response(
+    JSON.stringify({ ok: true, version: VERSION, email, token }),
+    { status: 200, headers }
+  );
 }
 
 /* ---------- helpers ---------- */
+
+function makeAuthCookie(token) {
+  // ملاحظة: Secure يشتغل لأننا على HTTPS
+  // Lax ممتاز للتصفح الطبيعي. (No third-party)
+  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; Secure; HttpOnly; SameSite=Lax`;
+}
 
 function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
@@ -176,7 +191,6 @@ function base64ToBytes(b64) {
 }
 
 function safeEqualB64(a, b) {
-  // constant-ish time compare (length + char codes)
   a = String(a || "");
   b = String(b || "");
   if (a.length !== b.length) return false;
