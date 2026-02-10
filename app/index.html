@@ -66,7 +66,6 @@
     }
     @keyframes s{to{transform:rotate(360deg)}}
 
-    /* iframe */
     #frame{
       position:fixed;
       inset:0;
@@ -74,7 +73,7 @@
       height:100vh;
       border:0;
       background:transparent;
-      display:none; /* يظهر بعد التحميل */
+      display:none;
     }
     .hide{display:none !important;}
   </style>
@@ -95,8 +94,10 @@
     const frame = document.getElementById("frame");
     const loading = document.getElementById("loading");
 
+    // ✅ هنا صفحة لعبتك الحقيقية اللي بتبدأ منها (الجذر)
     const DEFAULT_PAGE = "/index.html";
-    const KEY_LAST_URL = "sandooq_app_last_url_v1";
+
+    const KEY_LAST_URL  = "sandooq_app_last_url_v1";
     const KEY_LAST_PATH = "sandooq_app_last_path_v1";
 
     function showFrame(){
@@ -114,7 +115,8 @@
       if(!h) return "";
 
       // ممنوع api
-      if(h.toLowerCase().startsWith("api") || h.toLowerCase().startsWith("api2")) return "";
+      const low = h.toLowerCase();
+      if(low.startsWith("api") || low.startsWith("api2")) return "";
 
       const parts = h.split("?");
       let p = (parts[0] || "").trim();
@@ -136,7 +138,6 @@
     function initialTarget(){
       const fromHash = normalizeTarget(location.hash);
       if(fromHash){
-        // لو الهـاش بدون Query وعندنا آخر URL محفوظ لنفس الصفحة، رجّعه (يفيد لو كان فيه باراميتر داخلي)
         const wantPath = fromHash.split("?")[0];
         const last = sessionStorage.getItem(KEY_LAST_URL) || "";
         const lastPath = sessionStorage.getItem(KEY_LAST_PATH) || "";
@@ -158,7 +159,7 @@
         sessionStorage.setItem(KEY_LAST_URL, full);
         sessionStorage.setItem(KEY_LAST_PATH, u.pathname);
 
-        // نخلي الهـاش قصير (بس اسم الصفحة بدون query) عشان ما يصير 20 ألف حرف
+        // نخلي الرابط قصير: /app#اسم_الصفحة
         const file = (u.pathname.split("/").pop() || "");
         if(file.endsWith(".html")){
           const short = file.replace(/\.html$/,"");
@@ -170,7 +171,6 @@
       showFrame();
     });
 
-    // Start
     load(initialTarget());
   </script>
 </body>
