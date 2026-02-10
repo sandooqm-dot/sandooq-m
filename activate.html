@@ -418,21 +418,6 @@
       return v;
     }
 
-    // Session token (للواجهة فقط) + السيرفر يعتمد على Cookie للحماية
-    function setToken(t){
-      if(t) localStorage.setItem("sandooq_token_v1", t);
-      else localStorage.removeItem("sandooq_token_v1");
-    }
-    function getToken(){
-      return localStorage.getItem("sandooq_token_v1") || "";
-    }
-
-    async function logout(){
-      try { await api("/logout", {}, {auth:false}); } catch {}
-      setToken("");
-      boot();
-    }
-
     function apiUrl(path){
       let p = String(path||"");
       if(!p.startsWith("/")) p = "/" + p;
@@ -441,22 +426,29 @@
       return API_BASE + p;
     }
 
-    async function api(path, body, {auth=true}={}){
-      const headers = { "Content-Type":"application/json", "X-Device-Id": getDeviceId() };
-      if(auth && getToken()) headers["Authorization"] = "Bearer " + getToken();
+    async function api(path, body){
+      const headers = {
+        "Content-Type":"application/json",
+        "X-Device-Id": getDeviceId()
+      };
 
       const res = await fetch(apiUrl(path), {
         method:"POST",
         headers,
-        body: JSON.stringify(body||{})
+        body: JSON.stringify(body||{}),
+        credentials: "include"
       });
 
       let data=null;
       try{ data = await res.json(); }catch{ data = { ok:false, error:"BAD_RESPONSE" }; }
-      if(!res.ok && data && data.ok !== true){
-        return data;
-      }
       return data;
+    }
+
+    async function logout(){
+      try { await api("/logout", {}); } catch {}
+      // نمسح فقط pending_email محليًا
+      sessionStorage.removeItem("pending_email");
+      boot();
     }
 
     // =========================
@@ -478,7 +470,6 @@
     $("btnLogout2").onclick = async ()=>{ await logout(); };
 
     $("btnEnterGame").onclick = ()=>{
-      // ندخل عبر /app عشان الرابط يصير قصير وهاشتاق (#)
       window.location.href = "/app";
     };
 
@@ -492,11 +483,10 @@
       if(!email) return msg($("authMsg"), "اكتب البريد الإلكتروني", "err");
       if(password.length < 8) return msg($("authMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
 
-      const r = await api("/login", { email, password }, {auth:false});
+      const r = await api("/login", { email, password });
       if(!r?.ok){
         return msg($("authMsg"), translateErr(r), "err");
       }
-      setToken(r.token);
       await boot();
     };
 
@@ -509,7 +499,7 @@
       if(pw1.length < 8) return msg($("createMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
       if(pw1 !== pw2) return msg($("createMsg"), "كلمتا المرور غير متطابقتين", "err");
 
-      const r = await api("/register", { email, password: pw1 }, {auth:false});
+      const r = await api("/register", { email, password: pw1 });
       if(!r?.ok){
         return msg($("createMsg"), translateErr(r), "err");
       }
@@ -517,7 +507,13 @@
       sessionStorage.setItem("pending_email", email);
       $("vEmail").textContent = email;
       show("view-verify");
-      msg($("verifyMsg"), "تم إرسال رمز التحقق لبريدك ✅", "ok");
+
+      // لو DEBUG شغال، ممكن يرجع الرمز (للاختبار فقط)
+      if (r.debugOtp) {
+        msg($("verifyMsg"), "تم إرسال رمز التحقق ✅\n(للاختبار: " + r.debugOtp + ")", "ok");
+      } else {
+        msg($("verifyMsg"), "تم إرسال رمز التحقق لبريدك ✅", "ok");
+      }
     };
 
     $("btnVerifyOtp").onclick = async ()=>{
@@ -527,12 +523,11 @@
       if(!otp) return msg($("verifyMsg"), "اكتب رمز التحقق", "err");
       if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
 
-      const r = await api("/verify-email", { email, otp }, {auth:false});
+      const r = await api("/verify-email", { email, otp });
       if(!r?.ok){
         return msg($("verifyMsg"), translateErr(r), "err");
       }
 
-      if(r.token) setToken(r.token);
       sessionStorage.removeItem("pending_email");
       await boot();
     };
@@ -542,11 +537,16 @@
       const email = sessionStorage.getItem("pending_email") || "";
       if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
 
-      const r = await api("/resend-otp", { email }, {auth:false});
+      const r = await api("/resend-otp", { email });
       if(!r?.ok){
         return msg($("verifyMsg"), translateErr(r), "err");
       }
-      msg($("verifyMsg"), "تمت إعادة إرسال الرمز ✅", "ok");
+
+      if (r.debugOtp) {
+        msg($("verifyMsg"), "تمت إعادة إرسال الرمز ✅\n(للاختبار: " + r.debugOtp + ")", "ok");
+      } else {
+        msg($("verifyMsg"), "تمت إعادة إرسال الرمز ✅", "ok");
+      }
     };
 
     $("btnActivate").onclick = async ()=>{
@@ -562,25 +562,35 @@
     };
 
     // =========================
-    //   Boot
+    //   Boot: decides which screen to show
     // =========================
     async function boot(){
-      if(!getToken()){
-        show("view-auth");
+      // لو المستخدم في شاشة التحقق ولسه ما خلص OTP
+      const pending = sessionStorage.getItem("pending_email") || "";
+      if (pending) {
+        $("vEmail").textContent = pending;
+        show("view-verify");
         return;
       }
 
       const me = await api("/me", {});
       if(!me?.ok){
-        setToken("");
         show("view-auth");
-        msg($("authMsg"), "انتهت الجلسة. سجل دخول من جديد.", "err");
         return;
       }
 
       const email = me.email || "";
       $("who").textContent = email;
       $("readyEmail").textContent = email;
+
+      // لو الإيميل مو متحقق (نادر لأن login يمنع قبل التحقق)
+      if(me.verified === false){
+        sessionStorage.setItem("pending_email", email);
+        $("vEmail").textContent = email;
+        show("view-verify");
+        msg($("verifyMsg"), "لازم تؤكد بريدك أولاً.", "err");
+        return;
+      }
 
       if(!me.activated){
         show("view-activate");
@@ -591,25 +601,33 @@
     }
 
     // =========================
-    //   Error translation
+    //   Error translation (واجهة عربية واضحة)
     // =========================
     function translateErr(r){
       const e = (r && (r.error || r.code)) ? String(r.error || r.code) : "UNKNOWN_ERROR";
 
-      if(e === "SERVICE_UNAVAILABLE") return "الخدمة غير متاحة الآن. جرّب بعد قليل.";
       if(e === "BAD_RESPONSE") return "صار خطأ في الاتصال بالسيرفر.";
+      if(e === "DB_NOT_BOUND") return "في مشكلة إعدادات السيرفر (DB).";
+      if(e === "BAD_JSON") return "طلب غير صالح.";
       if(e === "INVALID_EMAIL") return "البريد الإلكتروني غير صحيح.";
-      if(e === "WEAK_PASSWORD") return "كلمة المرور ضعيفة.";
+      if(e === "MISSING_FIELDS" || e === "MISSING_FIELD") return "الرجاء تعبئة جميع الحقول.";
+
       if(e === "EMAIL_EXISTS") return "هذا الإيميل مسجل مسبقًا.";
-      if(e === "INVALID_LOGIN") return "الإيميل أو كلمة المرور غير صحيحة.";
+      if(e === "USER_NOT_FOUND") return "الإيميل أو كلمة المرور غير صحيحة.";
+      if(e === "BAD_PASSWORD") return "الإيميل أو كلمة المرور غير صحيحة.";
       if(e === "EMAIL_NOT_VERIFIED") return "لازم تؤكد بريدك الإلكتروني أولاً.";
-      if(e === "OTP_INVALID") return "رمز التحقق غير صحيح.";
+
+      if(e === "OTP_WRONG" || e === "OTP_INVALID" || e === "INVALID_OTP") return "رمز التحقق غير صحيح.";
       if(e === "OTP_EXPIRED") return "رمز التحقق انتهت صلاحيته. أعد الإرسال.";
+      if(e === "OTP_TOO_SOON") return "انتظر دقيقة ثم أعد الإرسال.";
+      if(e === "TOO_MANY_ATTEMPTS" || e === "OTP_LOCKED") return "محاولات كثيرة. جرّب بعد قليل.";
+
+      if(e === "MAIL_NOT_CONFIGURED") return "خدمة إرسال الإيميل غير مفعّلة حالياً.";
+      if(e === "MAIL_SEND_FAILED") return "فشل إرسال الإيميل. جرّب مرة ثانية.";
+
       if(e === "CODE_NOT_FOUND") return "الكود غير موجود.";
       if(e === "CODE_ALREADY_USED") return "الكود مستخدم مسبقًا.";
       if(e === "DEVICE_LIMIT_REACHED") return "تجاوزت الحد المسموح لربط الأجهزة (جهازين فقط).";
-      if(e === "ACTIVATE_REQUIRED") return "لازم تفعّل اللعبة بالكود أول مرة.";
-      if(e === "METHOD_NOT_ALLOWED") return "طلب غير صالح.";
 
       return "حدث خطأ: " + e;
     }
@@ -620,4 +638,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v4 (api2 + logout cookie) -->
+<!-- activate.html – نظام التفعيل الجديد v5 (Cookie-based session, api2) -->
