@@ -1,7 +1,7 @@
-// functions/api2/activate.js
+// /functions/api2/activate.js
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "api2-activate-v1-code-device";
+  const VERSION = "api2-activate-v1";
 
   const cors = makeCorsHeaders(request, env);
 
@@ -15,23 +15,35 @@ export async function onRequest(context) {
 
   if (!env?.DB) {
     return json(
-      { ok: false, error: "DB_NOT_BOUND", version: VERSION, message: "Bind D1 as DB in Pages Settings -> Bindings" },
+      { ok: false, error: "DB_NOT_BOUND", version: VERSION },
       500,
       cors
     );
   }
 
-  const token = readToken(request);
-  if (!token) {
+  if (!env?.JWT_SECRET) {
+    return json(
+      { ok: false, error: "MISSING_JWT_SECRET", version: VERSION },
+      500,
+      cors
+    );
+  }
+
+  // Auth
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const payload = token ? await verifyToken(env.JWT_SECRET, token) : null;
+  const email = String(payload?.email || "").trim().toLowerCase();
+  if (!email) {
     return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
   }
 
   const deviceId = String(request.headers.get("X-Device-Id") || "").trim();
   if (!deviceId) {
-    return json({ ok: false, error: "MISSING_DEVICE", version: VERSION }, 400, cors);
+    return json({ ok: false, error: "MISSING_DEVICE_ID", version: VERSION }, 400, cors);
   }
 
-  let body = null;
+  let body;
   try {
     body = await request.json();
   } catch {
@@ -40,153 +52,105 @@ export async function onRequest(context) {
 
   const code = normCode(body?.code);
   if (!code) {
-    return json({ ok: false, error: "MISSING_FIELDS", version: VERSION }, 400, cors);
+    return json({ ok: false, error: "MISSING_CODE", version: VERSION }, 400, cors);
   }
 
-  const now = Date.now();
-  const gameId = String(env?.GAME_ID || "horof").trim();
-  const deviceLimit = Number(env?.DEVICE_LIMIT || 2);
+  const now = new Date().toISOString();
 
-  // 1) تحقق Session -> email
-  const tokenHash = await sha256Hex(new TextEncoder().encode(token));
-  const s = await env.DB.prepare(
-    "SELECT email, expires_at, revoked_at FROM auth_sessions WHERE token_hash = ? LIMIT 1"
-  )
-    .bind(tokenHash)
-    .first();
-
-  if (!s || s.revoked_at || Number(s.expires_at) <= now) {
-    return json({ ok: false, error: "UNAUTHORIZED", version: VERSION }, 401, cors);
-  }
-
-  const email = String(s.email || "");
-
-  // 2) لازم البريد متأكد
-  const u = await env.DB.prepare("SELECT email_verified FROM auth_users WHERE email = ? LIMIT 1")
-    .bind(email)
-    .first();
-
-  if (!u || Number(u.email_verified || 0) !== 1) {
-    return json({ ok: false, error: "EMAIL_NOT_VERIFIED", version: VERSION }, 403, cors);
-  }
-
-  // 3) هل هذا الحساب مفعل سابقاً للعبة؟ (إذا مفعل نسمح ربط جهاز جديد فقط)
-  const existingLink = await env.DB.prepare(
-    "SELECT code FROM auth_code_links WHERE game_id = ? AND email = ? LIMIT 1"
-  )
-    .bind(gameId, email)
-    .first();
-
-  if (existingLink) {
-    const linkedCode = String(existingLink.code || "");
-
-    // لو يحاول يدخل كود غير اللي مرتبط بحسابه -> مرفوض
-    if (linkedCode !== code) {
-      return json({ ok: false, error: "CODE_ALREADY_USED", version: VERSION }, 409, cors);
-    }
-
-    // ربط جهاز (حد جهازين)
-    const count = await env.DB.prepare(
-      "SELECT COUNT(1) as c FROM auth_activations WHERE game_id = ? AND code = ?"
-    )
-      .bind(gameId, linkedCode)
-      .first();
-
-    const c = Number(count?.c || 0);
-    if (c >= deviceLimit) {
-      // إذا الجهاز نفسه موجود أصلاً نسمح
-      const already = await env.DB.prepare(
-        "SELECT 1 FROM auth_activations WHERE game_id = ? AND code = ? AND device_id = ? LIMIT 1"
-      )
-        .bind(gameId, linkedCode, deviceId)
-        .first();
-
-      if (!already) {
-        return json({ ok: false, error: "DEVICE_LIMIT_REACHED", version: VERSION }, 409, cors);
-      }
-    }
-
-    // upsert
-    await env.DB.prepare(
-      "INSERT OR IGNORE INTO auth_activations (game_id, code, device_id, email, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)"
-    )
-      .bind(gameId, linkedCode, deviceId, email, now, now)
-      .run();
-
-    await env.DB.prepare(
-      "UPDATE auth_activations SET last_seen_at = ? WHERE game_id = ? AND code = ? AND device_id = ?"
-    )
-      .bind(now, gameId, linkedCode, deviceId)
-      .run();
-
-    return json({ ok: true, version: VERSION, email, game_id: gameId, activated: true }, 200, cors);
-  }
-
-  // 4) أول مرة تفعيل: تحقق الكود من جدول الأكواد
+  // 1) Code exists?
   const codeRow = await env.DB.prepare(
-    "SELECT code, used_by_email FROM auth_codes WHERE game_id = ? AND code = ? LIMIT 1"
-  )
-    .bind(gameId, code)
-    .first();
+    `SELECT code, used_by_email, used_at
+     FROM codes
+     WHERE code = ?
+     LIMIT 1`
+  ).bind(code).first();
 
   if (!codeRow) {
     return json({ ok: false, error: "CODE_NOT_FOUND", version: VERSION }, 404, cors);
   }
 
-  // إذا مرتبط بإيميل آخر -> مرفوض
-  if (codeRow.used_by_email && String(codeRow.used_by_email) !== email) {
+  const usedBy = String(codeRow.used_by_email || "").trim().toLowerCase();
+
+  // If code already used by someone else -> blocked
+  if (usedBy && usedBy !== email) {
     return json({ ok: false, error: "CODE_ALREADY_USED", version: VERSION }, 409, cors);
   }
 
-  // 5) ربط الكود بالحساب (مرة واحدة)
-  // - علّم الكود مستخدم بهذا الإيميل
-  await env.DB.prepare(
-    "UPDATE auth_codes SET used_by_email = ?, used_at = COALESCE(used_at, ?) WHERE game_id = ? AND code = ?"
-  )
-    .bind(email, now, gameId, code)
-    .run();
+  // 2) Ensure activations table exists in your schema (we assume it does).
+  //    We rely on it for "2 devices only".
+  //    activations(email, device_id, code, activated_at)
+  //    UNIQUE(email, device_id) + UNIQUE(code) recommended.
 
-  // - سجل الربط (unique على game_id+email)
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO auth_code_links (game_id, email, code, activated_at) VALUES (?, ?, ?, ?)"
-  )
-    .bind(gameId, email, code, now)
-    .run();
+  // Already activated on this device?
+  const alreadyOnDevice = await env.DB.prepare(
+    `SELECT 1 FROM activations WHERE email = ? AND device_id = ? LIMIT 1`
+  ).bind(email, deviceId).first();
 
-  // 6) ربط الجهاز (حد جهازين)
-  const count2 = await env.DB.prepare(
-    "SELECT COUNT(1) as c FROM auth_activations WHERE game_id = ? AND code = ?"
-  )
-    .bind(gameId, code)
-    .first();
+  if (alreadyOnDevice) {
+    // Make sure user marked activated (best-effort)
+    await bestEffortMarkUserActivated(env.DB, email, now);
+    return json({ ok: true, version: VERSION, activated: true }, 200, cors);
+  }
 
-  const c2 = Number(count2?.c || 0);
-  if (c2 >= deviceLimit) {
+  // Device limit (2 devices)
+  const cntRow = await env.DB.prepare(
+    `SELECT COUNT(DISTINCT device_id) AS c FROM activations WHERE email = ?`
+  ).bind(email).first();
+
+  const deviceCount = Number(cntRow?.c || 0);
+  if (deviceCount >= 2) {
     return json({ ok: false, error: "DEVICE_LIMIT_REACHED", version: VERSION }, 409, cors);
   }
 
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO auth_activations (game_id, code, device_id, email, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)"
-  )
-    .bind(gameId, code, deviceId, email, now, now)
-    .run();
+  // 3) Claim code for this email if not yet claimed
+  if (!usedBy) {
+    const upd = await env.DB.prepare(
+      `UPDATE codes
+       SET used_by_email = ?, used_at = ?
+       WHERE code = ? AND (used_by_email IS NULL OR TRIM(used_by_email) = '')`
+    ).bind(email, now, code).run();
 
-  await env.DB.prepare(
-    "UPDATE auth_activations SET last_seen_at = ? WHERE game_id = ? AND code = ? AND device_id = ?"
-  )
-    .bind(now, gameId, code, deviceId)
-    .run();
+    if ((upd?.meta?.changes || 0) === 0) {
+      // Someone claimed it between our checks
+      const again = await env.DB.prepare(
+        `SELECT used_by_email FROM codes WHERE code = ? LIMIT 1`
+      ).bind(code).first();
+      const nowUsedBy = String(again?.used_by_email || "").trim().toLowerCase();
+      if (nowUsedBy && nowUsedBy !== email) {
+        return json({ ok: false, error: "CODE_ALREADY_USED", version: VERSION }, 409, cors);
+      }
+    }
+  }
 
-  return json({ ok: true, version: VERSION, email, game_id: gameId, activated: true }, 200, cors);
+  // 4) Insert activation for this device
+  try {
+    await env.DB.prepare(
+      `INSERT INTO activations (email, device_id, code, activated_at)
+       VALUES (?, ?, ?, ?)`
+    ).bind(email, deviceId, code, now).run();
+  } catch (e) {
+    // If duplicate due to race, re-check
+    const okNow = await env.DB.prepare(
+      `SELECT 1 FROM activations WHERE email = ? AND device_id = ? LIMIT 1`
+    ).bind(email, deviceId).first();
+
+    if (!okNow) {
+      return json({ ok: false, error: "ACTIVATION_FAILED", version: VERSION }, 500, cors);
+    }
+  }
+
+  // 5) Mark user activated (best effort)
+  await bestEffortMarkUserActivated(env.DB, email, now);
+
+  return json({ ok: true, version: VERSION, activated: true }, 200, cors);
 }
 
-/* ---------------- helpers ---------------- */
+/* ---------- helpers ---------- */
 
-function json(obj, status, corsHeaders, extraHeaders = {}) {
+function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
-  for (const [k, v] of Object.entries(extraHeaders || {})) headers.set(k, v);
   return new Response(JSON.stringify(obj), { status, headers });
 }
 
@@ -206,48 +170,91 @@ function makeCorsHeaders(request, env) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Vary": "Origin",
+    Vary: "Origin",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
-function readToken(request) {
-  const auth = request.headers.get("Authorization") || "";
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (m && m[1]) return m[1].trim();
-
-  const cookie = request.headers.get("Cookie") || "";
-  const token = getCookie(cookie, "sandooq_token_v1");
-  if (token) return token;
-
-  return "";
-}
-
-function getCookie(cookieHeader, name) {
-  const parts = cookieHeader.split(";").map((s) => s.trim());
-  for (const p of parts) {
-    if (!p) continue;
-    const eq = p.indexOf("=");
-    if (eq === -1) continue;
-    const k = p.slice(0, eq).trim();
-    const v = p.slice(eq + 1).trim();
-    if (k === name) return decodeURIComponent(v);
-  }
-  return "";
-}
-
 function normCode(v) {
-  return String(v || "").trim().toUpperCase().replace(/\s+/g, "").replace(/[–—−]/g, "-");
+  return String(v || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/[–—−]/g, "-");
 }
 
-async function sha256Hex(bytes) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = new Uint8Array(digest);
-  let hex = "";
-  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
-  return hex;
+/* ---------- JWT verify (HS256) ---------- */
+
+function base64UrlToBytes(b64url) {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64url.length + 3) % 4);
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function bytesToBase64Url(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function strToBytes(s) {
+  return new TextEncoder().encode(s);
+}
+function safeEqual(a, b) {
+  a = String(a || "");
+  b = String(b || "");
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
 }
 
-// functions/api2/activate.js – إصدار 1
+async function hmacSha256(secret, dataBytes) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    strToBytes(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, dataBytes);
+  return new Uint8Array(sig);
+}
+
+async function verifyToken(secret, token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    const [h, p, s] = parts;
+    const toSign = `${h}.${p}`;
+    const sigBytes = await hmacSha256(secret, strToBytes(toSign));
+    const expected = bytesToBase64Url(sigBytes);
+
+    if (!safeEqual(expected, s)) return null;
+
+    const payloadJson = new TextDecoder().decode(base64UrlToBytes(p));
+    const payload = JSON.parse(payloadJson);
+
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload?.exp || now >= Number(payload.exp)) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/* ---------- best-effort activated flag ---------- */
+
+async function bestEffortMarkUserActivated(DB, email, now) {
+  // بعض السكيمات فيها activated / activated_at وبعضها لا — نخليه Best-effort بدون ما يكسر.
+  try {
+    await DB.prepare(`UPDATE users SET activated = 1 WHERE email = ?`).bind(email).run();
+  } catch {}
+  try {
+    await DB.prepare(`UPDATE users SET activated_at = ? WHERE email = ?`).bind(now, email).run();
+  } catch {}
+}
