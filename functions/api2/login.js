@@ -1,7 +1,7 @@
-// functions/api2/login.js
+// /functions/api2/login.js
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "api2-login-v1-cookie";
+  const VERSION = "api2-login-v1";
 
   const cors = makeCorsHeaders(request, env);
 
@@ -13,90 +13,116 @@ export async function onRequest(context) {
     return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: VERSION }, 405, cors);
   }
 
-  if (!env?.DB) {
+  if (!env || !env.DB) {
     return json(
-      { ok: false, error: "DB_NOT_BOUND", version: VERSION, message: "Bind D1 as DB in Pages Settings -> Bindings" },
+      {
+        ok: false,
+        error: "DB_NOT_BOUND",
+        version: VERSION,
+        message: "env.DB is missing. Pages -> Settings -> Bindings -> D1 must be bound as DB",
+      },
       500,
       cors
     );
   }
 
-  let body = null;
+  if (!env.JWT_SECRET) {
+    return json(
+      {
+        ok: false,
+        error: "MISSING_JWT_SECRET",
+        version: VERSION,
+        message: "Set JWT_SECRET in Cloudflare Pages environment variables.",
+      },
+      500,
+      cors
+    );
+  }
+
+  let body;
   try {
     body = await request.json();
   } catch {
     return json({ ok: false, error: "BAD_JSON", version: VERSION }, 400, cors);
   }
 
-  const email = normEmail(body?.email);
+  const email = String(body?.email || "").trim().toLowerCase();
   const password = String(body?.password || "");
+  const deviceId =
+    String(request.headers.get("X-Device-Id") || body?.deviceId || "").trim();
 
   if (!email || !password) {
     return json({ ok: false, error: "MISSING_FIELDS", version: VERSION }, 400, cors);
   }
 
-  // جلب المستخدم
-  const u = await env.DB.prepare(
-    "SELECT email, provider, password_hash, salt_b64, email_verified FROM auth_users WHERE email = ? LIMIT 1"
+  const user = await env.DB.prepare(
+    `SELECT email, provider, password_hash, salt_b64, email_verified
+     FROM users
+     WHERE email = ?
+     LIMIT 1`
   )
     .bind(email)
     .first();
 
-  if (!u) {
+  if (!user) {
     return json({ ok: false, error: "INVALID_LOGIN", version: VERSION }, 401, cors);
   }
 
-  if (String(u.provider || "email") !== "email") {
-    // لاحقاً: Google provider
-    return json({ ok: false, error: "INVALID_LOGIN", version: VERSION }, 401, cors);
+  if (String(user.provider || "") !== "email") {
+    return json({ ok: false, error: "USE_GOOGLE_LOGIN", version: VERSION }, 403, cors);
   }
 
-  // لازم يكون البريد متأكد
-  if (Number(u.email_verified || 0) !== 1) {
+  if (Number(user.email_verified || 0) !== 1) {
     return json({ ok: false, error: "EMAIL_NOT_VERIFIED", version: VERSION }, 403, cors);
   }
 
-  // تحقق كلمة المرور (PBKDF2)
-  const ok = await verifyPbkdf2(password, String(u.salt_b64 || ""), String(u.password_hash || ""), {
-    iterations: Number(env?.PBKDF2_ITERS || 120000),
-  });
+  // Verify password: sha256(saltBytes + passwordBytes) base64 === password_hash
+  const saltBytes = base64ToBytes(String(user.salt_b64 || ""));
+  const pwBytes = new TextEncoder().encode(password);
+  const hashB64 = await sha256Base64(concatBytes(saltBytes, pwBytes));
 
-  if (!ok) {
+  if (!safeEqualB64(hashB64, String(user.password_hash || ""))) {
     return json({ ok: false, error: "INVALID_LOGIN", version: VERSION }, 401, cors);
   }
 
-  // إنشاء Session
-  const now = Date.now();
-  const token = await makeSessionToken();
-  const tokenHash = await sha256Hex(new TextEncoder().encode(token));
+  const now = new Date().toISOString();
 
-  const ttlDays = Number(env?.SESSION_TTL_DAYS || 30);
-  const expiresAt = now + ttlDays * 24 * 60 * 60 * 1000;
+  // Update last login
+  try {
+    await env.DB.prepare(`UPDATE users SET last_login_at = ? WHERE email = ?`)
+      .bind(now, email)
+      .run();
+  } catch {}
 
-  await env.DB.prepare(
-    "INSERT INTO auth_sessions (token_hash, email, created_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, NULL)"
-  )
-    .bind(tokenHash, email, now, expiresAt)
-    .run();
+  // Upsert device (optional)
+  if (deviceId) {
+    try {
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO user_devices (email, device_id, first_seen_at, last_seen_at)
+         VALUES (?, ?, ?, ?)`
+      )
+        .bind(email, deviceId, now, now)
+        .run();
 
-  const cookie = buildCookie("sandooq_token_v1", token, {
-    maxAge: ttlDays * 24 * 60 * 60,
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax",
-    path: "/",
-  });
+      await env.DB.prepare(
+        `UPDATE user_devices SET last_seen_at = ? WHERE email = ? AND device_id = ?`
+      )
+        .bind(now, email, deviceId)
+        .run();
+    } catch {}
+  }
 
-  return json({ ok: true, version: VERSION, email, token }, 200, cors, { "Set-Cookie": cookie });
+  const token = await signToken(env.JWT_SECRET, { email }, 60 * 60 * 24 * 30); // 30 days
+
+  return json({ ok: true, version: VERSION, email, token }, 200, cors);
 }
 
-/* ---------------- helpers ---------------- */
+/* ---------- helpers ---------- */
 
-function json(obj, status, corsHeaders, extraHeaders = {}) {
+function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
-  for (const [k, v] of Object.entries(extraHeaders || {})) headers.set(k, v);
   return new Response(JSON.stringify(obj), { status, headers });
 }
 
@@ -116,60 +142,41 @@ function makeCorsHeaders(request, env) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Vary": "Origin",
+    Vary: "Origin",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
-function normEmail(v) {
-  return String(v || "").trim().toLowerCase();
-}
-
-function base64ToBytes(b64) {
-  const bin = atob(String(b64 || ""));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+function concatBytes(a, b) {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
   return out;
 }
 
-function bytesToBase64(bytes) {
+async function sha256Base64(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = new Uint8Array(digest);
   let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
   return btoa(bin);
 }
 
-async function pbkdf2(password, saltBytes, iterations) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
-    key,
-    256
-  );
-
-  return new Uint8Array(bits);
-}
-
-async function verifyPbkdf2(password, saltB64, expectedHashB64, { iterations = 120000 } = {}) {
+function base64ToBytes(b64) {
   try {
-    const saltBytes = base64ToBytes(saltB64);
-    const got = await pbkdf2(password, saltBytes, iterations);
-    const gotB64 = bytesToBase64(got);
-    return timingSafeEqual(gotB64, expectedHashB64);
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
   } catch {
-    return false;
+    return new Uint8Array(0);
   }
 }
 
-function timingSafeEqual(a, b) {
+function safeEqualB64(a, b) {
+  // constant-ish time compare (length + char codes)
   a = String(a || "");
   b = String(b || "");
   if (a.length !== b.length) return false;
@@ -178,35 +185,41 @@ function timingSafeEqual(a, b) {
   return out === 0;
 }
 
-async function sha256Hex(bytes) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = new Uint8Array(digest);
-  let hex = "";
-  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
-  return hex;
-}
-
-async function makeSessionToken() {
-  const b = new Uint8Array(32);
-  crypto.getRandomValues(b);
-  return base64Url(b);
-}
-
-function base64Url(bytes) {
+function base64UrlFromBytes(bytes) {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  const b64 = btoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function buildCookie(name, value, opts = {}) {
-  const parts = [];
-  parts.push(`${name}=${encodeURIComponent(value)}`);
-  parts.push(`Path=${opts.path || "/"}`);
-  if (opts.maxAge) parts.push(`Max-Age=${opts.maxAge}`);
-  if (opts.httpOnly) parts.push("HttpOnly");
-  if (opts.secure) parts.push("Secure");
-  parts.push(`SameSite=${opts.sameSite || "Lax"}`);
-  return parts.join("; ");
+function bytesFromString(str) {
+  return new TextEncoder().encode(str);
 }
 
-// functions/api2/login.js – إصدار 1
+async function hmacSha256(secret, dataBytes) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    bytesFromString(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, dataBytes);
+  return new Uint8Array(sig);
+}
+
+async function signToken(secret, payloadObj, ttlSeconds) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + Math.max(60, Number(ttlSeconds || 0));
+
+  const payload = { ...payloadObj, iat, exp, v: 1 };
+
+  const encHeader = base64UrlFromBytes(bytesFromString(JSON.stringify(header)));
+  const encPayload = base64UrlFromBytes(bytesFromString(JSON.stringify(payload)));
+  const toSign = bytesFromString(`${encHeader}.${encPayload}`);
+  const sigBytes = await hmacSha256(secret, toSign);
+  const encSig = base64UrlFromBytes(sigBytes);
+
+  return `${encHeader}.${encPayload}.${encSig}`;
+}
