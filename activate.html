@@ -39,7 +39,6 @@
       padding:28px 14px;
     }
 
-    /* خلفية سداسية خفيفة */
     body:before{
       content:"";
       position:fixed; inset:0;
@@ -90,18 +89,6 @@
       line-height:1.6;
     }
 
-    .sectionTitle{
-      text-align:center;
-      font-weight:900;
-      font-size:22px;
-      margin:14px 0 12px;
-    }
-
-    .row{
-      display:flex;
-      gap:10px;
-    }
-
     .field{
       position:relative;
       width:100%;
@@ -139,12 +126,8 @@
       transition:transform .08s ease, opacity .2s ease, filter .2s ease;
     }
     .btn:active{transform:scale(.99)}
-    .btnPrimary{
-      background:linear-gradient(90deg,var(--btn1),var(--btn2));
-    }
-    .btnGreen{
-      background:linear-gradient(90deg,var(--green1),var(--green2));
-    }
+    .btnPrimary{ background:linear-gradient(90deg,var(--btn1),var(--btn2)); }
+    .btnGreen{ background:linear-gradient(90deg,var(--green1),var(--green2)); }
     .btnGhost{
       background:rgba(255,255,255,.08);
       border:1px solid var(--stroke);
@@ -265,7 +248,7 @@
         <div class="title">تسجيل الدخول</div>
         <div class="subtitle">
           لازم تسجّل دخول عشان تفتح اللعبة.<br/>
-          (بعد التفعيل، تقدر تدخل من أي متصفح حتى المتصفح الخفي)
+          (بعد التفعيل، تدخل من أي متصفح وحتى المتصفح الخفي)
         </div>
 
         <div class="field">
@@ -357,7 +340,7 @@
 
         <div class="field">
           <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="white" stroke-width="2"/><rect x="5" y="10" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 14v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
-          <input id="code" placeholder="M 3 2 9 5 9" autocomplete="one-time-code" />
+          <input id="code" placeholder="M32959" autocomplete="one-time-code" />
         </div>
 
         <button id="btnActivate" class="btn btnGreen">تفعيل</button>
@@ -373,7 +356,7 @@
       <!-- شاشة: جاهز / دخول اللعبة -->
       <div id="view-ready" class="hide">
         <div class="title">تم التفعيل</div>
-        <div class="subtitle">✅ هذا الجهاز مُفعّل</div>
+        <div class="subtitle">✅ حسابك جاهز</div>
 
         <div class="topInfo">
           <span class="pill">مرحباً، <span id="readyEmail" style="margin-right:6px"></span></span>
@@ -391,7 +374,7 @@
 
   <script>
     // =========================
-    //   Client helpers
+    //   helpers
     // =========================
     const $ = (id)=>document.getElementById(id);
 
@@ -414,7 +397,7 @@
       return (v||"").toString().trim().toUpperCase().replace(/\s+/g,"").replace(/[–—−]/g,"-");
     }
 
-    // Device ID ثابت لكل جهاز
+    // Device ID ثابت لكل جهاز (السيرفر يحد الأجهزة)
     function getDeviceId(){
       const k="sandooq_device_id_v1";
       let v = localStorage.getItem(k);
@@ -425,120 +408,58 @@
       return v;
     }
 
-    // =========================
-    //   NEXT (بعد التسجيل نرجع للمسار المطلوب)
-    // =========================
-    const NEXT_KEY = "sandooq_next_path_v1";
-
-    function sanitizeNext(n){
-      if(!n) return "";
-      try{
-        const s = String(n).trim();
-        // نسمح فقط بمسارات داخلية تبدأ بـ /
-        if(!s.startsWith("/")) return "";
-        if(s.startsWith("//")) return "";
-        if(s.toLowerCase().startsWith("/api/")) return "";
-        return s;
-      }catch{
-        return "";
-      }
-    }
-
-    (function captureNext(){
-      const u = new URL(location.href);
-      const n = sanitizeNext(u.searchParams.get("next"));
-      if(n) sessionStorage.setItem(NEXT_KEY, n);
-    })();
-
+    // next param (أين نروح بعد النجاح)
     function getNextPath(){
-      return sanitizeNext(sessionStorage.getItem(NEXT_KEY) || "");
+      const u = new URL(location.href);
+      const n = (u.searchParams.get("next") || "").trim();
+      if(!n) return "/app";
+      if(!n.startsWith("/")) return "/app";
+      if(n.startsWith("/api") || n.startsWith("/api2") || n.startsWith("/activate")) return "/app";
+      return n;
     }
 
-    // =========================
-    //   Session token (LocalStorage + Cookie) ✅
-    //   (عشان middleware يقدر يقفل /app)
-    // =========================
-    const TOKEN_KEY = "sandooq_token_v1";
-    const TOKEN_COOKIE = "sandooq_token_v1";
-    const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 يوم
+    async function api(path, body){
+      const headers = {
+        "Content-Type":"application/json",
+        "X-Device-Id": getDeviceId()
+      };
+      const res = await fetch(path, {
+        method:"POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify(body||{})
+      });
 
-    function setCookie(name, value, maxAgeSec){
-      const secure = location.protocol === "https:" ? " Secure;" : "";
-      document.cookie =
-        name + "=" + encodeURIComponent(value) +
-        "; Path=/; Max-Age=" + String(maxAgeSec) +
-        "; SameSite=Lax;" + secure;
-    }
-    function clearCookie(name){
-      const secure = location.protocol === "https:" ? " Secure;" : "";
-      document.cookie = name + "=; Path=/; Max-Age=0; SameSite=Lax;" + secure;
-    }
-    function getCookie(name){
-      const parts = (document.cookie || "").split(";").map(s => s.trim());
-      for(const p of parts){
-        if(!p) continue;
-        const eq = p.indexOf("=");
-        if(eq === -1) continue;
-        const k = p.slice(0, eq).trim();
-        const v = p.slice(eq + 1).trim();
-        if(k === name) return decodeURIComponent(v);
-      }
-      return "";
-    }
-
-    function setToken(t){
-      if(t){
-        localStorage.setItem(TOKEN_KEY, t);
-        setCookie(TOKEN_COOKIE, t, COOKIE_MAX_AGE_SEC); // ✅ أهم تعديل
-      }else{
-        localStorage.removeItem(TOKEN_KEY);
-        clearCookie(TOKEN_COOKIE); // ✅ مسح الكوكي
-      }
-    }
-
-    function getToken(){
-      // لو localStorage فاضي لكن الكوكي موجود (احتياط)
-      return localStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_COOKIE) || "";
-    }
-
-    async function api(path, body, {auth=true}={}){
-      const headers = { "Content-Type":"application/json", "X-Device-Id": getDeviceId() };
-      if(auth && getToken()) headers["Authorization"] = "Bearer " + getToken();
-      const res = await fetch(path, { method:"POST", headers, body: JSON.stringify(body||{}) });
       let data=null;
       try{ data = await res.json(); }catch{ data = { ok:false, error:"BAD_RESPONSE" }; }
-      if(!res.ok && data && data.ok !== true){
-        return data;
-      }
       return data;
     }
 
+    async function logoutEverywhere(){
+      // مسح الجلسة من جهة العميل: نحذف كوكي عبر مسار /activate (حل سريع)
+      document.cookie = "sandooq_token_v1=; Max-Age=0; path=/; secure; samesite=lax";
+    }
+
     // =========================
-    //   Navigation links
+    //   Navigation
     // =========================
     $("goCreate").onclick = (e)=>{ e.preventDefault(); show("view-create"); msg($("authMsg"),""); };
     $("haveAccount").onclick = (e)=>{ e.preventDefault(); show("view-auth"); msg($("createMsg"),""); };
+
     $("goForgot").onclick = async (e)=>{
       e.preventDefault();
-      msg($("authMsg"), "ميزة (نسيت كلمة المرور) بنضيفها بالخطوة الجاية.", "err");
+      msg($("authMsg"), "ميزة (نسيت كلمة المرور) بنضيفها بعد ما نثبت النظام بالكامل.", "err");
     };
 
     $("btnGoogle").onclick = async ()=>{
-      msg($("authMsg"), "زر Google جاهز بالواجهة. بنفعّله بالخطوة الخاصة بـ Google OAuth.", "err");
+      msg($("authMsg"), "زر Google جاهز بالواجهة. بنفعّله في خطوة Google OAuth.", "err");
     };
 
-    $("btnLogout").onclick = (e)=>{ e.preventDefault(); setToken(""); boot(); };
-    $("btnLogout2").onclick = ()=>{ setToken(""); boot(); };
+    $("btnLogout").onclick = async (e)=>{ e.preventDefault(); await logoutEverywhere(); boot(); };
+    $("btnLogout2").onclick = async ()=>{ await logoutEverywhere(); boot(); };
 
     $("btnEnterGame").onclick = ()=>{
-      // ✅ الآن: نحاول نرجع للمسار اللي دخل منه (مثل /app)
-      // مؤقتًا لو ما فيه next، ندخل index.html عشان ما نخرب شغلك قبل تجهيز /app بالكامل
-      const next = getNextPath();
-      if(next){
-        window.location.href = next;
-      }else{
-        window.location.href = "index.html";
-      }
+      window.location.href = getNextPath(); // غالباً /app
     };
 
     // =========================
@@ -551,11 +472,10 @@
       if(!email) return msg($("authMsg"), "اكتب البريد الإلكتروني", "err");
       if(password.length < 8) return msg($("authMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
 
-      const r = await api("/api/login", { email, password }, {auth:false});
+      const r = await api("/api2/login", { email, password });
       if(!r?.ok){
         return msg($("authMsg"), translateErr(r), "err");
       }
-      setToken(r.token); // ✅ صار يحفظ كوكي + LocalStorage
       await boot();
     };
 
@@ -568,13 +488,11 @@
       if(pw1.length < 8) return msg($("createMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
       if(pw1 !== pw2) return msg($("createMsg"), "كلمتا المرور غير متطابقتين", "err");
 
-      // 1) إنشاء الحساب (يرسل OTP)
-      const r = await api("/api/register", { email, password: pw1 }, {auth:false});
+      const r = await api("/api2/register", { email, password: pw1 });
       if(!r?.ok){
         return msg($("createMsg"), translateErr(r), "err");
       }
 
-      // ينتقل لصفحة التحقق
       sessionStorage.setItem("pending_email", email);
       $("vEmail").textContent = email;
       show("view-verify");
@@ -588,13 +506,11 @@
       if(!otp) return msg($("verifyMsg"), "اكتب رمز التحقق", "err");
       if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
 
-      const r = await api("/api/verify-email", { email, otp }, {auth:false});
+      const r = await api("/api2/verify-email", { email, otp });
       if(!r?.ok){
         return msg($("verifyMsg"), translateErr(r), "err");
       }
 
-      // بعد التحقق: يدخل تلقائي (يعطينا token)
-      if(r.token) setToken(r.token); // ✅ كوكي + LocalStorage
       sessionStorage.removeItem("pending_email");
       await boot();
     };
@@ -604,7 +520,7 @@
       const email = sessionStorage.getItem("pending_email") || "";
       if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
 
-      const r = await api("/api/resend-otp", { email }, {auth:false});
+      const r = await api("/api2/resend-otp", { email });
       if(!r?.ok){
         return msg($("verifyMsg"), translateErr(r), "err");
       }
@@ -616,7 +532,7 @@
       const code = normCode($("code").value);
       if(!code) return msg($("actMsg"), "الرجاء إدخال كود التفعيل", "err");
 
-      const r = await api("/api/activate", { code });
+      const r = await api("/api2/activate", { code });
       if(!r?.ok){
         return msg($("actMsg"), translateErr(r), "err");
       }
@@ -624,53 +540,34 @@
     };
 
     // =========================
-    //   Boot: decides which screen to show
+    //   Boot
     // =========================
     async function boot(){
-      // ✅ لو الكوكي موجود لكن localStorage فاضي، نزامنهم
-      const cookieTok = getCookie(TOKEN_COOKIE);
-      if(cookieTok && !localStorage.getItem(TOKEN_KEY)){
-        localStorage.setItem(TOKEN_KEY, cookieTok);
-      }
-
-      // إذا ما عنده توكن: شاشة الدخول
-      if(!getToken()){
-        show("view-auth");
-        return;
-      }
-
-      // استعلام حالة الحساب
-      const me = await api("/api/me", {});
+      // اسأل السيرفر عن حالتي (كوكي)
+      const me = await api("/api2/me", {});
       if(!me?.ok){
-        // توكن منتهي/غير صالح
-        setToken("");
         show("view-auth");
-        msg($("authMsg"), "انتهت الجلسة. سجل دخول من جديد.", "err");
         return;
       }
 
-      // حساب موجود
       const email = me.email || "";
       $("who").textContent = email;
       $("readyEmail").textContent = email;
 
-      // إذا ما فعل الكود بعد
       if(!me.activated){
         show("view-activate");
         return;
       }
 
-      // مفعل
       show("view-ready");
     }
 
     // =========================
-    //   Error translation (واجهة عربية واضحة)
+    //   Error translation
     // =========================
     function translateErr(r){
       const e = (r && (r.error || r.code)) ? String(r.error || r.code) : "UNKNOWN_ERROR";
 
-      if(e === "SERVICE_UNAVAILABLE") return "الخدمة غير متاحة الآن. جرّب بعد قليل.";
       if(e === "BAD_RESPONSE") return "صار خطأ في الاتصال بالسيرفر.";
       if(e === "INVALID_EMAIL") return "البريد الإلكتروني غير صحيح.";
       if(e === "WEAK_PASSWORD") return "كلمة المرور ضعيفة.";
@@ -679,19 +576,20 @@
       if(e === "EMAIL_NOT_VERIFIED") return "لازم تؤكد بريدك الإلكتروني أولاً.";
       if(e === "OTP_INVALID") return "رمز التحقق غير صحيح.";
       if(e === "OTP_EXPIRED") return "رمز التحقق انتهت صلاحيته. أعد الإرسال.";
+      if(e === "TOO_MANY_REQUESTS") return "تم الإرسال قبل قليل. انتظر 30 ثانية ثم جرّب.";
+      if(e === "EMAIL_SEND_FAILED") return "تعذر إرسال البريد الآن. (بنضبط إعدادات الإرسال بالخطوة الجاية)";
       if(e === "CODE_NOT_FOUND") return "الكود غير موجود.";
-      if(e === "CODE_ALREADY_USED") return "الكود مستخدم مسبقًا.";
+      if(e === "CODE_ALREADY_USED") return "الكود مستخدم/مرتبط بحساب آخر.";
       if(e === "DEVICE_LIMIT_REACHED") return "تجاوزت الحد المسموح لربط الأجهزة (جهازين فقط).";
-      if(e === "ACTIVATE_REQUIRED") return "لازم تفعّل اللعبة بالكود أول مرة.";
+      if(e === "UNAUTHORIZED" || e === "NO_SESSION" || e === "INVALID_SESSION") return "جلسة الدخول غير صالحة. سجّل دخول من جديد.";
       if(e === "METHOD_NOT_ALLOWED") return "طلب غير صالح.";
 
       return "حدث خطأ: " + e;
     }
 
-    // Start
     boot();
   </script>
 </body>
 </html>
 
-<!-- activate.html – إصدار 2 (Token Cookie لدعم حماية /app + next) -->
+<!-- activate.html – v3 (api2 + cookie sessions) -->
