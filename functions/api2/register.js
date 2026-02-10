@@ -1,252 +1,308 @@
-// functions/api2/register.js
-// api2-register-v2 (OTP via Resend)
+// functions/api/register.js
+// Register (Email+Password) + Send OTP via Resend + Store hashed OTP in D1
+// Returns { ok:true } on success, or { ok:false, code:"..." }
 
-function json(obj, status = 200, corsHeaders, extraHeaders = {}) {
-  const headers = new Headers(corsHeaders || {});
-  headers.set("Content-Type", "application/json; charset=utf-8");
-  headers.set("Cache-Control", "no-store");
-  for (const [k, v] of Object.entries(extraHeaders || {})) headers.set(k, v);
-  return new Response(JSON.stringify(obj), { status, headers });
+function json(data, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...extraHeaders,
+    },
+  });
 }
 
-function makeCorsHeaders(request, env) {
+function getCorsHeaders(request, env) {
   const origin = request.headers.get("Origin") || "";
   const allowedRaw = (env.ALLOWED_ORIGINS || "").trim();
 
-  let allowOrigin = "";
-  if (!allowedRaw) {
-    // لو ما حطيت ALLOWED_ORIGINS: اسمح لنفس الدومين فقط (أكثر أمان)
-    allowOrigin = origin || "";
-  } else {
-    const allowed = allowedRaw.split(",").map(s => s.trim()).filter(Boolean);
-    if (allowed.includes("*")) allowOrigin = "*";
-    else if (origin && allowed.includes(origin)) allowOrigin = origin;
-    else allowOrigin = ""; // غير مسموح
+  // If empty, allow same-origin only (still set no CORS headers)
+  if (!allowedRaw) return {};
+
+  // Allow all
+  if (allowedRaw === "*" || allowedRaw.includes("*")) {
+    return {
+      "Access-Control-Allow-Origin": origin || "*",
+      "Vary": "Origin",
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    };
   }
 
-  const h = {
-    "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
-    "Access-Control-Allow-Credentials": "true",
-    "Vary": "Origin",
-  };
-  return h;
-}
+  const allowed = allowedRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-function b64(bytes) {
-  let bin = "";
-  bytes.forEach(b => (bin += String.fromCharCode(b)));
-  return btoa(bin);
-}
+  if (allowed.includes(origin)) {
+    return {
+      "Access-Control-Allow-Origin": origin,
+      "Vary": "Origin",
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    };
+  }
 
-function bytesFromString(s) {
-  return new TextEncoder().encode(s);
-}
-
-async function sha256Hex(bytes) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = new Uint8Array(digest);
-  let hex = "";
-  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
-  return hex;
-}
-
-async function hashPasswordPBKDF2(password) {
-  const iterations = 210000;
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    bytesFromString(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
-    keyMaterial,
-    256
-  );
-
-  const hash = new Uint8Array(bits);
-  // format: pbkdf2_sha256$ITER$SALT_B64$HASH_B64
-  return `pbkdf2_sha256$${iterations}$${b64(salt)}$${b64(hash)}`;
+  // Not allowed origin → still respond without CORS to block browser
+  return {};
 }
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function makeOtp6() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+function isValidEmail(email) {
+  // Simple & safe validation
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-async function sendOtpEmail({ env, toEmail, otp }) {
-  const apiKey = (env.RESEND_API_KEY || "").trim();
-  const from = (env.RESEND_FROM || "").trim(); // مثال: "صندوق المسابقات <support@sandooq-games.com>"
-  const replyTo = (env.RESEND_REPLY_TO || "").trim(); // اختياري
+function base64FromBytes(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
 
-  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
-  if (!from) throw new Error("Missing RESEND_FROM");
+async function sha256Base64(text) {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest("SHA-256", enc.encode(text));
+  return base64FromBytes(new Uint8Array(buf));
+}
 
+async function pbkdf2HashBase64(password, saltBytes, iterations = 120000) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: saltBytes,
+      iterations,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    256
+  );
+
+  return base64FromBytes(new Uint8Array(bits));
+}
+
+function randomDigits(len = 6) {
+  const a = new Uint8Array(len);
+  crypto.getRandomValues(a);
+  let out = "";
+  for (let i = 0; i < len; i++) out += String(a[i] % 10);
+  return out;
+}
+
+async function insertUser(db, { email, passwordHashB64, saltB64, nowIso }) {
+  // Try multiple schema variants to avoid "no such column" errors
+  const variants = [
+    {
+      sql:
+        "INSERT INTO users (email, provider, password_hash, salt_b64, created_at, email_verified, is_email_verified) " +
+        "VALUES (?, 'email', ?, ?, ?, 0, 0)",
+      args: [email, passwordHashB64, saltB64, nowIso],
+    },
+    {
+      sql:
+        "INSERT INTO users (email, provider, password_hash, salt_b64, created_at, is_email_verified) " +
+        "VALUES (?, 'email', ?, ?, ?, 0)",
+      args: [email, passwordHashB64, saltB64, nowIso],
+    },
+    {
+      sql:
+        "INSERT INTO users (email, provider, password_hash, salt_b64, created_at) " +
+        "VALUES (?, 'email', ?, ?, ?)",
+      args: [email, passwordHashB64, saltB64, nowIso],
+    },
+  ];
+
+  let lastErr;
+  for (const v of variants) {
+    try {
+      await db.prepare(v.sql).bind(...v.args).run();
+      return;
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e && e.message ? e.message : e);
+      // If it's a schema mismatch, try next variant
+      if (msg.includes("no such column") || msg.includes("has no column")) continue;
+      throw e;
+    }
+  }
+  throw lastErr;
+}
+
+async function upsertOtp(db, { email, otpHashB64, nowIso, expIso }) {
+  // Clear previous OTPs for this email (simple & effective)
+  try {
+    await db.prepare("DELETE FROM email_otps WHERE email = ?").bind(email).run();
+  } catch (_) {
+    // ignore
+  }
+
+  const variants = [
+    {
+      sql:
+        "INSERT INTO email_otps (email, otp_hash, created_at, expires_at, attempts) " +
+        "VALUES (?, ?, ?, ?, 0)",
+      args: [email, otpHashB64, nowIso, expIso],
+    },
+    {
+      sql:
+        "INSERT INTO email_otps (email, otp_hash, created_at, expires_at) " +
+        "VALUES (?, ?, ?, ?)",
+      args: [email, otpHashB64, nowIso, expIso],
+    },
+  ];
+
+  let lastErr;
+  for (const v of variants) {
+    try {
+      await db.prepare(v.sql).bind(...v.args).run();
+      return;
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e && e.message ? e.message : e);
+      if (msg.includes("no such column") || msg.includes("has no column")) continue;
+      if (msg.includes("no such table") && msg.includes("email_otps")) {
+        // Table name mismatch fallback (rare)
+        await db
+          .prepare(
+            "INSERT INTO email_otp (email, otp_hash, created_at, expires_at, attempts) VALUES (?, ?, ?, ?, 0)"
+          )
+          .bind(email, otpHashB64, nowIso, expIso)
+          .run();
+        return;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
+}
+
+async function sendOtpEmail({ resendKey, from, to, otp }) {
   const subject = "رمز التحقق - صندوق المسابقات";
-  const text = `رمز التحقق الخاص بك هو: ${otp}\nصلاحية الرمز: 10 دقائق.\nإذا لم تطلب هذا الرمز تجاهل الرسالة.`;
-
   const html = `
-  <div dir="rtl" style="font-family:Arial, Tahoma, sans-serif; line-height:1.8">
-    <div style="max-width:520px;margin:0 auto;padding:18px;border-radius:14px;background:#ffffff">
-      <div style="text-align:center;margin-bottom:8px">
-        <div style="font-size:18px;font-weight:700;color:#111">صندوق المسابقات</div>
-        <div style="font-size:12px;color:#666">تأكيد البريد الإلكتروني</div>
-      </div>
-
-      <div style="margin-top:12px;color:#111">
-        هذا هو رمز التحقق الخاص بك:
-      </div>
-
-      <div style="margin:16px 0;padding:14px;border-radius:12px;background:#f5f7ff;text-align:center">
-        <div style="font-size:34px;font-weight:800;letter-spacing:6px;color:#1a1a1a">${otp}</div>
-      </div>
-
-      <div style="font-size:13px;color:#444">
-        صلاحية الرمز <b>10 دقائق</b>. إذا لم تطلب هذا الرمز تجاهل الرسالة.
-      </div>
-
-      <hr style="border:none;border-top:1px solid #eee;margin:16px 0" />
-      <div style="font-size:12px;color:#777;text-align:center">© صندوق المسابقات</div>
-    </div>
-  </div>`.trim();
-
-  const payload = {
-    from,
-    to: toEmail,
-    subject,
-    html,
-    text,
-  };
-
-  if (replyTo) payload.reply_to = replyTo;
+  <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; direction: rtl; text-align: right;">
+    <h2>رمز التحقق</h2>
+    <p>استخدم الرمز التالي لتأكيد بريدك الإلكتروني:</p>
+    <div style="font-size: 28px; letter-spacing: 6px; font-weight: 800; margin: 12px 0;">${otp}</div>
+    <p style="color:#666">تنبيه: ينتهي الرمز خلال 10 دقائق.</p>
+  </div>`;
 
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
+      Authorization: `Bearer ${resendKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      from, // e.g. "Sandooq Games <support@sandooq-games.com>"
+      to,
+      subject,
+      html,
+    }),
   });
 
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
-    const msg = data?.message || data?.error || `Resend error ${r.status}`;
+    const msg = `Resend failed: ${r.status} ${JSON.stringify(data)}`;
     throw new Error(msg);
   }
-  return data;
 }
 
 export async function onRequest(context) {
   const { request, env } = context;
-  const cors = makeCorsHeaders(request, env);
-
-  // لو origin مو مسموح (وما هو *) رجّع 403
-  if (cors["Access-Control-Allow-Origin"] === "" && (request.headers.get("Origin") || "")) {
-    return json({ ok: false, error: "CORS_NOT_ALLOWED" }, 403, cors);
-  }
+  const cors = getCorsHeaders(request, env);
 
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: cors });
   }
 
   if (request.method !== "POST") {
-    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405, cors);
+    return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405, cors);
   }
 
-  let body;
   try {
-    body = await request.json();
-  } catch {
-    return json({ ok: false, error: "BAD_JSON" }, 400, cors);
-  }
+    if (!env.DB) {
+      return json({ ok: false, code: "DB_NOT_BOUND" }, 500, cors);
+    }
 
-  const email = normalizeEmail(body.email);
-  const password = String(body.password || "");
+    const resendKey =
+      env.RESEND_API_KEY ||
+      env.RESEND_KEY ||
+      env.RESEND_TOKEN ||
+      env.RESEND;
 
-  if (!email || !email.includes("@")) {
-    return json({ ok: false, error: "INVALID_EMAIL" }, 400, cors);
-  }
-  if (password.length < 8) {
-    return json({ ok: false, error: "WEAK_PASSWORD" }, 400, cors);
-  }
+    if (!resendKey) {
+      return json({ ok: false, code: "MISSING_RESEND_KEY" }, 500, cors);
+    }
 
-  const db = env.DB;
-  if (!db) return json({ ok: false, error: "NO_DB_BINDING" }, 500, cors);
+    const body = await request.json().catch(() => ({}));
+    const email = normalizeEmail(body.email);
+    const password = String(body.password || "");
 
-  const now = Date.now();
-  const otp = makeOtp6();
-  const otpSecret = (env.OTP_SECRET || env.JWT_SECRET || "otp_secret").toString();
-  const otpHash = await sha256Hex(bytesFromString(`${email}|${otp}|${otpSecret}`));
-  const otpExpiresAt = now + 10 * 60 * 1000;
+    if (!isValidEmail(email)) {
+      return json({ ok: false, code: "INVALID_EMAIL" }, 400, cors);
+    }
+    if (password.length < 8) {
+      return json({ ok: false, code: "WEAK_PASSWORD" }, 400, cors);
+    }
 
-  // وجود المستخدم؟
-  let user = null;
-  try {
-    user = await db
-      .prepare("SELECT id, email_verified_at, otp_last_sent_at FROM users WHERE email = ? LIMIT 1")
+    // Check existing user
+    const exists = await env.DB
+      .prepare("SELECT 1 AS x FROM users WHERE email = ? LIMIT 1")
       .bind(email)
       .first();
-  } catch (e) {
-    // لو جدول/أعمدة مختلفة، عطنا خطأ واضح بدل “سيرفر”
-    return json({ ok: false, error: "DB_SCHEMA_ERROR", detail: String(e?.message || e) }, 500, cors);
-  }
 
-  // Rate limit للإرسال (60 ثانية)
-  if (user?.otp_last_sent_at && now - Number(user.otp_last_sent_at) < 60_000) {
-    const leftMs = 60_000 - (now - Number(user.otp_last_sent_at));
-    return json(
-      { ok: false, error: "OTP_RATE_LIMIT", retryAfterSec: Math.ceil(leftMs / 1000) },
-      429,
-      cors
-    );
-  }
-
-  // إذا البريد متحقق مسبقًا -> ما نسجل مرة ثانية
-  if (user?.email_verified_at) {
-    return json({ ok: false, error: "EMAIL_EXISTS" }, 409, cors);
-  }
-
-  // خزّن/حدّث المستخدم + OTP
-  try {
-    const passwordHash = await hashPasswordPBKDF2(password);
-
-    if (user?.id) {
-      await db
-        .prepare(
-          "UPDATE users SET password_hash = ?, otp_hash = ?, otp_expires_at = ?, otp_last_sent_at = ? WHERE email = ?"
-        )
-        .bind(passwordHash, otpHash, otpExpiresAt, now, email)
-        .run();
-    } else {
-      await db
-        .prepare(
-          "INSERT INTO users (email, password_hash, created_at, email_verified_at, otp_hash, otp_expires_at, otp_last_sent_at) VALUES (?, ?, ?, NULL, ?, ?, ?)"
-        )
-        .bind(email, passwordHash, now, otpHash, otpExpiresAt, now)
-        .run();
+    if (exists && exists.x) {
+      return json({ ok: false, code: "EMAIL_EXISTS" }, 409, cors);
     }
-  } catch (e) {
-    return json({ ok: false, error: "DB_WRITE_FAILED", detail: String(e?.message || e) }, 500, cors);
-  }
 
-  // أرسل OTP عبر Resend
-  try {
-    await sendOtpEmail({ env, toEmail: email, otp });
-  } catch (e) {
-    return json({ ok: false, error: "EMAIL_SEND_FAILED", detail: String(e?.message || e) }, 502, cors);
-  }
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const expIso = new Date(now.getTime() + 10 * 60 * 1000).toISOString(); // +10 min
 
-  return json({ ok: true, next: "verify_email" }, 200, cors);
+    // Password hash
+    const salt = new Uint8Array(16);
+    crypto.getRandomValues(salt);
+    const saltB64 = base64FromBytes(salt);
+    const passwordHashB64 = await pbkdf2HashBase64(password, salt);
+
+    // Create OTP + hash (with pepper)
+    const otp = randomDigits(6);
+    const pepper = env.OTP_PEPPER || env.JWT_SECRET || "";
+    const otpHashB64 = await sha256Base64(`${otp}:${email}:${pepper}`);
+
+    // Insert user + OTP
+    await insertUser(env.DB, { email, passwordHashB64, saltB64, nowIso });
+    await upsertOtp(env.DB, { email, otpHashB64, nowIso, expIso });
+
+    // Send email
+    const fromEmail = env.EMAIL_FROM || env.FROM_EMAIL || "support@sandooq-games.com";
+    const from = env.EMAIL_FROM_NAME
+      ? `${env.EMAIL_FROM_NAME} <${fromEmail}>`
+      : `Sandooq Games <${fromEmail}>`;
+
+    await sendOtpEmail({
+      resendKey,
+      from,
+      to: [email],
+      otp,
+    });
+
+    return json({ ok: true }, 200, cors);
+  } catch (e) {
+    console.error("register error:", e);
+    return json({ ok: false, code: "DB_SCHEMA_ERROR" }, 500, cors);
+  }
 }
-
-// functions/api2/register.js — إصدار 2
