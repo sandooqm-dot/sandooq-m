@@ -1,4 +1,4 @@
-// functions/api2/verify-email.js
+// /functions/api2/verify-email.js
 export async function onRequest(context) {
   const { request, env } = context;
   const VERSION = "api2-verify-email-v1";
@@ -14,97 +14,89 @@ export async function onRequest(context) {
   }
 
   if (!env?.DB) {
-    return json(
-      { ok: false, error: "DB_NOT_BOUND", version: VERSION, message: "Bind D1 as DB in Pages Settings -> Bindings" },
-      500,
-      cors
-    );
+    return json({ ok: false, error: "DB_NOT_BOUND", version: VERSION }, 500, cors);
   }
 
-  let body = null;
+  if (!env?.JWT_SECRET) {
+    return json({ ok: false, error: "MISSING_JWT_SECRET", version: VERSION }, 500, cors);
+  }
+
+  let body;
   try {
     body = await request.json();
   } catch {
     return json({ ok: false, error: "BAD_JSON", version: VERSION }, 400, cors);
   }
 
-  const email = normEmail(body?.email);
+  const email = String(body?.email || "").trim().toLowerCase();
   const otp = String(body?.otp || "").trim();
 
   if (!email || !otp) {
     return json({ ok: false, error: "MISSING_FIELDS", version: VERSION }, 400, cors);
   }
 
-  const now = Date.now();
-  const otpSecret = String(env?.OTP_SECRET || "").trim();
-  const otpHash = await sha256Hex(new TextEncoder().encode(`${email}|${otp}|${otpSecret || "dev"}`));
-
-  // نبحث عن OTP مطابق وغير مستخدم
+  // Get latest unused otp
   const row = await env.DB.prepare(
-    "SELECT id, expires_at, used_at FROM auth_email_otps WHERE email = ? AND otp_hash = ? ORDER BY created_at DESC LIMIT 1"
-  )
-    .bind(email, otpHash)
-    .first();
+    `SELECT id, otp, expires_at, used
+     FROM email_otps
+     WHERE email = ?
+     ORDER BY id DESC
+     LIMIT 1`
+  ).bind(email).first();
 
   if (!row) {
     return json({ ok: false, error: "OTP_INVALID", version: VERSION }, 400, cors);
   }
 
-  if (row.used_at) {
+  if (Number(row.used || 0) === 1) {
     return json({ ok: false, error: "OTP_INVALID", version: VERSION }, 400, cors);
   }
 
-  if (Number(row.expires_at) <= now) {
+  const expiresAt = Date.parse(String(row.expires_at || ""));
+  if (!expiresAt || Date.now() > expiresAt) {
     return json({ ok: false, error: "OTP_EXPIRED", version: VERSION }, 400, cors);
   }
 
-  // علّم OTP كمستخدم
-  await env.DB.prepare("UPDATE auth_email_otps SET used_at = ? WHERE id = ? AND used_at IS NULL")
+  if (String(row.otp || "") !== otp) {
+    return json({ ok: false, error: "OTP_INVALID", version: VERSION }, 400, cors);
+  }
+
+  const now = new Date().toISOString();
+
+  // Mark otp used
+  await env.DB.prepare(`UPDATE email_otps SET used = 1, used_at = ? WHERE id = ?`)
     .bind(now, row.id)
     .run();
 
-  // فعّل البريد
-  await env.DB.prepare("UPDATE auth_users SET email_verified = 1 WHERE email = ?")
-    .bind(email)
+  // Mark user verified
+  await env.DB.prepare(`UPDATE users SET email_verified = 1, email_verified_at = ? WHERE email = ?`)
+    .bind(now, email)
     .run();
 
-  // إنشاء Session token
-  const token = await makeSessionToken();
-  const tokenHash = await sha256Hex(new TextEncoder().encode(token));
+  // Issue token + cookie
+  const token = await signToken(env.JWT_SECRET, { email }, 60 * 60 * 24 * 30);
 
-  const ttlDays = Number(env?.SESSION_TTL_DAYS || 30);
-  const expiresAt = now + ttlDays * 24 * 60 * 60 * 1000;
+  const headers = new Headers(cors);
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+  headers.append("Set-Cookie", makeAuthCookie(token));
 
-  await env.DB.prepare(
-    "INSERT INTO auth_sessions (token_hash, email, created_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, NULL)"
-  )
-    .bind(tokenHash, email, now, expiresAt)
-    .run();
-
-  // Cookie للجلسة (عشان الميدلوير)
-  const cookie = buildCookie("sandooq_token_v1", token, {
-    maxAge: ttlDays * 24 * 60 * 60,
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax",
-    path: "/",
-  });
-
-  return json(
-    { ok: true, version: VERSION, email, token },
-    200,
-    cors,
-    { "Set-Cookie": cookie }
+  return new Response(
+    JSON.stringify({ ok: true, version: VERSION, email, token }),
+    { status: 200, headers }
   );
 }
 
-/* ---------------- helpers ---------------- */
+/* ---------- helpers ---------- */
 
-function json(obj, status, corsHeaders, extraHeaders = {}) {
+function makeAuthCookie(token) {
+  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; Secure; HttpOnly; SameSite=Lax`;
+}
+
+function json(obj, status, corsHeaders) {
   const headers = new Headers(corsHeaders || {});
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
-  for (const [k, v] of Object.entries(extraHeaders || {})) headers.set(k, v);
   return new Response(JSON.stringify(obj), { status, headers });
 }
 
@@ -124,46 +116,44 @@ function makeCorsHeaders(request, env) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Vary": "Origin",
+    Vary: "Origin",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
-function normEmail(v) {
-  return String(v || "").trim().toLowerCase();
-}
-
-async function sha256Hex(bytes) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const arr = new Uint8Array(digest);
-  let hex = "";
-  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
-  return hex;
-}
-
-async function makeSessionToken() {
-  const b = new Uint8Array(32);
-  crypto.getRandomValues(b);
-  return base64Url(b);
-}
-
-function base64Url(bytes) {
+function base64UrlFromBytes(bytes) {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  const b64 = btoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
-
-function buildCookie(name, value, opts = {}) {
-  const parts = [];
-  parts.push(`${name}=${encodeURIComponent(value)}`);
-  parts.push(`Path=${opts.path || "/"}`);
-  if (opts.maxAge) parts.push(`Max-Age=${opts.maxAge}`);
-  if (opts.httpOnly) parts.push("HttpOnly");
-  if (opts.secure) parts.push("Secure");
-  parts.push(`SameSite=${opts.sameSite || "Lax"}`);
-  return parts.join("; ");
+function bytesFromString(str) {
+  return new TextEncoder().encode(str);
 }
+async function hmacSha256(secret, dataBytes) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    bytesFromString(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, dataBytes);
+  return new Uint8Array(sig);
+}
+async function signToken(secret, payloadObj, ttlSeconds) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + Math.max(60, Number(ttlSeconds || 0));
+  const payload = { ...payloadObj, iat, exp, v: 1 };
 
-// functions/api2/verify-email.js – إصدار 1
+  const encHeader = base64UrlFromBytes(bytesFromString(JSON.stringify(header)));
+  const encPayload = base64UrlFromBytes(bytesFromString(JSON.stringify(payload)));
+  const toSign = bytesFromString(`${encHeader}.${encPayload}`);
+  const sigBytes = await hmacSha256(secret, toSign);
+  const encSig = base64UrlFromBytes(sigBytes);
+
+  return `${encHeader}.${encPayload}.${encSig}`;
+}
