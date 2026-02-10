@@ -3,165 +3,118 @@ export async function onRequest(context) {
 
   // Only POST
   if (request.method !== "POST") {
-    return json(
-      { ok: false, error: "METHOD_NOT_ALLOWED", version: "api2-verify-email-v3" },
-      405
-    );
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   }
 
+  let body;
   try {
-    if (!env || !env.DB) {
-      return json(
-        { ok: false, error: "NO_DB_BINDING", version: "api2-verify-email-v3" },
-        500
-      );
-    }
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: "BAD_JSON" }, 400);
+  }
 
-    const body = await safeJson(request);
-    const email = (body.email || "").toString().trim().toLowerCase();
-    const otp = (body.otp || body.code || "").toString().trim();
+  let email = (body?.email ?? "").toString().trim().toLowerCase();
+  let otpRaw = body?.otp;
 
-    if (!email || !otp) {
-      return json(
-        { ok: false, error: "MISSING_FIELDS", version: "api2-verify-email-v3" },
-        400
-      );
-    }
+  // otp may come as number, string, etc.
+  let otp = (otpRaw ?? "").toString().trim();
+  // keep digits only (prevents spaces or formatting issues)
+  otp = otp.replace(/[^\d]/g, "");
 
-    // Fetch latest OTP row for this email
-    const row = await env.DB.prepare(
+  if (!email || !otp || otp.length !== 6) {
+    return json({ ok: false, error: "BAD_INPUT" }, 400);
+  }
+
+  if (!env?.DB) {
+    return json({ ok: false, error: "NO_DB_BINDING" }, 500);
+  }
+
+  const nowIso = new Date().toISOString();
+  const pepper = (env?.OTP_PEPPER ?? "").toString();
+
+  try {
+    // ✅ ALWAYS take the latest OTP that is not used yet
+    const row = await env.DB
+      .prepare(
+        `
+        SELECT id, otp_hash, expires_at, used_at, attempts
+        FROM email_otps
+        WHERE email = ? AND used_at IS NULL
+        ORDER BY id DESC
+        LIMIT 1
       `
-      SELECT id, email, otp_hash, created_at, expires_at, used_at, attempts
-      FROM email_otps
-      WHERE email = ?
-      ORDER BY created_at DESC
-      LIMIT 1
-    `
-    )
+      )
       .bind(email)
       .first();
 
     if (!row) {
-      return json(
-        { ok: false, error: "OTP_NOT_FOUND", version: "api2-verify-email-v3" },
-        400
-      );
+      return json({ ok: false, error: "OTP_NOT_FOUND" }, 400);
     }
 
-    const now = new Date();
-    const nowIso = now.toISOString();
-
-    // used?
-    if (row.used_at) {
-      return json(
-        { ok: false, error: "OTP_ALREADY_USED", version: "api2-verify-email-v3" },
-        400
-      );
+    // Expiry check (expires_at is TEXT ISO)
+    const exp = Date.parse(row.expires_at);
+    if (!Number.isFinite(exp) || exp < Date.now()) {
+      return json({ ok: false, error: "OTP_EXPIRED" }, 400);
     }
 
-    // expired?
-    const exp = row.expires_at ? new Date(row.expires_at) : null;
-    if (exp && exp.getTime() <= now.getTime()) {
-      return json(
-        { ok: false, error: "OTP_EXPIRED", version: "api2-verify-email-v3" },
-        400
-      );
+    const stored = (row.otp_hash ?? "").toString().trim();
+
+    // Some deployments might store with prefixes like "sha256:<hash>"
+    const storedClean = stored.includes(":") ? stored.split(":").pop().trim() : stored;
+
+    // Generate multiple candidate hashes to match whatever register.js stored
+    const candidates = [];
+
+    // raw comparisons (just in case someone stored raw OTP – shouldn’t happen but we support it)
+    candidates.push(otp);
+
+    // sha256 candidates (hex + base64)
+    for (const s of [
+      otp,
+      otp + pepper,
+      `${otp}:${pepper}`,
+      `${email}:${otp}`,
+      `${email}:${otp}:${pepper}`,
+      `${email}|${otp}`,
+      `${email}|${otp}|${pepper}`,
+    ]) {
+      const hHex = await sha256Hex(s);
+      const hB64 = await sha256B64(s);
+      candidates.push(hHex, hB64);
     }
 
-    const attempts = Number(row.attempts || 0);
-    if (attempts >= 6) {
-      return json(
-        { ok: false, error: "OTP_LOCKED", version: "api2-verify-email-v3" },
-        429
-      );
-    }
-
-    // Compare with multiple compatible hashing styles (حتى لو تغيّر الأسلوب سابقًا)
-    const pepper = (env.OTP_PEPPER || "SANDOQ_OTP_v1").toString();
-    const candidate1 = otp; // in case stored plaintext (not recommended but compatible)
-    const candidate2 = await sha256Hex(otp + pepper);
-    const candidate3 = await sha256Hex(email + "|" + otp + "|" + pepper);
-
-    const stored = (row.otp_hash || "").toString();
-
-    const ok =
-      safeEq(stored, candidate1) ||
-      safeEq(stored, candidate2) ||
-      safeEq(stored, candidate3);
+    const ok = candidates.some((c) => safeEqual((c ?? "").toString(), storedClean));
 
     if (!ok) {
-      // increment attempts
-      await env.DB.prepare(
-        `UPDATE email_otps SET attempts = COALESCE(attempts,0) + 1 WHERE id = ?`
-      )
+      // Increment attempts
+      await env.DB
+        .prepare(`UPDATE email_otps SET attempts = COALESCE(attempts,0) + 1 WHERE id = ?`)
         .bind(row.id)
         .run();
 
-      return json(
-        { ok: false, error: "OTP_INVALID", version: "api2-verify-email-v3" },
-        400
-      );
+      return json({ ok: false, error: "OTP_INVALID" }, 400);
     }
 
-    // Mark OTP used
-    await env.DB.prepare(`UPDATE email_otps SET used_at = ? WHERE id = ?`)
+    // Mark user verified + consume otp
+    await env.DB
+      .prepare(`UPDATE users SET is_email_verified = 1 WHERE email = ?`)
+      .bind(email)
+      .run();
+
+    await env.DB
+      .prepare(`UPDATE email_otps SET used_at = ? WHERE id = ?`)
       .bind(nowIso, row.id)
       .run();
 
-    // Ensure user exists
-    const user = await env.DB.prepare(
-      `SELECT email FROM users WHERE email = ? LIMIT 1`
-    )
-      .bind(email)
-      .first();
-
-    if (!user) {
-      return json(
-        { ok: false, error: "USER_NOT_FOUND", version: "api2-verify-email-v3" },
-        400
-      );
-    }
-
-    // Mark email verified (حدّث الاثنين لأن عندك عمودين)
-    await env.DB.prepare(
-      `
-      UPDATE users
-      SET
-        is_email_verified = 1,
-        email_verified = 1,
-        email_verified_at = ?
-      WHERE email = ?
-    `
-    )
-      .bind(nowIso, email)
-      .run();
-
-    // Create session token (مثل تدفق activate.html)
-    const token = base64url(crypto.getRandomValues(new Uint8Array(32)));
-    const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30).toISOString(); // 30 days
-
-    await env.DB.prepare(
-      `INSERT INTO sessions (token, email, created_at, expires_at) VALUES (?,?,?,?)`
-    )
-      .bind(token, email, nowIso, expiresAt)
-      .run();
-
-    return json(
-      { ok: true, token, email, version: "api2-verify-email-v3" },
-      200
-    );
+    return json({ ok: true }, 200);
   } catch (e) {
     console.error("verify-email error:", e);
-    return json(
-      { ok: false, error: "DB_SCHEMA_ERROR", detail: String(e), version: "api2-verify-email-v3" },
-      500
-    );
+    return json({ ok: false, error: "SERVER_ERROR" }, 500);
   }
 }
 
-// ---------- helpers ----------
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
@@ -170,32 +123,29 @@ function json(data, status = 200) {
   });
 }
 
-async function safeJson(request) {
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
-}
-
-function safeEq(a, b) {
-  // constant-ish time compare for strings
-  a = (a ?? "").toString();
-  b = (b ?? "").toString();
+function safeEqual(a, b) {
+  // constant-ish time compare
   if (a.length !== b.length) return false;
   let out = 0;
   for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return out === 0;
 }
 
-async function sha256Hex(input) {
-  const enc = new TextEncoder().encode(input);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, "0")).join("");
+async function sha256Hex(str) {
+  const data = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(buf);
+  let hex = "";
+  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+  return hex;
 }
 
-function base64url(bytes) {
+async function sha256B64(str) {
+  const data = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(buf);
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  // btoa expects latin1
+  return btoa(bin);
 }
