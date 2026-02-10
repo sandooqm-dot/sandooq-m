@@ -4,10 +4,10 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  const VERSION = "mw-v4-root-to-activate";
+  const VERSION = "mw-v5-lock-html-to-activate";
   const TOKEN_COOKIE = "sandooq_token_v1";
 
-  // ✅ صفحة فحص (اختياري) للتأكد أن الميدلوير شغال
+  // ✅ فحص سريع
   if (path === "/__mw") {
     return new Response(
       JSON.stringify({ ok: true, version: VERSION, path, time: Date.now() }),
@@ -21,7 +21,7 @@ export async function onRequest(context) {
     );
   }
 
-  // ✅ مسارات عامة لا تتقفل
+  // ✅ مسارات عامة (لا تتقفل)
   if (
     path.startsWith("/api/") ||
     path.startsWith("/api2/") ||
@@ -35,27 +35,38 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅ الأهم: أي أحد يدخل الموقع على / أو /index.html -> يتحول لـ /activate
+  // ✅ اسمح للملفات الثابتة (صور/خطوط/JS/CSS/maps...) عشان الواجهات تشتغل
+  if (isStaticAsset(path)) {
+    return next();
+  }
+
+  // ✅ أي زيارة للرابط الرئيسي دايم تروح للتفعيل (مثل نظامكم المطلوب)
   if (path === "/" || path === "/index.html") {
     return redirect(url, "/activate?next=%2Fapp");
   }
 
-  // ✅ حماية /app (المرحلة الجاية بنخلي اللعبة هناك)
-  if (path === "/app" || path.startsWith("/app/")) {
-    const cookieHeader = request.headers.get("Cookie") || "";
-    const token = getCookie(cookieHeader, TOKEN_COOKIE);
+  // ✅ أي صفحة HTML ثانية/صفحات اللعبة: لازم يكون فيه جلسة (Cookie)
+  // هذا يضمن "أي رابط لأي صفحة يفتح صفحة التفعيل أولاً"
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const token = getCookie(cookieHeader, TOKEN_COOKIE);
 
-    // إذا ما عنده جلسة -> يرجع للتفعيل
-    if (!token) {
-      const nextPath = path + (url.search || "");
-      const to = "/activate?next=" + encodeURIComponent(nextPath);
-      return redirect(url, to);
-    }
-
-    return next();
+  if (!token) {
+    const nextPath = path + (url.search || "");
+    return redirect(url, "/activate?next=" + encodeURIComponent(nextPath));
   }
 
+  // عنده جلسة -> يكمل
   return next();
+}
+
+/* ---------------- helpers ---------------- */
+
+function isStaticAsset(path) {
+  // مجلدات ثابتة عندك
+  if (path.startsWith("/maps/")) return true;
+
+  // ملفات ثابتة (صور/خطوط/ستايل/سكربت…)
+  return /\.(png|jpe?g|webp|gif|svg|ico|css|js|json|map|txt|xml|woff2?|ttf|otf|eot|mp3|mp4)$/i.test(path);
 }
 
 function getCookie(cookieHeader, name) {
@@ -82,4 +93,4 @@ function redirect(currentUrl, toPath) {
   });
 }
 
-// functions/_middleware.js – إصدار 4
+// functions/_middleware.js – إصدار 5
