@@ -70,7 +70,7 @@ async function sha256Base64(text) {
   return base64FromBytes(new Uint8Array(buf));
 }
 
-async function pbkdf2HashBase64(password, saltBytes, iterations = 120000) {
+async function pbkdf2HashBase64(password, saltBytes, iterations = 100000) {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
