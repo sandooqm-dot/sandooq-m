@@ -1,5 +1,5 @@
 // functions/api2/resend-otp.js
-// api2-resend-otp-v1 (Resend OTP via Resend)
+// api2-resend-otp-v1 (Resend OTP email)
 
 function json(obj, status = 200, corsHeaders, extraHeaders = {}) {
   const headers = new Headers(corsHeaders || {});
@@ -32,12 +32,6 @@ function makeCorsHeaders(request, env) {
   };
 }
 
-function b64(bytes) {
-  let bin = "";
-  bytes.forEach(b => (bin += String.fromCharCode(b)));
-  return btoa(bin);
-}
-
 function bytesFromString(s) {
   return new TextEncoder().encode(s);
 }
@@ -54,64 +48,50 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function makeOtp6() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+function generateOtp6() {
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  const n = arr[0] % 1000000;
+  return String(n).padStart(6, "0");
 }
 
-async function sendOtpEmail({ env, toEmail, otp }) {
-  const apiKey = (env.RESEND_API_KEY || "").trim();
-  const from = (env.RESEND_FROM || "").trim(); // مثال: "صندوق المسابقات <support@sandooq-games.com>"
-  const replyTo = (env.RESEND_REPLY_TO || "").trim(); // اختياري
-
-  if (!apiKey) throw new Error("Missing RESEND_API_KEY");
-  if (!from) throw new Error("Missing RESEND_FROM");
-
-  const subject = "رمز التحقق - صندوق المسابقات";
-  const text = `رمز التحقق الخاص بك هو: ${otp}\nصلاحية الرمز: 10 دقائق.\nإذا لم تطلب هذا الرمز تجاهل الرسالة.`;
-
-  const html = `
-  <div dir="rtl" style="font-family:Arial, Tahoma, sans-serif; line-height:1.8">
-    <div style="max-width:520px;margin:0 auto;padding:18px;border-radius:14px;background:#ffffff">
-      <div style="text-align:center;margin-bottom:8px">
-        <div style="font-size:18px;font-weight:700;color:#111">صندوق المسابقات</div>
-        <div style="font-size:12px;color:#666">تأكيد البريد الإلكتروني</div>
-      </div>
-
-      <div style="margin-top:12px;color:#111">
-        هذا هو رمز التحقق الخاص بك:
-      </div>
-
-      <div style="margin:16px 0;padding:14px;border-radius:12px;background:#f5f7ff;text-align:center">
-        <div style="font-size:34px;font-weight:800;letter-spacing:6px;color:#1a1a1a">${otp}</div>
-      </div>
-
-      <div style="font-size:13px;color:#444">
-        صلاحية الرمز <b>10 دقائق</b>. إذا لم تطلب هذا الرمز تجاهل الرسالة.
-      </div>
-
-      <hr style="border:none;border-top:1px solid #eee;margin:16px 0" />
-      <div style="font-size:12px;color:#777;text-align:center">© صندوق المسابقات</div>
-    </div>
-  </div>`.trim();
-
-  const payload = { from, to: toEmail, subject, html, text };
-  if (replyTo) payload.reply_to = replyTo;
-
+async function sendViaResend({ apiKey, from, to, subject, html, text }) {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      from,
+      to,
+      subject,
+      html,
+      text,
+    }),
   });
 
-  const data = await r.json().catch(() => ({}));
+  const data = await r.json().catch(() => null);
   if (!r.ok) {
-    const msg = data?.message || data?.error || `Resend error ${r.status}`;
+    const msg = data?.message || data?.error || `RESEND_HTTP_${r.status}`;
     throw new Error(msg);
   }
-  return data;
+  return data; // { id: ... }
+}
+
+function otpEmailHtml({ otp }) {
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;direction:rtl;text-align:right">
+    <h2 style="margin:0 0 10px">رمز التحقق</h2>
+    <p style="margin:0 0 12px">رمزك لتأكيد البريد الإلكتروني هو:</p>
+    <div style="font-size:28px;font-weight:700;letter-spacing:4px;background:#f5f5f5;padding:12px 16px;border-radius:10px;display:inline-block">
+      ${otp}
+    </div>
+    <p style="margin:14px 0 0;color:#666">ينتهي خلال 10 دقائق. إذا ما طلبته، تجاهل الرسالة.</p>
+    <hr style="border:none;border-top:1px solid #eee;margin:18px 0" />
+    <p style="margin:0;color:#999;font-size:12px">© صندوق المسابقات</p>
+  </div>
+  `.trim();
 }
 
 export async function onRequest(context) {
@@ -130,6 +110,9 @@ export async function onRequest(context) {
     return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405, cors);
   }
 
+  const db = env.DB;
+  if (!db) return json({ ok: false, error: "NO_DB_BINDING" }, 500, cors);
+
   let body;
   try {
     body = await request.json();
@@ -142,66 +125,91 @@ export async function onRequest(context) {
     return json({ ok: false, error: "INVALID_EMAIL" }, 400, cors);
   }
 
-  const db = env.DB;
-  if (!db) return json({ ok: false, error: "NO_DB_BINDING" }, 500, cors);
-
-  const now = Date.now();
-
-  // جيب المستخدم
-  let user;
-  try {
-    user = await db
-      .prepare("SELECT id, email_verified_at, otp_last_sent_at FROM users WHERE email = ? LIMIT 1")
-      .bind(email)
-      .first();
-  } catch (e) {
-    return json({ ok: false, error: "DB_SCHEMA_ERROR", detail: String(e?.message || e) }, 500, cors);
+  const resendKey = (env.RESEND_API_KEY || "").toString().trim();
+  if (!resendKey) {
+    return json({ ok: false, error: "MISSING_RESEND_API_KEY" }, 500, cors);
   }
 
+  const fromEmail = (env.MAIL_FROM || env.RESEND_FROM || "support@sandooq-games.com").toString().trim();
+  const from = `صندوق المسابقات <${fromEmail}>`;
+
+  const now = Date.now();
+  const otp = generateOtp6();
+  const otpSecret = (env.OTP_SECRET || env.JWT_SECRET || "otp_secret").toString();
+  const otpHash = await sha256Hex(bytesFromString(`${email}|${otp}|${otpSecret}`));
+  const expiresAt = now + (10 * 60 * 1000); // 10 min
+
+  // 1) Read user + (optional) rate limit
+  let user;
+  let hasOtpSentAt = true;
+
+  try {
+    user = await db
+      .prepare("SELECT id, email_verified_at, otp_sent_at FROM users WHERE email = ? LIMIT 1")
+      .bind(email)
+      .first();
+  } catch {
+    hasOtpSentAt = false;
+    user = await db
+      .prepare("SELECT id, email_verified_at FROM users WHERE email = ? LIMIT 1")
+      .bind(email)
+      .first();
+  }
+
+  // أمنياً: لا نفضح هل الإيميل موجود أو لا
   if (!user?.id) {
-    // ما نكشف كثير للعميل، لكن نخليه واضح
-    return json({ ok: false, error: "USER_NOT_FOUND" }, 404, cors);
+    return json({ ok: true, queued: true }, 200, cors);
   }
 
   if (user.email_verified_at) {
-    return json({ ok: false, error: "ALREADY_VERIFIED" }, 409, cors);
+    return json({ ok: true, alreadyVerified: true }, 200, cors);
   }
 
-  // Rate limit: 60 ثانية
-  if (user.otp_last_sent_at && now - Number(user.otp_last_sent_at) < 60_000) {
-    const leftMs = 60_000 - (now - Number(user.otp_last_sent_at));
-    return json(
-      { ok: false, error: "OTP_RATE_LIMIT", retryAfterSec: Math.ceil(leftMs / 1000) },
-      429,
-      cors
-    );
+  if (hasOtpSentAt && user.otp_sent_at) {
+    const last = Number(user.otp_sent_at) || 0;
+    const diff = now - last;
+    if (diff < 60_000) {
+      const waitSec = Math.ceil((60_000 - diff) / 1000);
+      return json({ ok: false, error: "WAIT_BEFORE_RESEND", waitSec }, 429, cors);
+    }
   }
 
-  const otp = makeOtp6();
-  const otpSecret = (env.OTP_SECRET || env.JWT_SECRET || "otp_secret").toString();
-  const otpHash = await sha256Hex(bytesFromString(`${email}|${otp}|${otpSecret}`));
-  const otpExpiresAt = now + 10 * 60 * 1000;
-
-  // حدّث OTP في DB
+  // 2) Update OTP in DB
   try {
-    await db
-      .prepare(
-        "UPDATE users SET otp_hash = ?, otp_expires_at = ?, otp_last_sent_at = ? WHERE email = ?"
-      )
-      .bind(otpHash, otpExpiresAt, now, email)
-      .run();
+    if (hasOtpSentAt) {
+      await db
+        .prepare("UPDATE users SET otp_hash = ?, otp_expires_at = ?, otp_sent_at = ? WHERE id = ?")
+        .bind(otpHash, expiresAt, now, user.id)
+        .run();
+    } else {
+      await db
+        .prepare("UPDATE users SET otp_hash = ?, otp_expires_at = ? WHERE id = ?")
+        .bind(otpHash, expiresAt, user.id)
+        .run();
+    }
   } catch (e) {
     return json({ ok: false, error: "DB_WRITE_FAILED", detail: String(e?.message || e) }, 500, cors);
   }
 
-  // أرسل البريد
+  // 3) Send email
   try {
-    await sendOtpEmail({ env, toEmail: email, otp });
-  } catch (e) {
-    return json({ ok: false, error: "EMAIL_SEND_FAILED", detail: String(e?.message || e) }, 502, cors);
-  }
+    const subject = "رمز التحقق - صندوق المسابقات";
+    const html = otpEmailHtml({ otp });
+    const text = `رمز التحقق: ${otp}\nينتهي خلال 10 دقائق.`;
 
-  return json({ ok: true }, 200, cors);
+    const resp = await sendViaResend({
+      apiKey: resendKey,
+      from,
+      to: email,
+      subject,
+      html,
+      text,
+    });
+
+    return json({ ok: true, sent: true, resendId: resp?.id || null }, 200, cors);
+  } catch (e) {
+    return json({ ok: false, error: "EMAIL_SEND_FAILED", detail: String(e?.message || e) }, 500, cors);
+  }
 }
 
 // functions/api2/resend-otp.js — إصدار 1
