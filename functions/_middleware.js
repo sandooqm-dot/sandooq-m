@@ -4,12 +4,12 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // ✅ اسم الكوكي اللي بنستخدمه (بنخليه يتخزن من activate.html بالخطوة الجاية)
   const TOKEN_COOKIE = "sandooq_token_v1";
 
-  // ✅ مسارات عامة (لا تتقفل)
+  // ✅ مسارات عامة لا تتقفل
   if (
     path.startsWith("/api/") ||
+    path.startsWith("/api2/") ||
     path === "/activate" ||
     path === "/activate/" ||
     path === "/activate.html" ||
@@ -20,28 +20,30 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅ الآن (بهذه الخطوة) نقفل /app فقط
+  // ✅ مهم: الدومين الرئيسي / (أو /index.html) لا يفتح صفحة اللعبة القديمة
+  // يروح للتفعيل مباشرة (وبكذا نقتل لوب الريفرش)
+  if (path === "/" || path === "/index.html") {
+    return redirect(url, "/activate?next=%2Fapp");
+  }
+
+  // ✅ نقفل /app فقط
   if (path === "/app" || path.startsWith("/app/")) {
     const cookieHeader = request.headers.get("Cookie") || "";
     const token = getCookie(cookieHeader, TOKEN_COOKIE);
 
-    // إذا ما عنده جلسة -> نرجعه لصفحة التفعيل
     if (!token) {
       const nextPath = path + (url.search || "");
       const to = "/activate?next=" + encodeURIComponent(nextPath);
       return redirect(url, to);
     }
 
-    // عنده توكن (مبدئيًا نسمح له) - التحقق النهائي بيكون عبر /api/me بالخطوات الجاية
     return next();
   }
 
-  // باقي الموقع (حالياً) ما نلمسه عشان ما نخرب دخولك الحالي
   return next();
 }
 
 function getCookie(cookieHeader, name) {
-  // parsing بسيط وآمن
   const parts = cookieHeader.split(";").map((s) => s.trim());
   for (const p of parts) {
     if (!p) continue;
@@ -65,4 +67,4 @@ function redirect(currentUrl, toPath) {
   });
 }
 
-// functions/_middleware.js – إصدار 1 (حماية /app فقط)
+// functions/_middleware.js – إصدار 2 (منع لوب الصفحة الرئيسية + حماية /app)
