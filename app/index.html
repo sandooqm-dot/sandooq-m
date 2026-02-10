@@ -3,175 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>جاري فتح اللعبة</title>
-
+  <title>تشغيل اللعبة</title>
   <style>
-    :root{
-      --bg1:#0b2f6a;
-      --bg2:#0a4aa0;
-      --card:#ffffffee;
-      --text:#0b1c33;
-      --muted:#4b5a6b;
-      --shadow:0 18px 40px rgba(0,0,0,.18);
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      min-height:100vh;
-      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-      background:
-        radial-gradient(1200px 900px at 20% 10%, rgba(255,255,255,.10), transparent 60%),
-        radial-gradient(1000px 700px at 80% 20%, rgba(255,255,255,.08), transparent 60%),
-        linear-gradient(135deg,var(--bg1),var(--bg2));
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:24px 14px;
-    }
-    .wrap{width:min(520px,100%); position:relative;}
-    .loaderCard{
-      background:var(--card);
-      border-radius:18px;
-      box-shadow:var(--shadow);
-      padding:18px 16px;
-      text-align:center;
-    }
-    .logo{
-      width:54px;height:54px;object-fit:contain;
-      margin:0 auto 10px;
-      display:block;
-    }
-    .title{
-      margin:0;
-      font-size:22px;
-      font-weight:900;
-      color:var(--text);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
-    }
-    .sub{
-      margin:6px 0 0;
-      font-size:13px;
-      font-weight:800;
-      color:var(--muted);
-    }
-    .spin{
-      width:20px;height:20px;
-      border-radius:50%;
-      border:3px solid rgba(0,0,0,.12);
-      border-top-color: rgba(0,0,0,.55);
-      animation: s 1s linear infinite;
-    }
-    @keyframes s{to{transform:rotate(360deg)}}
-
-    #frame{
-      position:fixed;
-      inset:0;
-      width:100vw;
-      height:100vh;
-      border:0;
-      background:transparent;
-      display:none;
-    }
-    .hide{display:none !important;}
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui;background:#0b1020;color:#fff}
+    .box{width:min(520px,92%);padding:18px;border:1px solid rgba(255,255,255,.15);border-radius:16px;background:rgba(255,255,255,.06)}
+    .t{font-weight:900;font-size:22px;margin:0 0 8px}
+    .p{opacity:.85;line-height:1.8;margin:0}
+    code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px}
   </style>
 </head>
-
 <body>
-  <iframe id="frame" title="app"></iframe>
-
-  <div class="wrap" id="loading">
-    <div class="loaderCard">
-      <img class="logo" src="/logo.png" alt="logo">
-      <h1 class="title"><span class="spin"></span> جاري فتح اللعبة</h1>
-      <div class="sub">لحظة.. نجهّز لك الصفحة</div>
-    </div>
+  <div class="box">
+    <p class="t">✅ تم الدخول للعبة بنجاح</p>
+    <p class="p">إذا وصلت هنا يعني: <br/>
+      - تسجيل الدخول شغال<br/>
+      - الكوكي محفوظ<br/>
+      - الميدلوير يسمح بالدخول بعد التفعيل<br/><br/>
+      الآن نستبدل هذه الصفحة بملف لعبتك الحقيقي داخل <code>/app</code>.
+    </p>
   </div>
-
-  <script>
-    const frame = document.getElementById("frame");
-    const loading = document.getElementById("loading");
-
-    // ✅ هنا صفحة لعبتك الحقيقية اللي بتبدأ منها (الجذر)
-    const DEFAULT_PAGE = "/index.html";
-
-    const KEY_LAST_URL  = "sandooq_app_last_url_v1";
-    const KEY_LAST_PATH = "sandooq_app_last_path_v1";
-
-    function showFrame(){
-      loading.classList.add("hide");
-      frame.style.display = "block";
-    }
-
-    function normalizeTarget(raw){
-      if(!raw) return "";
-      let h = String(raw).trim();
-
-      // يدعم: #game أو #/game أو #game?x=1
-      h = h.replace(/^#\/?/, "");
-
-      if(!h) return "";
-
-      // ممنوع api
-      const low = h.toLowerCase();
-      if(low.startsWith("api") || low.startsWith("api2")) return "";
-
-      const parts = h.split("?");
-      let p = (parts[0] || "").trim();
-      const q = parts[1] ? ("?" + parts[1]) : "";
-
-      if(!p) return "";
-      if(!p.endsWith(".html")) p += ".html";
-      if(!p.startsWith("/")) p = "/" + p;
-
-      return p + q;
-    }
-
-    function load(target){
-      loading.classList.remove("hide");
-      frame.style.display = "none";
-      frame.src = target;
-    }
-
-    function initialTarget(){
-      const fromHash = normalizeTarget(location.hash);
-      if(fromHash){
-        const wantPath = fromHash.split("?")[0];
-        const last = sessionStorage.getItem(KEY_LAST_URL) || "";
-        const lastPath = sessionStorage.getItem(KEY_LAST_PATH) || "";
-        if(last && lastPath === wantPath && !fromHash.includes("?")) return last;
-        return fromHash;
-      }
-      return sessionStorage.getItem(KEY_LAST_URL) || DEFAULT_PAGE;
-    }
-
-    window.addEventListener("hashchange", ()=>{
-      const t = normalizeTarget(location.hash);
-      if(t) load(t);
-    });
-
-    frame.addEventListener("load", ()=>{
-      try{
-        const u = frame.contentWindow.location;
-        const full = u.pathname + (u.search || "");
-        sessionStorage.setItem(KEY_LAST_URL, full);
-        sessionStorage.setItem(KEY_LAST_PATH, u.pathname);
-
-        // نخلي الرابط قصير: /app#اسم_الصفحة
-        const file = (u.pathname.split("/").pop() || "");
-        if(file.endsWith(".html")){
-          const short = file.replace(/\.html$/,"");
-          if(short && location.hash !== "#" + short){
-            history.replaceState(null, "", "#" + short);
-          }
-        }
-      }catch(e){}
-      showFrame();
-    });
-
-    load(initialTarget());
-  </script>
 </body>
 </html>
