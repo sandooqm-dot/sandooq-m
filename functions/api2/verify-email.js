@@ -23,18 +23,33 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function isIntegerType(t) {
-  const s = String(t || "").toUpperCase();
-  return s.includes("INT");
+async function tableInfo(db, tableName) {
+  try {
+    const res = await db.prepare(`PRAGMA table_info(${tableName});`).all();
+    const rows = res?.results || [];
+    return rows.map(r => ({
+      name: r.name,
+      notnull: Number(r.notnull || 0),
+      dflt_value: r.dflt_value,
+      pk: Number(r.pk || 0),
+      type: r.type,
+    }));
+  } catch {
+    return [];
+  }
 }
 
-function defaultForType(t, now) {
-  const s = String(t || "").toUpperCase();
-  if (s.includes("INT")) return now;
-  if (s.includes("REAL") || s.includes("FLOA") || s.includes("DOUB")) return 0;
-  if (s.includes("CHAR") || s.includes("TEXT") || s.includes("CLOB")) return "";
-  // آخر حل: نص فاضي (أفضل من null مع NOT NULL)
-  return "";
+function hasCol(cols, name) {
+  return cols.some(c => c.name === name);
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+function safeUUID() {
+  // crypto.randomUUID موجودة على Cloudflare Workers
+  return (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }
 
 export async function onRequestOptions() {
@@ -53,142 +68,175 @@ export async function onRequestPost(context) {
       return json({ ok: false, error: "MISSING_FIELDS" }, 400);
     }
 
-    // 1) نجيب بيانات التسجيل المؤقت من pending_users (هو اللي عندك فيه otp فعليًا)
-    const pending = await env.DB
-      .prepare("SELECT email, password_hash, otp FROM pending_users WHERE email = ? LIMIT 1")
-      .bind(email)
-      .first();
+    // --- 1) نجيب الـ OTP من أي مكان موجود (pending_users أولاً ثم email_otps) ---
+    const pendingCols = await tableInfo(env.DB, "pending_users");
+    const emailOtpsCols = await tableInfo(env.DB, "email_otps");
 
-    if (!pending) {
+    let pending = null;
+
+    if (pendingCols.length) {
+      // لو جدول pending_users موجود
+      const selCols = ["email"];
+      if (hasCol(pendingCols, "password_hash")) selCols.push("password_hash");
+      if (hasCol(pendingCols, "otp")) selCols.push("otp");
+
+      // (مستقبلاً لو أضفت password_salt)
+      if (hasCol(pendingCols, "password_salt")) selCols.push("password_salt");
+
+      pending = await env.DB
+        .prepare(`SELECT ${selCols.join(", ")} FROM pending_users WHERE email = ? LIMIT 1`)
+        .bind(email)
+        .first();
+    }
+
+    // لو ما لقى في pending_users، جرّب email_otps
+    // (بعض النسخ كانت تكتب OTP هناك)
+    let otpRecord = null;
+    if (!pending && emailOtpsCols.length) {
+      const selCols = ["email"];
+      if (hasCol(emailOtpsCols, "otp")) selCols.push("otp");
+      if (hasCol(emailOtpsCols, "code")) selCols.push("code");
+      if (hasCol(emailOtpsCols, "otp_code")) selCols.push("otp_code");
+
+      otpRecord = await env.DB
+        .prepare(`SELECT ${selCols.join(", ")} FROM email_otps WHERE email = ? ORDER BY rowid DESC LIMIT 1`)
+        .bind(email)
+        .first();
+    }
+
+    // --- 2) تحقق من تطابق OTP ---
+    const pendingOtp = pending?.otp != null ? String(pending.otp).trim() : "";
+    const otpFromEmailOtps =
+      otpRecord?.otp != null ? String(otpRecord.otp).trim() :
+      otpRecord?.otp_code != null ? String(otpRecord.otp_code).trim() :
+      otpRecord?.code != null ? String(otpRecord.code).trim() : "";
+
+    const effectiveOtp = pendingOtp || otpFromEmailOtps;
+
+    if (!effectiveOtp) {
+      return json({ ok: false, error: "OTP_NOT_FOUND" }, 404);
+    }
+    if (effectiveOtp !== otp) {
       return json({ ok: false, error: "OTP_NOT_FOUND" }, 404);
     }
 
-    // لو ما تطابق
-    if (String(pending.otp).trim() !== otp) {
-      return json({ ok: false, error: "OTP_NOT_FOUND" }, 404);
+    // لازم يكون عندنا password_hash من pending_users عشان نقدر نسوي Login بعدين
+    if (!pending || !pending.password_hash) {
+      // OTP صحيح (من email_otps) لكن ما عندنا password_hash لأن التسجيل المؤقت مو موجود/انحذف
+      // هنا نوقف ونرجّع خطأ واضح بدل ما نكمل ونسبب INVALID_CREDENTIALS
+      return json({ ok: false, error: "PENDING_USER_NOT_FOUND" }, 409);
     }
 
-    // 2) نبني INSERT متوافق مع سكيمة users (بدون ما نكسر لو فيه أعمدة NOT NULL)
-    const info = await env.DB.prepare("PRAGMA table_info(users)").all();
-    const colsInfo = info?.results || [];
-    const colsByName = new Map(colsInfo.map((r) => [r.name, r]));
-
-    // لازم يوجد email + password_hash في users
-    if (!colsByName.has("email") || !colsByName.has("password_hash")) {
-      return json({ ok: false, error: "USERS_SCHEMA_MISSING_FIELDS" }, 500);
+    // --- 3) إدخال/تحديث المستخدم في users بشكل آمن ---
+    const usersCols = await tableInfo(env.DB, "users");
+    if (!usersCols.length) {
+      return json({ ok: false, error: "USERS_TABLE_NOT_FOUND" }, 500);
     }
 
-    const now = Date.now();
-
-    // هل المستخدم موجود؟
     const existing = await env.DB
-      .prepare("SELECT 1 FROM users WHERE email = ? LIMIT 1")
+      .prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
       .bind(email)
       .first();
+
+    const colSet = new Set(usersCols.map(c => c.name));
+
+    // تجهيز قيم افتراضية لأكثر الأعمدة شيوعًا
+    const valuesMap = {
+      email,
+      password_hash: pending.password_hash,
+      password_salt: pending.password_salt ?? null,
+      created_at: nowMs(),
+      updated_at: nowMs(),
+      verified_at: nowMs(),
+      email_verified: 1,
+      verified: 1,
+      is_verified: 1,
+      provider: "email",
+      status: "active",
+      role: "user",
+      id: safeUUID(),
+      user_id: safeUUID(),
+    };
+
+    // ساعدنا: إذا عنده أعمدة NOT NULL بدون default ولا نعرف نعبيها → نوقف بخطأ واضح في اللوق
+    const missingRequired = usersCols
+      .filter(c => c.notnull === 1 && (c.dflt_value === null || c.dflt_value === undefined))
+      .filter(c => !["email"].includes(c.name)) // email بنعبيه دائمًا
+      .filter(c => !Object.prototype.hasOwnProperty.call(valuesMap, c.name) && colSet.has(c.name));
+
+    if (missingRequired.length) {
+      console.log("verify_email_schema_missing_required", email, missingRequired.map(c => c.name));
+      return json({ ok: false, error: "USERS_SCHEMA_MISSING_REQUIRED_COLS" }, 500);
+    }
 
     if (!existing) {
-      const cols = [];
-      const ph = [];
-      const vals = [];
+      // INSERT
+      const insertCols = [];
+      const insertVals = [];
 
-      // أساسيات
-      cols.push("email"); ph.push("?"); vals.push(email);
-      cols.push("password_hash"); ph.push("?"); vals.push(pending.password_hash);
-
-      // قيم تحقق اختيارية لو الأعمدة موجودة
-      if (colsByName.has("is_verified")) {
-        cols.push("is_verified"); ph.push("?"); vals.push(1);
-      }
-      if (colsByName.has("email_verified_at")) {
-        cols.push("email_verified_at"); ph.push("?"); vals.push(now);
-      }
-      if (colsByName.has("verified_at")) {
-        cols.push("verified_at"); ph.push("?"); vals.push(now);
-      }
-      if (colsByName.has("created_at")) {
-        cols.push("created_at"); ph.push("?"); vals.push(now);
-      }
-      if (colsByName.has("updated_at")) {
-        cols.push("updated_at"); ph.push("?"); vals.push(now);
-      }
-
-      // لو عندك id نصّي (مو INTEGER PK) نعبيه UUID
-      if (colsByName.has("id")) {
-        const r = colsByName.get("id");
-        const isPk = Number(r.pk) === 1;
-        const isInt = isIntegerType(r.type);
-
-        // إذا id INTEGER PRIMARY KEY: لا ندخله وخله يتولد تلقائيًا
-        // إذا id TEXT أو غيره: نعبيه UUID (خصوصًا لو NOT NULL)
-        if (!(isPk && isInt)) {
-          cols.push("id"); ph.push("?"); vals.push(crypto.randomUUID());
+      // نضيف فقط الأعمدة الموجودة فعليًا في الجدول
+      for (const [k, v] of Object.entries(valuesMap)) {
+        if (colSet.has(k)) {
+          insertCols.push(k);
+          insertVals.push(v);
         }
       }
 
-      // 🔥 أكمل أي عمود NOT NULL بدون default (عشان ما يطيح INSERT)
-      for (const r of colsInfo) {
-        const name = r.name;
-        const notNull = Number(r.notnull) === 1;
-        const hasDefault = r.dflt_value !== null && r.dflt_value !== undefined;
-
-        if (!notNull || hasDefault) continue;
-        if (cols.includes(name)) continue;
-
-        const isPk = Number(r.pk) === 1;
-        const isInt = isIntegerType(r.type);
-
-        // PK رقم (rowid) خلّه يتولد
-        if (isPk && isInt) continue;
-
-        // PK نصّي نعطيه UUID
-        if (isPk && !isInt) {
-          cols.push(name); ph.push("?"); vals.push(crypto.randomUUID());
-          continue;
-        }
-
-        // غير ذلك: نعطي قيمة افتراضية حسب النوع
-        cols.push(name);
-        ph.push("?");
-        vals.push(defaultForType(r.type, now));
-      }
+      const placeholders = insertCols.map(() => "?").join(", ");
+      const sql = `INSERT INTO users (${insertCols.join(", ")}) VALUES (${placeholders})`;
 
       try {
-        await env.DB
-          .prepare(`INSERT INTO users (${cols.join(",")}) VALUES (${ph.join(",")})`)
-          .bind(...vals)
-          .run();
+        await env.DB.prepare(sql).bind(...insertVals).run();
       } catch (e) {
-        // إذا موجود مسبقًا (UNIQUE) نتجاهل ونكمل
-        const msg = String(e?.message || "");
-        if (!msg.includes("UNIQUE") && !msg.includes("constraint")) throw e;
+        const msg = String(e?.message || e);
+        // فقط نتجاهل UNIQUE الحقيقي… أي شيء ثاني نوقف
+        if (msg.includes("UNIQUE") || msg.includes("unique")) {
+          // موجود مسبقًا
+        } else {
+          console.log("verify_email_user_insert_failed", email, msg);
+          return json({ ok: false, error: "USER_INSERT_FAILED" }, 500);
+        }
       }
     } else {
-      // لو موجود، حدّث حالة التحقق لو الأعمدة موجودة
-      const sets = [];
-      const vals = [];
-
-      if (colsByName.has("is_verified")) { sets.push("is_verified = ?"); vals.push(1); }
-      if (colsByName.has("email_verified_at")) { sets.push("email_verified_at = ?"); vals.push(now); }
-      if (colsByName.has("verified_at")) { sets.push("verified_at = ?"); vals.push(now); }
-      if (colsByName.has("updated_at")) { sets.push("updated_at = ?"); vals.push(now); }
-
-      if (sets.length) {
+      // UPDATE (لو المستخدم موجود، نحدّث hash لتوحيد الحالة)
+      if (colSet.has("password_hash")) {
         await env.DB
-          .prepare(`UPDATE users SET ${sets.join(", ")} WHERE email = ?`)
-          .bind(...vals, email)
+          .prepare("UPDATE users SET password_hash = ? WHERE email = ?")
+          .bind(pending.password_hash, email)
+          .run();
+      }
+      if (colSet.has("email_verified")) {
+        await env.DB
+          .prepare("UPDATE users SET email_verified = 1 WHERE email = ?")
+          .bind(email)
+          .run();
+      }
+      if (colSet.has("verified")) {
+        await env.DB
+          .prepare("UPDATE users SET verified = 1 WHERE email = ?")
+          .bind(email)
           .run();
       }
     }
 
-    // 3) نحذف التسجيل المؤقت
-    await env.DB.prepare("DELETE FROM pending_users WHERE email = ?").bind(email).run();
+    // --- 4) تأكد 100% أن المستخدم صار موجود في users ---
+    const ensured = await env.DB
+      .prepare("SELECT email FROM users WHERE email = ? LIMIT 1")
+      .bind(email)
+      .first();
 
-    // (اختياري) تنظيف أي OTP قديم إن كان فيه جدول email_otps
+    if (!ensured) {
+      console.log("verify_email_user_not_created", email);
+      return json({ ok: false, error: "USER_NOT_CREATED" }, 500);
+    }
+
+    // --- 5) الآن فقط نحذف pending_users + ننظف email_otps ---
+    await env.DB.prepare("DELETE FROM pending_users WHERE email = ?").bind(email).run();
     try {
       await env.DB.prepare("DELETE FROM email_otps WHERE email = ?").bind(email).run();
     } catch (_) {}
 
-    return json({ ok: true, email, verified: true });
+    return json({ ok: true, email, verified: true }, 200);
   } catch (err) {
     console.log("verify_email_error", String(err?.message || err));
     return json({ ok: false, error: "SERVER_ERROR" }, 500);
@@ -196,5 +244,5 @@ export async function onRequestPost(context) {
 }
 
 /*
-verify-email.js – api2 – إصدار 2 (Schema-safe users insert)
+verify-email.js – api2 – إصدار 2 (Fix Users insert + No delete pending until ensured)
 */
