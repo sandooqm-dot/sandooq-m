@@ -46,37 +46,41 @@ function parseCookies(cookieHeader = "") {
   return map;
 }
 
-function htmlMessage(message) {
-  const safe = String(message || "").replace(/[<>&"]/g, s => ({
+function esc(s) {
+  return String(s ?? "").replace(/[<>&"]/g, c => ({
     "<": "&lt;",
     ">": "&gt;",
     "&": "&amp;",
     '"': "&quot;"
-  }[s]));
+  }[c]));
+}
+
+function htmlMessage(title, message) {
   return `<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>رسالة</title>
+  <title>${esc(title)}</title>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Tahoma,Arial; margin:0; background:#fff; color:#111;}
-    .wrap{padding:42px 22px; max-width:720px; margin:0 auto;}
-    h1{font-size:22px; margin:0 0 14px;}
-    p{font-size:18px; line-height:1.7; margin:0;}
+    .wrap{padding:40px 18px; max-width:760px; margin:0 auto;}
+    h1{font-size:22px; margin:0 0 12px;}
+    p{font-size:17px; line-height:1.8; margin:0 0 10px;}
+    .box{margin-top:14px; padding:14px; border:1px solid #e5e5e5; border-radius:10px; background:#fafafa; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; white-space:pre-wrap;}
+    .hint{margin-top:14px; color:#444;}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>رسالة</h1>
-    <p>${safe}</p>
+    <h1>${esc(title)}</h1>
+    <p>${esc(message)}</p>
   </div>
 </body>
 </html>`;
 }
 
 function setCookieHeadersForOAuth(state, verifier) {
-  // __Host- => لازم Path=/ و Secure و بدون Domain (أقوى وأضمن)
   const common = "Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=600";
   return [
     `__Host-g_state=${encodeURIComponent(state)}; ${common}`,
@@ -92,16 +96,22 @@ function clearCookieHeadersForOAuth() {
   ];
 }
 
+function getRedirectUri(reqUrl, env) {
+  // استخدم المتغير إذا موجود (أفضل — وأنت عندك GOOGLE_REDIRECT_URI ✅)
+  if (env.GOOGLE_REDIRECT_URI && String(env.GOOGLE_REDIRECT_URI).trim()) {
+    return String(env.GOOGLE_REDIRECT_URI).trim();
+  }
+  const u = new URL(reqUrl);
+  return `${u.origin}/api2/google/callback`;
+}
+
 async function ensureSessionsInsert(env, token, email) {
-  // جلسات (ضروري عشان /api2/me يقدر يتعرف عليك)
   const hasSessions =
     (await env.DB.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
     ).first());
 
-  if (!hasSessions) {
-    throw new Error("SESSIONS_TABLE_MISSING");
-  }
+  if (!hasSessions) throw new Error("SESSIONS_TABLE_MISSING");
 
   const info = await env.DB.prepare("PRAGMA table_info(sessions)").all();
   const cols = (info?.results || []).map(r => r.name);
@@ -110,9 +120,7 @@ async function ensureSessionsInsert(env, token, email) {
   const hasEmail = cols.includes("email");
   const hasCreatedAt = cols.includes("created_at");
 
-  if (!hasToken || !hasEmail) {
-    throw new Error("SESSIONS_SCHEMA_MISSING_TOKEN_OR_EMAIL");
-  }
+  if (!hasToken || !hasEmail) throw new Error("SESSIONS_SCHEMA_MISSING_TOKEN_OR_EMAIL");
 
   const now = new Date().toISOString();
   if (hasCreatedAt) {
@@ -129,19 +137,17 @@ async function ensureSessionsInsert(env, token, email) {
 /* -------------------- /api2/google/start -------------------- */
 async function handleStart({ request, env }) {
   if (!env.GOOGLE_CLIENT_ID) {
-    return new Response(htmlMessage("نقص إعدادات Google (GOOGLE_CLIENT_ID)."), {
+    return new Response(htmlMessage("رسالة", "نقص إعدادات Google (GOOGLE_CLIENT_ID)."), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },
     });
   }
 
-  const url = new URL(request.url);
-  const origin = url.origin;
-  const redirectUri = `${origin}/api2/google/callback`;
+  const redirectUri = getRedirectUri(request.url, env);
 
   // PKCE
   const state = randomB64Url(32);
-  const verifier = randomB64Url(64); // طول مناسب
+  const verifier = randomB64Url(64);
   const challenge = await sha256B64Url(verifier);
 
   const auth = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -155,9 +161,7 @@ async function handleStart({ request, env }) {
   auth.searchParams.set("prompt", "select_account");
 
   const headers = new Headers();
-  for (const c of setCookieHeadersForOAuth(state, verifier)) {
-    headers.append("Set-Cookie", c);
-  }
+  for (const c of setCookieHeadersForOAuth(state, verifier)) headers.append("Set-Cookie", c);
   headers.set("Location", auth.toString());
 
   return new Response(null, { status: 302, headers });
@@ -169,7 +173,7 @@ async function handleCallback({ request, env }) {
 
   const error = url.searchParams.get("error");
   if (error) {
-    return new Response(htmlMessage(`تعذر تسجيل الدخول عبر Google: ${error}`), {
+    return new Response(htmlMessage("رسالة", `تعذر تسجيل الدخول عبر Google: ${error}`), {
       status: 400,
       headers: { "content-type": "text/html; charset=utf-8" },
     });
@@ -178,7 +182,7 @@ async function handleCallback({ request, env }) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   if (!code || !state) {
-    return new Response(htmlMessage("بيانات الرجوع من Google ناقصة (code/state)."), {
+    return new Response(htmlMessage("رسالة", "بيانات الرجوع من Google ناقصة (code/state)."), {
       status: 400,
       headers: { "content-type": "text/html; charset=utf-8" },
     });
@@ -189,30 +193,24 @@ async function handleCallback({ request, env }) {
   const verifier = cookies.get("__Host-g_verifier");
 
   if (!savedState || !verifier || savedState !== state) {
-    // هذا هو الخطأ اللي عندك بالصورة (state/verifier)
     const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
     for (const c of clearCookieHeadersForOAuth()) headers.append("Set-Cookie", c);
-    return new Response(htmlMessage("تعذر قراءة بيانات التحقق (state/verifier)."), {
+    return new Response(htmlMessage("رسالة", "تعذر قراءة بيانات التحقق (state/verifier)."), {
       status: 400,
       headers,
     });
   }
 
-  const origin = url.origin;
-  const redirectUri = `${origin}/api2/google/callback`;
+  const redirectUri = getRedirectUri(request.url, env);
 
   // Exchange code -> token
   const tokenBody = new URLSearchParams();
   tokenBody.set("client_id", env.GOOGLE_CLIENT_ID || "");
+  tokenBody.set("client_secret", env.GOOGLE_CLIENT_SECRET || ""); // هنا لازم يكون صحيح
   tokenBody.set("code", code);
   tokenBody.set("redirect_uri", redirectUri);
   tokenBody.set("grant_type", "authorization_code");
   tokenBody.set("code_verifier", verifier);
-
-  // إذا عندك SECRET ضيفه (أفضل)، لو ما عندك ما يضر
-  if (env.GOOGLE_CLIENT_SECRET) {
-    tokenBody.set("client_secret", env.GOOGLE_CLIENT_SECRET);
-  }
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -220,14 +218,46 @@ async function handleCallback({ request, env }) {
     body: tokenBody.toString(),
   });
 
-  const tokenJson = await tokenRes.json().catch(() => ({}));
+  const tokenText = await tokenRes.text();
+  let tokenJson = {};
+  try { tokenJson = JSON.parse(tokenText); } catch {}
+
   if (!tokenRes.ok || !tokenJson.access_token) {
     const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
     for (const c of clearCookieHeadersForOAuth()) headers.append("Set-Cookie", c);
-    return new Response(
-      htmlMessage("فشل تبادل رمز Google. (token exchange)"),
-      { status: 400, headers }
-    );
+
+    const err = tokenJson.error || "UNKNOWN";
+    const desc = tokenJson.error_description || tokenText || "";
+    const debug = [
+      `status: ${tokenRes.status}`,
+      `error: ${err}`,
+      `desc: ${desc}`,
+      `redirect_uri_used: ${redirectUri}`,
+      `client_id_tail: ${(env.GOOGLE_CLIENT_ID || "").slice(-10)}`
+    ].join("\n");
+
+    const page = `<!doctype html><html lang="ar" dir="rtl"><head>
+      <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+      <title>رسالة</title>
+      <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Tahoma,Arial; margin:0; background:#fff; color:#111;}
+        .wrap{padding:40px 18px; max-width:760px; margin:0 auto;}
+        h1{font-size:22px; margin:0 0 12px;}
+        p{font-size:17px; line-height:1.8; margin:0 0 12px;}
+        .box{margin-top:14px; padding:14px; border:1px solid #e5e5e5; border-radius:10px; background:#fafafa; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; white-space:pre-wrap;}
+      </style>
+    </head><body><div class="wrap">
+      <h1>رسالة</h1>
+      <p>فشل تبادل رمز Google. (token exchange)</p>
+      <div class="box">${esc(debug)}</div>
+      <p style="margin-top:14px;color:#444">
+        إذا كانت <b>error</b> = <b>invalid_client</b> → مشكلة في GOOGLE_CLIENT_SECRET.<br/>
+        إذا كانت <b>error</b> = <b>invalid_grant</b> → غالبًا verifier/redirect_uri غير مطابق أو الكود انتهى.<br/>
+        إذا كانت <b>error</b> = <b>redirect_uri_mismatch</b> → تأكد redirect URI مطابق 100% في Google Console.
+      </p>
+    </div></body></html>`;
+
+    return new Response(page, { status: 400, headers });
   }
 
   // Get user info
@@ -236,10 +266,11 @@ async function handleCallback({ request, env }) {
   });
   const userJson = await userRes.json().catch(() => ({}));
   const email = userJson.email;
+
   if (!userRes.ok || !email) {
     const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
     for (const c of clearCookieHeadersForOAuth()) headers.append("Set-Cookie", c);
-    return new Response(htmlMessage("فشل جلب بيانات المستخدم من Google."), {
+    return new Response(htmlMessage("رسالة", "فشل جلب بيانات المستخدم من Google."), {
       status: 400,
       headers,
     });
@@ -255,13 +286,11 @@ async function handleCallback({ request, env }) {
     for (const c of clearCookieHeadersForOAuth()) headers.append("Set-Cookie", c);
 
     const msg =
-      (e && e.message === "SESSIONS_TABLE_MISSING")
-        ? "قاعدة البيانات ناقصها جدول sessions."
-        : (e && e.message === "SESSIONS_SCHEMA_MISSING_TOKEN_OR_EMAIL")
-          ? "جدول sessions ناقص أعمدة token/email."
-          : "خطأ في إنشاء جلسة الدخول (sessions).";
+      (e && e.message === "SESSIONS_TABLE_MISSING") ? "قاعدة البيانات ناقصها جدول sessions."
+      : (e && e.message === "SESSIONS_SCHEMA_MISSING_TOKEN_OR_EMAIL") ? "جدول sessions ناقص أعمدة token/email."
+      : "خطأ في إنشاء جلسة الدخول (sessions).";
 
-    return new Response(htmlMessage(msg), { status: 500, headers });
+    return new Response(htmlMessage("رسالة", msg), { status: 500, headers });
   }
 
   // Clear oauth cookies + Store token to localStorage + Redirect to /activate
@@ -270,11 +299,8 @@ async function handleCallback({ request, env }) {
 
   const html = `<!doctype html>
 <html lang="ar" dir="rtl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>جاري تسجيل الدخول…</title>
-</head>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>جاري تسجيل الدخول…</title></head>
 <body>
 <script>
   try {
