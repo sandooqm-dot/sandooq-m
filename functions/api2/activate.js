@@ -1,5 +1,6 @@
 // functions/api2/activate.js
-// Cloudflare Pages Function: POST /api2/activate
+// POST /api2/activate
+// v2: fixes SERVER_ERROR by auto-migrating activations table (missing columns)
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -51,35 +52,69 @@ function bearerToken(req) {
 }
 
 async function tableInfo(db, tableName) {
-  try {
-    const res = await db.prepare(`PRAGMA table_info(${tableName});`).all();
-    return (res?.results || []).map((r) => ({
-      name: String(r.name),
-      notnull: Number(r.notnull || 0),
-      dflt_value: r.dflt_value,
-      pk: Number(r.pk || 0),
-      type: String(r.type || ""),
-    }));
-  } catch {
-    return [];
+  const res = await db.prepare(`PRAGMA table_info(${tableName});`).all();
+  return (res?.results || []).map((r) => String(r.name));
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+async function ensureActivationsTable(db) {
+  // 1) Create if missing (new schema)
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS activations (
+      code TEXT NOT NULL,
+      email TEXT,
+      device_id TEXT NOT NULL,
+      created_at TEXT,
+      PRIMARY KEY (code, device_id)
+    );
+  `).run();
+
+  // 2) If table existed old/partial -> add missing cols safely
+  const cols = await tableInfo(db, "activations");
+
+  // add email if missing
+  if (!cols.includes("email")) {
+    try {
+      await db.prepare(`ALTER TABLE activations ADD COLUMN email TEXT;`).run();
+    } catch (e) {
+      // ignore if not supported / already exists race
+      console.log("activations_add_email_skip", String(e?.message || e));
+    }
   }
-}
 
-function hasCol(cols, name) {
-  return cols.some((c) => c.name === name);
-}
-
-function firstExistingCol(cols, names) {
-  for (const n of names) if (hasCol(cols, n)) return n;
-  return null;
-}
-
-async function findFirstTable(db, candidates) {
-  for (const t of candidates) {
-    const cols = await tableInfo(db, t);
-    if (cols.length) return { table: t, cols };
+  // add created_at if missing
+  if (!cols.includes("created_at")) {
+    try {
+      await db.prepare(`ALTER TABLE activations ADD COLUMN created_at TEXT;`).run();
+    } catch (e) {
+      console.log("activations_add_created_at_skip", String(e?.message || e));
+    }
   }
-  return { table: null, cols: [] };
+
+  // add device_id if somehow missing (rare)
+  if (!cols.includes("device_id")) {
+    try {
+      await db.prepare(`ALTER TABLE activations ADD COLUMN device_id TEXT;`).run();
+    } catch (e) {
+      console.log("activations_add_device_skip", String(e?.message || e));
+    }
+  }
+
+  // add code if somehow missing (rare)
+  if (!cols.includes("code")) {
+    try {
+      await db.prepare(`ALTER TABLE activations ADD COLUMN code TEXT;`).run();
+    } catch (e) {
+      console.log("activations_add_code_skip", String(e?.message || e));
+    }
+  }
 }
 
 async function getSessionEmail(db, req) {
@@ -100,29 +135,31 @@ async function getSessionEmail(db, req) {
   token = String(token || "").trim();
   if (!token) return { ok: false, error: "UNAUTHORIZED" };
 
-  // sessions schema: (token,email,created_at,expires_at...) حسب جدولك
-  try {
-    const row = await db
-      .prepare(`SELECT email FROM sessions WHERE token = ? LIMIT 1`)
-      .bind(token)
-      .first();
+  const row = await db
+    .prepare(`SELECT email FROM sessions WHERE token = ? LIMIT 1`)
+    .bind(token)
+    .first();
 
-    const email = normalizeEmail(row?.email);
-    if (!email) return { ok: false, error: "SESSION_NOT_FOUND" };
+  const email = normalizeEmail(row?.email);
+  if (!email) return { ok: false, error: "SESSION_NOT_FOUND" };
 
-    return { ok: true, email, token };
-  } catch (e) {
-    console.log("activate_session_lookup_failed", String(e?.message || e));
-    return { ok: false, error: "SESSION_LOOKUP_FAILED" };
+  return { ok: true, email, token };
+}
+
+async function findCodesTable(db) {
+  const candidates = ["codes", "activation_codes", "license_codes", "game_codes"];
+  for (const t of candidates) {
+    try {
+      const cols = await tableInfo(db, t);
+      if (cols.length) return { table: t, cols };
+    } catch {}
   }
+  return { table: null, cols: [] };
 }
 
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function nowMs() {
-  return Date.now();
+function firstExistingCol(cols, names) {
+  for (const n of names) if (cols.includes(n)) return n;
+  return null;
 }
 
 export async function onRequestOptions() {
@@ -138,49 +175,41 @@ export async function onRequestPost(context) {
     const deviceId = String(request.headers.get("X-Device-Id") || "").trim();
     if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE_ID" }, 400);
 
-    const body = await request.json().catch(() => ({}));
-    const codeRaw = body.code ?? body.activationCode ?? body.key ?? "";
-    const code = normalizeCode(codeRaw);
+    const body = await request.json().catch(() => null);
+    if (!body) return json({ ok: false, error: "BAD_JSON" }, 400);
 
+    const code = normalizeCode(body.code);
     if (!code) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
-    // --- Auth (session -> email) ---
+    // session -> email
     const ses = await getSessionEmail(env.DB, request);
     if (!ses.ok) return json({ ok: false, error: ses.error }, 401);
-
     const email = ses.email;
 
-    // --- Ensure activations table exists (عشان ما يطيح SERVER_ERROR) ---
-    await env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS activations (
-        code TEXT NOT NULL,
-        email TEXT NOT NULL,
-        device_id TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        PRIMARY KEY (code, device_id)
-      );
-    `).run();
+    // ✅ IMPORTANT: fix most common SERVER_ERROR cause
+    await ensureActivationsTable(env.DB);
 
-    // --- Find codes table (اسم الجدول يختلف عند بعض النسخ) ---
-    const { table: codesTable, cols: codesCols } = await findFirstTable(env.DB, [
-      "codes",
-      "activation_codes",
-      "license_codes",
-      "game_codes",
-    ]);
-
-    if (!codesTable) {
-      console.log("activate_codes_table_not_found");
-      return json({ ok: false, error: "CODES_TABLE_NOT_FOUND" }, 500);
-    }
+    // locate codes table
+    const { table: codesTable, cols: codesCols } = await findCodesTable(env.DB);
+    if (!codesTable) return json({ ok: false, error: "CODES_TABLE_NOT_FOUND" }, 500);
 
     const codeCol = firstExistingCol(codesCols, ["code", "activation_code", "license", "key"]);
-    if (!codeCol) {
-      console.log("activate_codes_table_missing_code_col", codesTable);
-      return json({ ok: false, error: "CODES_SCHEMA_MISSING_CODE_COL" }, 500);
-    }
+    if (!codeCol) return json({ ok: false, error: "CODES_SCHEMA_MISSING_CODE_COL" }, 500);
 
-    // --- Load code row ---
+    const ownerCol = firstExistingCol(codesCols, [
+      "used_by_email",
+      "bound_email",
+      "owner_email",
+      "used_email",
+      "email",
+    ]);
+
+    const isUsedCol = firstExistingCol(codesCols, ["is_used", "used", "activated", "is_activated"]);
+    const usedAtCol = firstExistingCol(codesCols, ["used_at", "activated_at"]);
+    const statusCol = firstExistingCol(codesCols, ["status"]);
+    const limitCol = firstExistingCol(codesCols, ["device_limit", "max_devices", "devices_limit"]);
+
+    // load code row
     const codeRow = await env.DB
       .prepare(`SELECT * FROM ${codesTable} WHERE ${codeCol} = ? LIMIT 1`)
       .bind(code)
@@ -188,81 +217,55 @@ export async function onRequestPost(context) {
 
     if (!codeRow) return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
 
-    // --- Determine “bound/owner email” column (الأكثر شيوعًا) ---
-    const ownerCol = firstExistingCol(codesCols, [
-      "used_by_email",
-      "bound_email",
-      "owner_email",
-      "used_email",
-      "email", // بعض الجداول تستخدم email لمالك الكود
-    ]);
-
-    const isUsedCol = firstExistingCol(codesCols, ["is_used", "used", "activated", "is_activated"]);
-    const usedAtCol = firstExistingCol(codesCols, ["used_at", "activated_at"]);
-    const statusCol = firstExistingCol(codesCols, ["status"]);
-
     const boundEmail = ownerCol ? normalizeEmail(codeRow[ownerCol]) : "";
 
-    // إذا الكود مربوط بحساب ثاني → مرفوض
+    // already used by another account
     if (boundEmail && boundEmail !== email) {
       return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
 
-    // بعض الجداول تميّز الاستخدام بدون إيميل
+    // if code marks used (even if email col missing)
     if (!boundEmail && isUsedCol && Number(codeRow[isUsedCol] || 0) === 1) {
       return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
-
     if (!boundEmail && statusCol && String(codeRow[statusCol] || "").toLowerCase() === "used") {
       return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
 
-    // --- Device limit (افتراضي جهازين) ---
-    const limitCol = firstExistingCol(codesCols, ["device_limit", "max_devices", "devices_limit"]);
+    // device limit
     let limit = 2;
     if (limitCol) {
       const v = Number(codeRow[limitCol]);
       if (Number.isFinite(v) && v >= 1) limit = v;
     }
 
-    // هل هذا الجهاز مفعّل مسبقًا لنفس الكود؟
-    const existingActivation = await env.DB
+    // already activated on same device?
+    const existing = await env.DB
       .prepare(`SELECT device_id FROM activations WHERE code = ? AND device_id = ? LIMIT 1`)
       .bind(code, deviceId)
       .first();
 
-    if (!existingActivation) {
+    if (!existing) {
+      // count activations for this code+email (email may exist now by migration)
       const cntRow = await env.DB
         .prepare(`SELECT COUNT(*) AS n FROM activations WHERE code = ? AND email = ?`)
         .bind(code, email)
         .first();
 
       const n = Number(cntRow?.n || 0);
-      if (n >= limit) {
-        return json({ ok: false, error: "DEVICE_LIMIT_REACHED" }, 409);
-      }
+      if (n >= limit) return json({ ok: false, error: "DEVICE_LIMIT_REACHED" }, 409);
 
-      // Insert activation
-      try {
-        await env.DB
-          .prepare(
-            `INSERT INTO activations (code, email, device_id, created_at)
-             VALUES (?, ?, ?, ?)`
-          )
-          .bind(code, email, deviceId, nowIso())
-          .run();
-      } catch (e) {
-        const msg = String(e?.message || e);
-        // لو صار Duplicate بسبب سباق، اعتبره OK
-        if (!msg.toLowerCase().includes("unique") && !msg.toLowerCase().includes("constraint")) {
-          console.log("activate_insert_failed", code, email, deviceId, msg);
-          return json({ ok: false, error: "ACTIVATION_WRITE_FAILED" }, 500);
-        }
-      }
+      // insert activation (after migration columns exist)
+      await env.DB
+        .prepare(
+          `INSERT INTO activations (code, email, device_id, created_at)
+           VALUES (?, ?, ?, ?)`
+        )
+        .bind(code, email, deviceId, nowIso())
+        .run();
     }
 
-    // --- Bind code to this email (أول مرة فقط) + mark used fields إن وجدت ---
-    // نحدّث فقط إذا كان غير مربوط
+    // bind code to email (first time only)
     if (ownerCol && !boundEmail) {
       const sets = [];
       const binds = [];
@@ -270,9 +273,7 @@ export async function onRequestPost(context) {
       sets.push(`${ownerCol} = ?`);
       binds.push(email);
 
-      if (isUsedCol) {
-        sets.push(`${isUsedCol} = 1`);
-      }
+      if (isUsedCol) sets.push(`${isUsedCol} = 1`);
       if (usedAtCol) {
         sets.push(`${usedAtCol} = ?`);
         binds.push(nowMs());
@@ -282,34 +283,29 @@ export async function onRequestPost(context) {
         binds.push("used");
       }
 
-      try {
-        await env.DB
-          .prepare(`UPDATE ${codesTable} SET ${sets.join(", ")} WHERE ${codeCol} = ?`)
-          .bind(...binds, code)
-          .run();
-      } catch (e) {
-        console.log("activate_bind_code_failed", String(e?.message || e));
-        // ما نوقف التفعيل إذا ربط الكود فشل (لكن نرجع تحذير واضح)
-        return json({ ok: false, error: "CODE_BIND_FAILED" }, 500);
-      }
+      await env.DB
+        .prepare(`UPDATE ${codesTable} SET ${sets.join(", ")} WHERE ${codeCol} = ?`)
+        .bind(...binds, code)
+        .run();
     }
 
     return json(
       {
         ok: true,
+        activated: true,
         email,
         code,
-        activated: true,
         deviceId,
       },
       200
     );
-  } catch (err) {
-    console.log("activate_error", String(err?.message || err));
+  } catch (e) {
+    // بدل SERVER_ERROR المبهم: نطبع السبب في اللوق (والواجهة تبقى SERVER_ERROR)
+    console.log("activate_error_v2", String(e?.message || e));
     return json({ ok: false, error: "SERVER_ERROR" }, 500);
   }
 }
 
 /*
-activate.js – api2 – إصدار 1 (Robust activate + device limit + schema-safe)
+activate.js – api2 – v2 (Auto-migrate activations columns to kill SERVER_ERROR)
 */
