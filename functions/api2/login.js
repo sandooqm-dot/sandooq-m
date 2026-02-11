@@ -1,21 +1,25 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // --- CORS / JSON helpers ---
-  const json = (data, status = 200) =>
+  const origin = request.headers.get("origin");
+
+  const json = (data, status = 200, extraHeaders = {}) =>
     new Response(JSON.stringify(data), {
       status,
       headers: {
         "content-type": "application/json; charset=utf-8",
         "cache-control": "no-store",
-        "access-control-allow-origin": request.headers.get("origin") || "*",
+        ...(origin ? { "access-control-allow-origin": origin } : {}),
+        "access-control-allow-credentials": "true",
         "access-control-allow-headers": "content-type, authorization, x-device-id",
         "access-control-allow-methods": "POST, OPTIONS",
+        ...extraHeaders,
       },
     });
 
   if (request.method === "OPTIONS") return json({ ok: true }, 200);
-  if (request.method !== "POST") return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+  if (request.method !== "POST")
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
 
   try {
     if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
@@ -23,110 +27,101 @@ export async function onRequest(context) {
     const body = await request.json().catch(() => ({}));
     const emailRaw = (body.email || "").toString().trim();
     const password = (body.password || "").toString();
-    const email = emailRaw.toLowerCase();
 
-    if (!email || !password) {
-      return json({ ok: false, error: "MISSING_FIELDS" }, 400);
-    }
+    const email = emailRaw.toLowerCase();
+    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
     // 1) Get user
-    const userRow = await env.DB
-      .prepare(`SELECT * FROM users WHERE email = ? LIMIT 1`)
-      .bind(email)
-      .first();
+    const userRow = await env.DB.prepare(
+      `SELECT * FROM users WHERE email = ? LIMIT 1`
+    ).bind(email).first();
 
-    if (!userRow) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    // نفس رسالة الخطأ (ما نكشف هل الإيميل موجود أو لا)
+    if (!userRow) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    const storedHash = (userRow.password_hash || "").toString().trim();
-    const saltB64 = (userRow.salt_b64 || "").toString().trim(); // مهم جدًا
+    // لو الحساب مو email provider (مثلاً Google) ما ينفع بكلمة مرور
+    const provider = String(userRow.provider || "email");
+    if (provider !== "email") return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    if (!storedHash) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    // تأكد من التحقق
+    const verified =
+      Number(userRow.is_email_verified ?? userRow.email_verified ?? 0) === 1;
+    if (!verified) return json({ ok: false, error: "EMAIL_NOT_VERIFIED" }, 401);
 
-    // 2) Verify password (يدعم: pbkdf2$... / pbkdf2(hash+salt columns) / legacy sha256)
-    const ok = await verifyPassword(storedHash, password, saltB64);
+    const storedHash = String(userRow.password_hash || "");
+    if (!storedHash) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    if (!ok) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    // 2) Verify password (يدعم:
+    // - pbkdf2$ITER$SALT_B64$HASH_B64
+    // - PBKDF2 salt في عمود salt_b64 + hash في password_hash
+    // - legacy sha256 base64)
+    const ok = await verifyPassword(userRow, password);
+    if (!ok) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    // 3) Create session token (لازم يرجع Token فعلي)
+    // 3) Create session token + set cookie
     const token = await createSessionIfPossible(env.DB, userRow);
+
     if (!token) {
-      console.log("login_session_create_failed", String(userRow.email || ""));
+      // لو ما قدرنا نسوي جلسة لا نكمل (لأن /me يعتمد على الكوكي)
       return json({ ok: false, error: "SESSION_CREATE_FAILED" }, 500);
     }
 
-    // 4) رجّع التوكن بأكثر من اسم (عشان أي واجهة قديمة/جديدة تشتغل)
-    return json(
-      {
-        ok: true,
-        token,
-        authToken: token,
-        sessionToken: token,
-        access_token: token,
-        email: String(userRow.email || "").toLowerCase(),
-      },
-      200
-    );
+    const maxAge = 30 * 24 * 60 * 60; // 30 يوم
+    const cookie =
+      `sandooq_session_v1=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+
+    return json({ ok: true }, 200, { "set-cookie": cookie });
   } catch (e) {
     console.log("login_error", String(e?.message || e));
     return json({ ok: false, error: "SERVER_ERROR" }, 500);
   }
 }
 
-/* ---------------- Password verify ----------------
-   ندعم:
-   1) pbkdf2$ITER$SALT_B64$HASH_B64
-   2) DB columns: password_hash(base64) + salt_b64(base64) مع PBKDF2 ثابت (100000)
-   3) legacy: password_hash = base64(sha256(password))
----------------------------------------------------*/
+/* ---------------- Password verify ---------------- */
 
-async function verifyPassword(stored, password, saltB64) {
-  // (1) PBKDF2 format: pbkdf2$100000$<saltB64>$<hashB64>
+async function verifyPassword(userRow, password) {
+  const stored = String(userRow.password_hash || "");
+
+  // A) pbkdf2$ITER$SALT$HASH
   if (stored.startsWith("pbkdf2$")) {
     const parts = stored.split("$");
     if (parts.length !== 4) return false;
 
     const iter = parseInt(parts[1], 10);
-    const saltB64x = parts[2];
+    const saltB64 = parts[2];
     const hashB64 = parts[3];
 
     if (!Number.isFinite(iter) || iter < 10000) return false;
 
-    const salt = b64ToBytes(saltB64x);
+    const salt = b64ToBytes(saltB64);
     if (!salt || salt.length < 8) return false;
 
     const derivedB64 = await pbkdf2B64(password, salt, iter, 32);
-    return timingSafeEqualStr(derivedB64, hashB64);
+    return timingSafeEqualStr(normB64(derivedB64), normB64(hashB64));
   }
 
-  // (2) PBKDF2 using DB columns (password_hash + salt_b64)
-  // شائع جدًا: hash طول 44 (32 bytes base64) + salt طول 24 (16 bytes base64)
-  if (saltB64 && looksBase64(saltB64) && stored.length === 44) {
+  // B) PBKDF2: salt في عمود منفصل salt_b64 + hash في password_hash
+  const saltB64 = String(userRow.salt_b64 || "");
+  if (saltB64) {
     const salt = b64ToBytes(saltB64);
-    if (salt && salt.length >= 8) {
-      // نفس الرقم الشائع
-      const derivedB64 = await pbkdf2B64(password, salt, 100000, 32);
-      if (timingSafeEqualStr(derivedB64, stored)) return true;
+    if (!salt || salt.length < 8) return false;
 
-      // احتياط (بعض الناس يستخدمون 120k)
-      const derivedB64_120 = await pbkdf2B64(password, salt, 120000, 32);
-      if (timingSafeEqualStr(derivedB64_120, stored)) return true;
-    }
+    const iterRaw =
+      userRow.pbkdf2_iter ?? userRow.iter ?? userRow.iterations ?? userRow.kdf_iter;
+    let iter = parseInt(String(iterRaw || "100000"), 10);
+    if (!Number.isFinite(iter) || iter < 10000) iter = 100000;
+
+    const derivedB64 = await pbkdf2B64(password, salt, iter, 32);
+    return timingSafeEqualStr(normB64(derivedB64), normB64(stored));
   }
 
-  // (3) Legacy: base64(sha256(password))
+  // C) Legacy: base64(sha256(password))
   const legacy = await sha256B64(password);
-  return timingSafeEqualStr(legacy, stored);
+  return timingSafeEqualStr(normB64(legacy), normB64(stored));
 }
 
-function looksBase64(s) {
-  // فحص بسيط جدًا
-  return /^[A-Za-z0-9+/=]+$/.test(s);
+function normB64(s) {
+  return String(s || "").replace(/=+$/g, "");
 }
 
 async function sha256B64(str) {
@@ -146,12 +141,7 @@ async function pbkdf2B64(password, saltBytes, iterations, keyLenBytes) {
   );
 
   const bits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: saltBytes,
-      iterations,
-    },
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
     keyMaterial,
     keyLenBytes * 8
   );
@@ -184,31 +174,26 @@ async function createSessionIfPossible(DB, userRow) {
     const tokenBytes = crypto.getRandomValues(new Uint8Array(32));
     const token = b64url(tokenBytes);
 
-    const now = new Date();
-    const createdAt = now.toISOString();
-    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const createdAt = new Date().toISOString();
 
-    const fields = [];
-    const placeholders = [];
-    const binds = [];
-
-    fields.push("token"); placeholders.push("?"); binds.push(token);
+    const fields = ["token"];
+    const placeholders = ["?"];
+    const binds = [token];
 
     if (cols.has("email")) {
-      fields.push("email"); placeholders.push("?"); binds.push(String(userRow.email || "").toLowerCase());
+      fields.push("email");
+      placeholders.push("?");
+      binds.push(String(userRow.email || "").toLowerCase());
     } else if (cols.has("user_email")) {
-      fields.push("user_email"); placeholders.push("?"); binds.push(String(userRow.email || "").toLowerCase());
-    }
-
-    if (cols.has("user_id") && userRow.id != null) {
-      fields.push("user_id"); placeholders.push("?"); binds.push(userRow.id);
+      fields.push("user_email");
+      placeholders.push("?");
+      binds.push(String(userRow.email || "").toLowerCase());
     }
 
     if (cols.has("created_at")) {
-      fields.push("created_at"); placeholders.push("?"); binds.push(createdAt);
-    }
-    if (cols.has("expires_at")) {
-      fields.push("expires_at"); placeholders.push("?"); binds.push(expiresAt);
+      fields.push("created_at");
+      placeholders.push("?");
+      binds.push(createdAt);
     }
 
     await DB.prepare(
@@ -217,7 +202,7 @@ async function createSessionIfPossible(DB, userRow) {
 
     return token;
   } catch (e) {
-    console.log("session_create_skip", String(e?.message || e));
+    console.log("session_create_failed", String(e?.message || e));
     return null;
   }
 }
@@ -252,7 +237,3 @@ function timingSafeEqualStr(a, b) {
   }
   return diff === 0;
 }
-
-/*
-login.js – api2 – إصدار 4 (Support PBKDF2 with salt_b64 + token aliases)
-*/
