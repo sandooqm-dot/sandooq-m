@@ -48,24 +48,54 @@ export async function onRequest(context) {
     `&prompt=select_account`;
 
   const headers = new Headers();
+
+  // ✅ مهم: نخليها SameSite=None عشان OAuth (أضمن مع سفاري)
   headers.set(
     "Set-Cookie",
-    `__Host-sandooq_state_v1=${cookieValue}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`
+    `__Host-sandooq_state_v1=${cookieValue}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=None`
   );
 
   const url = new URL(request.url);
   const wantsJson = url.searchParams.get("json") === "1";
 
+  // لو تبغى JSON (للاختبار أو fetch)
   if (wantsJson) {
     headers.set("Content-Type", "application/json; charset=utf-8");
-    return new Response(
-      JSON.stringify({ ok: true, url: authUrl, redirectUri }),
-      { status: 200, headers }
-    );
+    return new Response(JSON.stringify({ ok: true, url: authUrl, redirectUri }), {
+      status: 200,
+      headers,
+    });
   }
 
-  headers.set("Location", authUrl);
-  return new Response(null, { status: 302, headers });
+  // ✅ بدل 302: نرجّع صفحة 200 تثبت الكوكي ثم تحول
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  return new Response(
+    `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>توجيه إلى Google…</title>
+</head>
+<body style="font-family:system-ui,-apple-system;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#fff;">
+<div style="text-align:center;line-height:1.8;">
+<div style="font-size:18px;">لحظة… نودّيك لتسجيل الدخول عبر Google</div>
+<div style="font-size:14px;color:#666;">إذا ما تم التحويل تلقائيًا اضغط الزر</div>
+<button id="go" style="margin-top:14px;padding:12px 16px;border:0;border-radius:10px;background:#1a73e8;color:#fff;font-size:16px;cursor:pointer;">
+متابعة
+</button>
+</div>
+<script>
+  const url = ${JSON.stringify(authUrl)};
+  // تحويل مباشر
+  location.replace(url);
+  // زر احتياطي
+  document.getElementById('go').onclick = () => location.href = url;
+</script>
+</body>
+</html>`,
+    { status: 200, headers }
+  );
 }
 
 // ---------- helpers ----------
