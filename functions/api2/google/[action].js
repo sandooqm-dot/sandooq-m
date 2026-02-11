@@ -100,14 +100,21 @@ async function ensureSessionsInsert(env, token, email) {
 /* -------------------- /api2/google/debug -------------------- */
 async function handleDebug({ request, env }) {
   const redirectUri = getRedirectUri(request.url, env);
-  const cid = (env.GOOGLE_CLIENT_ID || "").trim();
-  const csec = (env.GOOGLE_CLIENT_SECRET || "").trim();
+
+  const rawCid = (env.GOOGLE_CLIENT_ID ?? "");
+  const cid = String(rawCid).trim();
+
+  const rawSecret = (env.GOOGLE_CLIENT_SECRET ?? "");
+  const csec = String(rawSecret).trim();
 
   const box = [
     `origin: ${new URL(request.url).origin}`,
     `redirect_uri_used: ${redirectUri}`,
     `client_id_tail: ${cid ? cid.slice(-18) : "(EMPTY)"}`,
     `client_id_format_ok: ${cid.endsWith(".apps.googleusercontent.com") ? "YES" : "NO"}`,
+    `client_id_has_whitespace: ${String(rawCid) !== cid ? "YES" : "NO"}`,
+    `client_id_len_raw: ${String(rawCid).length}`,
+    `client_id_len_trim: ${cid.length}`,
     `client_secret_present: ${csec ? "YES" : "NO"}`,
     `client_secret_len: ${csec ? String(csec.length) : "0"}`,
   ].join("\n");
@@ -120,7 +127,8 @@ async function handleDebug({ request, env }) {
 
 /* -------------------- /api2/google/start -------------------- */
 async function handleStart({ request, env }) {
-  if (!env.GOOGLE_CLIENT_ID) {
+  const clientId = String(env.GOOGLE_CLIENT_ID || "").trim(); // ✅ FIX: trim قبل الإرسال لـ Google
+  if (!clientId) {
     return new Response(htmlPage("رسالة", `<p>نقص إعدادات Google (GOOGLE_CLIENT_ID).</p>`), {
       status: 500, headers: { "content-type": "text/html; charset=utf-8" },
     });
@@ -133,7 +141,7 @@ async function handleStart({ request, env }) {
   const challenge = await sha256B64Url(verifier);
 
   const auth = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-  auth.searchParams.set("client_id", env.GOOGLE_CLIENT_ID);
+  auth.searchParams.set("client_id", clientId);
   auth.searchParams.set("redirect_uri", redirectUri);
   auth.searchParams.set("response_type", "code");
   auth.searchParams.set("scope", "openid email profile");
@@ -183,8 +191,8 @@ async function handleCallback({ request, env }) {
   const redirectUri = getRedirectUri(request.url, env);
 
   const tokenBody = new URLSearchParams();
-  tokenBody.set("client_id", (env.GOOGLE_CLIENT_ID || "").trim());
-  tokenBody.set("client_secret", (env.GOOGLE_CLIENT_SECRET || "").trim());
+  tokenBody.set("client_id", String(env.GOOGLE_CLIENT_ID || "").trim());
+  tokenBody.set("client_secret", String(env.GOOGLE_CLIENT_SECRET || "").trim());
   tokenBody.set("code", code);
   tokenBody.set("redirect_uri", redirectUri);
   tokenBody.set("grant_type", "authorization_code");
@@ -209,7 +217,7 @@ async function handleCallback({ request, env }) {
       `error: ${tokenJson.error || "UNKNOWN"}`,
       `desc: ${tokenJson.error_description || tokenText || ""}`,
       `redirect_uri_used: ${redirectUri}`,
-      `client_id_tail: ${((env.GOOGLE_CLIENT_ID || "").trim()).slice(-18)}`
+      `client_id_tail: ${(String(env.GOOGLE_CLIENT_ID || "").trim()).slice(-18)}`
     ].join("\n");
 
     return new Response(
