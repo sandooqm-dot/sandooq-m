@@ -1,110 +1,114 @@
 // functions/api2/google/start.js
-// Google OAuth Start (PKCE) - writes cookie reliably for Safari/iOS
-export async function onRequestGet({ request, env }) {
-  try {
-    const url = new URL(request.url);
 
-    const clientId = env.GOOGLE_CLIENT_ID;
-    const redirectUri = env.GOOGLE_REDIRECT_URI; // مثال: https://horof.sandooq-games.com/api2/google/callback
+export async function onRequest(context) {
+  const { request, env } = context;
 
-    if (!clientId || !redirectUri) {
-      return json({ ok: false, error: "MISSING_GOOGLE_ENV" }, 500);
-    }
-
-    const state = base64url(randomBytes(24));
-    const verifier = base64url(randomBytes(32));
-    const challenge = await pkceChallenge(verifier);
-
-    // نخزن state + verifier في كوكي (10 دقائق)
-    const payload = base64url(
-      new TextEncoder().encode(
-        JSON.stringify({ state, verifier, ts: Date.now() })
-      )
-    );
-
-    const cookieName = "g_oauth_v1";
-
-    // مهم جداً: SameSite=Lax عشان ينرسل في الرجعة من Google على Safari
-    // Path=/ عشان يكون متاح للـ callback
-    // Max-Age=600 (10 دقائق)
-    const setCookie =
-      `${cookieName}=${payload}; ` +
-      `Max-Age=600; Path=/; HttpOnly; Secure; SameSite=Lax`;
-
-    // بناء رابط جوجل
-    const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-    authUrl.searchParams.set("client_id", clientId);
-    authUrl.searchParams.set("redirect_uri", redirectUri);
-    authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("scope", "openid email profile");
-    authUrl.searchParams.set("state", state);
-    authUrl.searchParams.set("code_challenge", challenge);
-    authUrl.searchParams.set("code_challenge_method", "S256");
-    authUrl.searchParams.set("prompt", "select_account");
-
-    // إذا طلبت JSON
-    const wantJson =
-      url.searchParams.get("json") === "1" ||
-      (request.headers.get("accept") || "").includes("application/json");
-
-    if (wantJson) {
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          url: authUrl.toString(),
-          redirectUri,
-        }),
-        {
-          status: 200,
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": "no-store",
-            "set-cookie": setCookie,
-          },
-        }
-      );
-    }
-
-    // الأفضل: Redirect مباشر (يضمن حفظ الكوكي)
-    return new Response(null, {
-      status: 302,
-      headers: {
-        location: authUrl.toString(),
-        "cache-control": "no-store",
-        "set-cookie": setCookie,
-      },
-    });
-  } catch (e) {
-    return json({ ok: false, error: "START_ERROR", details: String(e) }, 500);
+  if (request.method !== "GET") {
+    return new Response("Method Not Allowed", { status: 405 });
   }
+
+  const clientId = String(env.GOOGLE_CLIENT_ID || "").trim();
+
+  // ✅ sanitize redirect uri (remove spaces/newlines anywhere)
+  const redirectUriRaw =
+    env.GOOGLE_REDIRECT_URI || "https://horof.sandooq-games.com/api2/google/callback";
+  const redirectUri = String(redirectUriRaw).replace(/\s+/g, "");
+
+  if (!clientId) {
+    return json({ ok: false, error: "MISSING_GOOGLE_CLIENT_ID" }, 500);
+  }
+
+  // PKCE
+  const state = randomB64Url(32);
+  const codeVerifier = randomB64Url(64);
+  const codeChallenge = await sha256B64Url(codeVerifier);
+
+  // Signed cookie using JWT_SECRET (HMAC-SHA256)
+  const jwtSecret = String(env.JWT_SECRET || "").trim();
+  if (!jwtSecret) {
+    return json({ ok: false, error: "MISSING_JWT_SECRET" }, 500);
+  }
+
+  const cookieValue = await signCookie(jwtSecret, {
+    state,
+    codeVerifier,
+    iat: Date.now(),
+  });
+
+  const scope = encodeURIComponent("openid email profile");
+  const authUrl =
+    "https://accounts.google.com/o/oauth2/v2/auth" +
+    `?client_id=${encodeURIComponent(clientId)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=${scope}` +
+    `&state=${encodeURIComponent(state)}` +
+    `&code_challenge=${encodeURIComponent(codeChallenge)}` +
+    `&code_challenge_method=S256` +
+    `&prompt=select_account`;
+
+  const headers = new Headers();
+  headers.set(
+    "Set-Cookie",
+    `__Host-sandooq_state_v1=${cookieValue}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`
+  );
+
+  const url = new URL(request.url);
+  const wantsJson = url.searchParams.get("json") === "1";
+
+  if (wantsJson) {
+    headers.set("Content-Type", "application/json; charset=utf-8");
+    return new Response(
+      JSON.stringify({ ok: true, url: authUrl, redirectUri }),
+      { status: 200, headers }
+    );
+  }
+
+  headers.set("Location", authUrl);
+  return new Response(null, { status: 302, headers });
 }
+
+// ---------- helpers ----------
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-    },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
   });
 }
 
-function randomBytes(len) {
-  const a = new Uint8Array(len);
-  crypto.getRandomValues(a);
-  return a;
+function randomB64Url(byteLen) {
+  const bytes = new Uint8Array(byteLen);
+  crypto.getRandomValues(bytes);
+  return b64urlEncode(bytes);
 }
 
-function base64url(buf) {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let str = "";
-  for (const b of bytes) str += String.fromCharCode(b);
-  const b64 = btoa(str);
+async function sha256B64Url(input) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return b64urlEncode(new Uint8Array(hash));
+}
+
+function b64urlEncode(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const b64 = btoa(binary);
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-async function pkceChallenge(verifier) {
-  const data = new TextEncoder().encode(verifier);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return base64url(new Uint8Array(digest));
+async function signCookie(secret, payload) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const payloadJson = JSON.stringify(payload);
+  const payloadB64 = b64urlEncode(new TextEncoder().encode(payloadJson));
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadB64));
+  const sigB64 = b64urlEncode(new Uint8Array(sig));
+
+  return `${payloadB64}.${sigB64}`;
 }
