@@ -39,7 +39,6 @@
       padding:28px 14px;
     }
 
-    /* خلفية سداسية خفيفة */
     body:before{
       content:"";
       position:fixed; inset:0;
@@ -384,6 +383,19 @@
     const API_BASE = "/api2";
 
     // =========================
+    //   Auth token (FIX)
+    // =========================
+    const TOKEN_KEY = "sandooq_token_v1";
+    function getToken(){ return localStorage.getItem(TOKEN_KEY) || ""; }
+    function setToken(t){
+      if(!t) return;
+      localStorage.setItem(TOKEN_KEY, String(t));
+    }
+    function clearToken(){
+      localStorage.removeItem(TOKEN_KEY);
+    }
+
+    // =========================
     //   Client helpers
     // =========================
     const $ = (id)=>document.getElementById(id);
@@ -432,6 +444,10 @@
         "X-Device-Id": getDeviceId()
       };
 
+      // ✅ FIX: أرسل التوكن لو موجود
+      const t = getToken();
+      if (t) headers["Authorization"] = "Bearer " + t;
+
       const res = await fetch(apiUrl(path), {
         method:"POST",
         headers,
@@ -446,8 +462,8 @@
 
     async function logout(){
       try { await api("/logout", {}); } catch {}
-      // نمسح فقط pending_email محليًا
       sessionStorage.removeItem("pending_email");
+      clearToken(); // ✅ FIX
       boot();
     }
 
@@ -487,6 +503,16 @@
       if(!r?.ok){
         return msg($("authMsg"), translateErr(r), "err");
       }
+
+      // ✅ FIX: احفظ التوكن
+      if (r.token) {
+        setToken(r.token);
+      } else {
+        // لو السيرفر ما رجّع توكن لأي سبب
+        msg($("authMsg"), "تم تسجيل الدخول لكن السيرفر ما رجّع توكن. راح نحتاج نعدّل /api2/login.", "err");
+        return;
+      }
+
       await boot();
     };
 
@@ -508,7 +534,6 @@
       $("vEmail").textContent = email;
       show("view-verify");
 
-      // لو DEBUG شغال، ممكن يرجع الرمز (للاختبار فقط)
       if (r.debugOtp) {
         msg($("verifyMsg"), "تم إرسال رمز التحقق ✅\n(للاختبار: " + r.debugOtp + ")", "ok");
       } else {
@@ -529,7 +554,12 @@
       }
 
       sessionStorage.removeItem("pending_email");
-      await boot();
+
+      // بعد التحقق: نرجع لواجهة الدخول (لأننا ما نعرف كلمة المرور هنا تلقائيًا)
+      show("view-auth");
+      $("email").value = email;
+      $("password").value = "";
+      msg($("authMsg"), "تم تأكيد البريد ✅ الآن سجّل دخول بنفس الإيميل وكلمة المرور.", "ok");
     };
 
     $("btnResendOtp").onclick = async ()=>{
@@ -565,7 +595,6 @@
     //   Boot: decides which screen to show
     // =========================
     async function boot(){
-      // لو المستخدم في شاشة التحقق ولسه ما خلص OTP
       const pending = sessionStorage.getItem("pending_email") || "";
       if (pending) {
         $("vEmail").textContent = pending;
@@ -583,7 +612,6 @@
       $("who").textContent = email;
       $("readyEmail").textContent = email;
 
-      // لو الإيميل مو متحقق (نادر لأن login يمنع قبل التحقق)
       if(me.verified === false){
         sessionStorage.setItem("pending_email", email);
         $("vEmail").textContent = email;
@@ -601,7 +629,7 @@
     }
 
     // =========================
-    //   Error translation (واجهة عربية واضحة)
+    //   Error translation
     // =========================
     function translateErr(r){
       const e = (r && (r.error || r.code)) ? String(r.error || r.code) : "UNKNOWN_ERROR";
@@ -615,6 +643,7 @@
       if(e === "EMAIL_EXISTS") return "هذا الإيميل مسجل مسبقًا.";
       if(e === "USER_NOT_FOUND") return "الإيميل أو كلمة المرور غير صحيحة.";
       if(e === "BAD_PASSWORD") return "الإيميل أو كلمة المرور غير صحيحة.";
+      if(e === "INVALID_CREDENTIALS") return "الإيميل أو كلمة المرور غير صحيحة.";
       if(e === "EMAIL_NOT_VERIFIED") return "لازم تؤكد بريدك الإلكتروني أولاً.";
 
       if(e === "OTP_WRONG" || e === "OTP_INVALID" || e === "INVALID_OTP") return "رمز التحقق غير صحيح.";
@@ -632,10 +661,9 @@
       return "حدث خطأ: " + e;
     }
 
-    // Start
     boot();
   </script>
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v5 (Cookie-based session, api2) -->
+<!-- activate.html – نظام التفعيل الجديد v6 (Save token + Authorization header) -->
