@@ -48,8 +48,13 @@ function nowMs() {
 }
 
 function safeUUID() {
-  // crypto.randomUUID موجودة على Cloudflare Workers
   return (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
+function isIntegerPk(col) {
+  if (!col) return false;
+  const t = String(col.type || "").toUpperCase();
+  return col.pk === 1 && t.includes("INT"); // INTEGER PRIMARY KEY
 }
 
 export async function onRequestOptions() {
@@ -75,13 +80,20 @@ export async function onRequestPost(context) {
     let pending = null;
 
     if (pendingCols.length) {
-      // لو جدول pending_users موجود
       const selCols = ["email"];
-      if (hasCol(pendingCols, "password_hash")) selCols.push("password_hash");
-      if (hasCol(pendingCols, "otp")) selCols.push("otp");
 
-      // (مستقبلاً لو أضفت password_salt)
+      // أهم شي: hash + salt لازم يوصلون هنا
+      if (hasCol(pendingCols, "password_hash")) selCols.push("password_hash");
+      if (hasCol(pendingCols, "salt_b64")) selCols.push("salt_b64");
+      if (hasCol(pendingCols, "salt")) selCols.push("salt");
+
+      // بعض النسخ القديمة تسميه password_salt
       if (hasCol(pendingCols, "password_salt")) selCols.push("password_salt");
+
+      // OTP قد يكون باسم مختلف
+      if (hasCol(pendingCols, "otp")) selCols.push("otp");
+      if (hasCol(pendingCols, "code")) selCols.push("code");
+      if (hasCol(pendingCols, "otp_code")) selCols.push("otp_code");
 
       pending = await env.DB
         .prepare(`SELECT ${selCols.join(", ")} FROM pending_users WHERE email = ? LIMIT 1`)
@@ -90,9 +102,8 @@ export async function onRequestPost(context) {
     }
 
     // لو ما لقى في pending_users، جرّب email_otps
-    // (بعض النسخ كانت تكتب OTP هناك)
     let otpRecord = null;
-    if (!pending && emailOtpsCols.length) {
+    if ((!pending || (!pending.otp && !pending.code && !pending.otp_code)) && emailOtpsCols.length) {
       const selCols = ["email"];
       if (hasCol(emailOtpsCols, "otp")) selCols.push("otp");
       if (hasCol(emailOtpsCols, "code")) selCols.push("code");
@@ -105,7 +116,11 @@ export async function onRequestPost(context) {
     }
 
     // --- 2) تحقق من تطابق OTP ---
-    const pendingOtp = pending?.otp != null ? String(pending.otp).trim() : "";
+    const pendingOtp =
+      pending?.otp != null ? String(pending.otp).trim() :
+      pending?.otp_code != null ? String(pending.otp_code).trim() :
+      pending?.code != null ? String(pending.code).trim() : "";
+
     const otpFromEmailOtps =
       otpRecord?.otp != null ? String(otpRecord.otp).trim() :
       otpRecord?.otp_code != null ? String(otpRecord.otp_code).trim() :
@@ -113,17 +128,11 @@ export async function onRequestPost(context) {
 
     const effectiveOtp = pendingOtp || otpFromEmailOtps;
 
-    if (!effectiveOtp) {
-      return json({ ok: false, error: "OTP_NOT_FOUND" }, 404);
-    }
-    if (effectiveOtp !== otp) {
-      return json({ ok: false, error: "OTP_NOT_FOUND" }, 404);
-    }
+    if (!effectiveOtp) return json({ ok: false, error: "OTP_NOT_FOUND" }, 404);
+    if (effectiveOtp !== otp) return json({ ok: false, error: "OTP_NOT_FOUND" }, 404);
 
-    // لازم يكون عندنا password_hash من pending_users عشان نقدر نسوي Login بعدين
+    // لازم يكون عندنا password_hash من pending_users عشان نسوي Login بعدين
     if (!pending || !pending.password_hash) {
-      // OTP صحيح (من email_otps) لكن ما عندنا password_hash لأن التسجيل المؤقت مو موجود/انحذف
-      // هنا نوقف ونرجّع خطأ واضح بدل ما نكمل ونسبب INVALID_CREDENTIALS
       return json({ ok: false, error: "PENDING_USER_NOT_FOUND" }, 409);
     }
 
@@ -139,30 +148,62 @@ export async function onRequestPost(context) {
       .first();
 
     const colSet = new Set(usersCols.map(c => c.name));
+    const idCol = usersCols.find(c => c.name === "id");
+    const idIsAutoInt = isIntegerPk(idCol);
 
-    // تجهيز قيم افتراضية لأكثر الأعمدة شيوعًا
+    // salt_b64: لازم نجيبها من pending_users (لأن جدول users يطلبها NOT NULL)
+    const pendingSaltB64 =
+      (pending?.salt_b64 != null ? String(pending.salt_b64) : "") ||
+      (pending?.password_salt != null ? String(pending.password_salt) : "") ||
+      (pending?.salt != null ? String(pending.salt) : "");
+
+    // إذا جدول users يتطلب salt_b64 وما عندنا قيمة له → نوقف بخطأ واضح
+    const usersNeedsSaltB64 = usersCols.some(c => c.name === "salt_b64" && c.notnull === 1 && (c.dflt_value == null));
+    if (usersNeedsSaltB64 && !pendingSaltB64) {
+      console.log("verify_email_pending_salt_missing", email);
+      return json({ ok: false, error: "PENDING_SALT_MISSING" }, 409);
+    }
+
     const valuesMap = {
       email,
+      provider: "email",
+
       password_hash: pending.password_hash,
-      password_salt: pending.password_salt ?? null,
+
+      // توافق: نخزن salt_b64 إذا العمود موجود
+      salt_b64: pendingSaltB64 || null,
+      salt: pendingSaltB64 || null, // بعض الجداول/الأكواد تتوقع salt بدل salt_b64
+
       created_at: nowMs(),
       updated_at: nowMs(),
-      verified_at: nowMs(),
+
       email_verified: 1,
+      is_email_verified: 1,
+      email_verified_at: String(nowMs()),
+
       verified: 1,
       is_verified: 1,
-      provider: "email",
+      verified_at: nowMs(),
+
       status: "active",
       role: "user",
-      id: safeUUID(),
+
+      // ملاحظة: id إذا كان INTEGER AUTOINCREMENT ما نرسله نهائيًا
+      id: idIsAutoInt ? undefined : safeUUID(),
       user_id: safeUUID(),
+      google_sub: null,
     };
 
-    // ساعدنا: إذا عنده أعمدة NOT NULL بدون default ولا نعرف نعبيها → نوقف بخطأ واضح في اللوق
+    // الأعمدة NOT NULL بدون default ولا نقدر نعبيها → نوقف بخطأ واضح
     const missingRequired = usersCols
       .filter(c => c.notnull === 1 && (c.dflt_value === null || c.dflt_value === undefined))
-      .filter(c => !["email"].includes(c.name)) // email بنعبيه دائمًا
-      .filter(c => !Object.prototype.hasOwnProperty.call(valuesMap, c.name) && colSet.has(c.name));
+      .filter(c => !["email"].includes(c.name))
+      .filter(c => {
+        // لا نعتبر id مطلوب إذا كان INTEGER PK (بيتعبي تلقائي)
+        if (c.name === "id" && idIsAutoInt) return false;
+        return !Object.prototype.hasOwnProperty.call(valuesMap, c.name) || valuesMap[c.name] === undefined;
+      })
+      .filter(c => colSet.has(c.name));
 
     if (missingRequired.length) {
       console.log("verify_email_schema_missing_required", email, missingRequired.map(c => c.name));
@@ -174,12 +215,14 @@ export async function onRequestPost(context) {
       const insertCols = [];
       const insertVals = [];
 
-      // نضيف فقط الأعمدة الموجودة فعليًا في الجدول
       for (const [k, v] of Object.entries(valuesMap)) {
-        if (colSet.has(k)) {
-          insertCols.push(k);
-          insertVals.push(v);
-        }
+        if (!colSet.has(k)) continue;
+        if (v === undefined) continue;
+        // لو id INTEGER AUTOINCREMENT لا نرسله
+        if (k === "id" && idIsAutoInt) continue;
+
+        insertCols.push(k);
+        insertVals.push(v);
       }
 
       const placeholders = insertCols.map(() => "?").join(", ");
@@ -189,7 +232,6 @@ export async function onRequestPost(context) {
         await env.DB.prepare(sql).bind(...insertVals).run();
       } catch (e) {
         const msg = String(e?.message || e);
-        // فقط نتجاهل UNIQUE الحقيقي… أي شيء ثاني نوقف
         if (msg.includes("UNIQUE") || msg.includes("unique")) {
           // موجود مسبقًا
         } else {
@@ -198,24 +240,36 @@ export async function onRequestPost(context) {
         }
       }
     } else {
-      // UPDATE (لو المستخدم موجود، نحدّث hash لتوحيد الحالة)
+      // UPDATE
       if (colSet.has("password_hash")) {
         await env.DB
           .prepare("UPDATE users SET password_hash = ? WHERE email = ?")
           .bind(pending.password_hash, email)
           .run();
       }
-      if (colSet.has("email_verified")) {
+      if (colSet.has("salt_b64") && pendingSaltB64) {
         await env.DB
-          .prepare("UPDATE users SET email_verified = 1 WHERE email = ?")
-          .bind(email)
+          .prepare("UPDATE users SET salt_b64 = ? WHERE email = ?")
+          .bind(pendingSaltB64, email)
           .run();
       }
-      if (colSet.has("verified")) {
+      if (colSet.has("salt") && pendingSaltB64) {
         await env.DB
-          .prepare("UPDATE users SET verified = 1 WHERE email = ?")
-          .bind(email)
+          .prepare("UPDATE users SET salt = ? WHERE email = ?")
+          .bind(pendingSaltB64, email)
           .run();
+      }
+      if (colSet.has("email_verified")) {
+        await env.DB.prepare("UPDATE users SET email_verified = 1 WHERE email = ?").bind(email).run();
+      }
+      if (colSet.has("is_email_verified")) {
+        await env.DB.prepare("UPDATE users SET is_email_verified = 1 WHERE email = ?").bind(email).run();
+      }
+      if (colSet.has("email_verified_at")) {
+        await env.DB.prepare("UPDATE users SET email_verified_at = ? WHERE email = ?").bind(String(nowMs()), email).run();
+      }
+      if (colSet.has("updated_at")) {
+        await env.DB.prepare("UPDATE users SET updated_at = ? WHERE email = ?").bind(nowMs(), email).run();
       }
     }
 
@@ -232,9 +286,7 @@ export async function onRequestPost(context) {
 
     // --- 5) الآن فقط نحذف pending_users + ننظف email_otps ---
     await env.DB.prepare("DELETE FROM pending_users WHERE email = ?").bind(email).run();
-    try {
-      await env.DB.prepare("DELETE FROM email_otps WHERE email = ?").bind(email).run();
-    } catch (_) {}
+    try { await env.DB.prepare("DELETE FROM email_otps WHERE email = ?").bind(email).run(); } catch (_) {}
 
     return json({ ok: true, email, verified: true }, 200);
   } catch (err) {
@@ -244,5 +296,5 @@ export async function onRequestPost(context) {
 }
 
 /*
-verify-email.js – api2 – إصدار 2 (Fix Users insert + No delete pending until ensured)
+verify-email.js – api2 – إصدار 3 (Fix salt_b64 required + don't insert autoincrement id)
 */
