@@ -1,7 +1,10 @@
+// functions/api2/login.js
+// POST /api2/login
+// إصلاح: دعم salted SHA-256 باستخدام salt_b64 الموجود في users
+
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // --- CORS / JSON helpers ---
   const json = (data, status = 200) =>
     new Response(JSON.stringify(data), {
       status,
@@ -10,6 +13,7 @@ export async function onRequest(context) {
         "access-control-allow-origin": request.headers.get("origin") || "*",
         "access-control-allow-headers": "content-type, authorization, x-device-id",
         "access-control-allow-methods": "POST, OPTIONS",
+        "cache-control": "no-store",
       },
     });
 
@@ -22,34 +26,26 @@ export async function onRequest(context) {
     const body = await request.json().catch(() => ({}));
     const emailRaw = (body.email || "").toString().trim();
     const password = (body.password || "").toString();
-
     const email = emailRaw.toLowerCase();
 
-    if (!email || !password) {
-      return json({ ok: false, error: "MISSING_FIELDS" }, 400);
-    }
+    if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
     // 1) Get user
-    const userRow = await env.DB.prepare(
-      `SELECT * FROM users WHERE email = ? LIMIT 1`
-    ).bind(email).first();
+    const userRow = await env.DB
+      .prepare(`SELECT * FROM users WHERE email = ? LIMIT 1`)
+      .bind(email)
+      .first();
 
-    // نفس رسالة الخطأ (ما نكشف هل الإيميل موجود أو لا)
-    if (!userRow) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    // لا نكشف هل الإيميل موجود
+    if (!userRow) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    const storedHash = (userRow.password_hash || "").toString();
-    if (!storedHash) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    const storedHash = (userRow.password_hash || "").toString().trim();
+    if (!storedHash) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    // 2) Verify password (يدعم صيغتين)
-    const ok = await verifyPassword(storedHash, password);
+    // 2) Verify password (يدعم: PBKDF2 + SHA256 legacy + SHA256 salted)
+    const ok = await verifyPassword(storedHash, password, userRow);
 
-    if (!ok) {
-      return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
-    }
+    if (!ok) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
     // 3) Create session token (إذا جدول sessions يدعمها)
     const token = await createSessionIfPossible(env.DB, userRow);
@@ -63,12 +59,17 @@ export async function onRequest(context) {
 
 /* ---------------- Password verify ----------------
    ندعم:
-   1) legacy: password_hash = base64(sha256(password))
-   2) pbkdf2$ITER$SALT_B64$HASH_B64  (للمستقبل)
+   1) pbkdf2$ITER$SALT_B64$HASH_B64
+   2) legacy: base64(sha256(password))
+   3) salted sha256 باستخدام userRow.salt_b64:
+      - sha256( passwordBytes + saltBytes )
+      - sha256( saltBytes + passwordBytes )
+      - sha256( password + saltB64String )
+      - sha256( saltB64String + password )
 ---------------------------------------------------*/
 
-async function verifyPassword(stored, password) {
-  // PBKDF2 format: pbkdf2$100000$<saltB64>$<hashB64>
+async function verifyPassword(stored, password, userRow) {
+  // PBKDF2 format
   if (stored.startsWith("pbkdf2$")) {
     const parts = stored.split("$");
     if (parts.length !== 4) return false;
@@ -86,14 +87,56 @@ async function verifyPassword(stored, password) {
     return timingSafeEqualStr(derivedB64, hashB64);
   }
 
-  // Legacy: base64(sha256(password))
+  // --- 1) Legacy: sha256(password) ---
   const legacy = await sha256B64(password);
-  return timingSafeEqualStr(legacy, stored);
+  if (timingSafeEqualStr(legacy, stored)) return true;
+
+  // --- 2) Salted sha256 (إذا عندنا salt_b64) ---
+  const saltB64 = (userRow?.salt_b64 || userRow?.salt || "").toString().trim();
+  if (!saltB64) return false;
+
+  const saltBytes = b64ToBytes(saltB64);
+
+  // 2A) bytes(password) + saltBytes
+  if (saltBytes) {
+    const cand1 = await sha256B64Bytes(concatBytes(utf8Bytes(password), saltBytes));
+    if (timingSafeEqualStr(cand1, stored)) return true;
+
+    // 2B) saltBytes + bytes(password)
+    const cand2 = await sha256B64Bytes(concatBytes(saltBytes, utf8Bytes(password)));
+    if (timingSafeEqualStr(cand2, stored)) return true;
+  }
+
+  // 2C) password + saltB64 (كسلسلة)
+  const cand3 = await sha256B64(password + saltB64);
+  if (timingSafeEqualStr(cand3, stored)) return true;
+
+  // 2D) saltB64 + password (كسلسلة)
+  const cand4 = await sha256B64(saltB64 + password);
+  if (timingSafeEqualStr(cand4, stored)) return true;
+
+  return false;
+}
+
+function utf8Bytes(str) {
+  return new TextEncoder().encode(str);
+}
+
+function concatBytes(a, b) {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
 }
 
 async function sha256B64(str) {
-  const data = new TextEncoder().encode(str);
+  const data = utf8Bytes(str);
   const hash = await crypto.subtle.digest("SHA-256", data);
+  return bytesToB64(new Uint8Array(hash));
+}
+
+async function sha256B64Bytes(bytes) {
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
   return bytesToB64(new Uint8Array(hash));
 }
 
@@ -134,7 +177,6 @@ async function getSessionsCols(DB) {
 }
 
 function b64url(bytes) {
-  // base64url (بدون + / وبدون =)
   const b64 = bytesToB64(bytes);
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
@@ -142,8 +184,6 @@ function b64url(bytes) {
 async function createSessionIfPossible(DB, userRow) {
   try {
     const cols = await getSessionsCols(DB);
-
-    // لازم يكون فيه token على الأقل
     if (!cols.has("token")) return null;
 
     const tokenBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -151,7 +191,7 @@ async function createSessionIfPossible(DB, userRow) {
 
     const now = new Date();
     const createdAt = now.toISOString();
-    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 يوم
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const fields = [];
     const placeholders = [];
@@ -195,7 +235,7 @@ async function createSessionIfPossible(DB, userRow) {
     return token;
   } catch (e) {
     console.log("session_create_skip", String(e?.message || e));
-    return null; // ما نوقف تسجيل الدخول لو السيشن ما نفع
+    return null;
   }
 }
 
@@ -219,7 +259,6 @@ function b64ToBytes(b64) {
 }
 
 function timingSafeEqualStr(a, b) {
-  // مقارنة ثابتة الزمن على مستوى النص (قريبة من constant-time)
   if (typeof a !== "string" || typeof b !== "string") return false;
   const len = Math.max(a.length, b.length);
   let diff = a.length ^ b.length;
@@ -230,3 +269,7 @@ function timingSafeEqualStr(a, b) {
   }
   return diff === 0;
 }
+
+/*
+login.js – api2 – إصدار 2 (Fix salted SHA256 using salt_b64)
+*/
