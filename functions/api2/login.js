@@ -1,6 +1,9 @@
 // functions/api2/login.js
 // POST /api2/login
-// إصلاح: دعم salted SHA-256 باستخدام salt_b64 الموجود في users
+// إصلاح جذري: دعم 3 طرق تحقق
+// 1) pbkdf2$ITER$SALT$HASH (لو مخزن بالنص)
+// 2) PBKDF2 "منفصل": password_hash=HASH_B64 + salt_b64=SALT_B64 (هذا هو حالتك غالبًا)
+// 3) legacy: base64(sha256(password)) + salted sha256 كاحتياط
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -30,24 +33,19 @@ export async function onRequest(context) {
 
     if (!email || !password) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
-    // 1) Get user
     const userRow = await env.DB
       .prepare(`SELECT * FROM users WHERE email = ? LIMIT 1`)
       .bind(email)
       .first();
 
-    // لا نكشف هل الإيميل موجود
     if (!userRow) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
     const storedHash = (userRow.password_hash || "").toString().trim();
     if (!storedHash) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    // 2) Verify password (يدعم: PBKDF2 + SHA256 legacy + SHA256 salted)
     const ok = await verifyPassword(storedHash, password, userRow);
-
     if (!ok) return json({ ok: false, error: "INVALID_CREDENTIALS" }, 401);
 
-    // 3) Create session token (إذا جدول sessions يدعمها)
     const token = await createSessionIfPossible(env.DB, userRow);
 
     return json({ ok: true, token }, 200);
@@ -57,19 +55,10 @@ export async function onRequest(context) {
   }
 }
 
-/* ---------------- Password verify ----------------
-   ندعم:
-   1) pbkdf2$ITER$SALT_B64$HASH_B64
-   2) legacy: base64(sha256(password))
-   3) salted sha256 باستخدام userRow.salt_b64:
-      - sha256( passwordBytes + saltBytes )
-      - sha256( saltBytes + passwordBytes )
-      - sha256( password + saltB64String )
-      - sha256( saltB64String + password )
----------------------------------------------------*/
+/* ---------------- Password verify ---------------- */
 
 async function verifyPassword(stored, password, userRow) {
-  // PBKDF2 format
+  // (1) صيغة PBKDF2 النصية (لو موجودة)
   if (stored.startsWith("pbkdf2$")) {
     const parts = stored.split("$");
     if (parts.length !== 4) return false;
@@ -87,36 +76,44 @@ async function verifyPassword(stored, password, userRow) {
     return timingSafeEqualStr(derivedB64, hashB64);
   }
 
-  // --- 1) Legacy: sha256(password) ---
+  // (2) Legacy: sha256(password)
   const legacy = await sha256B64(password);
   if (timingSafeEqualStr(legacy, stored)) return true;
 
-  // --- 2) Salted sha256 (إذا عندنا salt_b64) ---
+  // (3) PBKDF2 منفصل: hash في password_hash والسولت في salt_b64 (هذا هو المتوقع عندك)
   const saltB64 = (userRow?.salt_b64 || userRow?.salt || "").toString().trim();
-  if (!saltB64) return false;
-
   const saltBytes = b64ToBytes(saltB64);
 
-  // 2A) bytes(password) + saltBytes
+  if (saltBytes && saltBytes.length >= 8) {
+    // جرّب أشهر Iterations (نفس اللي غالبًا في التسجيل)
+    const itersToTry = [100000, 150000, 200000];
+
+    for (const iter of itersToTry) {
+      const derivedB64 = await pbkdf2B64(password, saltBytes, iter, 32);
+      if (timingSafeEqualStr(derivedB64, stored)) return true;
+    }
+  }
+
+  // (4) احتياط: salted sha256 بأنماط مختلفة
   if (saltBytes) {
     const cand1 = await sha256B64Bytes(concatBytes(utf8Bytes(password), saltBytes));
     if (timingSafeEqualStr(cand1, stored)) return true;
 
-    // 2B) saltBytes + bytes(password)
     const cand2 = await sha256B64Bytes(concatBytes(saltBytes, utf8Bytes(password)));
     if (timingSafeEqualStr(cand2, stored)) return true;
   }
+  if (saltB64) {
+    const cand3 = await sha256B64(password + saltB64);
+    if (timingSafeEqualStr(cand3, stored)) return true;
 
-  // 2C) password + saltB64 (كسلسلة)
-  const cand3 = await sha256B64(password + saltB64);
-  if (timingSafeEqualStr(cand3, stored)) return true;
-
-  // 2D) saltB64 + password (كسلسلة)
-  const cand4 = await sha256B64(saltB64 + password);
-  if (timingSafeEqualStr(cand4, stored)) return true;
+    const cand4 = await sha256B64(saltB64 + password);
+    if (timingSafeEqualStr(cand4, stored)) return true;
+  }
 
   return false;
 }
+
+/* ---------------- Crypto helpers ---------------- */
 
 function utf8Bytes(str) {
   return new TextEncoder().encode(str);
@@ -151,12 +148,7 @@ async function pbkdf2B64(password, saltBytes, iterations, keyLenBytes) {
   );
 
   const bits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: saltBytes,
-      iterations,
-    },
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
     keyMaterial,
     keyLenBytes * 8
   );
@@ -271,5 +263,5 @@ function timingSafeEqualStr(a, b) {
 }
 
 /*
-login.js – api2 – إصدار 2 (Fix salted SHA256 using salt_b64)
+login.js – api2 – إصدار 3 (Support PBKDF2 split columns using salt_b64)
 */
