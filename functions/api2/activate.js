@@ -1,29 +1,20 @@
 // functions/api2/activate.js
 // Cloudflare Pages Function: POST /api2/activate
 
-const CORS_HEADERS = (req) => {
-  const origin = req.headers.get("origin");
-  const h = {
-    "Access-Control-Allow-Methods": "POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
-    "Access-Control-Max-Age": "86400",
-    "cache-control": "no-store",
-  };
-  if (origin) {
-    h["Access-Control-Allow-Origin"] = origin;
-    h["Access-Control-Allow-Credentials"] = "true";
-  } else {
-    h["Access-Control-Allow-Origin"] = "*";
-  }
-  return h;
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
+  "Access-Control-Max-Age": "86400",
 };
 
-function json(req, data, status = 200) {
+function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      ...CORS_HEADERS(req),
+      ...CORS_HEADERS,
       "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
     },
   });
 }
@@ -40,276 +31,285 @@ function normalizeCode(code) {
     .replace(/[–—−]/g, "-");
 }
 
-function getCookie(req, name) {
-  const cookie = req.headers.get("Cookie") || "";
-  const parts = cookie.split(";");
-  for (const p of parts) {
-    const [k, ...rest] = p.trim().split("=");
-    if (k === name) return rest.join("=") || "";
-  }
-  return "";
+function parseCookies(cookieHeader) {
+  const out = {};
+  const s = String(cookieHeader || "");
+  s.split(";").forEach((part) => {
+    const i = part.indexOf("=");
+    if (i === -1) return;
+    const k = part.slice(0, i).trim();
+    const v = part.slice(i + 1).trim();
+    if (k) out[k] = decodeURIComponent(v);
+  });
+  return out;
 }
 
-function looksLikeEmail(v) {
-  const s = String(v || "").trim();
-  return s.includes("@") && s.includes(".");
+function bearerToken(req) {
+  const h = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : "";
 }
 
-async function tableExists(DB, table) {
+async function tableInfo(db, tableName) {
   try {
-    const r = await DB.prepare(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`
-    ).bind(table).first();
-    return !!r?.name;
-  } catch {
-    return false;
-  }
-}
-
-async function tableInfo(DB, table) {
-  try {
-    const res = await DB.prepare(`PRAGMA table_info(${table});`).all();
-    const rows = res?.results || [];
-    return rows.map((r) => String(r.name));
+    const res = await db.prepare(`PRAGMA table_info(${tableName});`).all();
+    return (res?.results || []).map((r) => ({
+      name: String(r.name),
+      notnull: Number(r.notnull || 0),
+      dflt_value: r.dflt_value,
+      pk: Number(r.pk || 0),
+      type: String(r.type || ""),
+    }));
   } catch {
     return [];
   }
 }
 
-async function findSessionEmail(DB, token) {
-  if (!token) return null;
+function hasCol(cols, name) {
+  return cols.some((c) => c.name === name);
+}
 
-  const cols = new Set(await tableInfo(DB, "sessions"));
-  if (!cols.size || !cols.has("token")) return null;
-
-  if (cols.has("email")) {
-    const row = await DB.prepare(
-      `SELECT email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
-    ).bind(token).first();
-    return row?.email ? normalizeEmail(row.email) : null;
-  }
-
-  if (cols.has("user_email")) {
-    const row = await DB.prepare(
-      `SELECT user_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
-    ).bind(token).first();
-    return row?.email ? normalizeEmail(row.email) : null;
-  }
-
+function firstExistingCol(cols, names) {
+  for (const n of names) if (hasCol(cols, n)) return n;
   return null;
 }
 
-async function ensureActivationsTable(DB) {
-  // ننشئ جدول activations إذا ما كان موجود (آمن)
-  await DB.prepare(`
-    CREATE TABLE IF NOT EXISTS activations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      code TEXT NOT NULL,
-      email TEXT,
-      device_id TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `).run();
-
-  await DB.prepare(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_activations_code_device
-    ON activations(code, device_id);
-  `).run();
-
-  await DB.prepare(`
-    CREATE INDEX IF NOT EXISTS idx_activations_code
-    ON activations(code);
-  `).run();
-
-  await DB.prepare(`
-    CREATE INDEX IF NOT EXISTS idx_activations_email
-    ON activations(email);
-  `).run();
-}
-
-async function getCodeRow(DB, code) {
-  const exists = await tableExists(DB, "codes");
-  if (!exists) return { error: "CODES_TABLE_NOT_FOUND" };
-
-  const colsArr = await tableInfo(DB, "codes");
-  const cols = new Set(colsArr);
-
-  // نحدد عمود الكود (غالبًا "code")
-  const codeCol =
-    cols.has("code") ? "code" :
-    cols.has("activation_code") ? "activation_code" :
-    cols.has("key") ? "key" :
-    null;
-
-  if (!codeCol) return { error: "CODES_SCHEMA_NO_CODE_COL" };
-
-  const row = await DB.prepare(
-    `SELECT * FROM codes WHERE ${codeCol} = ? LIMIT 1`
-  ).bind(code).first();
-
-  if (!row) return { error: "CODE_NOT_FOUND" };
-
-  return { row, cols, codeCol };
-}
-
-function getBoundEmailFromCodeRow(row) {
-  // نقرأ الإيميل من أي عمود معروف
-  const candidates = [
-    "used_by_email",
-    "email",
-    "user_email",
-    "owner_email",
-  ];
-  for (const k of candidates) {
-    if (row && row[k] != null) {
-      const v = String(row[k] || "").trim();
-      if (!v) continue;
-
-      // لو كانت مشكلة قديمة (كان ينحفظ deviceId) نتجاهله
-      if (!looksLikeEmail(v)) continue;
-
-      return normalizeEmail(v);
-    }
+async function findFirstTable(db, candidates) {
+  for (const t of candidates) {
+    const cols = await tableInfo(db, t);
+    if (cols.length) return { table: t, cols };
   }
-  return null;
+  return { table: null, cols: [] };
 }
 
-async function getCodeDevices(DB, code) {
-  const res = await DB.prepare(
-    `SELECT device_id FROM activations WHERE code = ?`
-  ).bind(code).all();
+async function getSessionEmail(db, req) {
+  // 1) Authorization Bearer
+  let token = bearerToken(req);
 
-  const rows = res?.results || [];
-  const set = new Set(rows.map((r) => String(r.device_id || "").trim()).filter(Boolean));
-  return set;
+  // 2) Cookie fallback (أسماء محتملة)
+  if (!token) {
+    const cookies = parseCookies(req.headers.get("Cookie") || "");
+    token =
+      cookies["sandooq_session_v1"] ||
+      cookies["sandooq_session"] ||
+      cookies["sandooq_token_v1"] ||
+      cookies["token"] ||
+      "";
+  }
+
+  token = String(token || "").trim();
+  if (!token) return { ok: false, error: "UNAUTHORIZED" };
+
+  // sessions schema: (token,email,created_at,expires_at...) حسب جدولك
+  try {
+    const row = await db
+      .prepare(`SELECT email FROM sessions WHERE token = ? LIMIT 1`)
+      .bind(token)
+      .first();
+
+    const email = normalizeEmail(row?.email);
+    if (!email) return { ok: false, error: "SESSION_NOT_FOUND" };
+
+    return { ok: true, email, token };
+  } catch (e) {
+    console.log("activate_session_lookup_failed", String(e?.message || e));
+    return { ok: false, error: "SESSION_LOOKUP_FAILED" };
+  }
 }
 
-async function getExistingActivationEmail(DB, code) {
-  const row = await DB.prepare(
-    `SELECT email FROM activations WHERE code = ? AND email IS NOT NULL AND email != '' ORDER BY rowid DESC LIMIT 1`
-  ).bind(code).first();
-
-  return row?.email ? normalizeEmail(row.email) : null;
+function nowIso() {
+  return new Date().toISOString();
 }
 
-async function updateCodesRow(DB, cols, codeCol, code, email) {
-  const sets = [];
-  const binds = [];
-
-  // اربط الإيميل
-  if (cols.has("used_by_email")) { sets.push("used_by_email = ?"); binds.push(email); }
-  else if (cols.has("email")) { sets.push("email = ?"); binds.push(email); }
-  else if (cols.has("user_email")) { sets.push("user_email = ?"); binds.push(email); }
-  else if (cols.has("owner_email")) { sets.push("owner_email = ?"); binds.push(email); }
-
-  // علّم أنه مستخدم/مفعّل
-  if (cols.has("used")) { sets.push("used = 1"); }
-  if (cols.has("is_used")) { sets.push("is_used = 1"); }
-  if (cols.has("status")) { sets.push("status = 'used'"); }
-
-  const nowIso = new Date().toISOString();
-  if (cols.has("used_at")) { sets.push("used_at = ?"); binds.push(nowIso); }
-  if (cols.has("activated_at")) { sets.push("activated_at = ?"); binds.push(nowIso); }
-  if (cols.has("updated_at")) { sets.push("updated_at = ?"); binds.push(nowIso); }
-
-  if (!sets.length) return;
-
-  binds.push(code);
-  await DB.prepare(
-    `UPDATE codes SET ${sets.join(", ")} WHERE ${codeCol} = ?`
-  ).bind(...binds).run();
+function nowMs() {
+  return Date.now();
 }
 
-export async function onRequest(context) {
+export async function onRequestOptions() {
+  return new Response(null, { headers: CORS_HEADERS });
+}
+
+export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS_HEADERS(request) });
-  }
-  if (request.method !== "POST") {
-    return json(request, { ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
-  }
-
   try {
-    if (!env.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
-
-    const body = await request.json().catch(() => ({}));
-    const code = normalizeCode(body.code);
-    if (!code) return json(request, { ok: false, error: "MISSING_FIELDS" }, 400);
+    if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 500);
 
     const deviceId = String(request.headers.get("X-Device-Id") || "").trim();
-    if (!deviceId) return json(request, { ok: false, error: "MISSING_DEVICE_ID" }, 400);
+    if (!deviceId) return json({ ok: false, error: "MISSING_DEVICE_ID" }, 400);
 
-    // session token من:
-    // 1) Authorization Bearer
-    // 2) Cookie: sandooq_session_v1
-    // 3) body.token (احتياط)
-    const auth = request.headers.get("Authorization") || "";
-    const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-    const cookieTok = getCookie(request, "sandooq_session_v1");
-    const bodyTok = body?.token ? String(body.token).trim() : "";
-    const token = bearer || cookieTok || bodyTok;
+    const body = await request.json().catch(() => ({}));
+    const codeRaw = body.code ?? body.activationCode ?? body.key ?? "";
+    const code = normalizeCode(codeRaw);
 
-    if (!token) return json(request, { ok: false, error: "NO_SESSION" }, 401);
+    if (!code) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
-    const email = await findSessionEmail(env.DB, token);
-    if (!email) return json(request, { ok: false, error: "SESSION_NOT_FOUND" }, 401);
+    // --- Auth (session -> email) ---
+    const ses = await getSessionEmail(env.DB, request);
+    if (!ses.ok) return json({ ok: false, error: ses.error }, 401);
 
-    // تأكد user موجود
-    const userRow = await env.DB.prepare(
-      `SELECT email, email_verified, is_email_verified, verified, is_verified FROM users WHERE email = ? LIMIT 1`
-    ).bind(email).first();
+    const email = ses.email;
 
-    if (!userRow) return json(request, { ok: false, error: "USER_NOT_FOUND" }, 401);
+    // --- Ensure activations table exists (عشان ما يطيح SERVER_ERROR) ---
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS activations (
+        code TEXT NOT NULL,
+        email TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (code, device_id)
+      );
+    `).run();
 
-    // جهّز activations
-    await ensureActivationsTable(env.DB);
+    // --- Find codes table (اسم الجدول يختلف عند بعض النسخ) ---
+    const { table: codesTable, cols: codesCols } = await findFirstTable(env.DB, [
+      "codes",
+      "activation_codes",
+      "license_codes",
+      "game_codes",
+    ]);
 
-    // تحقق الكود من جدول codes
-    const codeRes = await getCodeRow(env.DB, code);
-    if (codeRes.error) return json(request, { ok: false, error: codeRes.error }, 404);
-
-    const { row: codeRow, cols, codeCol } = codeRes;
-
-    // هل الكود مرتبط مسبقًا بإيميل آخر؟
-    const boundEmailInCodes = getBoundEmailFromCodeRow(codeRow);
-    if (boundEmailInCodes && boundEmailInCodes !== email) {
-      return json(request, { ok: false, error: "CODE_ALREADY_USED" }, 409);
+    if (!codesTable) {
+      console.log("activate_codes_table_not_found");
+      return json({ ok: false, error: "CODES_TABLE_NOT_FOUND" }, 500);
     }
 
-    // لو جدول activations فيه إيميل مختلف (حماية إضافية)
-    const boundEmailInActs = await getExistingActivationEmail(env.DB, code);
-    if (boundEmailInActs && boundEmailInActs !== email) {
-      return json(request, { ok: false, error: "CODE_ALREADY_USED" }, 409);
+    const codeCol = firstExistingCol(codesCols, ["code", "activation_code", "license", "key"]);
+    if (!codeCol) {
+      console.log("activate_codes_table_missing_code_col", codesTable);
+      return json({ ok: false, error: "CODES_SCHEMA_MISSING_CODE_COL" }, 500);
     }
 
-    // حد الأجهزة = جهازين لكل كود
-    const devices = await getCodeDevices(env.DB, code);
-    if (devices.has(deviceId)) {
-      // نفس الجهاز: اعتبره مفعّل
-      return json(request, { ok: true, email, code, activated: true, already: true }, 200);
-    }
-    if (devices.size >= 2) {
-      return json(request, { ok: false, error: "DEVICE_LIMIT_REACHED" }, 409);
+    // --- Load code row ---
+    const codeRow = await env.DB
+      .prepare(`SELECT * FROM ${codesTable} WHERE ${codeCol} = ? LIMIT 1`)
+      .bind(code)
+      .first();
+
+    if (!codeRow) return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
+
+    // --- Determine “bound/owner email” column (الأكثر شيوعًا) ---
+    const ownerCol = firstExistingCol(codesCols, [
+      "used_by_email",
+      "bound_email",
+      "owner_email",
+      "used_email",
+      "email", // بعض الجداول تستخدم email لمالك الكود
+    ]);
+
+    const isUsedCol = firstExistingCol(codesCols, ["is_used", "used", "activated", "is_activated"]);
+    const usedAtCol = firstExistingCol(codesCols, ["used_at", "activated_at"]);
+    const statusCol = firstExistingCol(codesCols, ["status"]);
+
+    const boundEmail = ownerCol ? normalizeEmail(codeRow[ownerCol]) : "";
+
+    // إذا الكود مربوط بحساب ثاني → مرفوض
+    if (boundEmail && boundEmail !== email) {
+      return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
 
-    // سجل التفعيل
-    await env.DB.prepare(
-      `INSERT INTO activations (code, email, device_id, created_at) VALUES (?, ?, ?, ?)`
-    ).bind(code, email, deviceId, new Date().toISOString()).run();
-
-    // اربط الكود بالإيميل داخل codes (مرة واحدة)
-    if (!boundEmailInCodes) {
-      await updateCodesRow(env.DB, cols, codeCol, code, email);
+    // بعض الجداول تميّز الاستخدام بدون إيميل
+    if (!boundEmail && isUsedCol && Number(codeRow[isUsedCol] || 0) === 1) {
+      return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
 
-    return json(request, { ok: true, email, code, activated: true }, 200);
-  } catch (e) {
-    console.log("activate_error", String(e?.message || e));
-    return json(request, { ok: false, error: "SERVER_ERROR" }, 500);
+    if (!boundEmail && statusCol && String(codeRow[statusCol] || "").toLowerCase() === "used") {
+      return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
+    }
+
+    // --- Device limit (افتراضي جهازين) ---
+    const limitCol = firstExistingCol(codesCols, ["device_limit", "max_devices", "devices_limit"]);
+    let limit = 2;
+    if (limitCol) {
+      const v = Number(codeRow[limitCol]);
+      if (Number.isFinite(v) && v >= 1) limit = v;
+    }
+
+    // هل هذا الجهاز مفعّل مسبقًا لنفس الكود؟
+    const existingActivation = await env.DB
+      .prepare(`SELECT device_id FROM activations WHERE code = ? AND device_id = ? LIMIT 1`)
+      .bind(code, deviceId)
+      .first();
+
+    if (!existingActivation) {
+      const cntRow = await env.DB
+        .prepare(`SELECT COUNT(*) AS n FROM activations WHERE code = ? AND email = ?`)
+        .bind(code, email)
+        .first();
+
+      const n = Number(cntRow?.n || 0);
+      if (n >= limit) {
+        return json({ ok: false, error: "DEVICE_LIMIT_REACHED" }, 409);
+      }
+
+      // Insert activation
+      try {
+        await env.DB
+          .prepare(
+            `INSERT INTO activations (code, email, device_id, created_at)
+             VALUES (?, ?, ?, ?)`
+          )
+          .bind(code, email, deviceId, nowIso())
+          .run();
+      } catch (e) {
+        const msg = String(e?.message || e);
+        // لو صار Duplicate بسبب سباق، اعتبره OK
+        if (!msg.toLowerCase().includes("unique") && !msg.toLowerCase().includes("constraint")) {
+          console.log("activate_insert_failed", code, email, deviceId, msg);
+          return json({ ok: false, error: "ACTIVATION_WRITE_FAILED" }, 500);
+        }
+      }
+    }
+
+    // --- Bind code to this email (أول مرة فقط) + mark used fields إن وجدت ---
+    // نحدّث فقط إذا كان غير مربوط
+    if (ownerCol && !boundEmail) {
+      const sets = [];
+      const binds = [];
+
+      sets.push(`${ownerCol} = ?`);
+      binds.push(email);
+
+      if (isUsedCol) {
+        sets.push(`${isUsedCol} = 1`);
+      }
+      if (usedAtCol) {
+        sets.push(`${usedAtCol} = ?`);
+        binds.push(nowMs());
+      }
+      if (statusCol) {
+        sets.push(`${statusCol} = ?`);
+        binds.push("used");
+      }
+
+      try {
+        await env.DB
+          .prepare(`UPDATE ${codesTable} SET ${sets.join(", ")} WHERE ${codeCol} = ?`)
+          .bind(...binds, code)
+          .run();
+      } catch (e) {
+        console.log("activate_bind_code_failed", String(e?.message || e));
+        // ما نوقف التفعيل إذا ربط الكود فشل (لكن نرجع تحذير واضح)
+        return json({ ok: false, error: "CODE_BIND_FAILED" }, 500);
+      }
+    }
+
+    return json(
+      {
+        ok: true,
+        email,
+        code,
+        activated: true,
+        deviceId,
+      },
+      200
+    );
+  } catch (err) {
+    console.log("activate_error", String(err?.message || err));
+    return json({ ok: false, error: "SERVER_ERROR" }, 500);
   }
 }
 
 /*
-activate.js – api2 – إصدار 1 (Bind code to email + limit 2 devices via activations)
+activate.js – api2 – إصدار 1 (Robust activate + device limit + schema-safe)
 */
