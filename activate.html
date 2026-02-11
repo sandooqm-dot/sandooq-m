@@ -252,7 +252,7 @@
         <div class="title">تسجيل الدخول</div>
         <div class="subtitle">
           لازم تسجّل دخول عشان تفتح اللعبة.<br/>
-          (بعد التفعيل، تقدر تدخل من أي متصفح حتى المتصفح الخفي)
+          (إذا حسابك مُفعّل بتدخل اللعبة مباشرة)
         </div>
 
         <div class="field">
@@ -349,27 +349,11 @@
 
         <button id="btnActivate" class="btn btnGreen">تفعيل</button>
 
-        <div class="links" style="margin-top:12px">
+        <div class="links" style="margin-top:12px; justify-content:center">
           <a href="#" id="btnLogout">تسجيل الخروج</a>
-          <span></span>
         </div>
 
         <div id="actMsg" class="msg"></div>
-      </div>
-
-      <!-- شاشة: جاهز / دخول اللعبة -->
-      <div id="view-ready" class="hide">
-        <div class="title">تم التفعيل</div>
-        <div class="subtitle">✅ هذا الجهاز مُفعّل</div>
-
-        <div class="topInfo">
-          <span class="pill">مرحباً، <span id="readyEmail" style="margin-right:6px"></span></span>
-        </div>
-
-        <button id="btnEnterGame" class="btn btnGreen" style="margin-top:12px">دخول اللعبة</button>
-        <button id="btnLogout2" class="btn btnGhost" style="margin-top:10px">تسجيل الخروج</button>
-
-        <div id="readyMsg" class="msg"></div>
       </div>
 
       <div class="foot">© صندوق المسابقات</div>
@@ -377,31 +361,11 @@
   </div>
 
   <script>
-    // =========================
-    //   API base
-    // =========================
     const API_BASE = "/api2";
-
-    // =========================
-    //   Auth token (FIX)
-    // =========================
-    const TOKEN_KEY = "sandooq_token_v1";
-    function getToken(){ return localStorage.getItem(TOKEN_KEY) || ""; }
-    function setToken(t){
-      if(!t) return;
-      localStorage.setItem(TOKEN_KEY, String(t));
-    }
-    function clearToken(){
-      localStorage.removeItem(TOKEN_KEY);
-    }
-
-    // =========================
-    //   Client helpers
-    // =========================
     const $ = (id)=>document.getElementById(id);
 
     function show(viewId){
-      const ids = ["view-auth","view-create","view-verify","view-activate","view-ready"];
+      const ids = ["view-auth","view-create","view-verify","view-activate"];
       ids.forEach(x => $(x).classList.toggle("hide", x!==viewId));
     }
 
@@ -419,7 +383,6 @@
       return (v||"").toString().trim().toUpperCase().replace(/\s+/g,"").replace(/[–—−]/g,"-");
     }
 
-    // Device ID ثابت لكل جهاز
     function getDeviceId(){
       const k="sandooq_device_id_v1";
       let v = localStorage.getItem(k);
@@ -444,10 +407,6 @@
         "X-Device-Id": getDeviceId()
       };
 
-      // ✅ FIX: أرسل التوكن لو موجود
-      const t = getToken();
-      if (t) headers["Authorization"] = "Bearer " + t;
-
       const res = await fetch(apiUrl(path), {
         method:"POST",
         headers,
@@ -463,13 +422,9 @@
     async function logout(){
       try { await api("/logout", {}); } catch {}
       sessionStorage.removeItem("pending_email");
-      clearToken(); // ✅ FIX
       boot();
     }
 
-    // =========================
-    //   Navigation links
-    // =========================
     $("goCreate").onclick = (e)=>{ e.preventDefault(); show("view-create"); msg($("authMsg"),""); };
     $("haveAccount").onclick = (e)=>{ e.preventDefault(); show("view-auth"); msg($("createMsg"),""); };
 
@@ -483,15 +438,8 @@
     };
 
     $("btnLogout").onclick = async (e)=>{ e.preventDefault(); await logout(); };
-    $("btnLogout2").onclick = async ()=>{ await logout(); };
 
-    $("btnEnterGame").onclick = ()=>{
-      window.location.href = "/app";
-    };
-
-    // =========================
-    //   Actions
-    // =========================
+    // ====== Login
     $("btnLogin").onclick = async ()=>{
       msg($("authMsg"), "");
       const email = normEmail($("email").value);
@@ -503,19 +451,10 @@
       if(!r?.ok){
         return msg($("authMsg"), translateErr(r), "err");
       }
-
-      // ✅ FIX: احفظ التوكن
-      if (r.token) {
-        setToken(r.token);
-      } else {
-        // لو السيرفر ما رجّع توكن لأي سبب
-        msg($("authMsg"), "تم تسجيل الدخول لكن السيرفر ما رجّع توكن. راح نحتاج نعدّل /api2/login.", "err");
-        return;
-      }
-
       await boot();
     };
 
+    // ====== Create
     $("btnCreate").onclick = async ()=>{
       msg($("createMsg"), "");
       const email = normEmail($("cEmail").value);
@@ -541,6 +480,7 @@
       }
     };
 
+    // ====== Verify OTP
     $("btnVerifyOtp").onclick = async ()=>{
       msg($("verifyMsg"), "");
       const email = sessionStorage.getItem("pending_email") || "";
@@ -554,12 +494,7 @@
       }
 
       sessionStorage.removeItem("pending_email");
-
-      // بعد التحقق: نرجع لواجهة الدخول (لأننا ما نعرف كلمة المرور هنا تلقائيًا)
-      show("view-auth");
-      $("email").value = email;
-      $("password").value = "";
-      msg($("authMsg"), "تم تأكيد البريد ✅ الآن سجّل دخول بنفس الإيميل وكلمة المرور.", "ok");
+      await boot();
     };
 
     $("btnResendOtp").onclick = async ()=>{
@@ -579,6 +514,7 @@
       }
     };
 
+    // ====== Activate Code (بعد النجاح ندخل اللعبة مباشرة)
     $("btnActivate").onclick = async ()=>{
       msg($("actMsg"), "");
       const code = normCode($("code").value);
@@ -588,12 +524,12 @@
       if(!r?.ok){
         return msg($("actMsg"), translateErr(r), "err");
       }
-      await boot();
+
+      // نجاح التفعيل -> دخول اللعبة مباشرة
+      window.location.replace("/app");
     };
 
-    // =========================
-    //   Boot: decides which screen to show
-    // =========================
+    // ====== Boot (إذا الحساب مُفعّل -> دخول اللعبة مباشرة)
     async function boot(){
       const pending = sessionStorage.getItem("pending_email") || "";
       if (pending) {
@@ -610,7 +546,6 @@
 
       const email = me.email || "";
       $("who").textContent = email;
-      $("readyEmail").textContent = email;
 
       if(me.verified === false){
         sessionStorage.setItem("pending_email", email);
@@ -620,17 +555,16 @@
         return;
       }
 
-      if(!me.activated){
-        show("view-activate");
+      // لو متفعّل -> دخل اللعبة فورًا (بدون شاشة تم التفعيل)
+      if(me.activated){
+        window.location.replace("/app");
         return;
       }
 
-      show("view-ready");
+      // غير مفعّل -> اعرض صفحة إدخال الكود
+      show("view-activate");
     }
 
-    // =========================
-    //   Error translation
-    // =========================
     function translateErr(r){
       const e = (r && (r.error || r.code)) ? String(r.error || r.code) : "UNKNOWN_ERROR";
 
@@ -643,7 +577,6 @@
       if(e === "EMAIL_EXISTS") return "هذا الإيميل مسجل مسبقًا.";
       if(e === "USER_NOT_FOUND") return "الإيميل أو كلمة المرور غير صحيحة.";
       if(e === "BAD_PASSWORD") return "الإيميل أو كلمة المرور غير صحيحة.";
-      if(e === "INVALID_CREDENTIALS") return "الإيميل أو كلمة المرور غير صحيحة.";
       if(e === "EMAIL_NOT_VERIFIED") return "لازم تؤكد بريدك الإلكتروني أولاً.";
 
       if(e === "OTP_WRONG" || e === "OTP_INVALID" || e === "INVALID_OTP") return "رمز التحقق غير صحيح.";
@@ -666,4 +599,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v6 (Save token + Authorization header) -->
+<!-- activate.html – نظام التفعيل الجديد v6 (Auto redirect to /app) -->
