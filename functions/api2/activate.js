@@ -1,6 +1,7 @@
 // functions/api2/activate.js
 // POST /api2/activate
-// v2: fixes SERVER_ERROR by auto-migrating activations table (missing columns)
+// v3: Root-cause mode (returns the real DB error inside error text)
+// + Smart-detect codes table by scanning tables/columns.
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,10 @@ function json(data, status = 200) {
       "cache-control": "no-store",
     },
   });
+}
+
+export async function onRequestOptions() {
+  return new Response(null, { headers: CORS_HEADERS });
 }
 
 function normalizeEmail(email) {
@@ -51,22 +56,44 @@ function bearerToken(req) {
   return m ? m[1].trim() : "";
 }
 
-async function tableInfo(db, tableName) {
-  const res = await db.prepare(`PRAGMA table_info(${tableName});`).all();
-  return (res?.results || []).map((r) => String(r.name));
-}
-
 function nowIso() {
   return new Date().toISOString();
 }
 
-function nowMs() {
-  return Date.now();
+async function dbAll(DB, label, sql, binds = []) {
+  try {
+    return await DB.prepare(sql).bind(...binds).all();
+  } catch (e) {
+    throw new Error(`${label}: ${String(e?.message || e)}`);
+  }
 }
 
-async function ensureActivationsTable(db) {
-  // 1) Create if missing (new schema)
-  await db.prepare(`
+async function dbFirst(DB, label, sql, binds = []) {
+  try {
+    return await DB.prepare(sql).bind(...binds).first();
+  } catch (e) {
+    throw new Error(`${label}: ${String(e?.message || e)}`);
+  }
+}
+
+async function dbRun(DB, label, sql, binds = []) {
+  try {
+    return await DB.prepare(sql).bind(...binds).run();
+  } catch (e) {
+    throw new Error(`${label}: ${String(e?.message || e)}`);
+  }
+}
+
+async function tableInfo(DB, tableName) {
+  const r = await dbAll(DB, `PRAGMA table_info(${tableName})`, `PRAGMA table_info(${tableName});`);
+  return (r?.results || []).map((x) => String(x.name));
+}
+
+async function ensureActivationsTable(DB) {
+  await dbRun(
+    DB,
+    "ensureActivationsTable:CREATE",
+    `
     CREATE TABLE IF NOT EXISTS activations (
       code TEXT NOT NULL,
       email TEXT,
@@ -74,54 +101,29 @@ async function ensureActivationsTable(db) {
       created_at TEXT,
       PRIMARY KEY (code, device_id)
     );
-  `).run();
+  `
+  );
 
-  // 2) If table existed old/partial -> add missing cols safely
-  const cols = await tableInfo(db, "activations");
+  // add missing columns if table is old
+  const cols = await tableInfo(DB, "activations");
 
-  // add email if missing
   if (!cols.includes("email")) {
-    try {
-      await db.prepare(`ALTER TABLE activations ADD COLUMN email TEXT;`).run();
-    } catch (e) {
-      // ignore if not supported / already exists race
-      console.log("activations_add_email_skip", String(e?.message || e));
-    }
+    try { await dbRun(DB, "ensureActivationsTable:ADD email", `ALTER TABLE activations ADD COLUMN email TEXT;`); } catch {}
   }
-
-  // add created_at if missing
   if (!cols.includes("created_at")) {
-    try {
-      await db.prepare(`ALTER TABLE activations ADD COLUMN created_at TEXT;`).run();
-    } catch (e) {
-      console.log("activations_add_created_at_skip", String(e?.message || e));
-    }
+    try { await dbRun(DB, "ensureActivationsTable:ADD created_at", `ALTER TABLE activations ADD COLUMN created_at TEXT;`); } catch {}
   }
-
-  // add device_id if somehow missing (rare)
   if (!cols.includes("device_id")) {
-    try {
-      await db.prepare(`ALTER TABLE activations ADD COLUMN device_id TEXT;`).run();
-    } catch (e) {
-      console.log("activations_add_device_skip", String(e?.message || e));
-    }
+    try { await dbRun(DB, "ensureActivationsTable:ADD device_id", `ALTER TABLE activations ADD COLUMN device_id TEXT;`); } catch {}
   }
-
-  // add code if somehow missing (rare)
   if (!cols.includes("code")) {
-    try {
-      await db.prepare(`ALTER TABLE activations ADD COLUMN code TEXT;`).run();
-    } catch (e) {
-      console.log("activations_add_code_skip", String(e?.message || e));
-    }
+    try { await dbRun(DB, "ensureActivationsTable:ADD code", `ALTER TABLE activations ADD COLUMN code TEXT;`); } catch {}
   }
 }
 
-async function getSessionEmail(db, req) {
-  // 1) Authorization Bearer
+async function getSessionEmail(DB, req) {
   let token = bearerToken(req);
 
-  // 2) Cookie fallback (أسماء محتملة)
   if (!token) {
     const cookies = parseCookies(req.headers.get("Cookie") || "");
     token =
@@ -135,35 +137,69 @@ async function getSessionEmail(db, req) {
   token = String(token || "").trim();
   if (!token) return { ok: false, error: "UNAUTHORIZED" };
 
-  const row = await db
-    .prepare(`SELECT email FROM sessions WHERE token = ? LIMIT 1`)
-    .bind(token)
-    .first();
+  // sessions قد يكون email أو user_email
+  let row = await dbFirst(DB, "getSessionEmail:sessions(email)", `SELECT email FROM sessions WHERE token = ? LIMIT 1`, [token]);
+  let email = normalizeEmail(row?.email);
 
-  const email = normalizeEmail(row?.email);
+  if (!email) {
+    row = await dbFirst(DB, "getSessionEmail:sessions(user_email)", `SELECT user_email FROM sessions WHERE token = ? LIMIT 1`, [token]);
+    email = normalizeEmail(row?.user_email);
+  }
+
   if (!email) return { ok: false, error: "SESSION_NOT_FOUND" };
-
   return { ok: true, email, token };
 }
 
-async function findCodesTable(db) {
-  const candidates = ["codes", "activation_codes", "license_codes", "game_codes"];
-  for (const t of candidates) {
-    try {
-      const cols = await tableInfo(db, t);
-      if (cols.length) return { table: t, cols };
-    } catch {}
-  }
-  return { table: null, cols: [] };
-}
-
-function firstExistingCol(cols, names) {
+function pickFirst(cols, names) {
   for (const n of names) if (cols.includes(n)) return n;
   return null;
 }
 
-export async function onRequestOptions() {
-  return new Response(null, { headers: CORS_HEADERS });
+async function listTables(DB) {
+  const r = await dbAll(
+    DB,
+    "listTables",
+    `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;`
+  );
+  return (r?.results || []).map((x) => String(x.name));
+}
+
+async function detectCodesTable(DB) {
+  const tables = await listTables(DB);
+  const codeColCandidates = ["code", "activation_code", "license", "key"];
+
+  let best = null;
+
+  for (const t of tables) {
+    // تجاهل جداول النظام
+    if (t === "sessions" || t === "users" || t === "pending_users" || t === "activations") continue;
+
+    let cols = [];
+    try { cols = await tableInfo(DB, t); } catch { continue; }
+
+    const codeCol = pickFirst(cols, codeColCandidates);
+    if (!codeCol) continue;
+
+    // score
+    const ownerCol = pickFirst(cols, ["used_by_email", "bound_email", "owner_email", "used_email", "email"]);
+    const isUsedCol = pickFirst(cols, ["is_used", "used", "activated", "is_activated"]);
+    const usedAtCol = pickFirst(cols, ["used_at", "activated_at"]);
+    const statusCol = pickFirst(cols, ["status"]);
+    const limitCol = pickFirst(cols, ["device_limit", "max_devices", "devices_limit"]);
+
+    let score = 10;
+    if (ownerCol) score += 5;
+    if (isUsedCol) score += 3;
+    if (usedAtCol) score += 2;
+    if (statusCol) score += 2;
+    if (limitCol) score += 1;
+
+    if (!best || score > best.score) {
+      best = { table: t, cols, codeCol, ownerCol, isUsedCol, usedAtCol, statusCol, limitCol, score };
+    }
+  }
+
+  return { best, tables };
 }
 
 export async function onRequestPost(context) {
@@ -181,50 +217,51 @@ export async function onRequestPost(context) {
     const code = normalizeCode(body.code);
     if (!code) return json({ ok: false, error: "MISSING_FIELDS" }, 400);
 
-    // session -> email
+    // auth -> email
     const ses = await getSessionEmail(env.DB, request);
     if (!ses.ok) return json({ ok: false, error: ses.error }, 401);
     const email = ses.email;
 
-    // ✅ IMPORTANT: fix most common SERVER_ERROR cause
+    // ensure activations
     await ensureActivationsTable(env.DB);
 
-    // locate codes table
-    const { table: codesTable, cols: codesCols } = await findCodesTable(env.DB);
-    if (!codesTable) return json({ ok: false, error: "CODES_TABLE_NOT_FOUND" }, 500);
+    // detect codes table
+    const { best, tables } = await detectCodesTable(env.DB);
+    if (!best) {
+      return json(
+        { ok: false, error: `CODES_TABLE_NOT_FOUND|tables=${tables.join(",")}` },
+        500
+      );
+    }
 
-    const codeCol = firstExistingCol(codesCols, ["code", "activation_code", "license", "key"]);
-    if (!codeCol) return json({ ok: false, error: "CODES_SCHEMA_MISSING_CODE_COL" }, 500);
-
-    const ownerCol = firstExistingCol(codesCols, [
-      "used_by_email",
-      "bound_email",
-      "owner_email",
-      "used_email",
-      "email",
-    ]);
-
-    const isUsedCol = firstExistingCol(codesCols, ["is_used", "used", "activated", "is_activated"]);
-    const usedAtCol = firstExistingCol(codesCols, ["used_at", "activated_at"]);
-    const statusCol = firstExistingCol(codesCols, ["status"]);
-    const limitCol = firstExistingCol(codesCols, ["device_limit", "max_devices", "devices_limit"]);
+    const {
+      table: codesTable,
+      codeCol,
+      ownerCol,
+      isUsedCol,
+      usedAtCol,
+      statusCol,
+      limitCol,
+    } = best;
 
     // load code row
-    const codeRow = await env.DB
-      .prepare(`SELECT * FROM ${codesTable} WHERE ${codeCol} = ? LIMIT 1`)
-      .bind(code)
-      .first();
+    const codeRow = await dbFirst(
+      env.DB,
+      "loadCodeRow",
+      `SELECT * FROM ${codesTable} WHERE ${codeCol} = ? LIMIT 1`,
+      [code]
+    );
 
     if (!codeRow) return json({ ok: false, error: "CODE_NOT_FOUND" }, 404);
 
     const boundEmail = ownerCol ? normalizeEmail(codeRow[ownerCol]) : "";
 
-    // already used by another account
+    // used by another account
     if (boundEmail && boundEmail !== email) {
       return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
 
-    // if code marks used (even if email col missing)
+    // used flags
     if (!boundEmail && isUsedCol && Number(codeRow[isUsedCol] || 0) === 1) {
       return json({ ok: false, error: "CODE_ALREADY_USED" }, 409);
     }
@@ -239,33 +276,34 @@ export async function onRequestPost(context) {
       if (Number.isFinite(v) && v >= 1) limit = v;
     }
 
-    // already activated on same device?
-    const existing = await env.DB
-      .prepare(`SELECT device_id FROM activations WHERE code = ? AND device_id = ? LIMIT 1`)
-      .bind(code, deviceId)
-      .first();
+    // already on same device?
+    const existing = await dbFirst(
+      env.DB,
+      "checkExistingActivation",
+      `SELECT device_id FROM activations WHERE code = ? AND device_id = ? LIMIT 1`,
+      [code, deviceId]
+    );
 
     if (!existing) {
-      // count activations for this code+email (email may exist now by migration)
-      const cntRow = await env.DB
-        .prepare(`SELECT COUNT(*) AS n FROM activations WHERE code = ? AND email = ?`)
-        .bind(code, email)
-        .first();
+      const cntRow = await dbFirst(
+        env.DB,
+        "countActivations",
+        `SELECT COUNT(*) AS n FROM activations WHERE code = ? AND email = ?`,
+        [code, email]
+      );
 
       const n = Number(cntRow?.n || 0);
       if (n >= limit) return json({ ok: false, error: "DEVICE_LIMIT_REACHED" }, 409);
 
-      // insert activation (after migration columns exist)
-      await env.DB
-        .prepare(
-          `INSERT INTO activations (code, email, device_id, created_at)
-           VALUES (?, ?, ?, ?)`
-        )
-        .bind(code, email, deviceId, nowIso())
-        .run();
+      await dbRun(
+        env.DB,
+        "insertActivation",
+        `INSERT INTO activations (code, email, device_id, created_at) VALUES (?, ?, ?, ?)`,
+        [code, email, deviceId, nowIso()]
+      );
     }
 
-    // bind code to email (first time only)
+    // bind to email first time
     if (ownerCol && !boundEmail) {
       const sets = [];
       const binds = [];
@@ -276,36 +314,31 @@ export async function onRequestPost(context) {
       if (isUsedCol) sets.push(`${isUsedCol} = 1`);
       if (usedAtCol) {
         sets.push(`${usedAtCol} = ?`);
-        binds.push(nowMs());
+        binds.push(Date.now());
       }
       if (statusCol) {
         sets.push(`${statusCol} = ?`);
         binds.push("used");
       }
 
-      await env.DB
-        .prepare(`UPDATE ${codesTable} SET ${sets.join(", ")} WHERE ${codeCol} = ?`)
-        .bind(...binds, code)
-        .run();
+      await dbRun(
+        env.DB,
+        "bindCodeToEmail",
+        `UPDATE ${codesTable} SET ${sets.join(", ")} WHERE ${codeCol} = ?`,
+        [...binds, code]
+      );
     }
 
-    return json(
-      {
-        ok: true,
-        activated: true,
-        email,
-        code,
-        deviceId,
-      },
-      200
-    );
+    return json({ ok: true, activated: true, email, code, deviceId }, 200);
   } catch (e) {
-    // بدل SERVER_ERROR المبهم: نطبع السبب في اللوق (والواجهة تبقى SERVER_ERROR)
-    console.log("activate_error_v2", String(e?.message || e));
-    return json({ ok: false, error: "SERVER_ERROR" }, 500);
+    // ✅ هنا الجذر: نُرجع سبب السقوط فعليًا داخل error
+    const msg = String(e?.message || e || "unknown");
+    return json({ ok: false, error: `SERVER_ERROR|${msg}` }, 500);
   }
 }
 
 /*
-activate.js – api2 – v2 (Auto-migrate activations columns to kill SERVER_ERROR)
+activate.js – api2 – v3
+- returns real error inside SERVER_ERROR|...
+- smart-detect codes table
 */
