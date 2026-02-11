@@ -106,12 +106,7 @@
     <img class="logo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
     <div class="card">
       <div class="title"><span id="stateText">جاري فتح اللعبة</span><span class="spinner" id="sp"></span></div>
-      <p class="sub" id="stateSub">لحظة.. نتحقق من التفعيل.</p>
-
-      <div class="row hidden" id="actions">
-        <button class="btn-secondary" id="retryBtn">إعادة المحاولة</button>
-        <button class="btn-primary" id="goActivateBtn">اذهب لصفحة التفعيل</button>
-      </div>
+      <p class="sub" id="stateSub">لحظة.. جاري فتح اللعبة.</p>
 
       <div class="dbg" id="dbg"></div>
     </div>
@@ -134,94 +129,10 @@
       if (DBG) dbgEl.style.display = "block";
       const dbg = (t)=>{ if(DBG){ dbgEl.textContent = t; } };
 
-      const stateText = document.getElementById("stateText");
-      const stateSub  = document.getElementById("stateSub");
-      const spinner   = document.getElementById("sp");
-      const actions   = document.getElementById("actions");
-      const retryBtn  = document.getElementById("retryBtn");
-      const goActBtn  = document.getElementById("goActivateBtn");
+      dbg("redirect -> " + r);
 
-      function showActions(msg, sub){
-        stateText.textContent = msg || "تعذر فتح اللعبة";
-        stateSub.textContent  = sub || "جرّب إعادة المحاولة.";
-        spinner.classList.add("hidden");
-        actions.classList.remove("hidden");
-      }
-
-      function gotoActivate(reason){
-        dbg("gotoActivate: " + (reason || "unknown"));
-        const url = "activate.html?r=" + encodeURIComponent(r);
-        location.replace(url);
-      }
-
-      async function checkActivationOnce(){
-        const endpoint = "/api/verify"; // الموجود عندك
-
-        try{
-          const controller = new AbortController();
-          const t = setTimeout(()=>controller.abort(), 6000);
-
-          const res = await fetch(endpoint, {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-            signal: controller.signal
-          });
-
-          clearTimeout(t);
-
-          dbg(`verify status=${res.status}`);
-
-          // ✅ مفعل
-          if (res.ok) return { ok:true, status: res.status };
-
-          // ✅ غير مفعل
-          if (res.status === 401 || res.status === 403) return { ok:false, status: res.status };
-
-          // 404/405/500/… نعتبرها فشل تحقق (نوديه للتفعيل بدل ما نوقفه)
-          return { ok:null, status: res.status };
-        }catch(e){
-          dbg("verify error=" + (e && e.name ? e.name : "fetch_error"));
-          return { ok:null, status: 0 };
-        }
-      }
-
-      async function openGate(){
-        actions.classList.add("hidden");
-        spinner.classList.remove("hidden");
-        stateText.textContent = "جاري فتح اللعبة";
-        stateSub.textContent  = "لحظة.. نتحقق من التفعيل.";
-
-        // محاولة واحدة + احتياطية (بدون reload)
-        const a1 = await checkActivationOnce();
-        if (a1.ok === true){
-          location.replace(r);
-          return;
-        }
-        if (a1.ok === false){
-          gotoActivate("not_activated");
-          return;
-        }
-
-        await new Promise(res => setTimeout(res, 600));
-        const a2 = await checkActivationOnce();
-        if (a2.ok === true){
-          location.replace(r);
-          return;
-        }
-        if (a2.ok === false){
-          gotoActivate("not_activated_2");
-          return;
-        }
-
-        // ✅ أهم تغيير: إذا التحقق تعطل، ما نوقف العميل.. نوديه للتفعيل
-        gotoActivate("verify_failed_or_missing");
-      }
-
-      retryBtn.addEventListener("click", openGate);
-      goActBtn.addEventListener("click", ()=>gotoActivate("manual"));
-
-      openGate();
+      // فتح اللعبة مباشرة
+      setTimeout(()=>location.replace(r), 60);
     })();
   </script>
 </body>
