@@ -1,6 +1,7 @@
 // functions/api2/reset.js
 // POST /api2/reset
-// Reset password using token stored in D1 password_resets (created by /api2/forgot)
+// Resets password using token from password_resets table
+// Fix: Cloudflare PBKDF2 iterations must be <= 100000
 
 const CORS_HEADERS = (req) => {
   const origin = req.headers.get("origin");
@@ -33,20 +34,16 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function isStrongEnough(pw) {
-  return String(pw || "").length >= 8;
+function base64FromBytes(arr) {
+  let s = "";
+  for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+  return btoa(s);
 }
 
-async function tableCols(DB, table) {
-  const res = await DB.prepare(`PRAGMA table_info(${table});`).all();
-  return new Set((res?.results || []).map((r) => String(r.name)));
-}
-
-async function tableExists(DB, table) {
-  const r = await DB.prepare(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`
-  ).bind(table).first();
-  return !!r?.name;
+function makeSalt(bytes = 16) {
+  const a = new Uint8Array(bytes);
+  crypto.getRandomValues(a);
+  return a;
 }
 
 async function sha256Hex(str) {
@@ -58,27 +55,48 @@ async function sha256Hex(str) {
   return hex;
 }
 
-function b64FromBytes(arr) {
-  return btoa(String.fromCharCode(...arr));
-}
+async function pbkdf2Hash(password, saltBytes, iterations = 100000, dkLenBytes = 32) {
+  // Cloudflare limit: iterations <= 100000
+  const it = Math.min(Math.max(1, Number(iterations) || 1), 100000);
 
-async function pbkdf2Base64(password, saltBytes, iterations = 210000, length = 32) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
+  const pwKey = await crypto.subtle.importKey(
     "raw",
-    enc.encode(String(password)),
+    new TextEncoder().encode(String(password)),
     { name: "PBKDF2" },
     false,
     ["deriveBits"]
   );
 
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: saltBytes, iterations, hash: "SHA-256" },
-    key,
-    length * 8
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: saltBytes,
+      iterations: it,
+    },
+    pwKey,
+    dkLenBytes * 8
   );
 
-  return b64FromBytes(new Uint8Array(bits));
+  return { iters: it, bytes: new Uint8Array(bits) };
+}
+
+async function tableInfo(DB, table) {
+  const r = await DB.prepare(`PRAGMA table_info(${table});`).all();
+  return (r?.results || []);
+}
+
+async function tableExists(DB, table) {
+  const r = await DB.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`
+  ).bind(table).first();
+  return !!r?.name;
+}
+
+function pickHashCol(cols) {
+  const candidates = ["password_hash", "pass_hash", "pw_hash", "hash"];
+  for (const c of candidates) if (cols.has(c)) return c;
+  return "";
 }
 
 export async function onRequest(context) {
@@ -95,105 +113,88 @@ export async function onRequest(context) {
     if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
 
     const body = await request.json().catch(() => ({}));
-
-    const auth = request.headers.get("Authorization") || "";
-    const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-
-    const token =
-      String(body?.token || body?.reset_token || body?.resetToken || bearer || "").trim();
-
-    const password =
-      String(body?.password || body?.new_password || body?.newPassword || "").trim();
-
-    const maybeEmail = body?.email ? normalizeEmail(body.email) : "";
+    const token = String(body?.token || "").trim();
+    const password = String(body?.password || "").trim();
 
     if (!token) return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
     if (!password) return json(request, { ok: false, error: "MISSING_PASSWORD" }, 400);
-    if (!isStrongEnough(password)) return json(request, { ok: false, error: "WEAK_PASSWORD" }, 400);
+    if (password.length < 8) return json(request, { ok: false, error: "WEAK_PASSWORD" }, 400);
 
+    // لازم جدول password_resets موجود (يتسوّى من forgot.js)
     if (!(await tableExists(env.DB, "password_resets"))) {
       return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
     }
 
-    const now = Date.now();
     const tokenHash = await sha256Hex(token);
+    const now = Date.now();
 
     const row = await env.DB.prepare(
       `SELECT email, expires_at, used_at
-         FROM password_resets
-        WHERE token_hash = ?
-        LIMIT 1`
+       FROM password_resets
+       WHERE token_hash = ?
+       LIMIT 1`
     ).bind(tokenHash).first();
 
     if (!row) return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
-    if (row.used_at) return json(request, { ok: false, error: "RESET_TOKEN_USED" }, 400);
+    if (row.used_at) return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
     if (Number(row.expires_at || 0) < now) return json(request, { ok: false, error: "RESET_TOKEN_EXPIRED" }, 400);
 
     const email = normalizeEmail(row.email);
-    if (maybeEmail && maybeEmail !== email) {
-      return json(request, { ok: false, error: "EMAIL_MISMATCH" }, 400);
-    }
+    if (!email) return json(request, { ok: false, error: "MISSING_EMAIL" }, 400);
 
-    const uCols = await tableCols(env.DB, "users");
+    // hash new password (PBKDF2 max 100000)
+    const salt = makeSalt(16);
+    const { iters, bytes } = await pbkdf2Hash(password, salt, 100000, 32);
 
-    const hashCol =
-      (uCols.has("password_hash") && "password_hash") ||
-      (uCols.has("pass_hash") && "pass_hash") ||
-      (uCols.has("pw_hash") && "pw_hash") ||
-      (uCols.has("hash") && "hash") ||
-      "";
+    const passwordHashB64 = base64FromBytes(bytes);
+    const saltB64 = base64FromBytes(salt);
 
+    // Update users table safely حسب الأعمدة الموجودة
+    const info = await tableInfo(env.DB, "users");
+    const cols = new Set(info.map((x) => String(x.name)));
+
+    const hashCol = pickHashCol(cols);
     if (!hashCol) {
-      return json(request, { ok: false, error: "USERS_SCHEMA_MISSING_PASSWORD_COL", detail: `users cols: ${Array.from(uCols).join(",")}` }, 500);
-    }
-
-    let newHash = "";
-    let newSaltB64 = "";
-
-    if (uCols.has("salt_b64")) {
-      const salt = new Uint8Array(16);
-      crypto.getRandomValues(salt);
-      newSaltB64 = b64FromBytes(salt);
-      newHash = await pbkdf2Base64(password, salt, 210000, 32);
-    } else {
-      newHash = await sha256Hex(password);
+      console.log("reset_error_detail", "USERS_SCHEMA_MISSING_PASSWORD_COL");
+      return json(request, { ok: false, error: "USERS_SCHEMA_MISSING_PASSWORD_COL" }, 500);
     }
 
     const sets = [];
     const binds = [];
 
     sets.push(`${hashCol} = ?`);
-    binds.push(newHash);
+    binds.push(passwordHashB64);
 
-    if (uCols.has("salt_b64")) {
+    if (cols.has("salt_b64")) {
       sets.push(`salt_b64 = ?`);
-      binds.push(newSaltB64);
+      binds.push(saltB64);
     }
-
-    if (uCols.has("updated_at")) {
+    if (cols.has("pbkdf2_iters")) {
+      sets.push(`pbkdf2_iters = ?`);
+      binds.push(iters);
+    }
+    if (cols.has("updated_at")) {
       sets.push(`updated_at = ?`);
       binds.push(new Date().toISOString());
     }
 
-    binds.push(email);
-
+    // لا نكشف وجود المستخدم: لو ما وُجد نعتبرها ok برضو
     await env.DB.prepare(
       `UPDATE users SET ${sets.join(", ")} WHERE email = ?`
-    ).bind(...binds).run();
+    ).bind(...binds, email).run();
 
+    // mark token used
     await env.DB.prepare(
       `UPDATE password_resets SET used_at = ? WHERE token_hash = ?`
     ).bind(now, tokenHash).run();
 
     return json(request, { ok: true }, 200);
-
   } catch (e) {
-    const detail = String(e?.message || e?.stack || e).slice(0, 500);
-    console.log("reset_error_detail", detail);
-    return json(request, { ok: false, error: "SERVER_ERROR", detail }, 500);
+    console.log("reset_error_detail", String(e?.message || e));
+    return json(request, { ok: false, error: "SERVER_ERROR" }, 500);
   }
 }
 
 /*
-reset.js – api2 – إصدار 2 (returns error detail to debug)
+reset.js – api2 – إصدار 1.1 (PBKDF2 iterations <= 100000 fix)
 */
