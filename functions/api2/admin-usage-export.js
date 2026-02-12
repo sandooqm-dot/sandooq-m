@@ -1,93 +1,193 @@
 // functions/api2/admin-usage-export.js
-// GET /api2/admin-usage-export
-// Returns used codes + email + used_at from D1 (code_usage_v2)
-// Protected by ADMIN_API_KEY (header X-Admin-Key) or ?key= for quick testing
+// GET /api2/admin-usage-export?key=XXXX&format=json|csv
+// يرجّع: قائمة الأكواد + حالة الاستخدام + تاريخ الاستخدام + الإيميل (بدون أي Redirect للعبة)
 
-const CORS_HEADERS = (req) => {
-  const origin = req.headers.get("origin");
-  const h = {
-    "Access-Control-Allow-Methods": "GET,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id, X-Admin-Key",
-    "Access-Control-Max-Age": "86400",
-    "cache-control": "no-store",
-  };
-  h["Access-Control-Allow-Origin"] = origin || "*";
-  return h;
-};
-
-function json(req, data, status = 200) {
-  return new Response(JSON.stringify(data), {
+function text(status, msg) {
+  return new Response(msg, {
     status,
-    headers: {
-      ...CORS_HEADERS(req),
-      "content-type": "application/json; charset=utf-8",
-    },
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
   });
 }
 
-function iso(ts) {
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+async function tableInfo(DB, table) {
   try {
-    return new Date(Number(ts)).toISOString();
+    const r = await DB.prepare(`PRAGMA table_info(${table});`).all();
+    return r?.results || [];
   } catch {
-    return null;
+    return [];
   }
+}
+
+async function tableExists(DB, table) {
+  try {
+    const r = await DB.prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`
+    ).bind(table).first();
+    return !!r?.name;
+  } catch {
+    return false;
+  }
+}
+
+function pickFirst(colsSet, candidates) {
+  for (const c of candidates) if (colsSet.has(c)) return c;
+  return "";
+}
+
+function normalizeEmail(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+function normalizeCode(v) {
+  return String(v || "").trim().toUpperCase().replace(/\s+/g, "").replace(/[–—−]/g, "-");
+}
+
+function toISO(v) {
+  if (v === null || v === undefined || v === "") return "";
+  // رقم (ms أو sec)
+  if (typeof v === "number") {
+    const ms = v > 10_000_000_000 ? v : v * 1000;
+    try { return new Date(ms).toISOString(); } catch { return String(v); }
+  }
+  const s = String(v).trim();
+  // رقم كنص
+  if (/^\d+$/.test(s)) {
+    const n = Number(s);
+    const ms = n > 10_000_000_000 ? n : n * 1000;
+    try { return new Date(ms).toISOString(); } catch { return s; }
+  }
+  // ISO أو نص
+  return s;
+}
+
+function toCSV(items) {
+  const esc = (x) => {
+    const s = String(x ?? "");
+    if (/[,"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const head = ["code", "used", "used_at", "email"];
+  const rows = [head.join(",")];
+
+  for (const it of items) {
+    rows.push([esc(it.code), esc(it.used ? 1 : 0), esc(it.used_at), esc(it.email)].join(","));
+  }
+  return rows.join("\n");
 }
 
 export async function onRequest(context) {
   const { request, env } = context;
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS_HEADERS(request) });
-  }
-  if (request.method !== "GET") {
-    return json(request, { ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
-  }
-
   try {
-    if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
+    if (!env?.DB) return text(500, "DB_NOT_BOUND");
 
-    // 🔒 حماية: لازم مفتاح إداري
     const url = new URL(request.url);
-    const keyFromQuery = (url.searchParams.get("key") || "").trim(); // للاختبار السريع
-    const keyFromHeader = (request.headers.get("x-admin-key") || "").trim();
-    const adminKey = String(env.ADMIN_API_KEY || "").trim();
 
-    if (!adminKey) return json(request, { ok: false, error: "ADMIN_KEY_NOT_SET" }, 500);
+    // ✅ admin key من env (ندعم أكثر من اسم عشان ما نتوه)
+    const ADMIN_KEY =
+      String(env.ADMIN_USAGE_EXPORT_KEY || env.ADMIN_EXPORT_KEY || env.ADMIN_KEY || "").trim();
 
-    const provided = keyFromHeader || keyFromQuery;
-    if (!provided || provided !== adminKey) {
-      return json(request, { ok: false, error: "UNAUTHORIZED" }, 401);
+    if (!ADMIN_KEY) return text(500, "ADMIN_KEY_NOT_SET");
+
+    const key = String(url.searchParams.get("key") || "").trim();
+    if (!key || key !== ADMIN_KEY) {
+      // ❌ لا Redirect للعبة — يرجّع 401 واضح
+      return text(401, "UNAUTHORIZED");
     }
 
-    // اختياري: فلترة حسب لعبة
-    const game = (url.searchParams.get("game") || "").trim(); // مثال: ?game=horof
+    const format = String(url.searchParams.get("format") || "json").toLowerCase();
 
-    let q = `SELECT code, email, used_at, device_id, game_slug FROM code_usage_v2`;
-    let args = [];
-    if (game) {
-      q += ` WHERE game_slug = ?`;
-      args.push(game);
+    // 1) الأفضل: جدول codes لأنه يحتوي كل الأكواد (مستخدم/غير مستخدم)
+    let items = [];
+
+    if (await tableExists(env.DB, "codes")) {
+      const info = await tableInfo(env.DB, "codes");
+      const cols = new Set(info.map((x) => String(x.name)));
+
+      const codeCol = pickFirst(cols, ["code", "activation_code"]);
+      if (!codeCol) return text(500, "CODES_TABLE_MISSING_CODE_COL");
+
+      const emailCol = pickFirst(cols, ["used_by_email", "email", "user_email", "used_email"]);
+      const usedAtCol = pickFirst(cols, ["used_at", "activated_at", "updated_at", "created_at"]);
+      const isUsedCol = pickFirst(cols, ["is_used", "used", "activated"]);
+
+      const sql = `SELECT * FROM codes`;
+      const r = await env.DB.prepare(sql).all();
+
+      for (const row of (r?.results || [])) {
+        const code = normalizeCode(row[codeCol]);
+        const email = emailCol ? normalizeEmail(row[emailCol]) : "";
+        const usedAt = usedAtCol ? toISO(row[usedAtCol]) : "";
+
+        let used = false;
+        if (isUsedCol) used = Number(row[isUsedCol]) === 1;
+        // fallback
+        if (!used) used = !!email || !!usedAt;
+
+        items.push({
+          code,
+          used,
+          used_at: usedAt,
+          email,
+        });
+      }
+
+      // ترتيب ثابت: الأكواد تبقى بمكانها
+      items.sort((a, b) => (a.code > b.code ? 1 : a.code < b.code ? -1 : 0));
+    } else if (await tableExists(env.DB, "activations")) {
+      // fallback: لو ما عندك codes
+      const r = await env.DB.prepare(`SELECT * FROM activations`).all();
+      const sample = (r?.results || [])[0] || {};
+      const cols = new Set(Object.keys(sample).map(String));
+
+      const codeCol = pickFirst(cols, ["code", "activation_code"]);
+      const emailCol = pickFirst(cols, ["used_by_email", "email", "user_email"]);
+      const usedAtCol = pickFirst(cols, ["used_at", "activated_at", "created_at"]);
+
+      items = (r?.results || []).map((row) => ({
+        code: normalizeCode(codeCol ? row[codeCol] : ""),
+        used: true,
+        used_at: toISO(usedAtCol ? row[usedAtCol] : ""),
+        email: normalizeEmail(emailCol ? row[emailCol] : ""),
+      })).filter((x) => x.code);
+
+      items.sort((a, b) => (a.code > b.code ? 1 : a.code < b.code ? -1 : 0));
+    } else {
+      return text(500, "NO_CODES_OR_ACTIVATIONS_TABLE");
     }
-    q += ` ORDER BY used_at DESC LIMIT 10000`;
 
-    const res = await env.DB.prepare(q).bind(...args).all();
+    // ✅ Output
+    if (format === "csv") {
+      const csv = toCSV(items);
+      return new Response(csv, {
+        status: 200,
+        headers: {
+          "content-type": "text/csv; charset=utf-8",
+          "content-disposition": "attachment; filename=code_usage.csv",
+          "cache-control": "no-store",
+        },
+      });
+    }
 
-    const items = (res?.results || []).map((r) => ({
-      code: r.code,
-      email: r.email,
-      used_at: r.used_at,
-      used_at_iso: iso(r.used_at),
-      device_id: r.device_id || null,
-      game_slug: r.game_slug || null,
-    }));
+    return json({
+      ok: true,
+      count: items.length,
+      items,
+    }, 200);
 
-    return json(request, { ok: true, count: items.length, items }, 200);
   } catch (e) {
-    console.log("admin_usage_export_error", String(e?.message || e));
-    return json(request, { ok: false, error: "SERVER_ERROR" }, 500);
+    return text(500, "SERVER_ERROR: " + String(e?.message || e));
   }
 }
 
 /*
-admin-usage-export.js – api2 – إصدار 1
+functions/api2/admin-usage-export.js – إصدار 1 (No redirect, JSON/CSV export)
 */
