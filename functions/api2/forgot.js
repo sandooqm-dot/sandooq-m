@@ -78,7 +78,10 @@ async function ensureResetTable(DB) {
 
 async function sendResend(env, toEmail, resetLink) {
   const apiKey = String(env.RESEND_API_KEY || "").trim();
-  const from = String(env.MAIL_FROM || "").trim(); // مثال: "Sandooq <onboarding@resend.dev>" أو "noreply@yourdomain.com"
+
+  // ✅ التعديل الوحيد: دعم RESEND_FROM (اسمك الحالي) + دعم MAIL_FROM (لو نسخة قديمة)
+  const from = String(env.RESEND_FROM || env.MAIL_FROM || "").trim();
+
   if (!apiKey || !from) {
     return { ok: false, error: "MAIL_NOT_CONFIGURED" };
   }
@@ -178,5 +181,5 @@ export async function onRequest(context) {
 }
 
 /*
-forgot.js – api2 – إصدار 1 (Resend + D1 password_resets)
+forgot.js – api2 – إصدار 2 (RESEND_FROM supported + legacy MAIL_FROM)
 */
