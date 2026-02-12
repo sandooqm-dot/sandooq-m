@@ -1,227 +1,194 @@
 export async function onRequestGet({ request, env }) {
-  try {
-    const url = new URL(request.url);
-    const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
-    const oauthError = url.searchParams.get("error");
+  const url = new URL(request.url);
 
-    if (oauthError) {
-      return html(`رسالة\nخطأ من Google: ${escapeHtml(oauthError)}`);
-    }
-    if (!code || !state) {
-      return html("رسالة\nبيانات الرجوع من Google ناقصة (code/state).");
-    }
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
 
-    // --- Cookies (for PKCE/state) ---
-    const cookie = request.headers.get("Cookie") || "";
-    const cookieGet = (name) => {
-      const m = cookie.match(new RegExp(`(?:^|; )${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}=([^;]*)`));
-      return m ? decodeURIComponent(m[1]) : null;
-    };
+  if (!code || !state) {
+    return text("بيانات الرجوع من Google ناقصة (code/state).", 400);
+  }
 
-    const expectedState =
-      cookieGet("g_state") ||
-      cookieGet("google_state") ||
-      cookieGet("oauth_state") ||
-      cookieGet("state");
+  const cookie = request.headers.get("Cookie") || "";
+  const stateCookie = getCookie(cookie, "g_state");
+  const verifier = getCookie(cookie, "g_verifier");
 
-    if (expectedState && expectedState !== state) {
-      return html("رسالة\nبيانات التحقق غير صحيحة (state mismatch).");
-    }
+  if (!stateCookie || stateCookie !== state) {
+    return text("state غير مطابق (قد تكون الكوكي ما وصلت).", 400);
+  }
+  if (!verifier) {
+    return text("Missing code verifier (g_verifier).", 400);
+  }
 
-    const codeVerifier =
-      cookieGet("g_verifier") ||
-      cookieGet("google_verifier") ||
-      cookieGet("oauth_verifier") ||
-      cookieGet("verifier");
+  const clientId = String(env.GOOGLE_CLIENT_ID || "").trim();
+  const clientSecret = String(env.GOOGLE_CLIENT_SECRET || "").trim();
+  const redirectUri =
+    (env.GOOGLE_REDIRECT_URI && String(env.GOOGLE_REDIRECT_URI).trim()) ||
+    `${url.origin}/api2/google/callback`;
 
-    const redirectUri =
-      (env.GOOGLE_REDIRECT_URI && String(env.GOOGLE_REDIRECT_URI).trim()) ||
-      `${url.origin}/api2/google/callback`;
+  if (!clientId || !clientSecret) {
+    return text("GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET غير مضبوطين.", 500);
+  }
 
-    const clientId = String(env.GOOGLE_CLIENT_ID || "").trim();
-    const clientSecret = String(env.GOOGLE_CLIENT_SECRET || "").trim();
+  // 1) Token Exchange (PKCE)
+  const form = new URLSearchParams();
+  form.set("client_id", clientId);
+  form.set("client_secret", clientSecret);
+  form.set("code", code);
+  form.set("grant_type", "authorization_code");
+  form.set("redirect_uri", redirectUri);
+  form.set("code_verifier", verifier);
 
-    if (!clientId || !clientSecret) {
-      return html("رسالة\nنقص في إعدادات GOOGLE_CLIENT_ID أو GOOGLE_CLIENT_SECRET داخل Cloudflare.");
-    }
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+  });
 
-    // --- Token exchange ---
-    const body = new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri,
-    });
-
-    // PKCE is optional depending on start.js
-    if (codeVerifier) body.set("code_verifier", codeVerifier);
-
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-    });
-
-    const tokenJson = await tokenRes.json().catch(() => ({}));
-
-    if (!tokenRes.ok) {
-      const msg = [
-        "فشل تبادل رمز (token exchange) من Google.",
-        "",
+  const tokenJson = await tokenRes.json().catch(() => ({}));
+  if (!tokenRes.ok) {
+    return text(
+      [
+        "Google (token exchange) فشل",
         `status: ${tokenRes.status}`,
-        `error: ${tokenJson.error || "unknown"}`,
-        `desc: ${tokenJson.error_description || "no_desc"}`,
+        `error: ${tokenJson.error || ""}`,
+        `desc: ${tokenJson.error_description || ""}`,
         `redirect_uri_used: ${redirectUri}`,
-      ].join("\n");
-      return html(escapeHtml(msg));
-    }
+      ].join("\n"),
+      400
+    );
+  }
 
-    const accessToken = tokenJson.access_token;
-    if (!accessToken) {
-      return html("رسالة\nلم يصل access_token من Google.");
-    }
+  const accessToken = tokenJson.access_token;
+  if (!accessToken) {
+    return text("Google لم يرجّع access_token.", 400);
+  }
 
-    // --- Get user info ---
-    const infoRes = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const info = await infoRes.json().catch(() => ({}));
+  // 2) Userinfo
+  const uiRes = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 
-    if (!infoRes.ok || !info.email) {
-      return html("رسالة\nلم نستطع جلب بيانات البريد من Google.");
-    }
+  const profile = await uiRes.json().catch(() => ({}));
+  if (!uiRes.ok) {
+    return text(
+      [
+        "Google (userinfo) فشل",
+        `status: ${uiRes.status}`,
+        JSON.stringify(profile, null, 2),
+      ].join("\n"),
+      400
+    );
+  }
 
-    const email = String(info.email).toLowerCase().trim();
-    const sub = info.sub ? String(info.sub).trim() : null;
-    const now = Date.now();
+  const email = String(profile.email || "").trim().toLowerCase();
+  const sub = String(profile.sub || "").trim();
 
-    // --- Ensure users row (dynamic columns-safe) ---
-    // We avoid crashing if your users schema differs.
-    try {
-      const colsRes = await env.DB.prepare("PRAGMA table_info(users)").all();
-      const cols = (colsRes.results || []).map((r) => r.name);
+  if (!email || !sub) {
+    return text("Google لم يرجّع email/sub.", 400);
+  }
 
-      const insertCols = [];
-      const insertVals = [];
-      const placeholders = [];
+  // 3) Upsert user (Google يعتبر Email Verified)
+  const now = new Date().toISOString();
 
-      if (cols.includes("email")) {
-        insertCols.push("email");
-        insertVals.push(email);
-        placeholders.push("?");
-      }
+  const uInfo = await env.DB.prepare("PRAGMA table_info(users)").all();
+  const uCols = new Set((uInfo.results || []).map((r) => r.name));
 
-      if (sub && cols.includes("google_sub")) {
-        insertCols.push("google_sub");
-        insertVals.push(sub);
-        placeholders.push("?");
-      }
+  const insertCols = [];
+  const insertVals = [];
+  const params = [];
 
-      if (cols.includes("created_at")) {
-        insertCols.push("created_at");
-        insertVals.push(now);
-        placeholders.push("?");
-      }
+  const push = (col, val) => {
+    insertCols.push(col);
+    insertVals.push("?");
+    params.push(val);
+  };
 
-      // mark verified if column exists
-      if (cols.includes("verified_at")) {
-        insertCols.push("verified_at");
-        insertVals.push(now);
-        placeholders.push("?");
-      } else if (cols.includes("is_verified")) {
-        insertCols.push("is_verified");
-        insertVals.push(1);
-        placeholders.push("?");
-      }
+  if (uCols.has("email")) push("email", email);
 
-      if (insertCols.length) {
-        const sql =
-          `INSERT INTO users (${insertCols.join(",")}) VALUES (${placeholders.join(",")}) ` +
-          `ON CONFLICT(email) DO UPDATE SET ` +
-          insertCols
-            .filter((c) => c !== "email")
-            .map((c) => `${c}=excluded.${c}`)
-            .join(",");
+  if (uCols.has("google_sub")) push("google_sub", sub);
+  if (uCols.has("email_verified")) push("email_verified", 1);
+  if (uCols.has("verified_at")) push("verified_at", now);
+  if (uCols.has("created_at")) push("created_at", now);
+  if (uCols.has("id")) push("id", crypto.randomUUID());
 
-        // If only email col exists, update set becomes empty -> handle:
-        if (sql.includes("DO UPDATE SET ") && sql.endsWith("DO UPDATE SET ")) {
-          // do nothing
-        } else {
-          await env.DB.prepare(sql).bind(...insertVals).run();
-        }
-      }
-    } catch (_) {
-      // ignore users upsert errors to not block login
-    }
+  // إذا جدول users ما فيه email أصلاً، نوقف برسالة واضحة
+  if (!uCols.has("email")) {
+    return text("جدول users ما فيه عمود email.", 500);
+  }
 
-    // --- Create session ---
-    const token = crypto.randomUUID();
+  const updates = [];
+  if (uCols.has("google_sub")) updates.push("google_sub=excluded.google_sub");
+  if (uCols.has("email_verified")) updates.push("email_verified=1");
+  if (uCols.has("verified_at")) updates.push("verified_at=excluded.verified_at");
 
-    try {
-      await env.DB.prepare(
-        "INSERT INTO sessions (token, email, created_at) VALUES (?, ?, ?)"
-      ).bind(token, email, now).run();
-    } catch (e) {
-      return html("رسالة\nخطأ في إنشاء جلسة الدخول (sessions).");
-    }
+  const upsertSql =
+    `INSERT INTO users (${insertCols.join(",")}) VALUES (${insertVals.join(",")}) ` +
+    `ON CONFLICT(email) DO UPDATE SET ${updates.length ? updates.join(",") : "email=email"}`;
 
-    // --- Return HTML that stores token then redirects ---
-    // IMPORTANT: activate page reads localStorage 'sandooq_token_v1'
-    const redirectTo = "/activate";
-    const page = `<!doctype html>
+  await env.DB.prepare(upsertSql).bind(...params).run();
+
+  // 4) Create session token (مثل login.js)
+  const sessionToken = base64urlRandom(32);
+
+  await env.DB
+    .prepare("INSERT INTO sessions (token, email, created_at) VALUES (?,?,?)")
+    .bind(sessionToken, email, now)
+    .run();
+
+  // 5) Clear PKCE cookies + return HTML that stores token in localStorage then redirects
+  const headers = new Headers();
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+  headers.append("Set-Cookie", clearCookie("g_state"));
+  headers.append("Set-Cookie", clearCookie("g_verifier"));
+
+  const activatePath = "/activate"; // عندك /activate شغال
+  const html = `<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>تسجيل الدخول...</title>
+  <title>جاري تسجيل الدخول...</title>
 </head>
 <body>
-<script>
-(function(){
-  try{
-    localStorage.setItem("sandooq_token_v1", ${JSON.stringify(token)});
-    // optional: keep email for UI
-    localStorage.setItem("sandooq_email_v1", ${JSON.stringify(email)});
-  }catch(e){}
-  location.replace(${JSON.stringify(redirectTo)});
-})();
-</script>
+  <script>
+    (function(){
+      try {
+        localStorage.setItem("sandooq_token_v1", ${JSON.stringify(sessionToken)});
+      } catch(e) {}
+      location.replace(${JSON.stringify(activatePath)});
+    })();
+  </script>
 </body>
 </html>`;
 
-    // clear oauth cookies if موجودة (اختياري)
-    return new Response(page, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Set-Cookie": [
-          "g_state=; Path=/; Max-Age=0; Secure; SameSite=Lax",
-          "g_verifier=; Path=/; Max-Age=0; Secure; SameSite=Lax",
-          "google_state=; Path=/; Max-Age=0; Secure; SameSite=Lax",
-          "google_verifier=; Path=/; Max-Age=0; Secure; SameSite=Lax",
-          "oauth_state=; Path=/; Max-Age=0; Secure; SameSite=Lax",
-          "oauth_verifier=; Path=/; Max-Age=0; Secure; SameSite=Lax",
-        ].join(", "),
-      },
-    });
-  } catch (err) {
-    return html("رسالة\nحدث خطأ غير متوقع في Google callback.");
-  }
+  return new Response(html, { status: 200, headers });
 }
 
-function html(text) {
-  return new Response(`<!doctype html><meta charset="utf-8"><pre>${escapeHtml(String(text))}</pre>`, {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+function text(msg, status = 200) {
+  return new Response(String(msg), {
+    status,
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
 
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+function getCookie(cookie, name) {
+  const m = cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[2]) : "";
+}
+
+function clearCookie(name) {
+  return `${name}=; Path=/; Secure; SameSite=Lax; Max-Age=0; HttpOnly`;
+}
+
+function base64url(bytes) {
+  const bin = String.fromCharCode(...bytes);
+  const b64 = btoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64urlRandom(nBytes) {
+  const bytes = new Uint8Array(nBytes);
+  crypto.getRandomValues(bytes);
+  return base64url(bytes);
 }
