@@ -1,5 +1,6 @@
 // functions/api2/reset.js
-// POST /api2/reset  -> يرسل رابط إعادة تعيين كلمة المرور على الإيميل
+// POST /api2/reset
+// Reset password using token only (no email needed)
 
 const CORS_HEADERS = (req) => {
   const origin = req.headers.get("origin");
@@ -32,21 +33,44 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function b64url(bytes) {
-  let s = btoa(String.fromCharCode(...bytes));
-  return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+function base64FromBytes(arr) {
+  let s = "";
+  for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+  return btoa(s);
+}
+function base64urlFromBytes(arr) {
+  return base64FromBytes(arr).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function makeToken(bytes = 32) {
-  const arr = new Uint8Array(bytes);
-  crypto.getRandomValues(arr);
-  return b64url(arr);
-}
-
-async function sha256B64Url(str) {
-  const data = new TextEncoder().encode(String(str || ""));
+async function sha256Hex(str) {
+  const data = new TextEncoder().encode(String(str));
   const digest = await crypto.subtle.digest("SHA-256", data);
-  return b64url(new Uint8Array(digest));
+  const b = new Uint8Array(digest);
+  let hex = "";
+  for (const x of b) hex += x.toString(16).padStart(2, "0");
+  return hex;
+}
+
+async function pbkdf2HashB64(password, saltBytes, iterations = 100000) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(String(password)),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
+    key,
+    256
+  );
+  return base64FromBytes(new Uint8Array(bits));
+}
+
+async function tableCols(DB, table) {
+  const res = await DB.prepare(`PRAGMA table_info(${table});`).all();
+  return new Set((res?.results || []).map((r) => String(r.name)));
 }
 
 async function ensureResetTable(DB) {
@@ -54,29 +78,21 @@ async function ensureResetTable(DB) {
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT NOT NULL,
-      token_hash TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      expires_at TEXT NOT NULL,
-      used_at TEXT
-    )
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
   `).run();
 
-  await DB.prepare(`CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email)`).run();
-  await DB.prepare(`CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token_hash)`).run();
+  await DB.prepare(`CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email);`).run();
+  await DB.prepare(`CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expires_at);`).run();
 }
 
-async function sendResendEmail(apiKey, from, to, subject, html) {
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ from, to, subject, html }),
-  });
-
-  const j = await r.json().catch(() => ({}));
-  return { ok: r.ok, status: r.status, json: j };
+function pickPasswordHashColumn(cols) {
+  const candidates = ["password_hash", "pass_hash", "pw_hash", "hash", "password"];
+  for (const c of candidates) if (cols.has(c)) return c;
+  return null;
 }
 
 export async function onRequest(context) {
@@ -93,65 +109,57 @@ export async function onRequest(context) {
     if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
 
     const body = await request.json().catch(() => ({}));
-    const email = normalizeEmail(body?.email);
-    if (!email) return json(request, { ok: false, error: "MISSING_EMAIL" }, 400);
 
-    // نجهّز جدول الاستعادة (مرة واحدة)
+    const token = String(body?.token || "").trim();
+    const password = String(body?.password || body?.new_password || "").trim();
+
+    if (!token) return json(request, { ok: false, error: "MISSING_TOKEN" }, 400);
+    if (!password) return json(request, { ok: false, error: "MISSING_PASSWORD" }, 400);
+    if (password.length < 8) return json(request, { ok: false, error: "WEAK_PASSWORD" }, 400);
+
     await ensureResetTable(env.DB);
 
-    // (اختياري) تأكد الإيميل موجود بدون ما نفضح النتيجة للعميل
-    const user = await env.DB.prepare(`SELECT email, provider FROM users WHERE email=? LIMIT 1`)
-      .bind(email)
-      .first();
+    const tokenHash = await sha256Hex(token);
+    const row = await env.DB.prepare(
+      `SELECT id, email, expires_at, used_at FROM password_resets WHERE token_hash = ? LIMIT 1`
+    ).bind(tokenHash).first();
 
-    // لو المستخدم غير موجود: نرجع ok برضه (حتى ما نكشف)
-    if (!user?.email) {
-      return json(request, { ok: true }, 200);
+    if (!row?.id) return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
+    if (row.used_at) return json(request, { ok: false, error: "RESET_TOKEN_USED" }, 400);
+
+    const now = Date.now();
+    if (Number(row.expires_at) < now) {
+      return json(request, { ok: false, error: "RESET_TOKEN_EXPIRED" }, 400);
     }
 
-    // لو حسابه Google: نخليه ok (وتقدر لاحقًا تعرض له رسالة “ادخل بجوجل” من الواجهة)
-    if (String(user.provider || "").toLowerCase() === "google") {
-      return json(request, { ok: true }, 200);
+    const email = normalizeEmail(row.email);
+    if (!email) return json(request, { ok: false, error: "MISSING_EMAIL" }, 400);
+
+    const userCols = await tableCols(env.DB, "users");
+    const hashCol = pickPasswordHashColumn(userCols);
+    if (!hashCol) return json(request, { ok: false, error: "USERS_NO_PASSWORD_COL" }, 500);
+
+    // ✅ نخزنها PBKDF2 لو عندك salt_b64، وإلا نخزن SHA-256 كحل توافق قديم
+    if (userCols.has("salt_b64")) {
+      const saltBytes = new Uint8Array(16);
+      crypto.getRandomValues(saltBytes);
+      const saltB64 = base64FromBytes(saltBytes);
+      const hashB64 = await pbkdf2HashB64(password, saltBytes, 100000);
+
+      await env.DB.prepare(
+        `UPDATE users SET ${hashCol} = ?, salt_b64 = ? WHERE email = ?`
+      ).bind(hashB64, saltB64, email).run();
+    } else {
+      const sha = await sha256Hex(password);
+      await env.DB.prepare(
+        `UPDATE users SET ${hashCol} = ? WHERE email = ?`
+      ).bind(sha, email).run();
     }
 
-    const resendKey = String(env.RESEND_API_KEY || "").trim();
-    const from = String(env.RESEND_FROM || env.MAIL_FROM || "").trim(); // RESEND_FROM هو الأساس عندك
-
-    if (!resendKey) return json(request, { ok: false, error: "RESEND_API_KEY_MISSING" }, 500);
-    if (!from) return json(request, { ok: false, error: "RESEND_FROM_MISSING" }, 500);
-
-    // توليد توكن + حفظ هاش
-    const token = makeToken(32);
-    const tokenHash = await sha256B64Url(token);
-
-    const now = new Date();
-    const createdAt = now.toISOString();
-    const exp = new Date(now.getTime() + 30 * 60 * 1000); // 30 دقيقة
-    const expiresAt = exp.toISOString();
-
-    await env.DB.prepare(`
-      INSERT INTO password_resets (email, token_hash, created_at, expires_at)
-      VALUES (?, ?, ?, ?)
-    `).bind(email, tokenHash, createdAt, expiresAt).run();
-
-    const origin = new URL(request.url).origin;
-    const link = `${origin}/activate?reset=${encodeURIComponent(token)}`;
-
-    const subject = "إعادة تعيين كلمة المرور - صندوق المسابقات";
-    const html = `
-      <div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
-        <h2>إعادة تعيين كلمة المرور</h2>
-        <p>اضغط الرابط التالي لتعيين كلمة مرور جديدة (صالح لمدة 30 دقيقة):</p>
-        <p><a href="${link}">${link}</a></p>
-        <p style="color:#666;font-size:12px">إذا ما طلبت الاستعادة تجاهل الرسالة.</p>
-      </div>
-    `;
-
-    const sent = await sendResendEmail(resendKey, from, email, subject, html);
-    if (!sent.ok) {
-      console.log("reset_send_failed", sent.status, sent.json);
-      return json(request, { ok: false, error: "MAIL_SEND_FAILED" }, 500);
-    }
+    // علّم التوكن كمستخدم
+    await env.DB.prepare(
+      `UPDATE password_resets SET used_at = ? WHERE id = ?`
+    ).bind(now, row.id).run();
 
     return json(request, { ok: true }, 200);
   } catch (e) {
@@ -161,5 +169,5 @@ export async function onRequest(context) {
 }
 
 /*
-reset.js – api2 – إصدار 1 (Resend: RESEND_API_KEY + RESEND_FROM)
+reset.js – api2 – إصدار 1 (token-only reset; fixes MISSING_EMAIL)
 */
