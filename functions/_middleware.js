@@ -1,6 +1,6 @@
 // functions/_middleware.js
-// Guard /app: require logged-in + activated, otherwise redirect to /activate
-// Uses /api2/me as source of truth + caches per-session for performance.
+// Protect ALL routes except /activate and /api2/*
+// Redirect unauth/unalactivated users to /activate
 
 function getCookie(req, name) {
   const cookie = req.headers.get("Cookie") || "";
@@ -12,9 +12,36 @@ function getCookie(req, name) {
   return "";
 }
 
+function isPublicPath(pathname) {
+  // Allow activation + APIs + minimal public assets
+  if (pathname === "/activate" || pathname === "/activate.html") return true;
+  if (pathname.startsWith("/api2/")) return true;
+
+  // reset links also hit /activate?reset=1 (same path)
+  // Minimal assets for activate page
+  const PUBLIC_FILES = new Set([
+    "/logo.png",
+    "/logo.PNG",
+    "/favicon.ico",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/manifest.json",
+    "/apple-touch-icon.png",
+  ]);
+  if (PUBLIC_FILES.has(pathname)) return true;
+
+  // Let's Encrypt / well-known (safe)
+  if (pathname.startsWith("/.well-known/")) return true;
+
+  return false;
+}
+
 function redirectToActivate(req) {
   const url = new URL(req.url);
-  return Response.redirect(`${url.origin}/activate`, 302);
+  const next = `${url.pathname}${url.search}`;
+  const target = new URL(`${url.origin}/activate`);
+  target.searchParams.set("next", next);
+  return Response.redirect(target.toString(), 302);
 }
 
 async function fetchMe(origin, token) {
@@ -23,7 +50,6 @@ async function fetchMe(origin, token) {
     headers: {
       "content-type": "application/json",
       "authorization": `Bearer ${token}`,
-      // device id مو ضروري هنا لأننا نعتمد على تفعيل الإيميل/الكود
     },
     body: JSON.stringify({}),
   });
@@ -36,20 +62,19 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // نحمي فقط /app
-  if (!path.startsWith("/app")) return next();
+  // Public allowlist
+  if (isPublicPath(path)) return next();
 
-  // token من Cookie أو Authorization
-  const auth = request.headers.get("Authorization") || "";
-  const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  // Session token from cookie (page requests don't carry Authorization)
   const cookieTok = getCookie(request, "sandooq_session_v1");
-  const token = bearer || cookieTok;
+  const token = cookieTok ? String(cookieTok).trim() : "";
 
   if (!token) return redirectToActivate(request);
 
-  // Cache (5 دقائق) عشان ما نضغط على D1 مع كل ملف داخل /app
+  // Cache per token (5 minutes) to avoid D1 load
   const cache = caches.default;
   const cacheKey = new Request(`https://auth-cache.local/me/${encodeURIComponent(token)}`, { method: "GET" });
+
   const cached = await cache.match(cacheKey);
   if (cached) {
     const data = await cached.json().catch(() => null);
@@ -59,7 +84,6 @@ export async function onRequest(context) {
 
   const me = await fetchMe(url.origin, token);
 
-  // خزّن بالكااش
   await cache.put(
     cacheKey,
     new Response(JSON.stringify(me || { ok: false }), {
@@ -72,5 +96,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 1 (Protect /app via /api2/me + cache)
+_middleware.js – إصدار 2 (Protect ALL site except /activate + /api2)
 */
