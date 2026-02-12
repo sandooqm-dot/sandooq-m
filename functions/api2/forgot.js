@@ -34,7 +34,6 @@ function normalizeEmail(email) {
 }
 
 function isValidEmail(email) {
-  // بسيط وعملي
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
@@ -60,7 +59,6 @@ async function sha256Hex(str) {
 }
 
 async function ensureResetTable(DB) {
-  // جدول بسيط وقوي + يشتغل حتى لو ما سويت migration
   await DB.prepare(`
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,10 +76,7 @@ async function ensureResetTable(DB) {
 
 async function sendResend(env, toEmail, resetLink) {
   const apiKey = String(env.RESEND_API_KEY || "").trim();
-
-  // ✅ التعديل الوحيد: دعم RESEND_FROM (اسمك الحالي) + دعم MAIL_FROM (لو نسخة قديمة)
-  const from = String(env.RESEND_FROM || env.MAIL_FROM || "").trim();
-
+  const from = String(env.MAIL_FROM || env.RESEND_FROM || "").trim(); // يدعم الاسمين
   if (!apiKey || !from) {
     return { ok: false, error: "MAIL_NOT_CONFIGURED" };
   }
@@ -151,13 +146,17 @@ export async function onRequest(context) {
       return json(request, { ok: true }, 200);
     }
 
-    // نلغي الروابط السابقة لهذا الإيميل (عشان ما تتكدس)
-    await env.DB.prepare(`DELETE FROM password_resets WHERE email = ? AND used_at IS NULL`).bind(email).run();
+    // ✅ تنظيف فقط: الروابط المنتهية أو المستخدمة (بدون حذف الروابط غير المستخدمة)
+    const now = Date.now();
+    await env.DB.prepare(
+      `DELETE FROM password_resets
+       WHERE email = ?
+         AND (used_at IS NOT NULL OR expires_at < ?)`
+    ).bind(email, now).run();
 
     const token = makeToken(32);
     const tokenHash = await sha256Hex(token);
 
-    const now = Date.now();
     const expires = now + 30 * 60 * 1000; // 30 دقيقة
 
     await env.DB.prepare(
@@ -169,7 +168,6 @@ export async function onRequest(context) {
 
     const mail = await sendResend(env, email, resetLink);
     if (!mail.ok) {
-      // عشان واجهتك تطلع نفس رسالة الصورة
       return json(request, { ok: false, error: mail.error }, 500);
     }
 
@@ -181,5 +179,5 @@ export async function onRequest(context) {
 }
 
 /*
-forgot.js – api2 – إصدار 2 (RESEND_FROM supported + legacy MAIL_FROM)
+forgot.js – api2 – إصدار 2 (لا يحذف الروابط غير المستخدمة → يمنع RESET_TOKEN_NOT_FOUND)
 */
