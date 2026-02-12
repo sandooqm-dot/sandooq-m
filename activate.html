@@ -356,6 +356,53 @@
         <div id="actMsg" class="msg"></div>
       </div>
 
+      <!-- شاشة: نسيت كلمة المرور -->
+      <div id="view-forgot" class="hide">
+        <div class="title">نسيت كلمة المرور</div>
+        <div class="subtitle">
+          اكتب بريدك، وراح توصلك رسالة فيها رابط تغيير كلمة المرور.
+        </div>
+
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M4 8l8 6 8-6" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="2"/></svg>
+          <input id="fEmail" type="email" placeholder="example@email.com" autocomplete="email" />
+        </div>
+
+        <button id="btnSendReset" class="btn btnPrimary">إرسال رابط الاستعادة</button>
+
+        <div class="links" style="justify-content:center">
+          <a href="#" id="backToLogin1">رجوع لتسجيل الدخول</a>
+        </div>
+
+        <div id="forgotMsg" class="msg"></div>
+      </div>
+
+      <!-- شاشة: تغيير كلمة المرور (من رابط الإيميل) -->
+      <div id="view-reset" class="hide">
+        <div class="title">تغيير كلمة المرور</div>
+        <div class="subtitle">
+          اكتب كلمة مرور جديدة (8 أحرف على الأقل).
+        </div>
+
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/></svg>
+          <input id="rPass1" type="password" placeholder="كلمة المرور الجديدة" autocomplete="new-password" />
+        </div>
+
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/></svg>
+          <input id="rPass2" type="password" placeholder="تأكيد كلمة المرور" autocomplete="new-password" />
+        </div>
+
+        <button id="btnDoReset" class="btn btnGreen">حفظ كلمة المرور</button>
+
+        <div class="links" style="justify-content:center; margin-top:12px">
+          <a href="#" id="backToLogin2">رجوع لتسجيل الدخول</a>
+        </div>
+
+        <div id="resetMsg" class="msg"></div>
+      </div>
+
       <div class="foot">© صندوق المسابقات</div>
     </div>
   </div>
@@ -364,7 +411,7 @@
     const API_BASE = "/api2";
     const $ = (id)=>document.getElementById(id);
 
-    // ✅ جديد: حفظ/قراءة توكن الجلسة
+    // ✅ توكن الجلسة
     const TOKEN_KEY = "sandooq_token_v1";
     function getToken(){ return localStorage.getItem(TOKEN_KEY) || ""; }
     function setToken(t){
@@ -372,21 +419,44 @@
       localStorage.setItem(TOKEN_KEY, String(t));
     }
 
-    // ✅ جديد: التقاط token من رابط Google callback ثم تنظيف الرابط
-    (function captureTokenFromUrl(){
+    // ✅ توكن الاستعادة (من رابط الإيميل) نخزنه في sessionStorage
+    const RESET_TOKEN_KEY = "sandooq_reset_token_v1";
+    function getResetToken(){ return sessionStorage.getItem(RESET_TOKEN_KEY) || ""; }
+    function setResetToken(t){
+      if(!t) return;
+      sessionStorage.setItem(RESET_TOKEN_KEY, String(t));
+    }
+
+    function getQuery(){
+      try { return new URL(location.href).searchParams; } catch { return new URLSearchParams(); }
+    }
+
+    // ✅ التقاط token من الرابط بدون خلط:
+    // - Google callback: /activate?token=SESSIONTOKEN
+    // - Reset link:      /activate?reset=1&token=RESETTOKEN
+    (function captureTokensFromUrl(){
       try{
         const u = new URL(location.href);
+        const isReset = u.searchParams.get("reset") === "1";
+
         const t = u.searchParams.get("token");
         if(t){
-          setToken(t);
-          u.searchParams.delete("token");
-          history.replaceState(null, "", u.toString());
+          if(isReset){
+            setResetToken(t);
+            // نخفي التوكن من الرابط للأمان
+            u.searchParams.delete("token");
+            history.replaceState(null, "", u.toString());
+          } else {
+            setToken(t);
+            u.searchParams.delete("token");
+            history.replaceState(null, "", u.toString());
+          }
         }
       }catch{}
     })();
 
     function show(viewId){
-      const ids = ["view-auth","view-create","view-verify","view-activate"];
+      const ids = ["view-auth","view-create","view-verify","view-activate","view-forgot","view-reset"];
       ids.forEach(x => $(x).classList.toggle("hide", x!==viewId));
     }
 
@@ -428,7 +498,6 @@
         "X-Device-Id": getDeviceId()
       };
 
-      // ✅ جديد: إرسال Authorization لو فيه توكن
       const tok = getToken();
       if(tok) headers["Authorization"] = "Bearer " + tok;
 
@@ -442,7 +511,6 @@
       let data=null;
       try{ data = await res.json(); }catch{ data = { ok:false, error:"BAD_RESPONSE" }; }
 
-      // ✅ جديد: لو السيرفر رجّع token نخزنه
       if(data && data.token) setToken(data.token);
 
       return data;
@@ -451,25 +519,31 @@
     async function logout(){
       try { await api("/logout", {}); } catch {}
       sessionStorage.removeItem("pending_email");
-      localStorage.removeItem(TOKEN_KEY); // ✅ جديد
+      localStorage.removeItem(TOKEN_KEY);
       boot();
     }
 
+    // ====== روابط التنقل
     $("goCreate").onclick = (e)=>{ e.preventDefault(); show("view-create"); msg($("authMsg"),""); };
     $("haveAccount").onclick = (e)=>{ e.preventDefault(); show("view-auth"); msg($("createMsg"),""); };
+    $("btnLogout").onclick = async (e)=>{ e.preventDefault(); await logout(); };
 
-    $("goForgot").onclick = async (e)=>{
+    $("goForgot").onclick = (e)=>{
       e.preventDefault();
-      msg($("authMsg"), "ميزة (نسيت كلمة المرور) بنضيفها بالخطوة الجاية.", "err");
+      // نسخ الإيميل المكتوب إن وجد
+      $("fEmail").value = normEmail($("email").value);
+      msg($("forgotMsg"), "");
+      show("view-forgot");
     };
 
-    // ✅ Google
+    $("backToLogin1").onclick = (e)=>{ e.preventDefault(); show("view-auth"); msg($("authMsg"),""); };
+    $("backToLogin2").onclick = (e)=>{ e.preventDefault(); show("view-auth"); msg($("authMsg"),""); };
+
+    // ====== Google
     $("btnGoogle").onclick = async ()=>{
       msg($("authMsg"), "");
       window.location.href = "/api2/google/start";
     };
-
-    $("btnLogout").onclick = async (e)=>{ e.preventDefault(); await logout(); };
 
     // ====== Login
     $("btnLogin").onclick = async ()=>{
@@ -546,7 +620,7 @@
       }
     };
 
-    // ====== Activate Code (بعد النجاح ندخل اللعبة مباشرة)
+    // ====== Activate Code
     $("btnActivate").onclick = async ()=>{
       msg($("actMsg"), "");
       const code = normCode($("code").value);
@@ -560,8 +634,58 @@
       window.location.replace("/app");
     };
 
+    // ====== Forgot Password
+    $("btnSendReset").onclick = async ()=>{
+      msg($("forgotMsg"), "");
+      const email = normEmail($("fEmail").value);
+      if(!email) return msg($("forgotMsg"), "اكتب البريد الإلكتروني", "err");
+
+      const r = await api("/forgot", { email });
+      if(!r?.ok){
+        return msg($("forgotMsg"), translateErr(r), "err");
+      }
+
+      msg($("forgotMsg"),
+        "تم ✅\nإذا كان البريد مسجّل عندنا راح توصلك رسالة فيها رابط الاستعادة خلال لحظات.",
+        "ok"
+      );
+    };
+
+    // ====== Reset Password
+    $("btnDoReset").onclick = async ()=>{
+      msg($("resetMsg"), "");
+      const t = getResetToken();
+      if(!t) return msg($("resetMsg"), "الرابط غير صحيح أو انتهت صلاحيته. اطلب رابط جديد.", "err");
+
+      const p1 = $("rPass1").value || "";
+      const p2 = $("rPass2").value || "";
+      if(p1.length < 8) return msg($("resetMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
+      if(p1 !== p2) return msg($("resetMsg"), "كلمتا المرور غير متطابقتين", "err");
+
+      const r = await api("/reset", { token: t, newPassword: p1 });
+      if(!r?.ok){
+        return msg($("resetMsg"), translateErr(r), "err");
+      }
+
+      sessionStorage.removeItem(RESET_TOKEN_KEY);
+      msg($("resetMsg"), "تم تغيير كلمة المرور ✅\nالحين سجل دخول بكلمة المرور الجديدة.", "ok");
+
+      setTimeout(()=>{
+        show("view-auth");
+        msg($("authMsg"), "تم تغيير كلمة المرور ✅ سجّل دخول الآن.", "ok");
+      }, 700);
+    };
+
     // ====== Boot
     async function boot(){
+      // ✅ لو رابط استعادة: افتح شاشة reset مباشرة ولا ندخل في me
+      const q = getQuery();
+      if(q.get("reset") === "1"){
+        show("view-reset");
+        msg($("resetMsg"), "");
+        return;
+      }
+
       const pending = sessionStorage.getItem("pending_email") || "";
       if (pending) {
         $("vEmail").textContent = pending;
@@ -578,7 +702,6 @@
       const email = me.email || "";
       $("who").textContent = email;
 
-      // Google يعتبر verified غالبًا، بس نخلي الشرط مثل ما هو
       if(me.verified === false){
         sessionStorage.setItem("pending_email", email);
         $("vEmail").textContent = email;
@@ -617,6 +740,11 @@
       if(e === "MAIL_NOT_CONFIGURED") return "خدمة إرسال الإيميل غير مفعّلة حالياً.";
       if(e === "MAIL_SEND_FAILED") return "فشل إرسال الإيميل. جرّب مرة ثانية.";
 
+      if(e === "WEAK_PASSWORD") return "كلمة المرور ضعيفة. لازم 8 أحرف أو أكثر.";
+      if(e === "TOKEN_INVALID") return "رابط الاستعادة غير صحيح.";
+      if(e === "TOKEN_EXPIRED") return "انتهت صلاحية رابط الاستعادة. اطلب رابط جديد.";
+      if(e === "TOKEN_USED") return "تم استخدام الرابط مسبقًا. اطلب رابط جديد.";
+
       if(e === "CODE_NOT_FOUND") return "الكود غير موجود.";
       if(e === "CODE_ALREADY_USED") return "الكود مستخدم مسبقًا.";
       if(e === "DEVICE_LIMIT_REACHED") return "تجاوزت الحد المسموح لربط الأجهزة (جهازين فقط).";
@@ -629,4 +757,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v8 (captures token from URL + Authorization) -->
+<!-- activate.html – نظام التفعيل الجديد v9 (Forgot+Reset UI + token param safe) -->
