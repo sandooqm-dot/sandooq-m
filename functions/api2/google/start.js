@@ -7,15 +7,12 @@ export async function onRequestGet({ request, env }) {
       (env.GOOGLE_REDIRECT_URI && String(env.GOOGLE_REDIRECT_URI).trim()) ||
       `${url.origin}/api2/google/callback`;
 
-    if (!clientId) {
-      return text("GOOGLE_CLIENT_ID غير موجود في Cloudflare.", 500);
-    }
+    if (!clientId) return text("GOOGLE_CLIENT_ID غير موجود.", 500);
 
-    // PKCE: generate code_verifier + code_challenge
-    const verifier = base64urlRandom(64); // 64 bytes -> safe length
+    // PKCE
+    const verifier = base64urlRandom(64);
     const challenge = await pkceChallengeS256(verifier);
 
-    // state for CSRF protection
     const state = crypto.randomUUID();
 
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -27,24 +24,17 @@ export async function onRequestGet({ request, env }) {
     authUrl.searchParams.set("code_challenge", challenge);
     authUrl.searchParams.set("code_challenge_method", "S256");
     authUrl.searchParams.set("prompt", "select_account");
-
-    // optional but helpful sometimes
     authUrl.searchParams.set("access_type", "offline");
 
-    // Cookies must be sent back on callback
-    const cookie = [
-      cookieSet("g_state", state, { httpOnly: true, maxAge: 600 }),
-      cookieSet("g_verifier", verifier, { httpOnly: true, maxAge: 600 }),
-    ].join(", ");
+    const headers = new Headers();
+    headers.set("Location", authUrl.toString());
+    headers.set("Cache-Control", "no-store");
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: authUrl.toString(),
-        "Cache-Control": "no-store",
-        "Set-Cookie": cookie,
-      },
-    });
+    // ✅ لازم كل كوكي في Set-Cookie لحاله (مهم جدًا لـ iOS)
+    headers.append("Set-Cookie", cookieSet("g_state", state, { maxAge: 600 }));
+    headers.append("Set-Cookie", cookieSet("g_verifier", verifier, { maxAge: 600 }));
+
+    return new Response(null, { status: 302, headers });
   } catch (e) {
     return text("خطأ غير متوقع في /api2/google/start", 500);
   }
@@ -60,18 +50,16 @@ function text(msg, status = 200) {
   });
 }
 
-// ---- helpers ----
-function cookieSet(name, value, { httpOnly = true, maxAge = 600 } = {}) {
-  // SameSite=Lax يسمح بإرسال الكوكيز عند الرجوع من Google (top-level navigation)
-  const parts = [
+function cookieSet(name, value, { maxAge = 600 } = {}) {
+  // SameSite=Lax يسمح بإرسال الكوكيز عند الرجوع من Google
+  return [
     `${name}=${encodeURIComponent(value)}`,
     "Path=/",
     "Secure",
     "SameSite=Lax",
     `Max-Age=${maxAge}`,
-  ];
-  if (httpOnly) parts.push("HttpOnly");
-  return parts.join("; ");
+    "HttpOnly",
+  ].join("; ");
 }
 
 function base64url(bytes) {
