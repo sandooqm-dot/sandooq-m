@@ -364,6 +364,27 @@
     const API_BASE = "/api2";
     const $ = (id)=>document.getElementById(id);
 
+    // ✅ جديد: حفظ/قراءة توكن الجلسة
+    const TOKEN_KEY = "sandooq_token_v1";
+    function getToken(){ return localStorage.getItem(TOKEN_KEY) || ""; }
+    function setToken(t){
+      if(!t) return;
+      localStorage.setItem(TOKEN_KEY, String(t));
+    }
+
+    // ✅ جديد: التقاط token من رابط Google callback ثم تنظيف الرابط
+    (function captureTokenFromUrl(){
+      try{
+        const u = new URL(location.href);
+        const t = u.searchParams.get("token");
+        if(t){
+          setToken(t);
+          u.searchParams.delete("token");
+          history.replaceState(null, "", u.toString());
+        }
+      }catch{}
+    })();
+
     function show(viewId){
       const ids = ["view-auth","view-create","view-verify","view-activate"];
       ids.forEach(x => $(x).classList.toggle("hide", x!==viewId));
@@ -407,6 +428,10 @@
         "X-Device-Id": getDeviceId()
       };
 
+      // ✅ جديد: إرسال Authorization لو فيه توكن
+      const tok = getToken();
+      if(tok) headers["Authorization"] = "Bearer " + tok;
+
       const res = await fetch(apiUrl(path), {
         method:"POST",
         headers,
@@ -416,12 +441,17 @@
 
       let data=null;
       try{ data = await res.json(); }catch{ data = { ok:false, error:"BAD_RESPONSE" }; }
+
+      // ✅ جديد: لو السيرفر رجّع token نخزنه
+      if(data && data.token) setToken(data.token);
+
       return data;
     }
 
     async function logout(){
       try { await api("/logout", {}); } catch {}
       sessionStorage.removeItem("pending_email");
+      localStorage.removeItem(TOKEN_KEY); // ✅ جديد
       boot();
     }
 
@@ -433,7 +463,7 @@
       msg($("authMsg"), "ميزة (نسيت كلمة المرور) بنضيفها بالخطوة الجاية.", "err");
     };
 
-    // ✅ التغيير الوحيد: زر Google صار يفتح مسار Google OAuth مباشرة
+    // ✅ Google
     $("btnGoogle").onclick = async ()=>{
       msg($("authMsg"), "");
       window.location.href = "/api2/google/start";
@@ -527,11 +557,10 @@
         return msg($("actMsg"), translateErr(r), "err");
       }
 
-      // نجاح التفعيل -> دخول اللعبة مباشرة
       window.location.replace("/app");
     };
 
-    // ====== Boot (إذا الحساب مُفعّل -> دخول اللعبة مباشرة)
+    // ====== Boot
     async function boot(){
       const pending = sessionStorage.getItem("pending_email") || "";
       if (pending) {
@@ -549,6 +578,7 @@
       const email = me.email || "";
       $("who").textContent = email;
 
+      // Google يعتبر verified غالبًا، بس نخلي الشرط مثل ما هو
       if(me.verified === false){
         sessionStorage.setItem("pending_email", email);
         $("vEmail").textContent = email;
@@ -557,13 +587,11 @@
         return;
       }
 
-      // لو متفعّل -> دخل اللعبة فورًا (بدون شاشة تم التفعيل)
       if(me.activated){
         window.location.replace("/app");
         return;
       }
 
-      // غير مفعّل -> اعرض صفحة إدخال الكود
       show("view-activate");
     }
 
@@ -601,4 +629,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v7 (Google button enabled) -->
+<!-- activate.html – نظام التفعيل الجديد v8 (captures token from URL + Authorization) -->
