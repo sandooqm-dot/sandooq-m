@@ -18,14 +18,23 @@ const CORS_HEADERS = (req) => {
   return h;
 };
 
-function json(req, data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      ...CORS_HEADERS(req),
-      "content-type": "application/json; charset=utf-8",
-    },
+// ✅ أضفنا دعم headers إضافية (مثل Set-Cookie) بدون تغيير سلوكك السابق
+function json(req, data, status = 200, extraHeaders = {}) {
+  const headers = new Headers({
+    ...CORS_HEADERS(req),
+    "content-type": "application/json; charset=utf-8",
   });
+
+  // extraHeaders قد تكون string أو array (لـ set-cookie)
+  for (const [k, v] of Object.entries(extraHeaders || {})) {
+    if (Array.isArray(v)) {
+      for (const vv of v) headers.append(k, vv);
+    } else if (v !== undefined && v !== null && v !== "") {
+      headers.set(k, String(v));
+    }
+  }
+
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
 function normalizeEmail(email) {
@@ -33,13 +42,34 @@ function normalizeEmail(email) {
 }
 
 function getCookie(req, name) {
-  const cookie = req.headers.get("Cookie") || "";
+  const cookie = req.headers.get("cookie") || req.headers.get("Cookie") || "";
   const parts = cookie.split(";");
   for (const p of parts) {
     const [k, ...rest] = p.trim().split("=");
-    if (k === name) return rest.join("=") || "";
+    if (k === name) {
+      const raw = rest.join("=") || "";
+      try { return decodeURIComponent(raw); } catch { return raw; }
+    }
   }
   return "";
+}
+
+// ✅ Cookie حق الجلسة اللي يحتاجها الـ Middleware
+function setAuthCookie(token) {
+  // 30 يوم
+  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=2592000; Secure; SameSite=Lax; HttpOnly`;
+}
+
+// ✅ نخلي القديم شغال كمان (ما ضرّه)
+function setLegacyCookie(token) {
+  return `sandooq_session_v1=${encodeURIComponent(token)}; Path=/; Max-Age=2592000; Secure; SameSite=Lax; HttpOnly`;
+}
+
+function clearAuthCookie() {
+  return `sandooq_token_v1=; Path=/; Max-Age=0; Secure; SameSite=Lax; HttpOnly`;
+}
+function clearLegacyCookie() {
+  return `sandooq_session_v1=; Path=/; Max-Age=0; Secure; SameSite=Lax; HttpOnly`;
 }
 
 async function tableCols(DB, table) {
@@ -84,12 +114,10 @@ async function findSessionEmail(DB, token) {
     return row?.email ? normalizeEmail(row.email) : null;
   }
 
-  // لو ما فيه أعمدة بريد، ما نقدر
   return null;
 }
 
 function isVerifiedFromUserRow(u) {
-  // عندك ظاهر بالصورة: email_verified و is_email_verified
   return (
     u?.is_email_verified === 1 ||
     u?.email_verified === 1 ||
@@ -101,7 +129,6 @@ function isVerifiedFromUserRow(u) {
 async function isActivated(DB, email, deviceId) {
   email = normalizeEmail(email);
 
-  // نحاول من جدول activations إن وجد
   if (await tableExists(DB, "activations")) {
     const cols = await tableCols(DB, "activations");
     const where = [];
@@ -111,7 +138,6 @@ async function isActivated(DB, email, deviceId) {
     if (cols.has("user_email")) { where.push("user_email = ?"); binds.push(email); }
     if (cols.has("used_by_email")) { where.push("used_by_email = ?"); binds.push(email); }
 
-    // لو فيه device_id نضيفه كخيار (OR) إذا توفر
     if (deviceId && cols.has("device_id")) {
       where.push("device_id = ?");
       binds.push(deviceId);
@@ -125,7 +151,6 @@ async function isActivated(DB, email, deviceId) {
     }
   }
 
-  // نحاول من جدول codes إن وجد (بعض النسخ تربط الكود بالإيميل)
   if (await tableExists(DB, "codes")) {
     const cols = await tableCols(DB, "codes");
     const where = [];
@@ -143,7 +168,6 @@ async function isActivated(DB, email, deviceId) {
     }
   }
 
-  // ما لقينا مصدر تفعيل
   return false;
 }
 
@@ -162,41 +186,57 @@ export async function onRequest(context) {
 
     // token من:
     // 1) Authorization: Bearer
-    // 2) Cookie: sandooq_session_v1
-    // 3) body.token (احتياط)
+    // 2) Cookie: sandooq_token_v1 (الجديد للـ Middleware)
+    // 3) Cookie: sandooq_session_v1 (القديم)
+    // 4) body.token (احتياط)
     const auth = request.headers.get("Authorization") || "";
     const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-    const cookieTok = getCookie(request, "sandooq_session_v1");
+
+    const cookieTokNew = getCookie(request, "sandooq_token_v1");
+    const cookieTokOld = getCookie(request, "sandooq_session_v1");
+
     const body = await request.json().catch(() => ({}));
     const bodyTok = body?.token ? String(body.token).trim() : "";
 
-    const token = bearer || cookieTok || bodyTok;
-    if (!token) return json(request, { ok: false, error: "NO_SESSION" }, 401);
+    const token = bearer || cookieTokNew || cookieTokOld || bodyTok;
+    if (!token) {
+      return json(request, { ok: false, error: "NO_SESSION" }, 401, {
+        "set-cookie": [clearAuthCookie(), clearLegacyCookie()],
+      });
+    }
 
     const email = await findSessionEmail(env.DB, token);
-    if (!email) return json(request, { ok: false, error: "SESSION_NOT_FOUND" }, 401);
+    if (!email) {
+      return json(request, { ok: false, error: "SESSION_NOT_FOUND" }, 401, {
+        "set-cookie": [clearAuthCookie(), clearLegacyCookie()],
+      });
+    }
 
-    // user
     const userRow = await env.DB.prepare(
       `SELECT * FROM users WHERE email = ? LIMIT 1`
     ).bind(email).first();
 
     if (!userRow) {
-      return json(request, { ok: false, error: "USER_NOT_FOUND" }, 401);
+      return json(request, { ok: false, error: "USER_NOT_FOUND" }, 401, {
+        "set-cookie": [clearAuthCookie(), clearLegacyCookie()],
+      });
     }
 
     const verified = isVerifiedFromUserRow(userRow);
-
     const deviceId = request.headers.get("X-Device-Id") || "";
     const activated = await isActivated(env.DB, email, deviceId);
 
+    // ✅ أهم سطرين: زرع Cookie (عشان /app ما يعلق بريفريش)
     return json(request, {
       ok: true,
       email,
       verified,
       activated,
       provider: userRow.provider || "email",
-    }, 200);
+    }, 200, {
+      "set-cookie": [setAuthCookie(token), setLegacyCookie(token)],
+    });
+
   } catch (e) {
     console.log("me_error", String(e?.message || e));
     return json(request, { ok: false, error: "SERVER_ERROR" }, 500);
@@ -204,5 +244,5 @@ export async function onRequest(context) {
 }
 
 /*
-me.js – api2 – إصدار 1 (Cookie/Bearer session → returns verified + activated)
+me.js – api2 – إصدار 2 (يدعم Cookie sandooq_token_v1 + يزرع Cookie تلقائيًا لتفادي Loop /app)
 */
