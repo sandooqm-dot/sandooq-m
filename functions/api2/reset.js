@@ -59,7 +59,6 @@ async function sha256Hex(str) {
 }
 
 function b64FromBytes(arr) {
-  // arr صغير (16/32) فـ String.fromCharCode آمنة هنا
   return btoa(String.fromCharCode(...arr));
 }
 
@@ -95,28 +94,23 @@ export async function onRequest(context) {
   try {
     if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
 
-    // نقرأ body
     const body = await request.json().catch(() => ({}));
 
-    // token ممكن يجي بعدة أسماء + احتياط من Authorization (لو الفرونت خزّنه بالغلط)
     const auth = request.headers.get("Authorization") || "";
     const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
 
     const token =
       String(body?.token || body?.reset_token || body?.resetToken || bearer || "").trim();
 
-    // كلمة المرور ممكن تجي بأسماء مختلفة
     const password =
       String(body?.password || body?.new_password || body?.newPassword || "").trim();
 
-    // email اختياري (ما نعتمد عليه) لكن إذا جاء نطابقه مع اللي في التوكن
     const maybeEmail = body?.email ? normalizeEmail(body.email) : "";
 
     if (!token) return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
     if (!password) return json(request, { ok: false, error: "MISSING_PASSWORD" }, 400);
     if (!isStrongEnough(password)) return json(request, { ok: false, error: "WEAK_PASSWORD" }, 400);
 
-    // لازم جدول password_resets موجود (forgot.js يسويه، لكن هنا احتياط)
     if (!(await tableExists(env.DB, "password_resets"))) {
       return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
     }
@@ -131,29 +125,17 @@ export async function onRequest(context) {
         LIMIT 1`
     ).bind(tokenHash).first();
 
-    if (!row) {
-      return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
-    }
-
-    if (row.used_at) {
-      return json(request, { ok: false, error: "RESET_TOKEN_USED" }, 400);
-    }
-
-    if (Number(row.expires_at || 0) < now) {
-      return json(request, { ok: false, error: "RESET_TOKEN_EXPIRED" }, 400);
-    }
+    if (!row) return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
+    if (row.used_at) return json(request, { ok: false, error: "RESET_TOKEN_USED" }, 400);
+    if (Number(row.expires_at || 0) < now) return json(request, { ok: false, error: "RESET_TOKEN_EXPIRED" }, 400);
 
     const email = normalizeEmail(row.email);
-
-    // لو الفرونت مرر email، لازم يطابق (اختياري)
     if (maybeEmail && maybeEmail !== email) {
       return json(request, { ok: false, error: "EMAIL_MISMATCH" }, 400);
     }
 
-    // تحديث كلمة المرور في users
     const uCols = await tableCols(env.DB, "users");
 
-    // نحدد أعمدة الباسورد المتاحة
     const hashCol =
       (uCols.has("password_hash") && "password_hash") ||
       (uCols.has("pass_hash") && "pass_hash") ||
@@ -162,10 +144,9 @@ export async function onRequest(context) {
       "";
 
     if (!hashCol) {
-      return json(request, { ok: false, error: "USERS_SCHEMA_MISSING_PASSWORD_COL" }, 500);
+      return json(request, { ok: false, error: "USERS_SCHEMA_MISSING_PASSWORD_COL", detail: `users cols: ${Array.from(uCols).join(",")}` }, 500);
     }
 
-    // إذا فيه salt_b64 نستخدم PBKDF2، وإلا نحط SHA256 legacy
     let newHash = "";
     let newSaltB64 = "";
 
@@ -178,7 +159,6 @@ export async function onRequest(context) {
       newHash = await sha256Hex(password);
     }
 
-    // UPDATE users
     const sets = [];
     const binds = [];
 
@@ -197,18 +177,10 @@ export async function onRequest(context) {
 
     binds.push(email);
 
-    const upd = await env.DB.prepare(
+    await env.DB.prepare(
       `UPDATE users SET ${sets.join(", ")} WHERE email = ?`
     ).bind(...binds).run();
 
-    // لو ما فيه مستخدم فعليًا (احتياط)
-    if (!upd?.success) {
-      // D1 أحيانًا ما يعطي affected_rows بشكل ثابت، فنسوي تحقق سريع
-      const u = await env.DB.prepare(`SELECT email FROM users WHERE email=? LIMIT 1`).bind(email).first();
-      if (!u?.email) return json(request, { ok: false, error: "USER_NOT_FOUND" }, 400);
-    }
-
-    // نعلّم التوكن كمستخدم
     await env.DB.prepare(
       `UPDATE password_resets SET used_at = ? WHERE token_hash = ?`
     ).bind(now, tokenHash).run();
@@ -216,11 +188,12 @@ export async function onRequest(context) {
     return json(request, { ok: true }, 200);
 
   } catch (e) {
-    console.log("reset_error", String(e?.message || e));
-    return json(request, { ok: false, error: "SERVER_ERROR" }, 500);
+    const detail = String(e?.message || e?.stack || e).slice(0, 500);
+    console.log("reset_error_detail", detail);
+    return json(request, { ok: false, error: "SERVER_ERROR", detail }, 500);
   }
 }
 
 /*
-reset.js – api2 – إصدار 1 (robust token+password, derive email from token, PBKDF2 if salt_b64 exists)
+reset.js – api2 – إصدار 2 (returns error detail to debug)
 */
