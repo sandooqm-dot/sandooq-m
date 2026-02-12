@@ -1,3 +1,5 @@
+// functions/api2/google/callback.js
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -16,6 +18,7 @@ export async function onRequest(context) {
     }
 
     const code = url.searchParams.get("code");
+    const stateQ = url.searchParams.get("state") || "";
     if (!code) {
       return new Response("بيانات الرجوع من Google ناقصة (code).", { status: 400 });
     }
@@ -26,9 +29,23 @@ export async function onRequest(context) {
       return new Response("GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET غير مضبوطين.", { status: 500 });
     }
 
-    const redirectUri = `${origin}/api2/google/callback`;
+    // ✅ نفس منطق start.js (لو عندك GOOGLE_REDIRECT_URI استخدمه)
+    const redirectUriEnv = String(env.GOOGLE_REDIRECT_URI || "").trim();
+    const redirectUri = redirectUriEnv || `${origin}/api2/google/callback`;
 
-    // 1) Exchange code -> tokens (Server-side, no PKCE assumption here)
+    // ====== PKCE: اقرأ من الكوكيز
+    const stateC = getCookie(request, "sandooq_g_state");
+    const verifier = getCookie(request, "sandooq_g_verifier");
+
+    // لازم state يطابق (حماية) + verifier موجود (عشان PKCE)
+    if (!stateQ || !stateC || stateQ !== stateC) {
+      return new Response("Google callback: state غير صحيح/مفقود. ارجع وسوّ تسجيل الدخول من جديد.", { status: 400 });
+    }
+    if (!verifier) {
+      return new Response("Google callback: Missing code verifier. ارجع وابدأ تسجيل الدخول من جديد.", { status: 400 });
+    }
+
+    // 1) Exchange code -> tokens (PKCE ✅)
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -38,6 +55,7 @@ export async function onRequest(context) {
         client_secret: clientSecret,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
+        code_verifier: verifier, // ✅ هذا هو حل Missing code verifier
       }),
     });
 
@@ -98,14 +116,35 @@ export async function onRequest(context) {
     const sessionToken = makeToken(32);
     await insertSession(env.DB, sessionToken, email);
 
-    // 5) Redirect back to activate with token in URL (front will capture & store)
+    // 5) Redirect back to activate
     const dest = `${origin}/activate?token=${encodeURIComponent(sessionToken)}`;
-    return Response.redirect(dest, 302);
+
+    // ✅ امسح كوكيز PKCE بعد الاستخدام (نفس Path اللي سوّاه start.js)
+    const headers = new Headers();
+    headers.set("Location", dest);
+    headers.set("Cache-Control", "no-store");
+    headers.append("Set-Cookie", `sandooq_g_state=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`);
+    headers.append("Set-Cookie", `sandooq_g_verifier=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`);
+
+    return new Response(null, { status: 302, headers });
 
   } catch (e) {
     const msg = `Worker exception in google/callback\n${String(e?.stack || e)}`;
     return new Response(msg, { status: 500 });
   }
+}
+
+function getCookie(request, name) {
+  const raw = request.headers.get("Cookie") || "";
+  const parts = raw.split(";").map(s => s.trim()).filter(Boolean);
+  for (const p of parts) {
+    const eq = p.indexOf("=");
+    if (eq === -1) continue;
+    const k = p.slice(0, eq).trim();
+    const v = p.slice(eq + 1);
+    if (k === name) return decodeURIComponent(v);
+  }
+  return "";
 }
 
 function safeJsonParse(s) {
