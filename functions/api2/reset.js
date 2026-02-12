@@ -1,7 +1,8 @@
 // functions/api2/reset.js
 // POST /api2/reset
 // Resets password using token from password_resets table
-// Fix: Cloudflare PBKDF2 iterations must be <= 100000
+// Fix1: Cloudflare PBKDF2 iterations must be <= 100000
+// Fix2: Accept multiple body field names for password/token (to match frontend variations)
 
 const CORS_HEADERS = (req) => {
   const origin = req.headers.get("origin");
@@ -68,12 +69,7 @@ async function pbkdf2Hash(password, saltBytes, iterations = 100000, dkLenBytes =
   );
 
   const bits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: saltBytes,
-      iterations: it,
-    },
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations: it },
     pwKey,
     dkLenBytes * 8
   );
@@ -99,6 +95,40 @@ function pickHashCol(cols) {
   return "";
 }
 
+function pickBodyToken(body) {
+  return String(
+    body?.token ||
+    body?.reset_token ||
+    body?.resetToken ||
+    body?.resetTokenRaw ||
+    ""
+  ).trim();
+}
+
+function pickBodyPassword(body) {
+  // نقبل كل الأسماء المحتملة اللي ممكن تكون بالواجهة
+  return String(
+    body?.password ||
+    body?.newPassword ||
+    body?.new_password ||
+    body?.pass ||
+    body?.pw ||
+    body?.password1 ||
+    body?.pwd ||
+    ""
+  ).trim();
+}
+
+function pickBodyConfirm(body) {
+  return String(
+    body?.confirm ||
+    body?.confirmPassword ||
+    body?.confirm_password ||
+    body?.password2 ||
+    ""
+  ).trim();
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -113,12 +143,19 @@ export async function onRequest(context) {
     if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
 
     const body = await request.json().catch(() => ({}));
-    const token = String(body?.token || "").trim();
-    const password = String(body?.password || "").trim();
+
+    const token = pickBodyToken(body);
+    const password = pickBodyPassword(body);
+    const confirm = pickBodyConfirm(body);
 
     if (!token) return json(request, { ok: false, error: "RESET_TOKEN_NOT_FOUND" }, 400);
     if (!password) return json(request, { ok: false, error: "MISSING_PASSWORD" }, 400);
     if (password.length < 8) return json(request, { ok: false, error: "WEAK_PASSWORD" }, 400);
+
+    // لو الواجهة ترسل تأكيد كلمة المرور، نتحقق من التطابق
+    if (confirm && confirm !== password) {
+      return json(request, { ok: false, error: "PASSWORD_MISMATCH" }, 400);
+    }
 
     // لازم جدول password_resets موجود (يتسوّى من forgot.js)
     if (!(await tableExists(env.DB, "password_resets"))) {
@@ -178,7 +215,6 @@ export async function onRequest(context) {
       binds.push(new Date().toISOString());
     }
 
-    // لا نكشف وجود المستخدم: لو ما وُجد نعتبرها ok برضو
     await env.DB.prepare(
       `UPDATE users SET ${sets.join(", ")} WHERE email = ?`
     ).bind(...binds, email).run();
@@ -196,5 +232,5 @@ export async function onRequest(context) {
 }
 
 /*
-reset.js – api2 – إصدار 1.1 (PBKDF2 iterations <= 100000 fix)
+reset.js – api2 – إصدار 1.2 (PBKDF2 limit + accept multiple field names)
 */
