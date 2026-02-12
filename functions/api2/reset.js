@@ -1,6 +1,6 @@
 // functions/api2/reset.js
 // POST /api2/reset
-// Reset password using token only (no email needed)
+// Reset password using token only (accepts JSON or form body)
 
 const CORS_HEADERS = (req) => {
   const origin = req.headers.get("origin");
@@ -37,9 +37,6 @@ function base64FromBytes(arr) {
   let s = "";
   for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
   return btoa(s);
-}
-function base64urlFromBytes(arr) {
-  return base64FromBytes(arr).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 async function sha256Hex(str) {
@@ -95,6 +92,45 @@ function pickPasswordHashColumn(cols) {
   return null;
 }
 
+// ✅ robust body parser: JSON OR urlencoded OR form-data-like (best effort)
+async function readBodyAny(request) {
+  const ct = (request.headers.get("content-type") || "").toLowerCase();
+
+  // try json first when content-type says json
+  if (ct.includes("application/json")) {
+    const j = await request.json().catch(() => null);
+    if (j && typeof j === "object") return j;
+  }
+
+  // fallback: read text and parse
+  const text = await request.text().catch(() => "");
+  if (!text) return {};
+
+  // maybe json even if content-type wrong
+  if (text.trim().startsWith("{")) {
+    const j = (() => { try { return JSON.parse(text); } catch { return null; } })();
+    if (j && typeof j === "object") return j;
+  }
+
+  // urlencoded
+  try {
+    const sp = new URLSearchParams(text);
+    const obj = {};
+    for (const [k, v] of sp.entries()) obj[k] = v;
+    return obj;
+  } catch {
+    return {};
+  }
+}
+
+function pickFirst(body, keys) {
+  for (const k of keys) {
+    const v = body?.[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+  }
+  return "";
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -108,14 +144,30 @@ export async function onRequest(context) {
   try {
     if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
 
-    const body = await request.json().catch(() => ({}));
+    const url = new URL(request.url);
 
-    const token = String(body?.token || "").trim();
-    const password = String(body?.password || body?.new_password || "").trim();
+    const body = await readBodyAny(request);
+
+    // token ممكن يجي من body أو من query
+    const token =
+      pickFirst(body, ["token", "reset_token", "t"]) ||
+      String(url.searchParams.get("token") || url.searchParams.get("t") || "").trim();
+
+    // password ممكن يجي بأكثر من اسم
+    const password =
+      pickFirst(body, ["password", "new_password", "newPassword", "pass", "pw", "p1", "password1"]);
+
+    const password2 =
+      pickFirst(body, ["password2", "confirm_password", "confirmPassword", "p2", "password_confirm"]);
 
     if (!token) return json(request, { ok: false, error: "MISSING_TOKEN" }, 400);
     if (!password) return json(request, { ok: false, error: "MISSING_PASSWORD" }, 400);
     if (password.length < 8) return json(request, { ok: false, error: "WEAK_PASSWORD" }, 400);
+
+    // لو فيه تأكيد كلمة مرور وتختلف
+    if (password2 && password2 !== password) {
+      return json(request, { ok: false, error: "PASSWORD_MISMATCH" }, 400);
+    }
 
     await ensureResetTable(env.DB);
 
@@ -139,7 +191,7 @@ export async function onRequest(context) {
     const hashCol = pickPasswordHashColumn(userCols);
     if (!hashCol) return json(request, { ok: false, error: "USERS_NO_PASSWORD_COL" }, 500);
 
-    // ✅ نخزنها PBKDF2 لو عندك salt_b64، وإلا نخزن SHA-256 كحل توافق قديم
+    // ✅ PBKDF2 لو salt_b64 موجود، وإلا SHA256 توافق قديم
     if (userCols.has("salt_b64")) {
       const saltBytes = new Uint8Array(16);
       crypto.getRandomValues(saltBytes);
@@ -156,7 +208,6 @@ export async function onRequest(context) {
       ).bind(sha, email).run();
     }
 
-    // علّم التوكن كمستخدم
     await env.DB.prepare(
       `UPDATE password_resets SET used_at = ? WHERE id = ?`
     ).bind(now, row.id).run();
@@ -169,5 +220,5 @@ export async function onRequest(context) {
 }
 
 /*
-reset.js – api2 – إصدار 1 (token-only reset; fixes MISSING_EMAIL)
+reset.js – api2 – إصدار 2 (robust body parse + fixes MISSING_PASSWORD)
 */
