@@ -1,96 +1,76 @@
 // functions/_middleware.js
+// Guard /app: require logged-in + activated, otherwise redirect to /activate
+// Uses /api2/me as source of truth + caches per-session for performance.
+
+function getCookie(req, name) {
+  const cookie = req.headers.get("Cookie") || "";
+  const parts = cookie.split(";");
+  for (const p of parts) {
+    const [k, ...rest] = p.trim().split("=");
+    if (k === name) return rest.join("=") || "";
+  }
+  return "";
+}
+
+function redirectToActivate(req) {
+  const url = new URL(req.url);
+  return Response.redirect(`${url.origin}/activate`, 302);
+}
+
+async function fetchMe(origin, token) {
+  const r = await fetch(`${origin}/api2/me`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "authorization": `Bearer ${token}`,
+      // device id مو ضروري هنا لأننا نعتمد على تفعيل الإيميل/الكود
+    },
+    body: JSON.stringify({}),
+  });
+  const j = await r.json().catch(() => null);
+  return j;
+}
+
 export async function onRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
   const path = url.pathname;
 
-  const VERSION = "mw-v5-lock-html-to-activate";
-  const TOKEN_COOKIE = "sandooq_token_v1";
+  // نحمي فقط /app
+  if (!path.startsWith("/app")) return next();
 
-  // ✅ فحص سريع
-  if (path === "/__mw") {
-    return new Response(
-      JSON.stringify({ ok: true, version: VERSION, path, time: Date.now() }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-        },
-      }
-    );
+  // token من Cookie أو Authorization
+  const auth = request.headers.get("Authorization") || "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const cookieTok = getCookie(request, "sandooq_session_v1");
+  const token = bearer || cookieTok;
+
+  if (!token) return redirectToActivate(request);
+
+  // Cache (5 دقائق) عشان ما نضغط على D1 مع كل ملف داخل /app
+  const cache = caches.default;
+  const cacheKey = new Request(`https://auth-cache.local/me/${encodeURIComponent(token)}`, { method: "GET" });
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const data = await cached.json().catch(() => null);
+    if (data?.ok && data?.activated) return next();
+    return redirectToActivate(request);
   }
 
-  // ✅ مسارات عامة (لا تتقفل)
-  if (
-    path.startsWith("/api/") ||
-    path.startsWith("/api2/") ||
-    path === "/activate" ||
-    path === "/activate/" ||
-    path === "/activate.html" ||
-    path === "/robots.txt" ||
-    path === "/favicon.ico" ||
-    path.startsWith("/.well-known/")
-  ) {
-    return next();
-  }
+  const me = await fetchMe(url.origin, token);
 
-  // ✅ اسمح للملفات الثابتة (صور/خطوط/JS/CSS/maps...) عشان الواجهات تشتغل
-  if (isStaticAsset(path)) {
-    return next();
-  }
+  // خزّن بالكااش
+  await cache.put(
+    cacheKey,
+    new Response(JSON.stringify(me || { ok: false }), {
+      headers: { "content-type": "application/json", "cache-control": "public, max-age=300" },
+    })
+  );
 
-  // ✅ أي زيارة للرابط الرئيسي دايم تروح للتفعيل (مثل نظامكم المطلوب)
-  if (path === "/" || path === "/index.html") {
-    return redirect(url, "/activate?next=%2Fapp");
-  }
-
-  // ✅ أي صفحة HTML ثانية/صفحات اللعبة: لازم يكون فيه جلسة (Cookie)
-  // هذا يضمن "أي رابط لأي صفحة يفتح صفحة التفعيل أولاً"
-  const cookieHeader = request.headers.get("Cookie") || "";
-  const token = getCookie(cookieHeader, TOKEN_COOKIE);
-
-  if (!token) {
-    const nextPath = path + (url.search || "");
-    return redirect(url, "/activate?next=" + encodeURIComponent(nextPath));
-  }
-
-  // عنده جلسة -> يكمل
-  return next();
+  if (me?.ok && me?.activated) return next();
+  return redirectToActivate(request);
 }
 
-/* ---------------- helpers ---------------- */
-
-function isStaticAsset(path) {
-  // مجلدات ثابتة عندك
-  if (path.startsWith("/maps/")) return true;
-
-  // ملفات ثابتة (صور/خطوط/ستايل/سكربت…)
-  return /\.(png|jpe?g|webp|gif|svg|ico|css|js|json|map|txt|xml|woff2?|ttf|otf|eot|mp3|mp4)$/i.test(path);
-}
-
-function getCookie(cookieHeader, name) {
-  const parts = cookieHeader.split(";").map((s) => s.trim());
-  for (const p of parts) {
-    if (!p) continue;
-    const eq = p.indexOf("=");
-    if (eq === -1) continue;
-    const k = p.slice(0, eq).trim();
-    const v = p.slice(eq + 1).trim();
-    if (k === name) return decodeURIComponent(v);
-  }
-  return "";
-}
-
-function redirect(currentUrl, toPath) {
-  const to = new URL(toPath, currentUrl.origin);
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: to.toString(),
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
-// functions/_middleware.js – إصدار 5
+/*
+_middleware.js – إصدار 1 (Protect /app via /api2/me + cache)
+*/
