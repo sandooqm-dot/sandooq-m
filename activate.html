@@ -362,7 +362,6 @@
 
   <script>
     const API_BASE = "/api2";
-    const TOKEN_KEY = "sandooq_token_v1"; // ✅ جديد (ما يلمس الواجهة)
     const $ = (id)=>document.getElementById(id);
 
     function show(viewId){
@@ -402,61 +401,27 @@
       return API_BASE + p;
     }
 
-    // ✅ جديد: حفظ توكن لو جا من أي استجابة
-    function saveTokenFrom(r){
-      const t = r && (r.token || r.access_token || r.accessToken || r.authToken);
-      if(t) localStorage.setItem(TOKEN_KEY, String(t));
-    }
-
-    // ✅ جديد: التقاط token من الرابط بعد Google callback (لو السيرفر يرجعه كـ ?token=...)
-    function captureTokenFromUrl(){
-      const u = new URL(window.location.href);
-      const t = u.searchParams.get("token") || u.searchParams.get("t") || u.searchParams.get("access_token");
-      if(t){
-        localStorage.setItem(TOKEN_KEY, t);
-        u.searchParams.delete("token");
-        u.searchParams.delete("t");
-        u.searchParams.delete("access_token");
-        history.replaceState({}, "", u.toString());
-      }
-    }
-
-    // ✅ تعديل بسيط: api تدعم GET + ترسل Authorization لو فيه توكن
-    async function api(path, body, method="POST"){
+    async function api(path, body){
       const headers = {
         "Content-Type":"application/json",
         "X-Device-Id": getDeviceId()
       };
 
-      const tok = localStorage.getItem(TOKEN_KEY);
-      if(tok) headers["Authorization"] = "Bearer " + tok;
-
-      const opts = {
-        method,
+      const res = await fetch(apiUrl(path), {
+        method:"POST",
         headers,
+        body: JSON.stringify(body||{}),
         credentials: "include"
-      };
-
-      if(method !== "GET"){
-        opts.body = JSON.stringify(body||{});
-      }
-
-      const res = await fetch(apiUrl(path), opts);
+      });
 
       let data=null;
-      try{ data = await res.json(); }
-      catch{ data = { ok:false, error:"BAD_RESPONSE" }; }
-
-      // ✅ لو رجع السيرفر توكن، نخزنه
-      saveTokenFrom(data);
-
+      try{ data = await res.json(); }catch{ data = { ok:false, error:"BAD_RESPONSE" }; }
       return data;
     }
 
     async function logout(){
-      try { await api("/logout", {}, "POST"); } catch {}
+      try { await api("/logout", {}); } catch {}
       sessionStorage.removeItem("pending_email");
-      localStorage.removeItem(TOKEN_KEY); // ✅ جديد (للاختبار/الخروج)
       boot();
     }
 
@@ -468,11 +433,10 @@
       msg($("authMsg"), "ميزة (نسيت كلمة المرور) بنضيفها بالخطوة الجاية.", "err");
     };
 
-    // ✅ أهم تعديل: زر Google يروح start الحقيقي
+    // ✅ التغيير الوحيد: زر Google صار يفتح مسار Google OAuth مباشرة
     $("btnGoogle").onclick = async ()=>{
       msg($("authMsg"), "");
-      // ملاحظة: لو السيرفر يدعم return/game بيستفيد، وإذا ما يدعمها بيتجاهلها وما يضر
-      window.location.href = "/api2/google/start?return=%2Factivate&game=horof";
+      window.location.href = "/api2/google/start";
     };
 
     $("btnLogout").onclick = async (e)=>{ e.preventDefault(); await logout(); };
@@ -485,7 +449,7 @@
       if(!email) return msg($("authMsg"), "اكتب البريد الإلكتروني", "err");
       if(password.length < 8) return msg($("authMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
 
-      const r = await api("/login", { email, password }, "POST");
+      const r = await api("/login", { email, password });
       if(!r?.ok){
         return msg($("authMsg"), translateErr(r), "err");
       }
@@ -502,7 +466,7 @@
       if(pw1.length < 8) return msg($("createMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
       if(pw1 !== pw2) return msg($("createMsg"), "كلمتا المرور غير متطابقتين", "err");
 
-      const r = await api("/register", { email, password: pw1 }, "POST");
+      const r = await api("/register", { email, password: pw1 });
       if(!r?.ok){
         return msg($("createMsg"), translateErr(r), "err");
       }
@@ -526,7 +490,7 @@
       if(!otp) return msg($("verifyMsg"), "اكتب رمز التحقق", "err");
       if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
 
-      const r = await api("/verify-email", { email, otp }, "POST");
+      const r = await api("/verify-email", { email, otp });
       if(!r?.ok){
         return msg($("verifyMsg"), translateErr(r), "err");
       }
@@ -540,7 +504,7 @@
       const email = sessionStorage.getItem("pending_email") || "";
       if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
 
-      const r = await api("/resend-otp", { email }, "POST");
+      const r = await api("/resend-otp", { email });
       if(!r?.ok){
         return msg($("verifyMsg"), translateErr(r), "err");
       }
@@ -558,7 +522,7 @@
       const code = normCode($("code").value);
       if(!code) return msg($("actMsg"), "الرجاء إدخال كود التفعيل", "err");
 
-      const r = await api("/activate", { code }, "POST");
+      const r = await api("/activate", { code });
       if(!r?.ok){
         return msg($("actMsg"), translateErr(r), "err");
       }
@@ -569,9 +533,6 @@
 
     // ====== Boot (إذا الحساب مُفعّل -> دخول اللعبة مباشرة)
     async function boot(){
-      // ✅ جديد: لو رجعنا من Google ومعنا token بالـ URL نخزنه
-      captureTokenFromUrl();
-
       const pending = sessionStorage.getItem("pending_email") || "";
       if (pending) {
         $("vEmail").textContent = pending;
@@ -579,12 +540,7 @@
         return;
       }
 
-      // ✅ أهم إصلاح: /me غالباً GET — بنجرب GET أولاً ثم POST كاحتياط
-      let me = await api("/me", null, "GET");
-      if(!me?.ok){
-        me = await api("/me", {}, "POST");
-      }
-
+      const me = await api("/me", {});
       if(!me?.ok){
         show("view-auth");
         return;
@@ -593,7 +549,6 @@
       const email = me.email || "";
       $("who").textContent = email;
 
-      // (لو حساب جوجل يعتبر verified تلقائياً، ما راح يدخل هنا)
       if(me.verified === false){
         sessionStorage.setItem("pending_email", email);
         $("vEmail").textContent = email;
@@ -602,13 +557,13 @@
         return;
       }
 
-      // ✅ المطلوب: إذا مفعّل -> /app
+      // لو متفعّل -> دخل اللعبة فورًا (بدون شاشة تم التفعيل)
       if(me.activated){
         window.location.replace("/app");
         return;
       }
 
-      // ✅ غير مفعّل -> صفحة إدخال الكود
+      // غير مفعّل -> اعرض صفحة إدخال الكود
       show("view-activate");
     }
 
@@ -638,8 +593,6 @@
       if(e === "CODE_ALREADY_USED") return "الكود مستخدم مسبقًا.";
       if(e === "DEVICE_LIMIT_REACHED") return "تجاوزت الحد المسموح لربط الأجهزة (جهازين فقط).";
 
-      if(e === "UNAUTHORIZED") return "انتهت الجلسة. سجّل دخول من جديد.";
-
       return "حدث خطأ: " + e;
     }
 
@@ -648,4 +601,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v7 (Fix Google routing + /me GET + Authorization/token capture) -->
+<!-- activate.html – نظام التفعيل الجديد v7 (Google button enabled) -->
