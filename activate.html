@@ -3,561 +3,649 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>تسجيل الدخول</title>
+  <title>تفعيل اللعبة - صندوق المسابقات</title>
+
   <style>
     :root{
-      --bg1:#7e49b7;
-      --bg2:#c84aa3;
-      --card: rgba(255,255,255,.14);
-      --card2: rgba(255,255,255,.10);
-      --border: rgba(255,255,255,.22);
-      --text:#fff;
-      --muted: rgba(255,255,255,.75);
-      --danger:#ff6b6b;
-      --ok:#2ee59d;
-      --btn1:#ff4fb8;
-      --btn2:#5b7cff;
-      --shadow: 0 20px 60px rgba(0,0,0,.25);
+      --bg1:#7a3aa8;
+      --bg2:#c93fa7;
+      --card:#7f4bb7cc;
+      --card2:#ffffff14;
+      --stroke:#ffffff22;
+      --text:#ffffff;
+      --muted:#ffffffcc;
+      --shadow:0 18px 40px rgba(0,0,0,.18);
+      --btn1:#ff4fb1;
+      --btn2:#6d4bff;
+      --green1:#2ad37a;
+      --green2:#00b86b;
+      --danger:#ff4b4b;
+      --line:#ffffff33;
     }
-    *{box-sizing:border-box;font-family: system-ui,-apple-system,"Segoe UI",Tahoma,Arial;}
+
+    *{box-sizing:border-box}
     body{
-      margin:0; min-height:100vh;
-      background: radial-gradient(1200px 700px at 25% 20%, rgba(255,255,255,.18), transparent 60%),
-                  linear-gradient(135deg,var(--bg1),var(--bg2));
-      display:flex; align-items:center; justify-content:center;
-      padding:24px;
+      margin:0;
+      min-height:100vh;
+      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
       color:var(--text);
+      background:
+        radial-gradient(1200px 900px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
+        radial-gradient(1000px 700px at 80% 20%, rgba(255,255,255,.10), transparent 60%),
+        linear-gradient(135deg,var(--bg1),var(--bg2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:28px 14px;
     }
-    .wrap{width:min(420px, 100%);}
+
+    body:before{
+      content:"";
+      position:fixed; inset:0;
+      background-image:
+        radial-gradient(circle at 12px 12px, rgba(255,255,255,.08) 1px, transparent 1px);
+      background-size:34px 34px;
+      opacity:.35;
+      pointer-events:none;
+    }
+
+    .wrap{width:min(430px,100%)}
     .card{
-      background: linear-gradient(180deg, var(--card), var(--card2));
-      border:1px solid var(--border);
-      border-radius:28px;
-      box-shadow: var(--shadow);
-      padding:22px 18px 18px;
+      background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.08));
+      border:1px solid var(--stroke);
+      border-radius:30px;
+      box-shadow:var(--shadow);
+      padding:22px 18px 16px;
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
-    .logo{
-      display:flex; align-items:center; justify-content:center;
-      margin:6px 0 10px;
+
+    .brand{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      margin-top:2px;
+      margin-bottom:8px;
     }
-    .logo img{
-      height:34px; width:auto; display:block;
-      filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+    .brand img{
+      width:52px; height:52px; object-fit:contain;
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
     }
-    h1{
-      margin:6px 0 6px;
+
+    .title{
       text-align:center;
-      font-size:40px; letter-spacing:.5px;
+      font-weight:900;
+      letter-spacing:.2px;
+      margin:8px 0 6px;
+      font-size:34px;
+      text-shadow:0 2px 0 rgba(0,0,0,.12);
     }
-    .sub{
-      margin:0 0 14px;
+    .subtitle{
       text-align:center;
       color:var(--muted);
-      line-height:1.55;
+      margin:0 0 14px;
       font-size:14px;
+      line-height:1.6;
     }
+
     .field{
       position:relative;
+      width:100%;
       margin:10px 0;
     }
-    input{
+    .field input{
       width:100%;
+      padding:14px 44px 14px 44px;
       border-radius:16px;
-      border:1px solid rgba(255,255,255,.15);
-      background: rgba(0,0,0,.12);
-      color:#fff;
-      padding:14px 14px;
+      border:1px solid var(--stroke);
       outline:none;
-      font-size:16px;
+      background:rgba(0,0,0,.12);
+      color:#fff;
+      font-size:15px;
     }
-    input::placeholder{color: rgba(255,255,255,.55);}
+    .field input::placeholder{color:#ffffff9c}
+    .icon{
+      position:absolute; top:50%; transform:translateY(-50%);
+      width:22px; height:22px;
+      opacity:.9;
+    }
+    .icon.r{right:14px}
+    .icon.l{left:14px; opacity:.7}
+
     .btn{
       width:100%;
       border:none;
       border-radius:18px;
       padding:14px 14px;
-      color:#fff;
+      font-weight:900;
       font-size:18px;
+      color:#fff;
       cursor:pointer;
-      background: linear-gradient(90deg, var(--btn1), var(--btn2));
-      box-shadow: 0 10px 30px rgba(0,0,0,.18);
-      margin-top:10px;
+      box-shadow:0 14px 30px rgba(0,0,0,.16);
+      transition:transform .08s ease, opacity .2s ease, filter .2s ease;
     }
-    .btn:disabled{opacity:.55; cursor:not-allowed;}
-    .sep{
+    .btn:active{transform:scale(.99)}
+    .btnPrimary{
+      background:linear-gradient(90deg,var(--btn1),var(--btn2));
+    }
+    .btnGreen{
+      background:linear-gradient(90deg,var(--green1),var(--green2));
+    }
+    .btnGhost{
+      background:rgba(255,255,255,.08);
+      border:1px solid var(--stroke);
+      box-shadow:none;
+    }
+    .btn:disabled{opacity:.55; cursor:not-allowed; filter:grayscale(.2)}
+
+    .or{
       display:flex; align-items:center; gap:10px;
       margin:14px 0 12px;
-      color:rgba(255,255,255,.7);
-    }
-    .sep:before,.sep:after{
-      content:""; height:1px; background:rgba(255,255,255,.28); flex:1;
-    }
-    .gbtn{
-      width:100%;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.35);
-      background:#fff;
-      color:#111;
-      padding:12px 14px;
-      cursor:pointer;
-      font-weight:700;
-      display:flex;
-      align-items:center;
+      color:var(--muted);
+      font-weight:800;
       justify-content:center;
-      gap:10px;
     }
-    .g{
-      width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
-      border-radius:50%;
+    .or:before,.or:after{
+      content:"";
+      height:1px; flex:1;
+      background:var(--line);
+    }
+
+    .google{
+      width:100%;
+      border-radius:18px;
+      padding:12px 14px;
       background:#fff;
+      color:#222;
+      font-weight:900;
+      font-size:16px;
+      border:none;
+      cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      gap:10px;
+      box-shadow:0 14px 30px rgba(0,0,0,.14);
     }
+    .google img{width:20px; height:20px}
+
     .links{
-      margin-top:12px;
       display:flex;
       justify-content:space-between;
-      font-size:14px;
-      color: rgba(255,255,255,.8);
+      gap:10px;
+      margin-top:10px;
+      padding:0 4px;
+      color:var(--muted);
+      font-size:13px;
+      font-weight:800;
     }
     .links a{
-      color: rgba(255,255,255,.88);
+      color:var(--muted);
       text-decoration:none;
       border-bottom:1px dashed rgba(255,255,255,.35);
       padding-bottom:2px;
     }
+
     .msg{
-      margin-top:12px;
+      margin:10px 0 0;
       padding:10px 12px;
       border-radius:14px;
-      border:1px solid rgba(255,255,255,.22);
-      background: rgba(0,0,0,.14);
-      color:rgba(255,255,255,.92);
-      font-size:14px;
-      line-height:1.5;
+      background:rgba(0,0,0,.12);
+      border:1px solid var(--stroke);
+      color:#fff;
+      font-weight:800;
+      font-size:13px;
+      line-height:1.6;
       display:none;
+      white-space:pre-wrap;
     }
-    .msg.ok{border-color: rgba(46,229,157,.55); color:#eafff6;}
-    .msg.bad{border-color: rgba(255,107,107,.55); color:#fff2f2;}
+    .msg.err{
+      border-color:rgba(255,75,75,.45);
+      background:rgba(255,75,75,.10);
+    }
+    .msg.ok{
+      border-color:rgba(42,211,122,.45);
+      background:rgba(42,211,122,.10);
+    }
+
     .foot{
       text-align:center;
       margin-top:14px;
-      color: rgba(255,255,255,.75);
+      color:#ffffffb3;
       font-size:12px;
+      font-weight:800;
     }
-    .hide{display:none !important;}
-    .smallbtn{
-      width:100%;
-      margin-top:10px;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.35);
-      background: rgba(0,0,0,.10);
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      justify-content:center;
+      border-radius:999px;
+      padding:8px 12px;
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,.10);
       color:#fff;
-      padding:12px 14px;
-      cursor:pointer;
-      font-weight:700;
+      font-weight:900;
+      font-size:13px;
     }
+
+    .topInfo{
+      display:flex;
+      justify-content:center;
+      margin-top:10px;
+      margin-bottom:4px;
+    }
+
+    .hide{display:none !important;}
   </style>
 </head>
 
 <body>
   <div class="wrap">
     <div class="card">
-      <div class="logo">
-        <img src="logo.png" alt="logo">
+      <div class="brand">
+        <img src="logo.png" alt="logo" />
       </div>
 
-      <!-- LOADING -->
-      <section id="viewLoading">
-        <h1 style="font-size:34px;">جاري التحقق…</h1>
-        <p class="sub">لحظة بس ✨</p>
-        <div class="msg" id="loadingMsg"></div>
-      </section>
-
-      <!-- LOGIN -->
-      <section id="viewLogin" class="hide">
-        <h1>تسجيل الدخول</h1>
-        <p class="sub">لازم تسجل دخول عشان تفتح اللعبة.<br>(إذا حسابك مُفعّل بتدخل اللعبة مباشرة)</p>
-
-        <div class="field">
-          <input id="loginEmail" type="email" placeholder="example@email.com" autocomplete="email">
-        </div>
-        <div class="field">
-          <input id="loginPass" type="password" placeholder="********" autocomplete="current-password">
+      <!-- شاشة: تسجيل/دخول -->
+      <div id="view-auth">
+        <div class="title">تسجيل الدخول</div>
+        <div class="subtitle">
+          لازم تسجّل دخول عشان تفتح اللعبة.<br/>
+          (إذا حسابك مُفعّل بتدخل اللعبة مباشرة)
         </div>
 
-        <button class="btn" id="btnLogin">دخول</button>
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="white" stroke-width="2"/></svg>
+          <input id="email" type="email" placeholder="example@email.com" autocomplete="email" />
+        </div>
 
-        <div class="sep">أو</div>
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 15v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="password" type="password" placeholder="********" autocomplete="current-password" />
+        </div>
 
-        <button class="gbtn" id="btnGoogle">
-          <span class="g">G</span>
+        <button id="btnLogin" class="btn btnPrimary">دخول</button>
+
+        <div class="or">أو</div>
+
+        <button id="btnGoogle" class="google" type="button">
+          <img alt="g" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg">
           الدخول بواسطة حساب جوجل
         </button>
 
         <div class="links">
-          <a href="#" id="goRegister">إنشاء حساب جديد</a>
+          <a href="#" id="goCreate">إنشاء حساب جديد</a>
           <a href="#" id="goForgot">نسيت كلمة المرور؟</a>
         </div>
 
-        <div class="msg" id="loginMsg"></div>
-        <div class="foot">© صندوق المسابقات</div>
-      </section>
+        <div id="authMsg" class="msg"></div>
+      </div>
 
-      <!-- REGISTER -->
-      <section id="viewRegister" class="hide">
-        <h1 style="font-size:34px;">إنشاء حساب</h1>
-        <p class="sub">اكتب الإيميل وكلمة المرور… وبنرسل لك رمز تحقق.</p>
-
-        <div class="field">
-          <input id="regEmail" type="email" placeholder="example@email.com" autocomplete="email">
-        </div>
-        <div class="field">
-          <input id="regPass" type="password" placeholder="كلمة المرور" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <input id="regPass2" type="password" placeholder="تأكيد كلمة المرور" autocomplete="new-password">
-        </div>
-
-        <button class="btn" id="btnRegister">إنشاء حساب</button>
-
-        <div class="sep">أو</div>
-
-        <button class="gbtn" id="btnGoogle2">
-          <span class="g">G</span>
-          إنشاء/دخول عبر جوجل
-        </button>
-
-        <div class="links">
-          <a href="#" id="backToLogin1">رجوع لتسجيل الدخول</a>
-          <span></span>
-        </div>
-
-        <div class="msg" id="regMsg"></div>
-        <div class="foot">© صندوق المسابقات</div>
-      </section>
-
-      <!-- OTP -->
-      <section id="viewOtp" class="hide">
-        <h1 style="font-size:34px;">تأكيد البريد</h1>
-        <p class="sub">أدخل رمز التحقق المرسل لبريدك.</p>
-
-        <div class="field">
-          <input id="otpEmail" type="email" placeholder="email" readonly>
+      <!-- شاشة: إنشاء حساب -->
+      <div id="view-create" class="hide">
+        <div class="title">إنشاء حساب</div>
+        <div class="subtitle">
+          أنشئ حسابك ثم ثبّت بريدك الإلكتروني.<br/>
+          بعدها تفعّل اللعبة بالكود (مرة واحدة).
         </div>
 
         <div class="field">
-          <input id="otpCode" inputmode="numeric" placeholder="رمز التحقق" autocomplete="one-time-code">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4z" stroke="white" stroke-width="2" opacity=".0"/><path d="M4 8l8 6 8-6" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="2"/></svg>
+          <input id="cEmail" type="email" placeholder="example@email.com" autocomplete="email" />
         </div>
-
-        <button class="btn" id="btnVerifyOtp">تأكيد</button>
-        <button class="smallbtn" id="btnResendOtp">إعادة إرسال الرمز</button>
-
-        <div class="links">
-          <a href="#" id="backToLogin2">رجوع</a>
-          <span></span>
-        </div>
-
-        <div class="msg" id="otpMsg"></div>
-        <div class="foot">© صندوق المسابقات</div>
-      </section>
-
-      <!-- ACTIVATE CODE -->
-      <section id="viewCode" class="hide">
-        <h1 style="font-size:34px;">تفعيل الكود</h1>
-        <p class="sub">اول مرة فقط: أدخل كود التفعيل لربطه بحسابك.</p>
 
         <div class="field">
-          <input id="actCode" placeholder="اكتب كود التفعيل هنا…">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 15v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="cPass" type="password" placeholder="كلمة مرور (8 أحرف على الأقل)" autocomplete="new-password" />
         </div>
 
-        <button class="btn" id="btnActivate">تفعيل</button>
-        <button class="smallbtn" id="btnLogout">تسجيل خروج (للاختبار)</button>
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 15v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="cPass2" type="password" placeholder="تأكيد كلمة المرور" autocomplete="new-password" />
+        </div>
 
-        <div class="msg" id="codeMsg"></div>
-        <div class="foot">© صندوق المسابقات</div>
-      </section>
+        <button id="btnCreate" class="btn btnPrimary">إنشاء حساب</button>
 
-      <!-- FORGOT (Placeholder) -->
-      <section id="viewForgot" class="hide">
-        <h1 style="font-size:34px;">نسيت كلمة المرور</h1>
-        <p class="sub">هذي الخطوة بنكمّلها بعد ما نثبت Google بالكامل.</p>
-        <button class="smallbtn" id="backToLogin3">رجوع</button>
-        <div class="foot">© صندوق المسابقات</div>
-      </section>
+        <div class="links" style="justify-content:center">
+          <a href="#" id="haveAccount">لديك حساب بالفعل؟ سجل دخول</a>
+        </div>
 
+        <div id="createMsg" class="msg"></div>
+      </div>
+
+      <!-- شاشة: تأكيد البريد (OTP) -->
+      <div id="view-verify" class="hide">
+        <div class="title">تأكيد البريد الإلكتروني</div>
+        <div class="subtitle">
+          أدخل الرمز المرسل إلى:<br/>
+          <span id="vEmail" style="font-weight:900"></span>
+        </div>
+
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10z" stroke="white" stroke-width="2"/><path d="M9 21v-6h6v6" stroke="white" stroke-width="2"/></svg>
+          <input id="otp" inputmode="numeric" placeholder="رمز التحقق" />
+        </div>
+
+        <button id="btnVerifyOtp" class="btn btnPrimary">تحقق من الرمز</button>
+        <button id="btnResendOtp" class="btn btnGhost" style="margin-top:10px">لم تستلم الرمز؟ إعادة الإرسال</button>
+
+        <div id="verifyMsg" class="msg"></div>
+      </div>
+
+      <!-- شاشة: تفعيل الكود -->
+      <div id="view-activate" class="hide">
+        <div class="title">تفعيل اللعبة</div>
+        <div class="subtitle">أدخل كود التفعيل اللي وصلك بعد الشراء</div>
+
+        <div class="topInfo">
+          <span class="pill">الحساب: <span id="who" style="margin-right:6px"></span></span>
+        </div>
+
+        <div class="field">
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="white" stroke-width="2"/><rect x="5" y="10" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 14v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="code" placeholder="M32959" autocomplete="one-time-code" />
+        </div>
+
+        <button id="btnActivate" class="btn btnGreen">تفعيل</button>
+
+        <div class="links" style="margin-top:12px; justify-content:center">
+          <a href="#" id="btnLogout">تسجيل الخروج</a>
+        </div>
+
+        <div id="actMsg" class="msg"></div>
+      </div>
+
+      <div class="foot">© صندوق المسابقات</div>
     </div>
   </div>
 
-<script>
-(() => {
-  // ==== CONFIG ====
-  const TOKEN_KEY  = "sandooq_token_v1";
-  const DEVICE_KEY = "sandooq_device_id_v1";
-  const GAME_KEY   = "horof";   // مهم لتمييز اللعبة
-  const GAME_URL   = "/app";    // وجهة اللعبة بعد التفعيل
+  <script>
+    const API_BASE = "/api2";
+    const TOKEN_KEY = "sandooq_token_v1"; // ✅ جديد (ما يلمس الواجهة)
+    const $ = (id)=>document.getElementById(id);
 
-  // ==== UI HELPERS ====
-  const $ = (id) => document.getElementById(id);
-
-  const views = {
-    loading: $("viewLoading"),
-    login: $("viewLogin"),
-    register: $("viewRegister"),
-    otp: $("viewOtp"),
-    code: $("viewCode"),
-    forgot: $("viewForgot"),
-  };
-
-  function show(viewName){
-    Object.values(views).forEach(v => v.classList.add("hide"));
-    views[viewName].classList.remove("hide");
-  }
-
-  function setMsg(el, text, kind){
-    if(!el) return;
-    el.className = "msg" + (kind ? (" " + kind) : "");
-    el.textContent = text || "";
-    el.style.display = text ? "block" : "none";
-  }
-
-  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-
-  // ==== DEVICE ID ====
-  function getDeviceId(){
-    let id = localStorage.getItem(DEVICE_KEY);
-    if(!id){
-      try{ id = crypto.randomUUID(); }
-      catch{ id = "dev_" + Math.random().toString(16).slice(2) + Date.now(); }
-      localStorage.setItem(DEVICE_KEY, id);
-    }
-    return id;
-  }
-
-  // ==== URL PARAMS ====
-  function getParam(name){
-    const u = new URL(location.href);
-    return u.searchParams.get(name);
-  }
-  function removeParams(...names){
-    const u = new URL(location.href);
-    names.forEach(n => u.searchParams.delete(n));
-    history.replaceState({}, "", u.toString());
-  }
-
-  // ==== API ====
-  async function api(path, {method="GET", body=null, auth=true} = {}){
-    const headers = { "Content-Type": "application/json", "X-Device-Id": getDeviceId() };
-    const token = localStorage.getItem(TOKEN_KEY);
-
-    if(auth && token) headers["Authorization"] = "Bearer " + token;
-
-    const res = await fetch(path, {
-      method,
-      headers,
-      credentials: "include",
-      body: body ? JSON.stringify(body) : null
-    });
-
-    const text = await res.text();
-    let json = null;
-    try{ json = text ? JSON.parse(text) : null; }catch{}
-    return { ok: res.ok, status: res.status, json, text };
-  }
-
-  function extractToken(payload){
-    if(!payload) return null;
-    return payload.token || payload.authToken || payload.access_token || payload.accessToken || null;
-  }
-
-  function isActivated(payload){
-    // نحاول نلتقط أي شكل منطقي ممكن من /api2/me
-    if(!payload) return false;
-
-    if(payload.activated === true) return true;
-    if(payload.is_activated === true) return true;
-    if(payload.has_activation === true) return true;
-    if(payload.hasGame === true) return true;
-    if(payload.license === true) return true;
-
-    const user = payload.user || payload.data || null;
-    if(user){
-      if(user.activated === true) return true;
-      if(user.has_activation === true) return true;
-      if(Array.isArray(user.games) && user.games.includes(GAME_KEY)) return true;
-      if(Array.isArray(user.activated_games) && user.activated_games.includes(GAME_KEY)) return true;
+    function show(viewId){
+      const ids = ["view-auth","view-create","view-verify","view-activate"];
+      ids.forEach(x => $(x).classList.toggle("hide", x!==viewId));
     }
 
-    if(Array.isArray(payload.games) && payload.games.includes(GAME_KEY)) return true;
-    if(Array.isArray(payload.activated_games) && payload.activated_games.includes(GAME_KEY)) return true;
-
-    return false;
-  }
-
-  async function boot(){
-    show("loading");
-    setMsg($("loadingMsg"), "", "");
-
-    // reset للتجربة
-    if(getParam("reset") === "1"){
-      localStorage.removeItem(TOKEN_KEY);
-      // لا نمسح device id إلا إذا تبغى
-      removeParams("reset");
+    function msg(el, text, type){
+      el.classList.remove("err","ok");
+      if(type) el.classList.add(type);
+      el.textContent = text || "";
+      el.style.display = text ? "block" : "none";
     }
 
-    // لو جاء توكن بالـ URL (اختياري للمستقبل)
-    const urlToken = getParam("token") || getParam("t");
-    if(urlToken){
-      localStorage.setItem(TOKEN_KEY, urlToken);
-      removeParams("token","t");
+    function normEmail(v){
+      return (v||"").toString().trim().toLowerCase();
+    }
+    function normCode(v){
+      return (v||"").toString().trim().toUpperCase().replace(/\s+/g,"").replace(/[–—−]/g,"-");
     }
 
-    // 1) جرّب /api2/me (بالتوكن إن وجد) أو بالكوكيز
-    const me = await api(`/api2/me?game=${encodeURIComponent(GAME_KEY)}`, { method:"GET", auth:true });
+    function getDeviceId(){
+      const k="sandooq_device_id_v1";
+      let v = localStorage.getItem(k);
+      if(!v){
+        v = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)+Date.now());
+        localStorage.setItem(k,v);
+      }
+      return v;
+    }
 
-    if(me.ok){
-      // لو السيرفر رجّع توكن جديد
-      const t = extractToken(me.json);
-      if(t) localStorage.setItem(TOKEN_KEY, t);
+    function apiUrl(path){
+      let p = String(path||"");
+      if(!p.startsWith("/")) p = "/" + p;
+      if(p.startsWith("/api2/")) return p;
+      if(p.startsWith("/api/")) return p;
+      return API_BASE + p;
+    }
 
-      // 2) إذا مفعّل -> للعبة
-      if(isActivated(me.json)){
-        location.replace(GAME_URL);
+    // ✅ جديد: حفظ توكن لو جا من أي استجابة
+    function saveTokenFrom(r){
+      const t = r && (r.token || r.access_token || r.accessToken || r.authToken);
+      if(t) localStorage.setItem(TOKEN_KEY, String(t));
+    }
+
+    // ✅ جديد: التقاط token من الرابط بعد Google callback (لو السيرفر يرجعه كـ ?token=...)
+    function captureTokenFromUrl(){
+      const u = new URL(window.location.href);
+      const t = u.searchParams.get("token") || u.searchParams.get("t") || u.searchParams.get("access_token");
+      if(t){
+        localStorage.setItem(TOKEN_KEY, t);
+        u.searchParams.delete("token");
+        u.searchParams.delete("t");
+        u.searchParams.delete("access_token");
+        history.replaceState({}, "", u.toString());
+      }
+    }
+
+    // ✅ تعديل بسيط: api تدعم GET + ترسل Authorization لو فيه توكن
+    async function api(path, body, method="POST"){
+      const headers = {
+        "Content-Type":"application/json",
+        "X-Device-Id": getDeviceId()
+      };
+
+      const tok = localStorage.getItem(TOKEN_KEY);
+      if(tok) headers["Authorization"] = "Bearer " + tok;
+
+      const opts = {
+        method,
+        headers,
+        credentials: "include"
+      };
+
+      if(method !== "GET"){
+        opts.body = JSON.stringify(body||{});
+      }
+
+      const res = await fetch(apiUrl(path), opts);
+
+      let data=null;
+      try{ data = await res.json(); }
+      catch{ data = { ok:false, error:"BAD_RESPONSE" }; }
+
+      // ✅ لو رجع السيرفر توكن، نخزنه
+      saveTokenFrom(data);
+
+      return data;
+    }
+
+    async function logout(){
+      try { await api("/logout", {}, "POST"); } catch {}
+      sessionStorage.removeItem("pending_email");
+      localStorage.removeItem(TOKEN_KEY); // ✅ جديد (للاختبار/الخروج)
+      boot();
+    }
+
+    $("goCreate").onclick = (e)=>{ e.preventDefault(); show("view-create"); msg($("authMsg"),""); };
+    $("haveAccount").onclick = (e)=>{ e.preventDefault(); show("view-auth"); msg($("createMsg"),""); };
+
+    $("goForgot").onclick = async (e)=>{
+      e.preventDefault();
+      msg($("authMsg"), "ميزة (نسيت كلمة المرور) بنضيفها بالخطوة الجاية.", "err");
+    };
+
+    // ✅ أهم تعديل: زر Google يروح start الحقيقي
+    $("btnGoogle").onclick = async ()=>{
+      msg($("authMsg"), "");
+      // ملاحظة: لو السيرفر يدعم return/game بيستفيد، وإذا ما يدعمها بيتجاهلها وما يضر
+      window.location.href = "/api2/google/start?return=%2Factivate&game=horof";
+    };
+
+    $("btnLogout").onclick = async (e)=>{ e.preventDefault(); await logout(); };
+
+    // ====== Login
+    $("btnLogin").onclick = async ()=>{
+      msg($("authMsg"), "");
+      const email = normEmail($("email").value);
+      const password = $("password").value || "";
+      if(!email) return msg($("authMsg"), "اكتب البريد الإلكتروني", "err");
+      if(password.length < 8) return msg($("authMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
+
+      const r = await api("/login", { email, password }, "POST");
+      if(!r?.ok){
+        return msg($("authMsg"), translateErr(r), "err");
+      }
+      await boot();
+    };
+
+    // ====== Create
+    $("btnCreate").onclick = async ()=>{
+      msg($("createMsg"), "");
+      const email = normEmail($("cEmail").value);
+      const pw1 = $("cPass").value || "";
+      const pw2 = $("cPass2").value || "";
+      if(!email) return msg($("createMsg"), "اكتب البريد الإلكتروني", "err");
+      if(pw1.length < 8) return msg($("createMsg"), "كلمة المرور لازم تكون 8 أحرف أو أكثر", "err");
+      if(pw1 !== pw2) return msg($("createMsg"), "كلمتا المرور غير متطابقتين", "err");
+
+      const r = await api("/register", { email, password: pw1 }, "POST");
+      if(!r?.ok){
+        return msg($("createMsg"), translateErr(r), "err");
+      }
+
+      sessionStorage.setItem("pending_email", email);
+      $("vEmail").textContent = email;
+      show("view-verify");
+
+      if (r.debugOtp) {
+        msg($("verifyMsg"), "تم إرسال رمز التحقق ✅\n(للاختبار: " + r.debugOtp + ")", "ok");
+      } else {
+        msg($("verifyMsg"), "تم إرسال رمز التحقق لبريدك ✅", "ok");
+      }
+    };
+
+    // ====== Verify OTP
+    $("btnVerifyOtp").onclick = async ()=>{
+      msg($("verifyMsg"), "");
+      const email = sessionStorage.getItem("pending_email") || "";
+      const otp = ($("otp").value || "").trim();
+      if(!otp) return msg($("verifyMsg"), "اكتب رمز التحقق", "err");
+      if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
+
+      const r = await api("/verify-email", { email, otp }, "POST");
+      if(!r?.ok){
+        return msg($("verifyMsg"), translateErr(r), "err");
+      }
+
+      sessionStorage.removeItem("pending_email");
+      await boot();
+    };
+
+    $("btnResendOtp").onclick = async ()=>{
+      msg($("verifyMsg"), "");
+      const email = sessionStorage.getItem("pending_email") || "";
+      if(!email) return msg($("verifyMsg"), "ما قدرنا نحدد الإيميل. ارجع وسوّ تسجيل من جديد.", "err");
+
+      const r = await api("/resend-otp", { email }, "POST");
+      if(!r?.ok){
+        return msg($("verifyMsg"), translateErr(r), "err");
+      }
+
+      if (r.debugOtp) {
+        msg($("verifyMsg"), "تمت إعادة إرسال الرمز ✅\n(للاختبار: " + r.debugOtp + ")", "ok");
+      } else {
+        msg($("verifyMsg"), "تمت إعادة إرسال الرمز ✅", "ok");
+      }
+    };
+
+    // ====== Activate Code (بعد النجاح ندخل اللعبة مباشرة)
+    $("btnActivate").onclick = async ()=>{
+      msg($("actMsg"), "");
+      const code = normCode($("code").value);
+      if(!code) return msg($("actMsg"), "الرجاء إدخال كود التفعيل", "err");
+
+      const r = await api("/activate", { code }, "POST");
+      if(!r?.ok){
+        return msg($("actMsg"), translateErr(r), "err");
+      }
+
+      // نجاح التفعيل -> دخول اللعبة مباشرة
+      window.location.replace("/app");
+    };
+
+    // ====== Boot (إذا الحساب مُفعّل -> دخول اللعبة مباشرة)
+    async function boot(){
+      // ✅ جديد: لو رجعنا من Google ومعنا token بالـ URL نخزنه
+      captureTokenFromUrl();
+
+      const pending = sessionStorage.getItem("pending_email") || "";
+      if (pending) {
+        $("vEmail").textContent = pending;
+        show("view-verify");
         return;
       }
 
-      // 3) إذا غير مفعّل -> شاشة الكود
-      show("code");
-      setMsg($("codeMsg"), "تم تسجيل الدخول ✅ الآن فعّل الكود لأول مرة فقط.", "ok");
-      return;
+      // ✅ أهم إصلاح: /me غالباً GET — بنجرب GET أولاً ثم POST كاحتياط
+      let me = await api("/me", null, "GET");
+      if(!me?.ok){
+        me = await api("/me", {}, "POST");
+      }
+
+      if(!me?.ok){
+        show("view-auth");
+        return;
+      }
+
+      const email = me.email || "";
+      $("who").textContent = email;
+
+      // (لو حساب جوجل يعتبر verified تلقائياً، ما راح يدخل هنا)
+      if(me.verified === false){
+        sessionStorage.setItem("pending_email", email);
+        $("vEmail").textContent = email;
+        show("view-verify");
+        msg($("verifyMsg"), "لازم تؤكد بريدك أولاً.", "err");
+        return;
+      }
+
+      // ✅ المطلوب: إذا مفعّل -> /app
+      if(me.activated){
+        window.location.replace("/app");
+        return;
+      }
+
+      // ✅ غير مفعّل -> صفحة إدخال الكود
+      show("view-activate");
     }
 
-    // غير مسجّل: روح للّوجين
-    show("login");
-  }
+    function translateErr(r){
+      const e = (r && (r.error || r.code)) ? String(r.error || r.code) : "UNKNOWN_ERROR";
 
-  // ==== EVENTS ====
-  $("btnGoogle").addEventListener("click", () => {
-    // أهم شيء: لا تفتح callback مباشرة — لازم start
-    location.href = `/api2/google/start?game=${encodeURIComponent(GAME_KEY)}&return=${encodeURIComponent("/activate")}`;
-  });
-  $("btnGoogle2").addEventListener("click", () => {
-    location.href = `/api2/google/start?game=${encodeURIComponent(GAME_KEY)}&return=${encodeURIComponent("/activate")}`;
-  });
+      if(e === "BAD_RESPONSE") return "صار خطأ في الاتصال بالسيرفر.";
+      if(e === "DB_NOT_BOUND") return "في مشكلة إعدادات السيرفر (DB).";
+      if(e === "BAD_JSON") return "طلب غير صالح.";
+      if(e === "INVALID_EMAIL") return "البريد الإلكتروني غير صحيح.";
+      if(e === "MISSING_FIELDS" || e === "MISSING_FIELD") return "الرجاء تعبئة جميع الحقول.";
 
-  $("btnLogin").addEventListener("click", async () => {
-    const email = $("loginEmail").value.trim();
-    const pass  = $("loginPass").value;
-    if(!email || !pass){
-      setMsg($("loginMsg"), "اكتب الإيميل وكلمة المرور.", "bad");
-      return;
-    }
-    setMsg($("loginMsg"), "جاري تسجيل الدخول…", "");
-    const r = await api("/api2/login", { method:"POST", body:{ email, password: pass }, auth:false });
-    if(!r.ok){
-      setMsg($("loginMsg"), (r.json && (r.json.error || r.json.message)) ? (r.json.error || r.json.message) : "فشل تسجيل الدخول.", "bad");
-      return;
-    }
-    const t = extractToken(r.json);
-    if(t) localStorage.setItem(TOKEN_KEY, t);
-    await boot();
-  });
+      if(e === "EMAIL_EXISTS") return "هذا الإيميل مسجل مسبقًا.";
+      if(e === "USER_NOT_FOUND") return "الإيميل أو كلمة المرور غير صحيحة.";
+      if(e === "BAD_PASSWORD") return "الإيميل أو كلمة المرور غير صحيحة.";
+      if(e === "EMAIL_NOT_VERIFIED") return "لازم تؤكد بريدك الإلكتروني أولاً.";
 
-  $("goRegister").addEventListener("click", (e) => { e.preventDefault(); show("register"); setMsg($("regMsg"), "", ""); });
-  $("backToLogin1").addEventListener("click", (e) => { e.preventDefault(); show("login"); setMsg($("loginMsg"), "", ""); });
-  $("backToLogin2").addEventListener("click", (e) => { e.preventDefault(); show("login"); setMsg($("loginMsg"), "", ""); });
-  $("backToLogin3").addEventListener("click", (e) => { e.preventDefault(); show("login"); });
+      if(e === "OTP_WRONG" || e === "OTP_INVALID" || e === "INVALID_OTP") return "رمز التحقق غير صحيح.";
+      if(e === "OTP_EXPIRED") return "رمز التحقق انتهت صلاحيته. أعد الإرسال.";
+      if(e === "OTP_TOO_SOON") return "انتظر دقيقة ثم أعد الإرسال.";
+      if(e === "TOO_MANY_ATTEMPTS" || e === "OTP_LOCKED") return "محاولات كثيرة. جرّب بعد قليل.";
 
-  $("goForgot").addEventListener("click", (e) => { e.preventDefault(); show("forgot"); });
+      if(e === "MAIL_NOT_CONFIGURED") return "خدمة إرسال الإيميل غير مفعّلة حالياً.";
+      if(e === "MAIL_SEND_FAILED") return "فشل إرسال الإيميل. جرّب مرة ثانية.";
 
-  $("btnRegister").addEventListener("click", async () => {
-    const email = $("regEmail").value.trim();
-    const p1 = $("regPass").value;
-    const p2 = $("regPass2").value;
-    if(!email || !p1 || !p2){
-      setMsg($("regMsg"), "كمّل الحقول.", "bad");
-      return;
-    }
-    if(p1 !== p2){
-      setMsg($("regMsg"), "كلمتا المرور غير متطابقتين.", "bad");
-      return;
-    }
-    setMsg($("regMsg"), "جاري إنشاء الحساب…", "");
-    const r = await api("/api2/register", { method:"POST", body:{ email, password: p1 }, auth:false });
-    if(!r.ok){
-      setMsg($("regMsg"), (r.json && (r.json.error || r.json.message)) ? (r.json.error || r.json.message) : "فشل إنشاء الحساب.", "bad");
-      return;
+      if(e === "CODE_NOT_FOUND") return "الكود غير موجود.";
+      if(e === "CODE_ALREADY_USED") return "الكود مستخدم مسبقًا.";
+      if(e === "DEVICE_LIMIT_REACHED") return "تجاوزت الحد المسموح لربط الأجهزة (جهازين فقط).";
+
+      if(e === "UNAUTHORIZED") return "انتهت الجلسة. سجّل دخول من جديد.";
+
+      return "حدث خطأ: " + e;
     }
 
-    // بعض الأنظمة ترجع token مباشرة، وبعضها لا (OTP أولاً)
-    const t = extractToken(r.json);
-    if(t) localStorage.setItem(TOKEN_KEY, t);
-
-    // ندخّلك شاشة OTP دائمًا أولاً حسب تدفقك الحالي
-    $("otpEmail").value = email;
-    show("otp");
-    setMsg($("otpMsg"), "تم الإرسال ✅ اكتب رمز التحقق.", "ok");
-  });
-
-  $("btnVerifyOtp").addEventListener("click", async () => {
-    const email = $("otpEmail").value.trim();
-    const otp   = $("otpCode").value.trim();
-    if(!email || !otp){
-      setMsg($("otpMsg"), "اكتب الرمز.", "bad");
-      return;
-    }
-    setMsg($("otpMsg"), "جاري التحقق…", "");
-    const r = await api("/api2/verify-email", { method:"POST", body:{ email, otp }, auth:false });
-    if(!r.ok){
-      setMsg($("otpMsg"), (r.json && (r.json.error || r.json.message)) ? (r.json.error || r.json.message) : "فشل التحقق.", "bad");
-      return;
-    }
-    const t = extractToken(r.json);
-    if(t) localStorage.setItem(TOKEN_KEY, t);
-
-    // بعد التحقق: نفحص هل عنده تفعيل ولا يروح للكود
-    await boot();
-  });
-
-  $("btnResendOtp").addEventListener("click", async () => {
-    const email = $("otpEmail").value.trim();
-    if(!email) return;
-    setMsg($("otpMsg"), "جاري إعادة الإرسال…", "");
-    const r = await api("/api2/resend-otp", { method:"POST", body:{ email }, auth:false });
-    if(!r.ok){
-      setMsg($("otpMsg"), "تعذر إعادة الإرسال.", "bad");
-      return;
-    }
-    setMsg($("otpMsg"), "تم إرسال رمز جديد ✅", "ok");
-  });
-
-  $("btnActivate").addEventListener("click", async () => {
-    const code = $("actCode").value.trim();
-    if(!code){
-      setMsg($("codeMsg"), "اكتب كود التفعيل.", "bad");
-      return;
-    }
-    setMsg($("codeMsg"), "جاري التفعيل…", "");
-    const r = await api("/api2/activate", { method:"POST", body:{ code, game: GAME_KEY }, auth:true });
-    if(!r.ok){
-      setMsg($("codeMsg"), (r.json && (r.json.error || r.json.message)) ? (r.json.error || r.json.message) : "فشل التفعيل.", "bad");
-      return;
-    }
-    setMsg($("codeMsg"), "تم التفعيل ✅ سيتم نقلك للعبة…", "ok");
-    await sleep(600);
-    location.replace(GAME_URL);
-  });
-
-  $("btnLogout").addEventListener("click", () => {
-    localStorage.removeItem(TOKEN_KEY);
-    location.replace("/activate?reset=1");
-  });
-
-  // ==== START ====
-  boot();
-
-})();
-</script>
+    boot();
+  </script>
 </body>
 </html>
 
-<!-- activate.html – إصدار 2 (Google Redirect + Auto Route to Code/Game) -->
+<!-- activate.html – نظام التفعيل الجديد v7 (Fix Google routing + /me GET + Authorization/token capture) -->
