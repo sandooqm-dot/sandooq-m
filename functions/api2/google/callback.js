@@ -39,10 +39,16 @@ export async function onRequest(context) {
 
     // لازم state يطابق (حماية) + verifier موجود (عشان PKCE)
     if (!stateQ || !stateC || stateQ !== stateC) {
-      return new Response("Google callback: state غير صحيح/مفقود. ارجع وسوّ تسجيل الدخول من جديد.", { status: 400 });
+      return new Response(
+        "Google callback: state غير صحيح/مفقود. ارجع وسوّ تسجيل الدخول من جديد.",
+        { status: 400 }
+      );
     }
     if (!verifier) {
-      return new Response("Google callback: Missing code verifier. ارجع وابدأ تسجيل الدخول من جديد.", { status: 400 });
+      return new Response(
+        "Google callback: Missing code verifier. ارجع وابدأ تسجيل الدخول من جديد.",
+        { status: 400 }
+      );
     }
 
     // 1) Exchange code -> tokens (PKCE ✅)
@@ -55,7 +61,7 @@ export async function onRequest(context) {
         client_secret: clientSecret,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
-        code_verifier: verifier, // ✅ هذا هو حل Missing code verifier
+        code_verifier: verifier, // ✅ PKCE verifier
       }),
     });
 
@@ -79,7 +85,7 @@ export async function onRequest(context) {
     let emailVerified = true; // Google login = verified عملياً
     let googleSub = "";
 
-    // Try decode id_token payload (without signature verify – acceptable for our use here)
+    // Try decode id_token payload (بدون تحقق توقيع)
     if (idToken && idToken.split(".").length >= 2) {
       const payload = safeJsonParse(b64urlDecode(idToken.split(".")[1]));
       email = String(payload?.email || "");
@@ -116,21 +122,32 @@ export async function onRequest(context) {
     const sessionToken = makeToken(32);
     await insertSession(env.DB, sessionToken, email);
 
-    // 5) Redirect back to activate (نخليه مثل ما هو عندك عشان ما نكسر activate.html)
+    // 5) Redirect back to activate (مثل ما هو عندك عشان ما نكسر activate.html)
     const dest = `${origin}/activate?token=${encodeURIComponent(sessionToken)}`;
 
-    // ✅ امسح كوكيز PKCE بعد الاستخدام (نفس Path اللي سوّاه start.js)
+    // ✅ امسح كوكيز PKCE بعد الاستخدام + زرع كوكيز الجلسة
     const headers = new Headers();
     headers.set("Location", dest);
     headers.set("Cache-Control", "no-store");
 
-    // ✅✅ (التعديل الجديد المهم): زرع كوكيز الجلسة عشان /app + middleware
     const maxAge = 30 * 24 * 60 * 60; // 30 يوم
-    headers.append("Set-Cookie", `sandooq_token_v1=${encodeURIComponent(sessionToken)}; Max-Age=${maxAge}; Path=/; Secure; SameSite=Lax; HttpOnly`);
-    headers.append("Set-Cookie", `sandooq_session_v1=${encodeURIComponent(sessionToken)}; Max-Age=${maxAge}; Path=/; Secure; SameSite=Lax; HttpOnly`);
+    headers.append(
+      "Set-Cookie",
+      `sandooq_token_v1=${encodeURIComponent(sessionToken)}; Max-Age=${maxAge}; Path=/; Secure; SameSite=Lax; HttpOnly`
+    );
+    headers.append(
+      "Set-Cookie",
+      `sandooq_session_v1=${encodeURIComponent(sessionToken)}; Max-Age=${maxAge}; Path=/; Secure; SameSite=Lax; HttpOnly`
+    );
 
-    headers.append("Set-Cookie", `sandooq_g_state=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`);
-    headers.append("Set-Cookie", `sandooq_g_verifier=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`);
+    headers.append(
+      "Set-Cookie",
+      `sandooq_g_state=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`
+    );
+    headers.append(
+      "Set-Cookie",
+      `sandooq_g_verifier=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`
+    );
 
     return new Response(null, { status: 302, headers });
 
@@ -158,10 +175,8 @@ function safeJsonParse(s) {
 }
 
 function b64urlDecode(s) {
-  // base64url -> base64
   s = String(s || "").replace(/-/g, "+").replace(/_/g, "/");
   while (s.length % 4) s += "=";
-  // atob
   const bin = atob(s);
   let out = "";
   for (let i = 0; i < bin.length; i++) out += bin.charCodeAt(i) < 128 ? bin[i] : String.fromCharCode(bin.charCodeAt(i));
@@ -171,7 +186,6 @@ function b64urlDecode(s) {
 function makeToken(bytes = 32) {
   const arr = new Uint8Array(bytes);
   crypto.getRandomValues(arr);
-  // base64url
   let s = btoa(String.fromCharCode(...arr)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   return s;
 }
@@ -185,7 +199,6 @@ function defaultForType(type) {
   const t = String(type || "").toUpperCase();
   if (t.includes("INT")) return 0;
   if (t.includes("REAL") || t.includes("FLOAT") || t.includes("DOUBLE")) return 0;
-  // TEXT, BLOB, etc
   return "";
 }
 
@@ -198,11 +211,9 @@ async function upsertUser(db, data) {
 
   const now = new Date().toISOString();
 
-  // Build insert values with required NOT NULL cols
   const values = new Map();
   values.set("email", data.email);
 
-  // Common optional columns
   if (cols.has("verified")) values.set("verified", data.verified ?? 1);
   if (cols.has("provider")) values.set("provider", data.provider || "google");
   if (cols.has("google_sub")) values.set("google_sub", data.google_sub || "");
@@ -210,14 +221,12 @@ async function upsertUser(db, data) {
   if (cols.has("updated_at")) values.set("updated_at", now);
   if (cols.has("last_login_at")) values.set("last_login_at", now);
 
-  // If password columns exist & may be NOT NULL, set safe dummy values
   const pwCandidates = ["password_hash", "pass_hash", "pw_hash", "hash"];
   for (const c of pwCandidates) {
     if (cols.has(c) && !values.has(c)) values.set(c, "GOOGLE");
   }
   if (cols.has("salt_b64") && !values.has("salt_b64")) values.set("salt_b64", "");
 
-  // Satisfy any NOT NULL cols without default (excluding PK)
   for (const [name, meta] of cols.entries()) {
     if (meta.pk === 1) continue;
     if (values.has(name)) continue;
@@ -231,7 +240,6 @@ async function upsertUser(db, data) {
   const insertSql = `INSERT OR IGNORE INTO users (${insertCols.join(",")}) VALUES (${insertQs})`;
   await db.prepare(insertSql).bind(...insertCols.map(c => values.get(c))).run();
 
-  // Update existing row with key fields (if columns exist)
   const set = [];
   const bind = [];
   if (cols.has("verified")) { set.push("verified=?"); bind.push(data.verified ?? 1); }
@@ -253,7 +261,6 @@ async function insertSession(db, token, email) {
 
   const now = new Date().toISOString();
 
-  // default minimal
   const cols = [];
   const vals = [];
   const bind = [];
@@ -267,10 +274,14 @@ async function insertSession(db, token, email) {
   }
 
   add("token", token);
-  add("email", email);
+
+  // ✅✅ FIX: خزّن الإيميل في العمود الموجود فعلاً
+  if (colNames.has("email")) add("email", email);
+  else if (colNames.has("user_email")) add("user_email", email);
+  else if (colNames.has("used_by_email")) add("used_by_email", email);
+
   add("created_at", now);
 
-  // satisfy required NOT NULL cols without default if any
   for (const c of info) {
     if (c.pk === 1) continue;
     if (cols.includes(c.name)) continue;
@@ -286,5 +297,5 @@ async function insertSession(db, token, email) {
 }
 
 /*
-google/callback.js – إصدار 2 (adds sandooq_token_v1 + sandooq_session_v1 cookies for middleware)
+google/callback.js – إصدار 3 (fix sessions email column + sets sandooq_token_v1 & sandooq_session_v1 cookies)
 */
