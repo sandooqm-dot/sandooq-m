@@ -6,7 +6,12 @@ function getCookie(req, name) {
   const parts = cookie.split(";");
   for (const p of parts) {
     const [k, ...rest] = p.trim().split("=");
-    if (k === name) return rest.join("=") || "";
+    if (k === name) {
+      const raw = (rest.join("=") || "").trim();
+      if (!raw) return "";
+      // ✅ مهم: الكوكي قد تكون encoded عبر encodeURIComponent
+      try { return decodeURIComponent(raw); } catch { return raw; }
+    }
   }
   return "";
 }
@@ -253,5 +258,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 3 (Users-first activation + no-store headers + extra safety)
+_middleware.js – إصدار 4 (fix cookie decode to match me.js encodeURIComponent)
 */
