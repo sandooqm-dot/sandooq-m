@@ -1,33 +1,43 @@
 // functions/api2/login.js
 // Cloudflare Pages Function: POST /api2/login
 
+const VERSION = "api2-login-v4-cookie-tokenv1";
+
 const CORS_HEADERS = (req) => {
-  const origin = req.headers.get("origin");
-  // لو فيه origin نخليه (أفضل مع المتصفحات)، لو ما فيه نخليها *
+  const origin = req.headers.get("origin") || req.headers.get("Origin");
   const h = {
     "Access-Control-Allow-Methods": "POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
+    "cache-control": "no-store",
   };
   if (origin) {
     h["Access-Control-Allow-Origin"] = origin;
     h["Access-Control-Allow-Credentials"] = "true";
+    h["Vary"] = "Origin";
   } else {
     h["Access-Control-Allow-Origin"] = "*";
   }
   return h;
 };
 
+// ✅ يدعم Set-Cookie متعدد (append)
 function json(req, data, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      ...CORS_HEADERS(req),
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      ...extraHeaders,
-    },
+  const headers = new Headers({
+    ...CORS_HEADERS(req),
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
   });
+
+  for (const [k, v] of Object.entries(extraHeaders || {})) {
+    if (Array.isArray(v)) {
+      for (const vv of v) headers.append(k, vv);
+    } else if (v !== undefined && v !== null && v !== "") {
+      headers.set(k, String(v));
+    }
+  }
+
+  return new Response(JSON.stringify({ ...data, version: VERSION }), { status, headers });
 }
 
 function normalizeEmail(email) {
@@ -98,7 +108,7 @@ async function pbkdf2B64(password, saltBytes, iterations, keyLenBytes) {
 /**
  * يدعم 3 حالات:
  * 1) pbkdf2$ITER$SALT_B64$HASH_B64 داخل password_hash
- * 2) PBKDF2 مع salt_b64 منفصل (password_hash=HASH_B64 + salt_b64 موجود)
+ * 2) PBKDF2 مع salt_b64/ password_salt منفصل
  * 3) legacy: password_hash = base64(sha256(password))
  */
 async function verifyUserPassword(userRow, password) {
@@ -150,20 +160,20 @@ async function verifyUserPassword(userRow, password) {
 }
 
 async function insertSession(DB, token, email) {
-  const createdAt = new Date().toISOString();
+  const createdAtIso = new Date().toISOString();
 
-  // نحاول أولاً (token,email,created_at) مثل جدولك
+  // email
   try {
     await DB.prepare(
       `INSERT INTO sessions (token, email, created_at) VALUES (?,?,?)`
-    ).bind(token, email, createdAt).run();
+    ).bind(token, email, createdAtIso).run();
     return true;
   } catch (e1) {
-    // لو كان اسم العمود user_email بدل email
+    // user_email
     try {
       await DB.prepare(
         `INSERT INTO sessions (token, user_email, created_at) VALUES (?,?,?)`
-      ).bind(token, email, createdAt).run();
+      ).bind(token, email, createdAtIso).run();
       return true;
     } catch (e2) {
       console.log("session_insert_failed", String(e1?.message || e1), String(e2?.message || e2));
@@ -172,18 +182,27 @@ async function insertSession(DB, token, email) {
   }
 }
 
+// ✅ Cookie حق الـ Middleware
+function setAuthCookie(token) {
+  // 30 يوم
+  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=2592000; Secure; SameSite=Lax; HttpOnly`;
+}
+function setLegacyCookie(token) {
+  return `sandooq_session_v1=${encodeURIComponent(token)}; Path=/; Max-Age=2592000; Secure; SameSite=Lax; HttpOnly`;
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
   if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS_HEADERS(request) });
+    return new Response(null, { status: 204, headers: CORS_HEADERS(request) });
   }
   if (request.method !== "POST") {
     return json(request, { ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   }
 
   try {
-    if (!env.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
+    if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
 
     const body = await request.json().catch(() => ({}));
     const email = normalizeEmail(body.email);
@@ -202,7 +221,6 @@ export async function onRequest(context) {
       return json(request, { ok: false, error: "INVALID_CREDENTIALS" }, 401);
     }
 
-    // منع الدخول لو البريد غير مُتحقق (حسب أعمدتك)
     const isVerified =
       userRow.is_email_verified === 1 ||
       userRow.email_verified === 1 ||
@@ -218,7 +236,6 @@ export async function onRequest(context) {
       return json(request, { ok: false, error: "INVALID_CREDENTIALS" }, 401);
     }
 
-    // ✅ هنا نضمن توكن دائمًا
     const token = b64url(crypto.getRandomValues(new Uint8Array(32)));
 
     const inserted = await insertSession(env.DB, token, email);
@@ -226,13 +243,11 @@ export async function onRequest(context) {
       return json(request, { ok: false, error: "SESSION_CREATE_FAILED" }, 500);
     }
 
-    // اختياري: كوكي HttpOnly (يفيدنا لاحقًا في /me لو بغيناه كوكي)
-    const cookie =
-      `sandooq_session_v1=${token}; Max-Age=${30 * 24 * 60 * 60}; Path=/; Secure; SameSite=Lax; HttpOnly`;
-
+    // ✅ أهم شيء: نزرع الكوكيز الاثنين (الجديد + القديم)
     return json(request, { ok: true, token }, 200, {
-      "Set-Cookie": cookie,
+      "set-cookie": [setAuthCookie(token), setLegacyCookie(token)],
     });
+
   } catch (e) {
     console.log("login_error", String(e?.message || e));
     return json(request, { ok: false, error: "SERVER_ERROR" }, 500);
@@ -240,5 +255,5 @@ export async function onRequest(context) {
 }
 
 /*
-login.js – api2 – إصدار 3 (Always returns token + supports salt_b64 PBKDF2 + sets cookie)
+login.js – api2 – إصدار 4 (sets sandooq_token_v1 + legacy cookie, keeps token response)
 */
