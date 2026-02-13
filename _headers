@@ -1,0 +1,33 @@
+# ✅ لا تخزّن صفحات اللعبة/التفعيل في الكاش (عشان ما يصير لخبطة/لوب)
+/
+  Cache-Control: no-store
+
+/index.html
+  Cache-Control: no-store
+
+/activate
+  Cache-Control: no-store
+
+/activate.html
+  Cache-Control: no-store
+
+/game.html
+  Cache-Control: no-store
+
+/game_full.html
+  Cache-Control: no-store
+
+/app/*
+  Cache-Control: no-store
+
+# ✅ خزّن الملفات الثقيلة سنة كاملة (أسرع + تحمل أعلى)
+#/maps/ ملفات الخرائط
+/maps/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# ✅ الشعار والخط
+/logo.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/AA-GALAXY.otf
+  Cache-Control: public, max-age=31536000, immutable
