@@ -1,5 +1,13 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
+// v5: supports sessions.token OR sessions.token_hash + schema cache (no PRAGMA spam)
+
+const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
+const schemaCache = new Map(); // table -> { ts, cols:Set }
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
 
 function getCookie(req, name) {
   const cookie = req.headers.get("cookie") || req.headers.get("Cookie") || "";
@@ -9,7 +17,6 @@ function getCookie(req, name) {
     if (k === name) {
       const raw = (rest.join("=") || "").trim();
       if (!raw) return "";
-      // ✅ مهم: الكوكي قد تكون encoded عبر encodeURIComponent
       try { return decodeURIComponent(raw); } catch { return raw; }
     }
   }
@@ -29,57 +36,87 @@ function withNoStore(res) {
   return res;
 }
 
-async function tableCols(DB, table) {
+async function getCols(DB, table) {
+  const now = Date.now();
+  const cached = schemaCache.get(table);
+  if (cached && (now - cached.ts) < SCHEMA_TTL_MS) return cached.cols;
+
   try {
     const res = await DB.prepare(`PRAGMA table_info(${table});`).all();
-    return new Set((res?.results || []).map((r) => String(r.name)));
+    const cols = new Set((res?.results || []).map((r) => String(r.name)));
+    schemaCache.set(table, { ts: now, cols });
+    return cols;
   } catch {
-    return new Set();
+    const cols = new Set();
+    schemaCache.set(table, { ts: now, cols });
+    return cols;
   }
 }
 
-async function tableExists(DB, table) {
-  try {
-    const r = await DB.prepare(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`
-    ).bind(table).first();
-    return !!r?.name;
-  } catch {
-    return false;
-  }
+async function sha256Hex(str) {
+  const bytes = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = new Uint8Array(digest);
+  let hex = "";
+  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
+  return hex;
 }
 
-function normalizeEmail(email) {
-  return String(email || "").trim().toLowerCase();
-}
-
-async function findSessionEmail(DB, token) {
+async function findSessionEmail(DB, env, token) {
   if (!token) return null;
 
-  const cols = await tableCols(DB, "sessions");
-  if (!cols.size || !cols.has("token")) return null;
+  const cols = await getCols(DB, "sessions");
+  if (!cols.size) return null;
 
-  // أكثر الأعمدة شيوعًا
-  if (cols.has("email")) {
-    const row = await DB.prepare(
-      `SELECT email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
-    ).bind(token).first();
-    return row?.email ? normalizeEmail(row.email) : null;
+  // 1) sessions.token (الأسلوب الحالي عندك)
+  if (cols.has("token")) {
+    // أعمدة الإيميل المحتملة
+    if (cols.has("email")) {
+      const row = await DB.prepare(
+        `SELECT email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
+      ).bind(token).first();
+      return row?.email ? normalizeEmail(row.email) : null;
+    }
+    if (cols.has("user_email")) {
+      const row = await DB.prepare(
+        `SELECT user_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
+      ).bind(token).first();
+      return row?.email ? normalizeEmail(row.email) : null;
+    }
+    if (cols.has("used_by_email")) {
+      const row = await DB.prepare(
+        `SELECT used_by_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
+      ).bind(token).first();
+      return row?.email ? normalizeEmail(row.email) : null;
+    }
+    return null;
   }
 
-  if (cols.has("user_email")) {
-    const row = await DB.prepare(
-      `SELECT user_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
-    ).bind(token).first();
-    return row?.email ? normalizeEmail(row.email) : null;
-  }
+  // 2) sessions.token_hash (متوافق مع logout.js)
+  if (cols.has("token_hash")) {
+    const pepper = String(env?.SESSION_PEPPER || "sess_pepper_v1");
+    const tokenHash = await sha256Hex(token + "|" + pepper);
 
-  // احتياط لو كان الاسم قديم
-  if (cols.has("used_by_email")) {
-    const row = await DB.prepare(
-      `SELECT used_by_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
-    ).bind(token).first();
-    return row?.email ? normalizeEmail(row.email) : null;
+    // أعمدة الإيميل المحتملة
+    if (cols.has("email")) {
+      const row = await DB.prepare(
+        `SELECT email FROM sessions WHERE token_hash = ? LIMIT 1`
+      ).bind(tokenHash).first();
+      return row?.email ? normalizeEmail(row.email) : null;
+    }
+    if (cols.has("user_email")) {
+      const row = await DB.prepare(
+        `SELECT user_email AS email FROM sessions WHERE token_hash = ? LIMIT 1`
+      ).bind(tokenHash).first();
+      return row?.email ? normalizeEmail(row.email) : null;
+    }
+    if (cols.has("used_by_email")) {
+      const row = await DB.prepare(
+        `SELECT used_by_email AS email FROM sessions WHERE token_hash = ? LIMIT 1`
+      ).bind(tokenHash).first();
+      return row?.email ? normalizeEmail(row.email) : null;
+    }
+    return null;
   }
 
   return null;
@@ -87,18 +124,15 @@ async function findSessionEmail(DB, token) {
 
 async function isActivatedViaUsers(DB, email) {
   email = normalizeEmail(email);
-  if (!(await tableExists(DB, "users"))) return false;
 
-  const cols = await tableCols(DB, "users");
+  const cols = await getCols(DB, "users");
   if (!cols.size) return false;
 
-  // تحديد عمود الإيميل
   let emailCol = null;
   if (cols.has("email")) emailCol = "email";
   else if (cols.has("user_email")) emailCol = "user_email";
   else return false;
 
-  // أفضلية: is_activated / activated (قيمة 1)
   if (cols.has("is_activated")) {
     const row = await DB.prepare(
       `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND is_activated = 1 LIMIT 1`
@@ -113,7 +147,6 @@ async function isActivatedViaUsers(DB, email) {
     return !!row;
   }
 
-  // بدائل: activated_at أو activation_code (غير فارغة)
   if (cols.has("activated_at")) {
     const row = await DB.prepare(
       `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activated_at IS NOT NULL AND activated_at != '' LIMIT 1`
@@ -141,19 +174,17 @@ async function isActivatedViaUsers(DB, email) {
 async function isActivated(DB, email) {
   email = normalizeEmail(email);
 
-  // 0) الأفضل: users (لو فيه عمود تفعيل)
-  const viaUsers = await isActivatedViaUsers(DB, email);
-  if (viaUsers) return true;
+  // 0) الأفضل: users
+  if (await isActivatedViaUsers(DB, email)) return true;
 
   // 1) activations
-  if (await tableExists(DB, "activations")) {
-    const cols = await tableCols(DB, "activations");
+  const aCols = await getCols(DB, "activations");
+  if (aCols.size) {
     const where = [];
     const binds = [];
-
-    if (cols.has("email")) { where.push("email = ?"); binds.push(email); }
-    if (cols.has("user_email")) { where.push("user_email = ?"); binds.push(email); }
-    if (cols.has("used_by_email")) { where.push("used_by_email = ?"); binds.push(email); }
+    if (aCols.has("email")) { where.push("email = ?"); binds.push(email); }
+    if (aCols.has("user_email")) { where.push("user_email = ?"); binds.push(email); }
+    if (aCols.has("used_by_email")) { where.push("used_by_email = ?"); binds.push(email); }
 
     if (where.length) {
       const row = await DB.prepare(
@@ -163,15 +194,14 @@ async function isActivated(DB, email) {
     }
   }
 
-  // 2) codes (بعض النسخ تربط الكود بالإيميل)
-  if (await tableExists(DB, "codes")) {
-    const cols = await tableCols(DB, "codes");
+  // 2) codes
+  const cCols = await getCols(DB, "codes");
+  if (cCols.size) {
     const where = [];
     const binds = [];
-
-    if (cols.has("used_by_email")) { where.push("used_by_email = ?"); binds.push(email); }
-    if (cols.has("email")) { where.push("email = ?"); binds.push(email); }
-    if (cols.has("user_email")) { where.push("user_email = ?"); binds.push(email); }
+    if (cCols.has("used_by_email")) { where.push("used_by_email = ?"); binds.push(email); }
+    if (cCols.has("email")) { where.push("email = ?"); binds.push(email); }
+    if (cCols.has("user_email")) { where.push("user_email = ?"); binds.push(email); }
 
     if (where.length) {
       const row = await DB.prepare(
@@ -211,24 +241,15 @@ export async function onRequest(context) {
   }
 
   // ✅ الحماية فقط على /app وملفاته
-  if (!path.startsWith("/app")) {
-    return next();
-  }
+  if (!path.startsWith("/app")) return next();
 
-  // السماح لـ OPTIONS (Preflight) بدون لفّة تحويل
-  if (request.method === "OPTIONS") {
-    return next();
-  }
+  // السماح لـ OPTIONS
+  if (request.method === "OPTIONS") return next();
 
-  // لازم DB عشان نتحقق
-  if (!env?.DB) {
-    return withNoStore(new Response("DB_NOT_BOUND", { status: 500 }));
-  }
+  // لازم DB
+  if (!env?.DB) return withNoStore(new Response("DB_NOT_BOUND", { status: 500 }));
 
-  // token من:
-  // 1) Cookie الجديد sandooq_token_v1
-  // 2) Cookie القديم sandooq_session_v1
-  // 3) Authorization Bearer (احتياط)
+  // token من cookie أو Authorization
   const auth = request.headers.get("Authorization") || "";
   const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
 
@@ -236,11 +257,9 @@ export async function onRequest(context) {
   const tokOld = getCookie(request, "sandooq_session_v1");
   const token = tokNew || tokOld || bearer;
 
-  if (!token) {
-    return redirectToActivate(url);
-  }
+  if (!token) return redirectToActivate(url);
 
-  const email = await findSessionEmail(env.DB, token);
+  const email = await findSessionEmail(env.DB, env, token);
   if (!email) {
     const r = redirectToActivate(url);
     r.headers.append("Set-Cookie", clearCookie("sandooq_token_v1"));
@@ -249,14 +268,11 @@ export async function onRequest(context) {
   }
 
   const activated = await isActivated(env.DB, email);
-  if (!activated) {
-    return redirectToActivate(url);
-  }
+  if (!activated) return redirectToActivate(url);
 
-  // ✅ كل شيء تمام
   return next();
 }
 
 /*
-_middleware.js – إصدار 4 (fix cookie decode to match me.js encodeURIComponent)
+_middleware.js – إصدار 5 (supports sessions.token_hash + schema cache)
 */
