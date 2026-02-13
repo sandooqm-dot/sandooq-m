@@ -1,192 +1,209 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>جاري فتح اللعبة - صندوق المسابقات</title>
   <style>
     :root{
-      --bg1:#0e2f7a;
-      --bg2:#1f4fa3;
-      --yellow:#f4c400;
-      --text:#111;
-      --muted:#6b7280;
-      --shadow: 0 14px 35px rgba(0,0,0,.22);
-      --radius: 18px;
+      --bg1:#4b2a4e;
+      --bg2:#6b3b6a;
+      --card:#ffffff;
+      --text:#222;
+      --muted:#666;
+      --accent:#f4c400;
+      --btn:#1f4fa3;
     }
-    *{box-sizing:border-box}
     body{
-      margin:0;
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
+      margin:0; min-height:100vh;
       font-family: Arial, sans-serif;
-      background:
-        radial-gradient(1100px 500px at 15% 20%, rgba(244,196,0,.18), transparent 60%),
-        radial-gradient(900px 450px at 85% 80%, rgba(255,255,255,.10), transparent 60%),
-        linear-gradient(135deg, var(--bg1), var(--bg2));
-      padding: 18px;
+      background: radial-gradient(1200px 700px at 30% 10%, rgba(255,255,255,.10), transparent 60%),
+                  linear-gradient(180deg,var(--bg2),var(--bg1));
+      display:flex; align-items:flex-start; justify-content:center;
+      padding:24px 12px;
+      box-sizing:border-box;
+    }
+    .wrap{width:min(720px, 100%);}
+    .top{
+      display:flex; align-items:center; gap:10px;
+      margin:6px 0 14px;
       color:#fff;
     }
-    .wrap{ width:min(520px, 100%); position:relative; }
-    .logo{ display:flex; justify-content:center; margin-bottom: 14px; }
-    .logo img{
-      width:86px; height:86px; object-fit:contain;
-      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
-    }
+    .top img{width:48px;height:48px;object-fit:contain}
+    .top h1{margin:0;font-size:22px;font-weight:800}
     .card{
-      background: rgba(255,255,255,.96);
-      color: var(--text);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 22px 18px 18px;
-      border: 2px solid rgba(244,196,0,.35);
+      background:var(--card);
+      border-radius:18px;
+      padding:18px 16px;
+      box-shadow:0 14px 30px rgba(0,0,0,.22);
       text-align:center;
     }
-    h1{ margin:0 0 8px; font-size: 22px; }
-    p{
-      margin:0 0 14px;
-      color: var(--muted);
-      line-height:1.7;
-      font-size: 14px;
-    }
+    .title{margin:6px 0 10px;font-size:20px;font-weight:800;color:var(--text)}
+    .sub{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.6}
     .spinner{
-      display:inline-block;
-      width:18px;height:18px;
-      border: 3px solid rgba(17,17,17,.25);
-      border-top-color: rgba(17,17,17,.9);
-      border-radius:50%;
-      vertical-align: -4px;
-      margin-left:8px;
-      animation: spin 1s linear infinite;
+      width:40px;height:40px;border-radius:50%;
+      border:4px solid rgba(31,79,163,.18);
+      border-top-color: var(--btn);
+      margin:10px auto 14px;
+      animation:spin 1s linear infinite;
     }
-    @keyframes spin{ to{transform:rotate(360deg)} }
-
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
     .btn{
-      width:100%;
-      margin-top: 10px;
-      padding: 14px 14px;
-      border-radius: 12px;
-      border:none;
+      border:0; border-radius:12px;
+      padding:12px 14px;
+      font-weight:800;
       cursor:pointer;
-      background: var(--yellow);
-      color:#111;
-      font-weight: 900;
-      font-size: 16px;
-      display:none;
+      min-width:170px;
     }
-    .btn2{
-      width:100%;
-      margin-top: 10px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border:2px solid rgba(31,79,163,.25);
-      cursor:pointer;
-      background:#fff;
-      color:#111;
-      font-weight: 800;
-      font-size: 14px;
-      display:none;
-    }
-
-    .footer{
-      text-align:center;
-      margin-top: 12px;
-      color: rgba(255,255,255,.85);
-      font-size: 12px;
-    }
+    .btn-primary{background:var(--btn);color:#fff}
+    .btn-accent{background:var(--accent);color:#111}
+    .foot{margin-top:10px;color:#eee;text-align:center;font-size:12px;opacity:.9}
+    .small{font-size:12px;color:#777;margin-top:10px}
+    .hide{display:none}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="logo">
-      <img src="logo.png" alt="Sandooq" />
+    <div class="top">
+      <img src="/logo.png" alt="Sandooq" />
+      <h1>لعبة سباق الحروف</h1>
     </div>
 
     <div class="card">
-      <h1 id="title">جاري فتح اللعبة <span class="spinner"></span></h1>
-      <p id="desc">لحظة… نتحقق من التفعيل.</p>
+      <div class="title" id="statusTitle">جاري فتح اللعبة</div>
+      <div class="spinner" id="sp"></div>
+      <p class="sub" id="statusMsg">لحظة… نتحقق من التفعيل.</p>
 
-      <button id="openBtn" class="btn">فتح اللعبة</button>
-      <button id="changeBtn" class="btn2">تغيير / إعادة تفعيل الكود</button>
+      <div class="row hide" id="actions">
+        <button class="btn btn-primary" id="retryBtn">إعادة المحاولة</button>
+        <button class="btn btn-accent" id="goActivateBtn">فتح صفحة التفعيل</button>
+      </div>
+
+      <div class="small" id="debug"></div>
     </div>
 
-    <div class="footer">© صندوق المسابقات</div>
+    <div class="foot">© صندوق المسابقات</div>
   </div>
 
-  <script>
-    const LS_ACTIVATED = "sandooq_activated";
-    const LS_CODE      = "sandooq_code";
-    const LS_DEVICE    = "sandooq_device_id";
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
 
-    const $title = document.getElementById("title");
-    const $desc  = document.getElementById("desc");
-    const $open  = document.getElementById("openBtn");
-    const $chg   = document.getElementById("changeBtn");
+  const statusTitle = $("statusTitle");
+  const statusMsg   = $("statusMsg");
+  const spinner     = $("sp");
+  const actions     = $("actions");
+  const retryBtn    = $("retryBtn");
+  const goActBtn    = $("goActivateBtn");
+  const debugEl     = $("debug");
 
-    const params = new URLSearchParams(location.search);
+  function setUI({title, msg, loading, showActions, debug}){
+    if (title) statusTitle.textContent = title;
+    if (msg) statusMsg.textContent = msg;
+    spinner.classList.toggle("hide", !loading);
+    actions.classList.toggle("hide", !showActions);
+    debugEl.textContent = debug || "";
+  }
 
-    // reset: game.html?reset=1
-    if (params.get("reset") === "1") {
-      localStorage.removeItem(LS_ACTIVATED);
-      localStorage.removeItem(LS_CODE);
-      localStorage.removeItem(LS_DEVICE);
-      location.replace("activate.html?r=" + encodeURIComponent("game.html"));
+  function ensureDeviceId(){
+    const key = "sandooq_device_id_v1";
+    let id = localStorage.getItem(key);
+    if(!id){
+      id = (crypto?.randomUUID ? crypto.randomUUID() :
+        ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16)));
+      localStorage.setItem(key, id);
     }
+    return id;
+  }
 
-    function normalizeReturnUrl(url){
-      // نخليها safe نسبياً
-      try{
-        // لو جاية "game_full.html?role=..." خله كما هو
-        return String(url || "").trim() || "game_full.html";
-      }catch(e){
-        return "game_full.html";
+  function go(url){
+    // replace عشان ما يرجع بالباك لنفس صفحة التحويل
+    location.replace(url);
+  }
+
+  function buildNextToHere(){
+    return location.pathname + (location.search || "") + (location.hash || "");
+  }
+
+  function buildTargetGame(){
+    // ننقل نفس الـ query للملف الكبير (game_full.html)
+    // لأن صفحة إنشاء الغرفة غالبًا تمرر بيانات الغرفة/الكود بالباراميتر
+    return "/game_full.html" + (location.search || "") + (location.hash || "");
+  }
+
+  async function check(){
+    const deviceId = ensureDeviceId();
+    const target = buildTargetGame();
+
+    try{
+      setUI({title:"جاري فتح اللعبة", msg:"لحظة… نتحقق من التفعيل.", loading:true, showActions:false, debug:""});
+
+      const res = await fetch("/api2/me", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": deviceId
+        },
+        credentials: "include",
+        body: "{}"
+      });
+
+      const data = await res.json().catch(()=>null);
+
+      // غير مسجّل / الجلسة غير موجودة
+      if(!res.ok || !data || data.ok !== true){
+        const next = encodeURIComponent(buildNextToHere());
+        setUI({
+          title:"يلزم تسجيل الدخول",
+          msg:"بنحوّلك لصفحة التفعيل ثم نرجع نكمل فتح اللعبة.",
+          loading:false,
+          showActions:true,
+          debug: (data && data.error) ? ("سبب: " + data.error) : "سبب: NO_SESSION"
+        });
+
+        // تحويل تلقائي (مع next الصحيح)
+        setTimeout(()=>go("/activate?next=" + next), 600);
+        return;
       }
+
+      // مسجّل لكن غير مفعّل
+      if(!data.activated){
+        const next = encodeURIComponent(buildNextToHere());
+        setUI({
+          title:"الحساب غير مفعّل",
+          msg:"لازم تدخل كود التفعيل مرة واحدة. بنحوّلك للتفعيل ثم نرجع نكمل.",
+          loading:false,
+          showActions:true,
+          debug:""
+        });
+        setTimeout(()=>go("/activate?next=" + next), 600);
+        return;
+      }
+
+      // تمام: افتح اللعبة الكبيرة
+      setUI({title:"تم التحقق", msg:"جاري فتح اللعبة…", loading:true, showActions:false, debug:""});
+      setTimeout(()=>go(target), 250);
+
+    }catch(e){
+      setUI({
+        title:"تعذر الاتصال",
+        msg:"فيه مشكلة اتصال مؤقتة. جرّب إعادة المحاولة.",
+        loading:false,
+        showActions:true,
+        debug: String(e && e.message ? e.message : e)
+      });
     }
+  }
 
-    // ✅ إذا جايين من create.html فهذي أهم حالة:
-    // game.html?role=host&code=...&key=...
-    const hasRole = params.has("role");
-    const hasCode = params.has("code");
+  retryBtn.addEventListener("click", ()=>check());
+  goActBtn.addEventListener("click", ()=>{
+    const next = encodeURIComponent(buildNextToHere());
+    go("/activate?next=" + next);
+  });
 
-    // ✅ إذا الصفحة انفتحت برابط هدف r (نستخدمه فقط لو موجود)
-    // مثل: game.html?r=game_full.html?role=...
-    const rParam = params.get("r");
-
-    // الوجهة النهائية:
-    // 1) لو عندنا role+code -> افتح game_full مع نفس الباراميترات
-    // 2) لو عندنا r -> افتحها كما هي
-    // 3) غير كذا -> افتح game_full (بدون باراميترات)
-    let target;
-    if (hasRole && hasCode){
-      target = "game_full.html" + location.search + location.hash;
-    } else if (rParam){
-      target = normalizeReturnUrl(rParam);
-    } else {
-      target = "game_full.html";
-    }
-
-    // ✅ رابط الرجعة للتفعيل لازم يكون نفس صفحة game.html الحالية بكل باراميتراتها
-    const returnToHere = location.pathname.split("/").pop() + location.search + location.hash;
-
-    const activated = (localStorage.getItem(LS_ACTIVATED) === "1");
-
-    if (!activated) {
-      // غير مُفعّل -> فعّل ثم ارجع لنفس صفحة game.html (عشان ما نضيّع role/code)
-      location.replace("activate.html?r=" + encodeURIComponent(returnToHere));
-    } else {
-      // مُفعّل -> افتح الهدف
-      location.replace(target);
-    }
-
-    // أزرار احتياط لو احتجناها
-    $open.onclick = () => location.href = target;
-    $chg.onclick = () => {
-      localStorage.removeItem(LS_ACTIVATED);
-      localStorage.removeItem(LS_CODE);
-      location.href = "activate.html";
-    };
-  </script>
+  check();
+})();
+</script>
 </body>
 </html>
