@@ -1054,19 +1054,24 @@
       ]
     ];
 
-    const QUESTIONS = {};
-    const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
+        const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
+
+    // أسئلة افتراضية (Fallback) إذا ما كان فيه بنك أسئلة
+    const DEFAULT_QUESTIONS = {};
     for(const L of ALL_LETTERS){
-      QUESTIONS[L] = Array.from({length:25}, (_,i) => ({
+      DEFAULT_QUESTIONS[L] = Array.from({length:25}, (_,i) => ({
         q: `(${i+1}) سؤال لحرف ${L}`,
         a: `${L}...`
       }));
     }
 
     import "./questions_bank.js";
+
+    // استخدم بنك الأسئلة إذا موجود، وإلا استخدم الافتراضي
+    const QUESTIONS = (window.QUESTIONS && Object.keys(window.QUESTIONS).length)
+      ? window.QUESTIONS
+      : DEFAULT_QUESTIONS;
     
-const QUESTIONS = window.QUESTIONS || {};
-const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
