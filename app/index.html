@@ -8,7 +8,7 @@
     /* ✅ نفس خط اللعبة */
     @font-face{
       font-family:"AA-GALAXY";
-      src:url("AA-GALAXY.otf") format("opentype");
+      src:url("../AA-GALAXY.otf") format("opentype");
       font-weight:400;
       font-style:normal;
       font-display:swap;
@@ -67,7 +67,7 @@
 <body>
 
   <header>
-    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
+    <img class="logo" src="../logo.png" alt="شعار صندوق المسابقات">
     <h1>لعبة سباق الحروف</h1>
   </header>
 
@@ -104,7 +104,7 @@
 
     function random6(){
       return String(Math.floor(100000 + Math.random()*900000));
-    }
+       }
 
     function randomKey(){
       return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
@@ -153,14 +153,17 @@
         buzzer: null,
         current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
         players: {},
-        // (اختياري) ما يضر لو موجود
         scores: { orange: 0, green: 0 }
       };
 
       await set(ref(db, `rooms/${code}`), room);
 
-      // يودّي المقدم مباشرة لصفحة اختيار الفريقين (داخل game.html)
-      location.href = `game.html?role=host&code=${encodeURIComponent(code)}&key=${encodeURIComponent(presenterKey)}`;
+      // ✅ إصلاح مهم: لأننا داخل /app لازم نطلع للرووت
+      const u = new URL("../game.html", location.href);
+      u.searchParams.set("role", "host");
+      u.searchParams.set("code", code);
+      u.searchParams.set("key", presenterKey);
+      location.href = u.toString();
     }
 
     document.getElementById("btn").addEventListener("click", createRoom);
