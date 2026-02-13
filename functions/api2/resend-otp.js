@@ -1,8 +1,9 @@
 // functions/api2/resend-otp.js
 // Cloudflare Pages Function: POST /api2/resend-otp
 // ✅ متوافق مع التدفق الجديد: OTP داخل pending_users (قبل إنشاء users)
+// ✅ تعديل: error code -> OTP_TOO_SOON (متوافق مع translateErr في activate.html)
 
-const VERSION = "api2-resend-otp-v2-pending";
+const VERSION = "api2-resend-otp-v3-pending-otp-too-soon";
 
 const CORS_HEADERS = (req) => {
   const origin = req.headers.get("origin") || req.headers.get("Origin");
@@ -10,7 +11,7 @@ const CORS_HEADERS = (req) => {
     "Access-Control-Allow-Methods": "POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Max-Age": "86400",
-    "cache-control": "no-store",
+    "Cache-Control": "no-store",
   };
   if (origin) {
     h["Access-Control-Allow-Origin"] = origin;
@@ -27,7 +28,7 @@ function json(req, data, status = 200) {
     status,
     headers: {
       ...CORS_HEADERS(req),
-      "content-type": "application/json; charset=utf-8",
+      "Content-Type": "application/json; charset=utf-8",
     },
   });
 }
@@ -138,9 +139,12 @@ export async function onRequest(context) {
     const now = Date.now();
     const last = Number(pending.updated_at || 0);
     const diff = now - last;
+
     if (last && diff < 60_000) {
       const waitSec = Math.ceil((60_000 - diff) / 1000);
-      return json(request, { ok: false, error: "WAIT_BEFORE_RESEND", waitSec }, 429);
+
+      // ✅ (التعديل المهم) نخلي الكود اللي الواجهة تعرفه
+      return json(request, { ok: false, error: "OTP_TOO_SOON", waitSec }, 429);
     }
 
     // ✅ نولد OTP جديد ونحدثه في pending_users
@@ -174,5 +178,5 @@ export async function onRequest(context) {
 }
 
 /*
-resend-otp.js – api2 – إصدار 2 (pending_users flow + rate limit)
+resend-otp.js – api2 – إصدار 3 (pending_users flow + rate limit + OTP_TOO_SOON for UI)
 */
