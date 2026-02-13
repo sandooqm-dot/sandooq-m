@@ -1063,8 +1063,10 @@
       }));
     }
 
-    <script src="questions_bank.js"></script>
-
+    import "./questions_bank.js";
+    
+const QUESTIONS = window.QUESTIONS || {};
+const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
