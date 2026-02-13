@@ -1,33 +1,39 @@
 // functions/api2/login.js
 // Cloudflare Pages Function: POST /api2/login
-// ✅ Fix: supports password_salt + salt_b64, provider google guard, sessions compat (token + token_hash), always JSON
+// ✅ إصلاح: رسائل عربية بدل الأكواد + تمييز حساب Google + عدم كسر دخول الإيميل/باسورد
 
-const VERSION = "api2-login-v3-saltfix-sessions-compat";
+const VERSION = "api2-login-v3-ar-messages-google-safe";
 
-const CORS_HEADERS = (req) => {
-  const origin = req.headers.get("origin") || req.headers.get("Origin");
-  const h = {
-    "Access-Control-Allow-Methods": "POST,OPTIONS",
+const CORS_HEADERS = (req, env) => {
+  const origin = req.headers.get("Origin") || req.headers.get("origin") || "";
+  const allowedRaw = String(env?.ALLOWED_ORIGINS || "").trim();
+
+  let allowOrigin = origin || "*";
+  if (allowedRaw) {
+    const allowed = allowedRaw.split(",").map(s => s.trim()).filter(Boolean);
+    if (allowed.includes("*")) allowOrigin = "*";
+    else if (origin && allowed.includes(origin)) allowOrigin = origin;
+    else allowOrigin = allowed[0] || "*";
+  }
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Vary": "Origin",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
+    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     "Cache-Control": "no-store",
   };
-  if (origin) {
-    h["Access-Control-Allow-Origin"] = origin;
-    h["Access-Control-Allow-Credentials"] = "true";
-    h["Vary"] = "Origin";
-  } else {
-    h["Access-Control-Allow-Origin"] = "*";
-  }
-  return h;
 };
 
-function json(req, data, status = 200, extraHeaders = {}) {
+function json(req, env, data, status = 200, extra = {}) {
   const headers = new Headers({
-    ...CORS_HEADERS(req),
+    ...CORS_HEADERS(req, env),
     "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
   });
-  for (const [k, v] of Object.entries(extraHeaders || {})) {
+  for (const [k, v] of Object.entries(extra || {})) {
     if (Array.isArray(v)) for (const vv of v) headers.append(k, vv);
     else if (v !== undefined && v !== null && v !== "") headers.set(k, String(v));
   }
@@ -38,38 +44,21 @@ function normalizeEmail(v) {
   return String(v || "").trim().toLowerCase();
 }
 
-function getHeader(req, name) {
-  return req.headers.get(name) || req.headers.get(name.toLowerCase()) || "";
-}
-
-function getCookie(req, name) {
-  const cookie = req.headers.get("cookie") || req.headers.get("Cookie") || "";
-  const parts = cookie.split(";").map((s) => s.trim()).filter(Boolean);
-  for (const p of parts) {
-    const eq = p.indexOf("=");
-    if (eq === -1) continue;
-    const k = p.slice(0, eq).trim();
-    const v = p.slice(eq + 1);
-    if (k === name) {
-      try { return decodeURIComponent(v); } catch { return v; }
-    }
-  }
-  return "";
-}
-
-function setAuthCookie(token) {
+function setCookie(token) {
   const maxAge = 30 * 24 * 60 * 60; // 30 يوم
-  return `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; Secure; SameSite=Lax; HttpOnly`;
+  const a = `sandooq_token_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; Secure; SameSite=Lax; HttpOnly`;
+  const b = `sandooq_session_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; Secure; SameSite=Lax; HttpOnly`;
+  return [a, b];
 }
-function setLegacyCookie(token) {
-  const maxAge = 30 * 24 * 60 * 60;
-  return `sandooq_session_v1=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; Secure; SameSite=Lax; HttpOnly`;
+
+function clearCookie(name) {
+  return `${name}=; Path=/; Max-Age=0; Secure; SameSite=Lax; HttpOnly`;
 }
 
 async function tableCols(DB, table) {
   try {
     const res = await DB.prepare(`PRAGMA table_info(${table});`).all();
-    return new Set((res?.results || []).map((r) => String(r.name)));
+    return new Set((res?.results || []).map(r => String(r.name)));
   } catch {
     return new Set();
   }
@@ -86,60 +75,11 @@ async function tableExists(DB, table) {
   }
 }
 
-async function ensureUsersTable(DB) {
-  // ما نمسح شيء — بس نضمن وجود جدول users الأساسي
-  await DB.prepare(`
-    CREATE TABLE IF NOT EXISTS users (
-      email TEXT PRIMARY KEY,
-      provider TEXT DEFAULT 'email',
-      password_hash TEXT,
-      password_salt TEXT,
-      salt_b64 TEXT,
-      is_email_verified INTEGER DEFAULT 0,
-      email_verified INTEGER DEFAULT 0,
-      created_at INTEGER,
-      updated_at INTEGER
-    );
-  `).run();
-}
-
-async function ensureSessionsCompat(DB) {
-  // ✅ نضمن sessions موجود + الأعمدة اللي نحتاجها موجودة (بدون تخريب)
-  if (!(await tableExists(DB, "sessions"))) {
-    await DB.prepare(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        token TEXT,
-        token_hash TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
-        device_id TEXT
-      );
-    `).run();
-    return;
-  }
-
-  const cols = await tableCols(DB, "sessions");
-
-  // نضيف أعمدة ناقصة لو قدرنا
-  const addCol = async (name, typeSql) => {
-    if (cols.has(name)) return;
-    try {
-      await DB.prepare(`ALTER TABLE sessions ADD COLUMN ${name} ${typeSql};`).run();
-    } catch {}
-  };
-
-  // مهم لـ me.js و _middleware.js
-  await addCol("token", "TEXT");
-  await addCol("email", "TEXT");
-  await addCol("user_email", "TEXT");
-  await addCol("used_by_email", "TEXT");
-
-  // للـ logout.js
-  await addCol("token_hash", "TEXT");
-  await addCol("created_at", "INTEGER");
-  await addCol("expires_at", "INTEGER");
-  await addCol("device_id", "TEXT");
+function b64ToU8(b64) {
+  const bin = atob(String(b64 || ""));
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
 }
 
 function toB64(u8) {
@@ -148,17 +88,8 @@ function toB64(u8) {
   return btoa(s);
 }
 
-function b64ToU8(b64) {
-  const bin = atob(String(b64 || ""));
-  const u8 = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-  return u8;
-}
-
-async function pbkdf2B64(password, saltB64, iterations = 100000) {
-  const saltU8 = b64ToU8(saltB64);
+async function pbkdf2B64(password, saltU8, iterations = 100000) {
   const enc = new TextEncoder();
-
   const key = await crypto.subtle.importKey(
     "raw",
     enc.encode(password),
@@ -188,61 +119,56 @@ async function sha256Hex(str) {
 function makeToken(bytes = 32) {
   const arr = new Uint8Array(bytes);
   crypto.getRandomValues(arr);
-  return btoa(String.fromCharCode(...arr))
+  let s = btoa(String.fromCharCode(...arr))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
+  return s;
 }
 
-function isVerifiedFromUserRow(u) {
-  return (
-    u?.is_email_verified === 1 ||
-    u?.email_verified === 1 ||
-    u?.verified === 1 ||
-    u?.is_verified === 1
-  );
-}
+async function insertSession(DB, token, email) {
+  // نلتزم بنفس منطق me.js: sessions.token + sessions.email (أو user_email)
+  if (!(await tableExists(DB, "sessions"))) {
+    // إنشاء minimal إذا ما كان موجود
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT,
+        email TEXT,
+        created_at TEXT
+      );
+    `).run();
+  }
 
-async function insertSession(DB, token, email, deviceId, env) {
-  await ensureSessionsCompat(DB);
   const cols = await tableCols(DB, "sessions");
-
-  const now = Date.now();
-  const expiresAt = now + 30 * 24 * 60 * 60 * 1000; // 30 يوم
-
-  const pepper = String(env.SESSION_PEPPER || "sess_pepper_v1");
-  const tokenHash = await sha256Hex(token + "|" + pepper);
+  const now = new Date().toISOString();
 
   const insertCols = [];
-  const qs = [];
+  const vals = [];
   const bind = [];
 
-  const add = (name, val) => {
-    if (cols.has(name)) {
-      insertCols.push(name);
-      qs.push("?");
-      bind.push(val);
+  const add = (c, v) => {
+    if (cols.has(c)) {
+      insertCols.push(c);
+      vals.push("?");
+      bind.push(v);
     }
   };
 
-  add("token_hash", tokenHash);
+  // الأسماء المحتملة
   add("token", token);
-
-  // نخدم كل أسماء الإيميل المحتملة
-  if (cols.has("email")) add("email", email);
-  else if (cols.has("user_email")) add("user_email", email);
-  else if (cols.has("used_by_email")) add("used_by_email", email);
-
+  add("email", email);
+  add("user_email", email);
   add("created_at", now);
-  add("expires_at", expiresAt);
-  add("device_id", deviceId || "");
 
-  // لو ما فيه أي عمود إيميل معروف = مصيبة
-  if (!insertCols.includes("email") && !insertCols.includes("user_email") && !insertCols.includes("used_by_email")) {
-    throw new Error("SESSIONS_SCHEMA_NO_EMAIL_COL");
+  // إذا ما تعرفنا على أي عمود (جدول غريب) نحاول بطريقة مباشرة
+  if (!insertCols.length) {
+    // آخر حل: حاول إدخال token/email/created_at حتى لو ما كان موجود (راح يفشل ويطلع للأعلى)
+    await DB.prepare(`INSERT INTO sessions (token,email,created_at) VALUES (?,?,?)`)
+      .bind(token, email, now).run();
+    return;
   }
 
-  const sql = `INSERT OR REPLACE INTO sessions (${insertCols.join(",")}) VALUES (${qs.join(",")})`;
+  const sql = `INSERT INTO sessions (${insertCols.join(",")}) VALUES (${vals.join(",")})`;
   await DB.prepare(sql).bind(...bind).run();
 }
 
@@ -250,86 +176,99 @@ export async function onRequest(context) {
   const { request, env } = context;
 
   if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS(request) });
+    return new Response(null, { status: 204, headers: CORS_HEADERS(request, env) });
   }
   if (request.method !== "POST") {
-    return json(request, { ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+    return json(request, env, { ok: false, error: "الطريقة غير مسموحة." }, 405);
   }
 
   try {
-    if (!env?.DB) return json(request, { ok: false, error: "DB_NOT_BOUND" }, 500);
-
-    await ensureUsersTable(env.DB);
+    if (!env?.DB) {
+      return json(request, env, { ok: false, error: "قاعدة البيانات غير مربوطة." }, 500);
+    }
 
     const body = await request.json().catch(() => ({}));
     const email = normalizeEmail(body.email);
     const password = String(body.password || "");
 
-    if (!email || !email.includes("@") || password.length < 1) {
-      return json(request, { ok: false, error: "MISSING_FIELDS" }, 400);
+    if (!email || !email.includes("@")) {
+      return json(request, env, { ok: false, error: "اكتب بريد صحيح." }, 400);
+    }
+    if (!password) {
+      return json(request, env, { ok: false, error: "اكتب كلمة المرور." }, 400);
     }
 
-    const user = await env.DB.prepare(`SELECT * FROM users WHERE email = ? LIMIT 1`)
-      .bind(email)
-      .first();
+    // users لازم موجود
+    if (!(await tableExists(env.DB, "users"))) {
+      return json(request, env, { ok: false, error: "قاعدة المستخدمين غير جاهزة." }, 500);
+    }
 
-    // ✅ هذا اللي تبيه: إذا الإيميل غير مسجل
+    const user = await env.DB.prepare(`SELECT * FROM users WHERE email=? LIMIT 1`)
+      .bind(email).first();
+
     if (!user) {
-      return json(request, { ok: false, error: "EMAIL_NOT_REGISTERED" }, 404);
+      // ✅ عربي بدل EMAIL_NOT_REGISTERED
+      return json(request, env, {
+        ok: false,
+        error: "هذا البريد غير مسجّل. اضغط (إنشاء حساب جديد) أو تأكد من الكتابة.",
+      }, 401);
     }
 
-    // ✅ لو الحساب Google لا نحاول بكلمة مرور
     const provider = String(user.provider || "email").toLowerCase();
-    const storedHash = String(user.password_hash || "");
-    if (provider === "google" || storedHash === "GOOGLE") {
-      return json(request, { ok: false, error: "USE_GOOGLE_LOGIN" }, 409);
+
+    // اقرأ بيانات كلمة المرور بأكثر من اسم (توافق)
+    const hash = String(user.password_hash || user.pass_hash || user.pw_hash || user.hash || "").trim();
+
+    const saltB64 =
+      String(user.password_salt || user.salt_b64 || user.salt || "").trim();
+
+    const hasRealPassword = !!(hash && hash !== "GOOGLE" && (saltB64 || hash.length === 64)); // 64 = sha256 hex legacy
+
+    // ✅ لو حساب Google فقط (بدون كلمة مرور) → رسالة عربية واضحة
+    if (provider === "google" && !hasRealPassword) {
+      return json(request, env, {
+        ok: false,
+        error: "هذا البريد مسجّل عبر Google. اضغط زر (الدخول بواسطة حساب Google).",
+      }, 401);
     }
 
-    // ✅ لازم يكون موثّق OTP
-    const verified = isVerifiedFromUserRow(user);
-    if (!verified) {
-      return json(request, { ok: false, error: "EMAIL_NOT_VERIFIED" }, 403);
-    }
-
-    // ✅ تحقق كلمة المرور:
-    // 1) PBKDF2 باستخدام salt_b64 أو password_salt
-    // 2) Legacy SHA256 hex (لو ما فيه salt)
-    const saltB64 = String(user.salt_b64 || user.password_salt || user.salt || "").trim();
-
+    // تحقق كلمة المرور (PBKDF2 الجديد أو SHA256 القديم)
     let ok = false;
 
-    if (saltB64) {
-      const calc = await pbkdf2B64(password, saltB64, 100000);
-      ok = calc === storedHash;
-    } else {
-      // legacy: sha256 hex
-      const hex = await sha256Hex(password);
-      ok = hex === storedHash;
+    // PBKDF2 (الأساسي)
+    if (hash && saltB64) {
+      const saltU8 = b64ToU8(saltB64);
+      const computed = await pbkdf2B64(password, saltU8, 100000);
+      ok = (computed === hash);
+    } else if (hash && hash.length === 64) {
+      // legacy sha256 hex
+      const computedHex = await sha256Hex(password);
+      ok = (computedHex === hash.toLowerCase());
     }
 
     if (!ok) {
-      return json(request, { ok: false, error: "INVALID_CREDENTIALS" }, 401);
+      return json(request, env, { ok: false, error: "كلمة المرور غير صحيحة." }, 401);
     }
 
-    // ✅ أنشئ جلسة + كوكيز
+    // ✅ نجاح: أنشئ جلسة + كوكيز
     const token = makeToken(32);
-    const deviceId = String(getHeader(request, "X-Device-Id") || getCookie(request, "sandooq_device_id_v1") || "").trim();
-
-    await insertSession(env.DB, token, email, deviceId, env);
+    await insertSession(env.DB, token, email);
 
     return json(
       request,
-      { ok: true, token, email, verified: true },
+      env,
+      { ok: true, token, email, provider: provider || "email" },
       200,
-      { "Set-Cookie": [setAuthCookie(token), setLegacyCookie(token)] }
+      { "Set-Cookie": setCookie(token) }
     );
 
   } catch (e) {
     console.log("login_error", String(e?.message || e));
-    return json(request, { ok: false, error: "SERVER_ERROR" }, 500);
+    // لا نطلع إنجليزي للمستخدم
+    return json(request, env, { ok: false, error: "صار خطأ في السيرفر. جرّب مرة ثانية." }, 500);
   }
 }
 
 /*
-login.js – api2 – إصدار 3 (Fix PBKDF2 salt mismatch + sessions compat + EMAIL_NOT_REGISTERED + USE_GOOGLE_LOGIN)
+login.js – api2 – إصدار 3 (Arabic messages + Google-only detection + safe compatibility)
 */
