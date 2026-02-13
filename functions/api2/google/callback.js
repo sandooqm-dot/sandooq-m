@@ -116,13 +116,19 @@ export async function onRequest(context) {
     const sessionToken = makeToken(32);
     await insertSession(env.DB, sessionToken, email);
 
-    // 5) Redirect back to activate
+    // 5) Redirect back to activate (نخليه مثل ما هو عندك عشان ما نكسر activate.html)
     const dest = `${origin}/activate?token=${encodeURIComponent(sessionToken)}`;
 
     // ✅ امسح كوكيز PKCE بعد الاستخدام (نفس Path اللي سوّاه start.js)
     const headers = new Headers();
     headers.set("Location", dest);
     headers.set("Cache-Control", "no-store");
+
+    // ✅✅ (التعديل الجديد المهم): زرع كوكيز الجلسة عشان /app + middleware
+    const maxAge = 30 * 24 * 60 * 60; // 30 يوم
+    headers.append("Set-Cookie", `sandooq_token_v1=${encodeURIComponent(sessionToken)}; Max-Age=${maxAge}; Path=/; Secure; SameSite=Lax; HttpOnly`);
+    headers.append("Set-Cookie", `sandooq_session_v1=${encodeURIComponent(sessionToken)}; Max-Age=${maxAge}; Path=/; Secure; SameSite=Lax; HttpOnly`);
+
     headers.append("Set-Cookie", `sandooq_g_state=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`);
     headers.append("Set-Cookie", `sandooq_g_verifier=; Max-Age=0; Path=/api2/google/callback; HttpOnly; Secure; SameSite=Lax`);
 
@@ -278,3 +284,7 @@ async function insertSession(db, token, email) {
   const sql = `INSERT INTO sessions (${cols.join(",")}) VALUES (${vals.join(",")})`;
   await db.prepare(sql).bind(...bind).run();
 }
+
+/*
+google/callback.js – إصدار 2 (adds sandooq_token_v1 + sandooq_session_v1 cookies for middleware)
+*/
