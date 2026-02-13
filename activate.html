@@ -385,12 +385,12 @@
         </div>
 
         <div class="field">
-          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/></svg>
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 15v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           <input id="rPass1" type="password" placeholder="كلمة المرور الجديدة" autocomplete="new-password" />
         </div>
 
         <div class="field">
-          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/></svg>
+          <svg class="icon r" viewBox="0 0 24 24" fill="none"><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 15v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
           <input id="rPass2" type="password" placeholder="تأكيد كلمة المرور" autocomplete="new-password" />
         </div>
 
@@ -448,6 +448,10 @@
             history.replaceState(null, "", u.toString());
           } else {
             setToken(t);
+
+            // ✅ (تعديل) إذا جاء توكن جلسة (مثل Google) نمسح pending_email عشان ما يعلّقنا في OTP بالغلط
+            sessionStorage.removeItem("pending_email");
+
             u.searchParams.delete("token");
             history.replaceState(null, "", u.toString());
           }
@@ -686,6 +690,36 @@
         return;
       }
 
+      // ✅ (تعديل) إذا عندنا توكن، قدّم /me قبل pending_email (عشان ما يعلق Google في شاشة OTP)
+      const tok = getToken();
+      if(tok){
+        const me = await api("/me", {});
+        if(me?.ok){
+          const email = me.email || "";
+          $("who").textContent = email;
+
+          // إذا كان فيه pending_email قديم، نمسحه لأننا بالفعل داخلين
+          sessionStorage.removeItem("pending_email");
+
+          if(me.verified === false){
+            sessionStorage.setItem("pending_email", email);
+            $("vEmail").textContent = email;
+            show("view-verify");
+            msg($("verifyMsg"), "لازم تؤكد بريدك أولاً.", "err");
+            return;
+          }
+
+          if(me.activated){
+            window.location.replace("/app");
+            return;
+          }
+
+          show("view-activate");
+          return;
+        }
+        // لو فشل /me رغم وجود توكن -> نرجع لواجهة الدخول
+      }
+
       const pending = sessionStorage.getItem("pending_email") || "";
       if (pending) {
         $("vEmail").textContent = pending;
@@ -737,6 +771,12 @@
       if(e === "OTP_TOO_SOON") return "انتظر دقيقة ثم أعد الإرسال.";
       if(e === "TOO_MANY_ATTEMPTS" || e === "OTP_LOCKED") return "محاولات كثيرة. جرّب بعد قليل.";
 
+      // ✅ (تعديل) متوافق مع resend-otp.js عندك
+      if(e === "WAIT_BEFORE_RESEND"){
+        const s = Number(r?.waitSec || 60);
+        return `انتظر ${s} ثانية ثم أعد الإرسال.`;
+      }
+
       if(e === "MAIL_NOT_CONFIGURED") return "خدمة إرسال الإيميل غير مفعّلة حالياً.";
       if(e === "MAIL_SEND_FAILED") return "فشل إرسال الإيميل. جرّب مرة ثانية.";
 
@@ -757,4 +797,4 @@
 </body>
 </html>
 
-<!-- activate.html – نظام التفعيل الجديد v9 (Forgot+Reset UI + token param safe) -->
+<!-- activate.html – نظام التفعيل الجديد v10 (boot prioritizes /me when token exists + clears pending_email on session token + WAIT_BEFORE_RESEND support) -->
