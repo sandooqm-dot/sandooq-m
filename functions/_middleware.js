@@ -15,6 +15,15 @@ function clearCookie(name) {
   return `${name}=; Path=/; Max-Age=0; Secure; SameSite=Lax; HttpOnly`;
 }
 
+function withNoStore(res) {
+  try {
+    res.headers.set("Cache-Control", "no-store");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Vary", "Cookie, Authorization");
+  } catch {}
+  return res;
+}
+
 async function tableCols(DB, table) {
   try {
     const res = await DB.prepare(`PRAGMA table_info(${table});`).all();
@@ -45,6 +54,7 @@ async function findSessionEmail(DB, token) {
   const cols = await tableCols(DB, "sessions");
   if (!cols.size || !cols.has("token")) return null;
 
+  // أكثر الأعمدة شيوعًا
   if (cols.has("email")) {
     const row = await DB.prepare(
       `SELECT email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
@@ -59,11 +69,76 @@ async function findSessionEmail(DB, token) {
     return row?.email ? normalizeEmail(row.email) : null;
   }
 
+  // احتياط لو كان الاسم قديم
+  if (cols.has("used_by_email")) {
+    const row = await DB.prepare(
+      `SELECT used_by_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
+    ).bind(token).first();
+    return row?.email ? normalizeEmail(row.email) : null;
+  }
+
   return null;
+}
+
+async function isActivatedViaUsers(DB, email) {
+  email = normalizeEmail(email);
+  if (!(await tableExists(DB, "users"))) return false;
+
+  const cols = await tableCols(DB, "users");
+  if (!cols.size) return false;
+
+  // تحديد عمود الإيميل
+  let emailCol = null;
+  if (cols.has("email")) emailCol = "email";
+  else if (cols.has("user_email")) emailCol = "user_email";
+  else return false;
+
+  // أفضلية: is_activated / activated (قيمة 1)
+  if (cols.has("is_activated")) {
+    const row = await DB.prepare(
+      `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND is_activated = 1 LIMIT 1`
+    ).bind(email).first();
+    return !!row;
+  }
+
+  if (cols.has("activated")) {
+    const row = await DB.prepare(
+      `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activated = 1 LIMIT 1`
+    ).bind(email).first();
+    return !!row;
+  }
+
+  // بدائل: activated_at أو activation_code (غير فارغة)
+  if (cols.has("activated_at")) {
+    const row = await DB.prepare(
+      `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activated_at IS NOT NULL AND activated_at != '' LIMIT 1`
+    ).bind(email).first();
+    return !!row;
+  }
+
+  if (cols.has("activation_code")) {
+    const row = await DB.prepare(
+      `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activation_code IS NOT NULL AND activation_code != '' LIMIT 1`
+    ).bind(email).first();
+    return !!row;
+  }
+
+  if (cols.has("activated_code")) {
+    const row = await DB.prepare(
+      `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activated_code IS NOT NULL AND activated_code != '' LIMIT 1`
+    ).bind(email).first();
+    return !!row;
+  }
+
+  return false;
 }
 
 async function isActivated(DB, email) {
   email = normalizeEmail(email);
+
+  // 0) الأفضل: users (لو فيه عمود تفعيل)
+  const viaUsers = await isActivatedViaUsers(DB, email);
+  if (viaUsers) return true;
 
   // 1) activations
   if (await tableExists(DB, "activations")) {
@@ -107,13 +182,10 @@ async function isActivated(DB, email) {
 function redirectToActivate(url) {
   const next = url.pathname + (url.search || "");
   const dest = `/activate?next=${encodeURIComponent(next)}`;
-  return new Response(null, {
+  return withNoStore(new Response(null, {
     status: 302,
-    headers: {
-      "Location": dest,
-      "Cache-Control": "no-store",
-    },
-  });
+    headers: { "Location": dest }
+  }));
 }
 
 export async function onRequest(context) {
@@ -121,8 +193,9 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // ✅ نسمح دائمًا بهذه المسارات/الملفات
+  // ✅ مسارات لازم تمر دائمًا
   if (
+    path.startsWith("/cdn-cgi/") ||
     path.startsWith("/api2/") ||
     path.startsWith("/activate") ||
     path === "/logo.png" ||
@@ -137,9 +210,14 @@ export async function onRequest(context) {
     return next();
   }
 
+  // السماح لـ OPTIONS (Preflight) بدون لفّة تحويل
+  if (request.method === "OPTIONS") {
+    return next();
+  }
+
   // لازم DB عشان نتحقق
   if (!env?.DB) {
-    return new Response("DB_NOT_BOUND", { status: 500 });
+    return withNoStore(new Response("DB_NOT_BOUND", { status: 500 }));
   }
 
   // token من:
@@ -159,7 +237,6 @@ export async function onRequest(context) {
 
   const email = await findSessionEmail(env.DB, token);
   if (!email) {
-    // نمسح الكوكيز اللي ممكن تكون قديمة
     const r = redirectToActivate(url);
     r.headers.append("Set-Cookie", clearCookie("sandooq_token_v1"));
     r.headers.append("Set-Cookie", clearCookie("sandooq_session_v1"));
@@ -176,5 +253,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 2 (Fix redirect loop + unify activation check)
+_middleware.js – إصدار 3 (Users-first activation + no-store headers + extra safety)
 */
