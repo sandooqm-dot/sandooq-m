@@ -1,7 +1,10 @@
 // functions/api2/logout.js
+// POST /api2/logout
+// v2: safe logout (supports Bearer + cookies) + schema-tolerant sessions delete (no table creation)
+
 export async function onRequest(context) {
   const { request, env } = context;
-  const VERSION = "api2-logout-v1";
+  const VERSION = "api2-logout-v2";
 
   const cors = makeCorsHeaders(request, env);
 
@@ -13,27 +16,48 @@ export async function onRequest(context) {
     return json({ ok: false, error: "METHOD_NOT_ALLOWED", version: VERSION }, 405, cors);
   }
 
+  // نقرأ التوكن من:
+  // 1) Authorization Bearer (الأهم لأن activate.html يرسلها)
+  // 2) Cookie: sandooq_token_v1
+  // 3) Cookie: sandooq_session_v1
+  // 4) Cookie: env.SESSION_COOKIE_NAME (احتياط)
+  const auth = request.headers.get("Authorization") || request.headers.get("authorization") || "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+
+  const cookieHeader = request.headers.get("Cookie") || request.headers.get("cookie") || "";
+  const cookieName = String(env?.SESSION_COOKIE_NAME || "sandooq_session_v1");
+
+  const token =
+    bearer ||
+    getCookie(cookieHeader, "sandooq_token_v1") ||
+    getCookie(cookieHeader, "sandooq_session_v1") ||
+    getCookie(cookieHeader, cookieName) ||
+    "";
+
+  // حتى لو DB مو مربوط، نمسح الكوكيز وخلاص
   if (!env?.DB) {
-    // حتى لو DB مو مربوط، نرجّع كوكي فارغ عشان يسجل خروج
     return clearAndRespond(cors, env, VERSION, true);
   }
 
-  // نحاول نحذف السيشن من DB (اختياري)
-  const cookieHeader = request.headers.get("Cookie") || "";
-  const cookieName = String(env?.SESSION_COOKIE_NAME || "sandooq_session_v1");
-  const token =
-    getCookie(cookieHeader, cookieName) ||
-    getCookie(cookieHeader, "sandooq_token_v1") ||
-    "";
-
+  // نحاول نحذف السيشن من DB حسب سكيمة sessions الموجودة (بدون إنشاء جدول جديد)
   try {
-    await ensureSessionsTable(env.DB);
-    if (token) {
-      const pepper = String(env.SESSION_PEPPER || "sess_pepper_v1");
-      const tokenHash = await sha256Hex(token + "|" + pepper);
-      await env.DB.prepare(`DELETE FROM sessions WHERE token_hash = ?`).bind(tokenHash).run();
+    const cols = await sessionCols(env.DB);
+    if (token && cols.size) {
+      if (cols.has("token")) {
+        // سكيمتك الحالية
+        await env.DB.prepare(`DELETE FROM sessions WHERE token = ?`).bind(token).run();
+      } else if (cols.has("token_hash")) {
+        // لو فيه سكيمة قديمة/بديلة
+        const pepper = String(env.SESSION_PEPPER || "sess_pepper_v1");
+        const tokenHash = await sha256Hex(token + "|" + pepper);
+        await env.DB.prepare(`DELETE FROM sessions WHERE token_hash = ?`).bind(tokenHash).run();
+      } else {
+        // ما نعرف العمود — نتجاهل
+      }
     }
-  } catch {}
+  } catch {
+    // تجاهل أي خطأ — الهدف الأساسي خروج المستخدم (مسح الكوكيز)
+  }
 
   return clearAndRespond(cors, env, VERSION, false);
 }
@@ -52,10 +76,13 @@ function clearAndRespond(cors, env, VERSION, dbMissing) {
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
 
-  // نمسح الكوكيين
+  // نمسح الكوكيز (بغض النظر عن اسمها)
   const mainName = String(env?.SESSION_COOKIE_NAME || "sandooq_session_v1");
+
+  // امسح الأساسي + الأسماء المتوقعة دائماً
   headers.append("Set-Cookie", clearCookie(mainName));
   headers.append("Set-Cookie", clearCookie("sandooq_token_v1"));
+  headers.append("Set-Cookie", clearCookie("sandooq_session_v1"));
 
   const body = { ok: true, version: VERSION };
   if (dbMissing) body.note = "DB_MISSING_BUT_COOKIES_CLEARED";
@@ -70,24 +97,34 @@ function clearCookie(name) {
 function makeCorsHeaders(request, env) {
   const origin = request.headers.get("Origin") || "";
   const allowedRaw = String(env?.ALLOWED_ORIGINS || "").trim();
-  let allowOrigin = "*";
+
+  let allowOrigin = origin || "*";
 
   if (allowedRaw) {
     const allowed = allowedRaw.split(",").map((s) => s.trim()).filter(Boolean);
-    if (allowed.includes("*")) allowOrigin = "*";
-    else if (origin && allowed.includes(origin)) allowOrigin = origin;
-    else allowOrigin = allowed[0] || "*";
-  } else if (origin) {
-    allowOrigin = origin;
+    if (allowed.includes("*")) {
+      allowOrigin = origin || "*";
+    } else if (origin && allowed.includes(origin)) {
+      allowOrigin = origin;
+    } else {
+      allowOrigin = allowed[0] || (origin || "*");
+    }
   }
 
-  return {
+  const h = {
     "Access-Control-Allow-Origin": allowOrigin,
     "Vary": "Origin",
-    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Device-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Cache-Control": "no-store",
   };
+
+  // ملاحظة: credentials ممنوع مع "*"
+  if (allowOrigin !== "*") {
+    h["Access-Control-Allow-Credentials"] = "true";
+  }
+
+  return h;
 }
 
 function getCookie(cookieHeader, name) {
@@ -98,7 +135,9 @@ function getCookie(cookieHeader, name) {
     if (eq === -1) continue;
     const k = p.slice(0, eq).trim();
     const v = p.slice(eq + 1).trim();
-    if (k === name) return decodeURIComponent(v);
+    if (k === name) {
+      try { return decodeURIComponent(v); } catch { return v; }
+    }
   }
   return "";
 }
@@ -112,14 +151,21 @@ async function sha256Hex(str) {
   return hex;
 }
 
-async function ensureSessionsTable(DB) {
-  await DB.prepare(
-    `CREATE TABLE IF NOT EXISTS sessions (
-      token_hash TEXT PRIMARY KEY,
-      email TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      expires_at TEXT NOT NULL,
-      device_id TEXT
-    )`
-  ).run();
+async function sessionCols(DB) {
+  try {
+    // تأكد أن الجدول موجود
+    const t = await DB.prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='sessions' LIMIT 1`
+    ).first();
+    if (!t?.name) return new Set();
+
+    const r = await DB.prepare(`PRAGMA table_info(sessions);`).all();
+    return new Set((r?.results || []).map((x) => String(x.name)));
+  } catch {
+    return new Set();
+  }
 }
+
+/*
+functions/api2/logout.js – v2
+*/
