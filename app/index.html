@@ -75,7 +75,7 @@
     <div class="card">
       <input id="name" placeholder="ادخل اسم اللعبة">
       <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
-      <button id="btn">انشئ اللعبة</button>
+      <button id="btn">جاري التحقق…</button>
       <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
     </div>
   </div>
@@ -83,6 +83,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -96,6 +97,10 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    const btn = document.getElementById("btn");
+    btn.disabled = true;
 
     function normalizeDigits(str){
       const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
@@ -110,6 +115,50 @@
       return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     }
 
+    function ensureDeviceId(){
+      const key = "sandooq_device_id_v1";
+      let id = localStorage.getItem(key);
+      if(!id){
+        id = (crypto?.randomUUID ? crypto.randomUUID() :
+          ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16)));
+        localStorage.setItem(key, id);
+      }
+      return id;
+    }
+
+    function redirectToActivate(){
+      const next = encodeURIComponent(location.pathname + location.search);
+      location.replace("/activate?next=" + next);
+    }
+
+    async function getFirebaseCustomToken(){
+      const deviceId = ensureDeviceId();
+      const res = await fetch("/api2/firebase-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": deviceId
+        },
+        credentials: "include",
+        body: "{}"
+      });
+
+      const data = await res.json().catch(()=>null);
+      if(!res.ok || !data || data.ok !== true || !data.token){
+        throw new Error((data && data.error) ? data.error : "NO_FIREBASE_TOKEN");
+      }
+      return data.token;
+    }
+
+    async function ensureFirebaseAuth(){
+      // لو فيه مستخدم جاهز خلاص
+      if (auth.currentUser) return;
+
+      // خذ custom token من API ثم سجل دخول Firebase
+      const tok = await getFirebaseCustomToken();
+      await signInWithCustomToken(auth, tok);
+    }
+
     async function createRoom(){
       const name = document.getElementById("name").value.trim();
       const pRaw = document.getElementById("players").value;
@@ -122,8 +171,8 @@
         return;
       }
 
-      const btn = document.getElementById("btn");
       btn.disabled = true;
+      btn.textContent = "جاري الإنشاء…";
 
       let code = "";
       for(let i=0;i<10;i++){
@@ -134,6 +183,7 @@
 
       if(!code){
         btn.disabled = false;
+        btn.textContent = "انشئ اللعبة";
         alert("حاول مرة ثانية");
         return;
       }
@@ -164,9 +214,23 @@
       location.href = u.toString();
     }
 
-    document.getElementById("btn").addEventListener("click", createRoom);
+    // ✅ تهيئة: سجل دخول Firebase أولاً ثم فعّل زر إنشاء اللعبة
+    (async ()=>{
+      try{
+        btn.textContent = "جاري التحقق…";
+        await ensureFirebaseAuth();
+        btn.disabled = false;
+        btn.textContent = "انشئ اللعبة";
+      }catch(e){
+        // إذا فشل التوكن = اعتبره غير مسجّل وارجعه للتفعيل
+        alert("لازم تسجل دخولك من صفحة التفعيل أولًا.");
+        redirectToActivate();
+      }
+    })();
+
+    btn.addEventListener("click", createRoom);
   </script>
 </body>
 </html>
 
-<!-- app/index.html – إصدار 3 (إلغاء حماية التحقق داخل الصفحة) -->
+<!-- app/index.html – إصدار 2 (Firebase Custom Token Auth) -->
