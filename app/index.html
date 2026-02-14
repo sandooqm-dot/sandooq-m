@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لعبة سباق الحروف</title>
   <style>
-    /* ✅ نفس خط اللعبة */
     @font-face{
       font-family:"AA-GALAXY";
       src:url("../AA-GALAXY.otf") format("opentype");
@@ -13,23 +12,13 @@
       font-style:normal;
       font-display:swap;
     }
-
     :root{
-      /* ✅ نفس خلفية اللعبة */
-      --bg1:#7b1f63;
-      --bg2:#5f214f;
-      --bg3:#3a1234;
-
-      --yellow:#f4c400;
-      --card:#ffffff;
-      --text:#111;
+      --bg1:#7b1f63; --bg2:#5f214f; --bg3:#3a1234;
+      --yellow:#f4c400; --card:#ffffff; --text:#111;
       --danger:#b42318;
     }
-
     body{
-      margin:0;
-      color:#fff;
-      text-align:center;
+      margin:0; color:#fff; text-align:center;
       font-family:"AA-GALAXY", Arial, sans-serif;
       background:
         radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
@@ -38,9 +27,7 @@
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
     }
-
     button, input{ font-family:"AA-GALAXY", Arial, sans-serif; }
-
     header{position:relative;padding:30px 16px 0}
     .logo{
       position:absolute;left:14px;top:14px;
@@ -109,26 +96,23 @@
     }
     function hintErr(text){
       hint.classList.add("err");
-      hint.textContent = text || "تعذر التحضير مؤقتًا. جرّب تحديث الصفحة.";
+      hint.textContent = text || "تعذر إنشاء اللعبة مؤقتًا. جرّب تحديث الصفحة.";
     }
     function setBusy(on, text){
       btn.disabled = !!on;
-      btn.textContent = on ? (text || "جاري التحضير…") : "انشئ اللعبة";
+      btn.textContent = on ? (text || "جاري الإنشاء…") : "انشئ اللعبة";
     }
 
     function normalizeDigits(str){
       const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
       return String(str ?? "").trim().replace(/[٠-٩]/g, d => map[d]);
     }
-
     function random6(){
       return String(Math.floor(100000 + Math.random()*900000));
     }
-
     function randomKey(){
       return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     }
-
     function ensureDeviceId(){
       const key = "sandooq_device_id_v1";
       let id = localStorage.getItem(key);
@@ -139,51 +123,43 @@
       }
       return id;
     }
+    const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
 
     async function firebaseSilentSignIn(){
-      // ✅ هذا مو “حماية صفحة” ولا رسالة للمستخدم — تسجيل دخول تقني للفايربيس فقط
+      // ✅ ما في “جاري التحضير” ولا تحضير تلقائي — فقط وقت الحاجة
       if (auth.currentUser) return true;
 
       const deviceId = ensureDeviceId();
 
-      const res = await fetch("/api2/firebase-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Device-Id": deviceId
-        },
-        credentials: "include", // ✅ الأهم: يرسل الكوكي (الجلسة) للسيرفر
-        body: "{}"
-      });
+      for (let attempt = 0; attempt < 2; attempt++){
+        const res = await fetch("/api2/firebase-token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Device-Id": deviceId
+          },
+          credentials: "include",
+          body: "{}"
+        });
 
-      const data = await res.json().catch(()=>null);
-
-      if(!res.ok || !data || data.ok !== true || !data.token){
-        throw new Error((data && data.error) ? data.error : "FIREBASE_TOKEN_FAILED");
+        const data = await res.json().catch(()=>null);
+        if(res.ok && data && data.ok === true && data.token){
+          await signInWithCustomToken(auth, data.token);
+          return true;
+        }
+        // محاولة ثانية سريعة (خصوصًا على الجوال)
+        await sleep(250);
       }
 
-      await signInWithCustomToken(auth, data.token);
-      return true;
-    }
-
-    async function warmup(){
-      try{
-        setBusy(true, "جاري التحضير…");
-        hintOk("جاري التحضير…");
-        await firebaseSilentSignIn();
-        hintOk();
-        setBusy(false);
-      }catch(e){
-        // ✅ بدون “لازم تسجل…” ولا نفتح مودال — فقط رسالة خفيفة
-        hintErr("تعذر التحضير مؤقتًا. جرّب تحديث الصفحة.");
-        setBusy(false);
-      }
+      throw new Error("FIREBASE_SIGNIN_FAILED");
     }
 
     async function createRoom(){
       const name = document.getElementById("name").value.trim();
       const pRaw = document.getElementById("players").value;
       const players = Number(normalizeDigits(pRaw));
+
+      hintOk();
 
       if(!name){ alert("اكتب اسم اللعبة"); return; }
       if(!Number.isFinite(players) || players < 1){
@@ -193,9 +169,8 @@
 
       try{
         setBusy(true, "جاري الإنشاء…");
-        hintOk("جاري الإنشاء…");
 
-        // لو صار انقطاع أو أول فتح، نضمن تسجيل دخول فايربيس بهدوء
+        // ✅ تسجيل صامت (بدون أي تحضير قبل الضغط)
         await firebaseSilentSignIn();
 
         let code = "";
@@ -207,7 +182,6 @@
 
         if(!code){
           setBusy(false);
-          hintOk();
           alert("حاول مرة ثانية");
           return;
         }
@@ -231,7 +205,6 @@
 
         await set(ref(db, `rooms/${code}`), room);
 
-        // ✅ لأننا داخل /app لازم نطلع للرووت
         const u = new URL("../game.html", location.href);
         u.searchParams.set("role", "host");
         u.searchParams.set("code", code);
@@ -240,17 +213,14 @@
 
       }catch(e){
         setBusy(false);
-        hintErr("تعذر الإنشاء مؤقتًا. جرّب تحديث الصفحة.");
+        hintErr("تعذر إنشاء اللعبة مؤقتًا. جرّب تحديث الصفحة.");
         console.error(e);
       }
     }
 
     document.getElementById("btn").addEventListener("click", createRoom);
-
-    // ✅ تجهيز صامت عند فتح الصفحة (بدون أي نوافذ منبثقة)
-    warmup();
   </script>
 </body>
 </html>
 
-<!-- app/index.html – إصدار 2 (Silent Firebase auth + no popups) -->
+<!-- app/index.html – إصدار 3 (No warmup / silent sign-in only on click) -->
