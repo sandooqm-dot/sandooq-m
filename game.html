@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>جاري فتح اللعبة - صندوق المسابقات</title>
+  <title>جاري فتح اللعبة</title>
   <style>
     :root{
       --bg1:#4b2a4e;
@@ -19,18 +19,13 @@
       font-family: Arial, sans-serif;
       background: radial-gradient(1200px 700px at 30% 10%, rgba(255,255,255,.10), transparent 60%),
                   linear-gradient(180deg,var(--bg2),var(--bg1));
-      display:flex; align-items:flex-start; justify-content:center;
-      padding:24px 12px;
-      box-sizing:border-box;
+      display:flex; align-items:center; justify-content:center;
+      padding:18px 12px; box-sizing:border-box;
     }
-    .wrap{width:min(720px, 100%);}
-    .top{
-      display:flex; align-items:center; gap:10px;
-      margin:6px 0 14px;
-      color:#fff;
-    }
-    .top img{width:48px;height:48px;object-fit:contain}
-    .top h1{margin:0;font-size:22px;font-weight:800}
+    /* ✅ افتراضيًا نخلي الواجهة “غير ملحوظة” */
+    .wrap{ width:min(520px,100%); opacity:0; pointer-events:none; transition:.15s ease; }
+    .show{ opacity:1; pointer-events:auto; }
+
     .card{
       background:var(--card);
       border-radius:18px;
@@ -38,16 +33,20 @@
       box-shadow:0 14px 30px rgba(0,0,0,.22);
       text-align:center;
     }
-    .title{margin:6px 0 10px;font-size:20px;font-weight:800;color:var(--text)}
+    .top{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 8px}
+    .top img{width:40px;height:40px;object-fit:contain}
+    .title{margin:6px 0 8px;font-size:18px;font-weight:800;color:var(--text)}
     .sub{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.6}
+
     .spinner{
-      width:40px;height:40px;border-radius:50%;
+      width:34px;height:34px;border-radius:50%;
       border:4px solid rgba(31,79,163,.18);
       border-top-color: var(--btn);
-      margin:10px auto 14px;
-      animation:spin 1s linear infinite;
+      margin:8px auto 12px;
+      animation:spin .9s linear infinite;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
+
     .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
     .btn{
       border:0; border-radius:12px;
@@ -58,52 +57,46 @@
     }
     .btn-primary{background:var(--btn);color:#fff}
     .btn-accent{background:var(--accent);color:#111}
-    .foot{margin-top:10px;color:#eee;text-align:center;font-size:12px;opacity:.9}
     .small{font-size:12px;color:#777;margin-top:10px}
-    .hide{display:none}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top">
-      <img src="/logo.png" alt="Sandooq" />
-      <h1>لعبة سباق الحروف</h1>
-    </div>
 
+  <!-- ✅ هذا الصندوق ما يظهر إلا لو صار خطأ فعلي بعد محاولتين -->
+  <div class="wrap" id="wrap">
     <div class="card">
-      <div class="title" id="statusTitle">جاري فتح اللعبة</div>
+      <div class="top">
+        <img src="/logo.png" alt="Sandooq" />
+      </div>
+      <div class="title" id="t">تعذر الفتح</div>
       <div class="spinner" id="sp"></div>
-      <p class="sub" id="statusMsg">لحظة… نتحقق من التفعيل.</p>
+      <p class="sub" id="m">فيه مشكلة مؤقتة. جرّب إعادة المحاولة.</p>
 
-      <div class="row hide" id="actions">
+      <div class="row">
         <button class="btn btn-primary" id="retryBtn">إعادة المحاولة</button>
         <button class="btn btn-accent" id="goActivateBtn">فتح صفحة التفعيل</button>
       </div>
 
       <div class="small" id="debug"></div>
     </div>
-
-    <div class="foot">© صندوق المسابقات</div>
   </div>
 
 <script>
 (function(){
-  const $ = (id)=>document.getElementById(id);
+  const wrap = document.getElementById("wrap");
+  const t = document.getElementById("t");
+  const m = document.getElementById("m");
+  const sp = document.getElementById("sp");
+  const debugEl = document.getElementById("debug");
+  const retryBtn = document.getElementById("retryBtn");
+  const goActBtn = document.getElementById("goActivateBtn");
 
-  const statusTitle = $("statusTitle");
-  const statusMsg   = $("statusMsg");
-  const spinner     = $("sp");
-  const actions     = $("actions");
-  const retryBtn    = $("retryBtn");
-  const goActBtn    = $("goActivateBtn");
-  const debugEl     = $("debug");
-
-  function setUI({title, msg, loading, showActions, debug}){
-    if (title) statusTitle.textContent = title;
-    if (msg) statusMsg.textContent = msg;
-    spinner.classList.toggle("hide", !loading);
-    actions.classList.toggle("hide", !showActions);
-    debugEl.textContent = debug || "";
+  function showErrorUI(title, msg, dbg){
+    t.textContent = title || "تعذر الفتح";
+    m.textContent = msg || "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.";
+    sp.style.display = "none";
+    debugEl.textContent = dbg || "";
+    wrap.classList.add("show");
   }
 
   function ensureDeviceId(){
@@ -118,86 +111,28 @@
   }
 
   function go(url){
-    // replace عشان ما يرجع بالباك لنفس صفحة التحويل
     location.replace(url);
   }
 
-  function buildNextToHere(){
+  function here(){
     return location.pathname + (location.search || "") + (location.hash || "");
   }
 
-  function buildTargetGame(){
-    // ننقل نفس الـ query للملف الكبير (game_full.html)
+  function targetGame(){
+    // ننقل نفس الـ query للملف الكبير
     return "/game_full.html" + (location.search || "") + (location.hash || "");
   }
 
-  // ✅ تحميل Firebase (compat) لأن هذا ملف بوابة وما نبي نغير game_full
-  function loadScript(src){
-    return new Promise((resolve, reject)=>{
-      const s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.onload = ()=>resolve(true);
-      s.onerror = ()=>reject(new Error("SCRIPT_LOAD_FAILED"));
-      document.head.appendChild(s);
-    });
-  }
-
-  async function ensureFirebaseSignIn(deviceId){
-    // حمّل مكتبات compat
-    if (!window.firebase) {
-      await loadScript("https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js");
-      await loadScript("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js");
-    }
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
-      authDomain: "sabaq-alhorof.firebaseapp.com",
-      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "sabaq-alhorof",
-      storageBucket: "sabaq-alhorof.firebasestorage.app",
-      messagingSenderId: "1053646928152",
-      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
-    };
-
-    // init مرة واحدة
-    if (!firebase.apps || !firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-
-    const auth = firebase.auth();
-
-    // إذا بالفعل مسجّل Firebase — تمام
-    if (auth.currentUser) return true;
-
-    // اطلب custom token من السيرفر
-    const res = await fetch("/api2/firebase-token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Device-Id": deviceId
-      },
-      credentials: "include",
-      body: "{}"
+  async function fetchMe(deviceId){
+    // ✅ جرّب GET أول (أسرع/أخف)، وإذا رجع 405 جرّب POST
+    let res = await fetch("/api2/me", {
+      method: "GET",
+      headers: { "X-Device-Id": deviceId },
+      credentials: "include"
     });
 
-    const data = await res.json().catch(()=>null);
-    if (!res.ok || !data || data.ok !== true || !data.token) {
-      throw new Error("تعذر تجهيز صلاحيات الدخول للعبة. جرّب مرة ثانية.");
-    }
-
-    await auth.signInWithCustomToken(String(data.token));
-    return true;
-  }
-
-  async function check(){
-    const deviceId = ensureDeviceId();
-    const target = buildTargetGame();
-
-    try{
-      setUI({title:"جاري فتح اللعبة", msg:"لحظة… نتحقق من التفعيل.", loading:true, showActions:false, debug:""});
-
-      const res = await fetch("/api2/me", {
+    if (res.status === 405) {
+      res = await fetch("/api2/me", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -206,67 +141,75 @@
         credentials: "include",
         body: "{}"
       });
+    }
 
-      const data = await res.json().catch(()=>null);
+    let data = null;
+    try { data = await res.json(); } catch {}
+    return { res, data };
+  }
 
-      // غير مسجّل / الجلسة غير موجودة
-      if(!res.ok || !data || data.ok !== true){
-        const next = encodeURIComponent(buildNextToHere());
-        setUI({
-          title:"يلزم تسجيل الدخول",
-          msg:"بنحوّلك لصفحة التفعيل ثم نرجع نكمل فتح اللعبة.",
-          loading:false,
-          showActions:true,
-          debug: ""
-        });
+  async function checkOnce(){
+    const deviceId = ensureDeviceId();
 
-        setTimeout(()=>go("/activate?next=" + next), 600);
+    const { res, data } = await fetchMe(deviceId);
+
+    // غير مسجّل/جلسة غير موجودة
+    if(!res.ok || !data || data.ok !== true){
+      const next = encodeURIComponent(here());
+      go("/activate?next=" + next);
+      return;
+    }
+
+    // مسجّل لكن غير مفعّل
+    if(!data.activated){
+      const next = encodeURIComponent(here());
+      go("/activate?next=" + next);
+      return;
+    }
+
+    // ✅ تمام: افتح اللعبة الكبيرة فورًا
+    go(targetGame());
+  }
+
+  async function checkWithRetry(){
+    // ✅ محاولة 1
+    try{
+      await checkOnce();
+      return;
+    }catch(e1){
+      // ✅ محاولة 2 بعد 500ms
+      try{
+        await new Promise(r=>setTimeout(r, 500));
+        await checkOnce();
         return;
+      }catch(e2){
+        // ✅ هنا فقط نظهر واجهة الخطأ (نادر)
+        showErrorUI(
+          "تعذر الفتح",
+          "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.",
+          String((e2 && e2.message) ? e2.message : e2)
+        );
       }
-
-      // مسجّل لكن غير مفعّل
-      if(!data.activated){
-        const next = encodeURIComponent(buildNextToHere());
-        setUI({
-          title:"الحساب غير مفعّل",
-          msg:"لازم تدخل كود التفعيل مرة واحدة. بنحوّلك للتفعيل ثم نرجع نكمل.",
-          loading:false,
-          showActions:true,
-          debug:""
-        });
-        setTimeout(()=>go("/activate?next=" + next), 600);
-        return;
-      }
-
-      // ✅ الجديد: تسجيل دخول Firebase قبل فتح game_full
-      setUI({title:"تم التحقق", msg:"جاري تجهيز اتصال اللعبة…", loading:true, showActions:false, debug:""});
-      await ensureFirebaseSignIn(deviceId);
-
-      // تمام: افتح اللعبة الكبيرة
-      setUI({title:"جاهز", msg:"جاري فتح اللعبة…", loading:true, showActions:false, debug:""});
-      setTimeout(()=>go(target), 200);
-
-    }catch(e){
-      setUI({
-        title:"تعذر الفتح",
-        msg:"فيه مشكلة مؤقتة. جرّب إعادة المحاولة.",
-        loading:false,
-        showActions:true,
-        debug:""
-      });
     }
   }
 
-  retryBtn.addEventListener("click", ()=>check());
+  retryBtn.addEventListener("click", ()=>{
+    sp.style.display = "block";
+    wrap.classList.remove("show");
+    checkWithRetry();
+  });
+
   goActBtn.addEventListener("click", ()=>{
-    const next = encodeURIComponent(buildNextToHere());
+    const next = encodeURIComponent(here());
     go("/activate?next=" + next);
   });
 
-  check();
+  // ✅ ابدأ فورًا (بدون ما يلاحظ المستخدم)
+  checkWithRetry();
 })();
 </script>
+
 </body>
 </html>
 
-<!-- game.html – إصدار 2 (بوابة + /api2/me + Firebase custom token قبل فتح game_full.html) -->
+<!-- game.html – إصدار 2 (بوابة تحقق صامتة + ما تظهر إلا عند فشل مرتين) -->
