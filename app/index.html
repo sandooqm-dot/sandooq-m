@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لعبة سباق الحروف</title>
   <style>
+    /* ✅ نفس خط اللعبة */
     @font-face{
       font-family:"AA-GALAXY";
       src:url("../AA-GALAXY.otf") format("opentype");
@@ -12,13 +13,20 @@
       font-style:normal;
       font-display:swap;
     }
+
     :root{
-      --bg1:#7b1f63; --bg2:#5f214f; --bg3:#3a1234;
-      --yellow:#f4c400; --card:#ffffff; --text:#111;
-      --danger:#b42318;
+      --bg1:#7b1f63;
+      --bg2:#5f214f;
+      --bg3:#3a1234;
+      --yellow:#f4c400;
+      --card:#ffffff;
+      --text:#111;
     }
+
     body{
-      margin:0; color:#fff; text-align:center;
+      margin:0;
+      color:#fff;
+      text-align:center;
       font-family:"AA-GALAXY", Arial, sans-serif;
       background:
         radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
@@ -27,7 +35,9 @@
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
     }
+
     button, input{ font-family:"AA-GALAXY", Arial, sans-serif; }
+
     header{position:relative;padding:30px 16px 0}
     .logo{
       position:absolute;left:14px;top:14px;
@@ -49,7 +59,6 @@
     }
     button[disabled]{opacity:.75;cursor:not-allowed}
     .hint{font-size:13px;opacity:.9;margin-top:8px}
-    .hint.err{color:var(--danger);opacity:1}
   </style>
 </head>
 <body>
@@ -64,13 +73,12 @@
       <input id="name" placeholder="ادخل اسم اللعبة">
       <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
       <button id="btn">انشئ اللعبة</button>
-      <div class="hint" id="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
+      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
     const firebaseConfig = {
@@ -84,74 +92,19 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
     const db = getDatabase(app);
-
-    const btn = document.getElementById("btn");
-    const hint = document.getElementById("hint");
-
-    function hintOk(text){
-      hint.classList.remove("err");
-      hint.textContent = text || "تقدر تكتب الأرقام عربي أو إنجليزي";
-    }
-    function hintErr(text){
-      hint.classList.add("err");
-      hint.textContent = text || "تعذر إنشاء اللعبة مؤقتًا. جرّب تحديث الصفحة.";
-    }
-    function setBusy(on, text){
-      btn.disabled = !!on;
-      btn.textContent = on ? (text || "جاري الإنشاء…") : "انشئ اللعبة";
-    }
 
     function normalizeDigits(str){
       const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
       return String(str ?? "").trim().replace(/[٠-٩]/g, d => map[d]);
     }
+
     function random6(){
       return String(Math.floor(100000 + Math.random()*900000));
     }
+
     function randomKey(){
       return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    }
-    function ensureDeviceId(){
-      const key = "sandooq_device_id_v1";
-      let id = localStorage.getItem(key);
-      if(!id){
-        id = (crypto?.randomUUID ? crypto.randomUUID() :
-          ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16)));
-        localStorage.setItem(key, id);
-      }
-      return id;
-    }
-    const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
-
-    async function firebaseSilentSignIn(){
-      // ✅ ما في “جاري التحضير” ولا تحضير تلقائي — فقط وقت الحاجة
-      if (auth.currentUser) return true;
-
-      const deviceId = ensureDeviceId();
-
-      for (let attempt = 0; attempt < 2; attempt++){
-        const res = await fetch("/api2/firebase-token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Device-Id": deviceId
-          },
-          credentials: "include",
-          body: "{}"
-        });
-
-        const data = await res.json().catch(()=>null);
-        if(res.ok && data && data.ok === true && data.token){
-          await signInWithCustomToken(auth, data.token);
-          return true;
-        }
-        // محاولة ثانية سريعة (خصوصًا على الجوال)
-        await sleep(250);
-      }
-
-      throw new Error("FIREBASE_SIGNIN_FAILED");
     }
 
     async function createRoom(){
@@ -159,63 +112,52 @@
       const pRaw = document.getElementById("players").value;
       const players = Number(normalizeDigits(pRaw));
 
-      hintOk();
-
       if(!name){ alert("اكتب اسم اللعبة"); return; }
       if(!Number.isFinite(players) || players < 1){
         alert("عدد اللاعبين لازم يكون 1 أو أكثر");
         return;
       }
 
-      try{
-        setBusy(true, "جاري الإنشاء…");
+      const btn = document.getElementById("btn");
+      btn.disabled = true;
 
-        // ✅ تسجيل صامت (بدون أي تحضير قبل الضغط)
-        await firebaseSilentSignIn();
-
-        let code = "";
-        for(let i=0;i<10;i++){
-          const c = random6();
-          const exists = (await get(ref(db, `rooms/${c}`))).exists();
-          if(!exists){ code = c; break; }
-        }
-
-        if(!code){
-          setBusy(false);
-          alert("حاول مرة ثانية");
-          return;
-        }
-
-        const presenterKey = randomKey();
-
-        const room = {
-          code,
-          name,
-          maxPlayers: players,
-          presenterKey,
-          status: "lobby",
-          createdAt: Date.now(),
-          activeMap: 0,
-          freeze: false,
-          buzzer: null,
-          current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
-          players: {},
-          scores: { orange: 0, green: 0 }
-        };
-
-        await set(ref(db, `rooms/${code}`), room);
-
-        const u = new URL("../game.html", location.href);
-        u.searchParams.set("role", "host");
-        u.searchParams.set("code", code);
-        u.searchParams.set("key", presenterKey);
-        location.href = u.toString();
-
-      }catch(e){
-        setBusy(false);
-        hintErr("تعذر إنشاء اللعبة مؤقتًا. جرّب تحديث الصفحة.");
-        console.error(e);
+      let code = "";
+      for(let i=0;i<10;i++){
+        const c = random6();
+        const exists = (await get(ref(db, `rooms/${c}`))).exists();
+        if(!exists){ code = c; break; }
       }
+
+      if(!code){
+        btn.disabled = false;
+        alert("حاول مرة ثانية");
+        return;
+      }
+
+      const presenterKey = randomKey();
+
+      const room = {
+        code,
+        name,
+        maxPlayers: players,
+        presenterKey,
+        status: "lobby",
+        createdAt: Date.now(),
+        activeMap: 0,
+        freeze: false,
+        buzzer: null,
+        current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
+        players: {},
+        scores: { orange: 0, green: 0 }
+      };
+
+      await set(ref(db, `rooms/${code}`), room);
+
+      const u = new URL("../game.html", location.href);
+      u.searchParams.set("role", "host");
+      u.searchParams.set("code", code);
+      u.searchParams.set("key", presenterKey);
+      location.href = u.toString();
     }
 
     document.getElementById("btn").addEventListener("click", createRoom);
@@ -223,4 +165,4 @@
 </body>
 </html>
 
-<!-- app/index.html – إصدار 3 (No warmup / silent sign-in only on click) -->
+<!-- app/index.html – إصدار 4 (رجوع مثل قبل بدون Firebase Auth) -->
