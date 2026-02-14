@@ -128,8 +128,66 @@
 
   function buildTargetGame(){
     // ننقل نفس الـ query للملف الكبير (game_full.html)
-    // لأن صفحة إنشاء الغرفة غالبًا تمرر بيانات الغرفة/الكود بالباراميتر
     return "/game_full.html" + (location.search || "") + (location.hash || "");
+  }
+
+  // ✅ تحميل Firebase (compat) لأن هذا ملف بوابة وما نبي نغير game_full
+  function loadScript(src){
+    return new Promise((resolve, reject)=>{
+      const s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.onload = ()=>resolve(true);
+      s.onerror = ()=>reject(new Error("SCRIPT_LOAD_FAILED"));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensureFirebaseSignIn(deviceId){
+    // حمّل مكتبات compat
+    if (!window.firebase) {
+      await loadScript("https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js");
+      await loadScript("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js");
+    }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
+      authDomain: "sabaq-alhorof.firebaseapp.com",
+      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "sabaq-alhorof",
+      storageBucket: "sabaq-alhorof.firebasestorage.app",
+      messagingSenderId: "1053646928152",
+      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
+    };
+
+    // init مرة واحدة
+    if (!firebase.apps || !firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    const auth = firebase.auth();
+
+    // إذا بالفعل مسجّل Firebase — تمام
+    if (auth.currentUser) return true;
+
+    // اطلب custom token من السيرفر
+    const res = await fetch("/api2/firebase-token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Device-Id": deviceId
+      },
+      credentials: "include",
+      body: "{}"
+    });
+
+    const data = await res.json().catch(()=>null);
+    if (!res.ok || !data || data.ok !== true || !data.token) {
+      throw new Error("تعذر تجهيز صلاحيات الدخول للعبة. جرّب مرة ثانية.");
+    }
+
+    await auth.signInWithCustomToken(String(data.token));
+    return true;
   }
 
   async function check(){
@@ -159,10 +217,9 @@
           msg:"بنحوّلك لصفحة التفعيل ثم نرجع نكمل فتح اللعبة.",
           loading:false,
           showActions:true,
-          debug: (data && data.error) ? ("سبب: " + data.error) : "سبب: NO_SESSION"
+          debug: ""
         });
 
-        // تحويل تلقائي (مع next الصحيح)
         setTimeout(()=>go("/activate?next=" + next), 600);
         return;
       }
@@ -181,17 +238,21 @@
         return;
       }
 
+      // ✅ الجديد: تسجيل دخول Firebase قبل فتح game_full
+      setUI({title:"تم التحقق", msg:"جاري تجهيز اتصال اللعبة…", loading:true, showActions:false, debug:""});
+      await ensureFirebaseSignIn(deviceId);
+
       // تمام: افتح اللعبة الكبيرة
-      setUI({title:"تم التحقق", msg:"جاري فتح اللعبة…", loading:true, showActions:false, debug:""});
-      setTimeout(()=>go(target), 250);
+      setUI({title:"جاهز", msg:"جاري فتح اللعبة…", loading:true, showActions:false, debug:""});
+      setTimeout(()=>go(target), 200);
 
     }catch(e){
       setUI({
-        title:"تعذر الاتصال",
-        msg:"فيه مشكلة اتصال مؤقتة. جرّب إعادة المحاولة.",
+        title:"تعذر الفتح",
+        msg:"فيه مشكلة مؤقتة. جرّب إعادة المحاولة.",
         loading:false,
         showActions:true,
-        debug: String(e && e.message ? e.message : e)
+        debug:""
       });
     }
   }
@@ -207,3 +268,5 @@
 </script>
 </body>
 </html>
+
+<!-- game.html – إصدار 2 (بوابة + /api2/me + Firebase custom token قبل فتح game_full.html) -->
