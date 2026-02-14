@@ -61,7 +61,11 @@
       font-size:18px;border:none;border-radius:12px;cursor:pointer;
       background:var(--yellow);color:#000
     }
+    button:disabled{opacity:.6;cursor:not-allowed}
     .hint{font-size:13px;opacity:.9;margin-top:8px}
+    .msg{margin-top:10px;font-size:14px;line-height:1.6}
+    .msg.ok{color:#1b7a2a}
+    .msg.err{color:#b00020}
   </style>
 </head>
 <body>
@@ -75,14 +79,16 @@
     <div class="card">
       <input id="name" placeholder="ادخل اسم اللعبة">
       <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
-      <button id="btn">انشئ اللعبة</button>
+      <button id="btn" disabled>انشئ اللعبة</button>
       <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
+      <div id="msg" class="msg"></div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -96,6 +102,15 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    const btn = document.getElementById("btn");
+    const msgEl = document.getElementById("msg");
+
+    function setMsg(text, type=""){
+      msgEl.className = "msg" + (type ? " " + type : "");
+      msgEl.textContent = text || "";
+    }
 
     function normalizeDigits(str){
       const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
@@ -104,10 +119,62 @@
 
     function random6(){
       return String(Math.floor(100000 + Math.random()*900000));
-       }
+    }
 
     function randomKey(){
       return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    }
+
+    function getOrCreateDeviceId(){
+      const KEY = "sandooq_device_id_v1";
+      let id = "";
+      try { id = String(localStorage.getItem(KEY) || "").trim(); } catch {}
+      if(!id){
+        id = (crypto?.randomUUID?.() || (Math.random().toString(36).slice(2) + Date.now().toString(36)));
+        try { localStorage.setItem(KEY, id); } catch {}
+      }
+      return id;
+    }
+
+    async function ensureFirebaseSignIn(){
+      // إذا أصلاً مسجّل دخول Firebase، خلاص
+      if (auth.currentUser) return true;
+
+      const deviceId = getOrCreateDeviceId();
+
+      const r = await fetch("/api2/firebase-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": deviceId
+        },
+        credentials: "include",
+        body: JSON.stringify({})
+      });
+
+      const data = await r.json().catch(() => null);
+
+      if (!r.ok || !data?.ok || !data?.token) {
+        // رسالة عربية فقط
+        throw new Error("AUTH_REQUIRED");
+      }
+
+      await signInWithCustomToken(auth, String(data.token));
+      return true;
+    }
+
+    async function boot(){
+      btn.disabled = true;
+      setMsg("جاري تأكيد الدخول...", "");
+      try{
+        await ensureFirebaseSignIn();
+        btn.disabled = false;
+        setMsg("تم تأكيد الدخول ✅", "ok");
+      }catch(e){
+        console.log("firebase_signin_failed", e);
+        btn.disabled = true;
+        setMsg("لازم تسجّل دخولك من صفحة التفعيل أولاً، ثم ارجع هنا.", "err");
+      }
     }
 
     async function createRoom(){
@@ -123,8 +190,19 @@
         return;
       }
 
-      const btn = document.getElementById("btn");
       btn.disabled = true;
+      setMsg("جاري إنشاء الغرفة...", "");
+
+      try{
+        // ✅ تأكد أن Firebase Auth جاهز قبل أي كتابة في DB
+        await ensureFirebaseSignIn();
+      }catch{
+        btn.disabled = true;
+        setMsg("لازم تسجّل دخولك من صفحة التفعيل أولاً، ثم ارجع هنا.", "err");
+        // تحويل مباشر لصفحة التفعيل (لو عندك مسار /activate)
+        location.href = "/activate";
+        return;
+      }
 
       let code = "";
       for(let i=0;i<10;i++){
@@ -135,6 +213,7 @@
 
       if(!code){
         btn.disabled = false;
+        setMsg("", "");
         alert("حاول مرة ثانية");
         return;
       }
@@ -158,7 +237,7 @@
 
       await set(ref(db, `rooms/${code}`), room);
 
-      // ✅ إصلاح مهم: لأننا داخل /app لازم نطلع للرووت
+      // ✅ لأننا داخل /app لازم نطلع للرووت
       const u = new URL("../game.html", location.href);
       u.searchParams.set("role", "host");
       u.searchParams.set("code", code);
@@ -167,6 +246,11 @@
     }
 
     document.getElementById("btn").addEventListener("click", createRoom);
+
+    // تشغيل التحقق أول ما تفتح الصفحة
+    boot();
   </script>
 </body>
 </html>
+
+<!-- app/index.html – إصدار 2 (Firebase Custom Token Sign-In قبل إنشاء الغرفة) -->
