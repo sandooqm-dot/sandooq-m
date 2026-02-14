@@ -23,6 +23,7 @@
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
+      --danger:#b42318;
     }
 
     body{
@@ -38,9 +39,7 @@
       text-rendering:optimizeLegibility;
     }
 
-    button, input{
-      font-family:"AA-GALAXY", Arial, sans-serif;
-    }
+    button, input{ font-family:"AA-GALAXY", Arial, sans-serif; }
 
     header{position:relative;padding:30px 16px 0}
     .logo{
@@ -61,7 +60,9 @@
       font-size:18px;border:none;border-radius:12px;cursor:pointer;
       background:var(--yellow);color:#000
     }
+    button[disabled]{opacity:.75;cursor:not-allowed}
     .hint{font-size:13px;opacity:.9;margin-top:8px}
+    .hint.err{color:var(--danger);opacity:1}
   </style>
 </head>
 <body>
@@ -75,15 +76,15 @@
     <div class="card">
       <input id="name" placeholder="ادخل اسم اللعبة">
       <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
-      <button id="btn">جاري التحقق…</button>
-      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
+      <button id="btn">انشئ اللعبة</button>
+      <div class="hint" id="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
     import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -96,11 +97,24 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
     const auth = getAuth(app);
+    const db = getDatabase(app);
 
     const btn = document.getElementById("btn");
-    btn.disabled = true;
+    const hint = document.getElementById("hint");
+
+    function hintOk(text){
+      hint.classList.remove("err");
+      hint.textContent = text || "تقدر تكتب الأرقام عربي أو إنجليزي";
+    }
+    function hintErr(text){
+      hint.classList.add("err");
+      hint.textContent = text || "تعذر التحضير مؤقتًا. جرّب تحديث الصفحة.";
+    }
+    function setBusy(on, text){
+      btn.disabled = !!on;
+      btn.textContent = on ? (text || "جاري التحضير…") : "انشئ اللعبة";
+    }
 
     function normalizeDigits(str){
       const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
@@ -126,37 +140,44 @@
       return id;
     }
 
-    function redirectToActivate(){
-      const next = encodeURIComponent(location.pathname + location.search);
-      location.replace("/activate?next=" + next);
-    }
+    async function firebaseSilentSignIn(){
+      // ✅ هذا مو “حماية صفحة” ولا رسالة للمستخدم — تسجيل دخول تقني للفايربيس فقط
+      if (auth.currentUser) return true;
 
-    async function getFirebaseCustomToken(){
       const deviceId = ensureDeviceId();
+
       const res = await fetch("/api2/firebase-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Device-Id": deviceId
         },
-        credentials: "include",
+        credentials: "include", // ✅ الأهم: يرسل الكوكي (الجلسة) للسيرفر
         body: "{}"
       });
 
       const data = await res.json().catch(()=>null);
+
       if(!res.ok || !data || data.ok !== true || !data.token){
-        throw new Error((data && data.error) ? data.error : "NO_FIREBASE_TOKEN");
+        throw new Error((data && data.error) ? data.error : "FIREBASE_TOKEN_FAILED");
       }
-      return data.token;
+
+      await signInWithCustomToken(auth, data.token);
+      return true;
     }
 
-    async function ensureFirebaseAuth(){
-      // لو فيه مستخدم جاهز خلاص
-      if (auth.currentUser) return;
-
-      // خذ custom token من API ثم سجل دخول Firebase
-      const tok = await getFirebaseCustomToken();
-      await signInWithCustomToken(auth, tok);
+    async function warmup(){
+      try{
+        setBusy(true, "جاري التحضير…");
+        hintOk("جاري التحضير…");
+        await firebaseSilentSignIn();
+        hintOk();
+        setBusy(false);
+      }catch(e){
+        // ✅ بدون “لازم تسجل…” ولا نفتح مودال — فقط رسالة خفيفة
+        hintErr("تعذر التحضير مؤقتًا. جرّب تحديث الصفحة.");
+        setBusy(false);
+      }
     }
 
     async function createRoom(){
@@ -165,72 +186,71 @@
       const players = Number(normalizeDigits(pRaw));
 
       if(!name){ alert("اكتب اسم اللعبة"); return; }
-
       if(!Number.isFinite(players) || players < 1){
         alert("عدد اللاعبين لازم يكون 1 أو أكثر");
         return;
       }
 
-      btn.disabled = true;
-      btn.textContent = "جاري الإنشاء…";
+      try{
+        setBusy(true, "جاري الإنشاء…");
+        hintOk("جاري الإنشاء…");
 
-      let code = "";
-      for(let i=0;i<10;i++){
-        const c = random6();
-        const exists = (await get(ref(db, `rooms/${c}`))).exists();
-        if(!exists){ code = c; break; }
+        // لو صار انقطاع أو أول فتح، نضمن تسجيل دخول فايربيس بهدوء
+        await firebaseSilentSignIn();
+
+        let code = "";
+        for(let i=0;i<10;i++){
+          const c = random6();
+          const exists = (await get(ref(db, `rooms/${c}`))).exists();
+          if(!exists){ code = c; break; }
+        }
+
+        if(!code){
+          setBusy(false);
+          hintOk();
+          alert("حاول مرة ثانية");
+          return;
+        }
+
+        const presenterKey = randomKey();
+
+        const room = {
+          code,
+          name,
+          maxPlayers: players,
+          presenterKey,
+          status: "lobby",
+          createdAt: Date.now(),
+          activeMap: 0,
+          freeze: false,
+          buzzer: null,
+          current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
+          players: {},
+          scores: { orange: 0, green: 0 }
+        };
+
+        await set(ref(db, `rooms/${code}`), room);
+
+        // ✅ لأننا داخل /app لازم نطلع للرووت
+        const u = new URL("../game.html", location.href);
+        u.searchParams.set("role", "host");
+        u.searchParams.set("code", code);
+        u.searchParams.set("key", presenterKey);
+        location.href = u.toString();
+
+      }catch(e){
+        setBusy(false);
+        hintErr("تعذر الإنشاء مؤقتًا. جرّب تحديث الصفحة.");
+        console.error(e);
       }
-
-      if(!code){
-        btn.disabled = false;
-        btn.textContent = "انشئ اللعبة";
-        alert("حاول مرة ثانية");
-        return;
-      }
-
-      const presenterKey = randomKey();
-
-      const room = {
-        code,
-        name,
-        maxPlayers: players,
-        presenterKey,
-        status: "lobby",
-        createdAt: Date.now(),
-        activeMap: 0,
-        freeze: false,
-        buzzer: null,
-        current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
-        players: {},
-        scores: { orange: 0, green: 0 }
-      };
-
-      await set(ref(db, `rooms/${code}`), room);
-
-      const u = new URL("../game.html", location.href);
-      u.searchParams.set("role", "host");
-      u.searchParams.set("code", code);
-      u.searchParams.set("key", presenterKey);
-      location.href = u.toString();
     }
 
-    // ✅ تهيئة: سجل دخول Firebase أولاً ثم فعّل زر إنشاء اللعبة
-    (async ()=>{
-      try{
-        btn.textContent = "جاري التحقق…";
-        await ensureFirebaseAuth();
-        btn.disabled = false;
-        btn.textContent = "انشئ اللعبة";
-      }catch(e){
-        // إذا فشل التوكن = اعتبره غير مسجّل وارجعه للتفعيل
-        alert("لازم تسجل دخولك من صفحة التفعيل أولًا.");
-        redirectToActivate();
-      }
-    })();
+    document.getElementById("btn").addEventListener("click", createRoom);
 
-    btn.addEventListener("click", createRoom);
+    // ✅ تجهيز صامت عند فتح الصفحة (بدون أي نوافذ منبثقة)
+    warmup();
   </script>
 </body>
 </html>
 
-<!-- app/index.html – إصدار 2 (Firebase Custom Token Auth) -->
+<!-- app/index.html – إصدار 2 (Silent Firebase auth + no popups) -->
