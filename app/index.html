@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لعبة سباق الحروف</title>
   <style>
+    /* ✅ نفس خط اللعبة */
     @font-face{
       font-family:"AA-GALAXY";
       src:url("../AA-GALAXY.otf") format("opentype");
@@ -14,6 +15,7 @@
     }
 
     :root{
+      /* ✅ نفس خلفية اللعبة */
       --bg1:#7b1f63;
       --bg2:#5f214f;
       --bg3:#3a1234;
@@ -21,8 +23,6 @@
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
-      --danger:#c62828;
-      --ok:#1b5e20;
     }
 
     body{
@@ -61,20 +61,7 @@
       font-size:18px;border:none;border-radius:12px;cursor:pointer;
       background:var(--yellow);color:#000
     }
-    button:disabled{opacity:.6; cursor:not-allowed}
     .hint{font-size:13px;opacity:.9;margin-top:8px}
-    .status{
-      margin-top:10px;
-      font-size:13px;
-      line-height:1.6;
-      padding:10px 12px;
-      border-radius:10px;
-      display:none;
-    }
-    .status.show{display:block}
-    .status.danger{background:#ffe3e3;color:var(--danger);border:1px solid #ffb3b3}
-    .status.ok{background:#e7ffe7;color:var(--ok);border:1px solid #b7ffb7}
-    .link{color:#0d47a1; text-decoration:underline; font-weight:800; cursor:pointer}
   </style>
 </head>
 <body>
@@ -88,18 +75,14 @@
     <div class="card">
       <input id="name" placeholder="ادخل اسم اللعبة">
       <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
-      <button id="btn" disabled>جاري التحقق…</button>
-
+      <button id="btn">انشئ اللعبة</button>
       <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
-
-      <div class="status" id="statusBox"></div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-    import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -113,30 +96,6 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const auth = getAuth(app);
-
-    const btn = document.getElementById("btn");
-    const statusBox = document.getElementById("statusBox");
-
-    function showStatus(msg, type="danger"){
-      statusBox.className = "status show " + (type === "ok" ? "ok" : "danger");
-      statusBox.innerHTML = msg;
-    }
-    function hideStatus(){
-      statusBox.className = "status";
-      statusBox.innerHTML = "";
-    }
-
-    function ensureDeviceId(){
-      const key = "sandooq_device_id_v1";
-      let id = localStorage.getItem(key);
-      if(!id){
-        id = (crypto?.randomUUID ? crypto.randomUUID() :
-          ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16)));
-        localStorage.setItem(key, id);
-      }
-      return id;
-    }
 
     function normalizeDigits(str){
       const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
@@ -151,96 +110,19 @@
       return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     }
 
-    function go(url){
-      location.replace(url);
-    }
-
-    async function guardAndFirebaseLogin(){
-      hideStatus();
-      const deviceId = ensureDeviceId();
-
-      // 1) تحقق جلسة الحساب + التفعيل
-      const meRes = await fetch("/api2/me", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Device-Id": deviceId
-        },
-        credentials: "include",
-        body: "{}"
-      });
-
-      const me = await meRes.json().catch(()=>null);
-
-      if(!meRes.ok || !me || me.ok !== true){
-        const next = encodeURIComponent("/app/index.html");
-        showStatus(`لازم تسجل دخولك من صفحة التفعيل أولاً. ثم نرجع هنا تلقائيًا…`);
-        setTimeout(()=>go("/activate?next=" + next), 600);
-        return false;
-      }
-
-      if(!me.activated){
-        const next = encodeURIComponent("/app/index.html");
-        showStatus(`حسابك غير مفعّل. لازم تدخل كود التفعيل مرة واحدة…`);
-        setTimeout(()=>go("/activate?next=" + next), 600);
-        return false;
-      }
-
-      // 2) تسجيل دخول Firebase بـ custom token (عشان قواعد Firebase المقفلة)
-      if (auth.currentUser) return true;
-
-      const tokRes = await fetch("/api2/firebase-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Device-Id": deviceId
-        },
-        credentials: "include",
-        body: "{}"
-      });
-
-      const tok = await tokRes.json().catch(()=>null);
-
-      if(!tokRes.ok || !tok || tok.ok !== true || !tok.token){
-        showStatus(`تعذر تجهيز صلاحيات اللعبة الآن. اضغط تحديث وجرب مرة ثانية.`);
-        return false;
-      }
-
-      await signInWithCustomToken(auth, String(tok.token));
-      return true;
-    }
-
-    async function init(){
-      btn.disabled = true;
-      btn.textContent = "جاري التحقق…";
-
-      try{
-        const ok = await guardAndFirebaseLogin();
-        if(!ok) return;
-
-        hideStatus();
-        btn.disabled = false;
-        btn.textContent = "انشئ اللعبة";
-      }catch(e){
-        btn.disabled = true;
-        btn.textContent = "تعذر التحميل";
-        showStatus(`صار خطأ مؤقت. جرّب تحديث الصفحة.`);
-      }
-    }
-
     async function createRoom(){
-      if(btn.disabled) return;
-
       const name = document.getElementById("name").value.trim();
       const pRaw = document.getElementById("players").value;
       const players = Number(normalizeDigits(pRaw));
 
       if(!name){ alert("اكتب اسم اللعبة"); return; }
+
       if(!Number.isFinite(players) || players < 1){
         alert("عدد اللاعبين لازم يكون 1 أو أكثر");
         return;
       }
 
+      const btn = document.getElementById("btn");
       btn.disabled = true;
 
       let code = "";
@@ -273,28 +155,18 @@
         scores: { orange: 0, green: 0 }
       };
 
-      try{
-        await set(ref(db, `rooms/${code}`), room);
+      await set(ref(db, `rooms/${code}`), room);
 
-        const u = new URL("../game.html", location.href);
-        u.searchParams.set("role", "host");
-        u.searchParams.set("code", code);
-        u.searchParams.set("key", presenterKey);
-        location.href = u.toString();
-      }catch(err){
-        btn.disabled = false;
-        alert("ماقدرنا ننشئ الغرفة. جرّب مرة ثانية.");
-      }
+      const u = new URL("../game.html", location.href);
+      u.searchParams.set("role", "host");
+      u.searchParams.set("code", code);
+      u.searchParams.set("key", presenterKey);
+      location.href = u.toString();
     }
 
     document.getElementById("btn").addEventListener("click", createRoom);
-
-    // إعادة تحقق لو رجعنا من صفحة التفعيل
-    window.addEventListener("pageshow", init);
-
-    init();
   </script>
 </body>
 </html>
 
-<!-- app/index.html – إصدار 2 (تحقق /api2/me + تسجيل Firebase custom token قبل إنشاء الغرفة) -->
+<!-- app/index.html – إصدار 3 (إلغاء حماية التحقق داخل الصفحة) -->
