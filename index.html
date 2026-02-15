@@ -135,5 +135,18 @@
       setTimeout(()=>location.replace(r), 60);
     })();
   </script>
+
+  <!-- ✅ تسجيل Service Worker (sw.js في جذر المستودع) -->
+  <script>
+    (function () {
+      if (!("serviceWorker" in navigator)) return;
+      if (location.protocol !== "https:" && location.hostname !== "localhost") return;
+
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./sw.js")
+          .catch(function () { /* تجاهل الخطأ بدون إزعاج المستخدم */ });
+      });
+    })();
+  </script>
 </body>
 </html>
