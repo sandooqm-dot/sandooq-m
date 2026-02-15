@@ -1250,8 +1250,15 @@
       const t = normalizeTimer(TIMER_UI.latestTimer || {});
       const view = computeTimerView(t);
 
-      const displayNum = (view.running ? view.remaining : view.sel);
+      // ✅ إصلاح: عند انتهاء المؤقت لازم يثبت الرقم 0 (حتى لو Firebase رجّع running=false)
+      const displayNum = (view.done ? 0 : (view.running ? view.remaining : view.sel));
       numEl.textContent = String(displayNum);
+
+      // ✅ حماية: لا نرسل تحديث done أكثر من مرة عند الوصول لـ 0
+      TIMER_UI.__doneSent = !!TIMER_UI.__doneSent;
+      if((!view.running && !view.done) || (view.running && view.remaining > 0)){
+        TIMER_UI.__doneSent = false;
+      }
 
       numEl.classList.toggle("last5", !!view.inLast5);
       if(view.inLast5){
@@ -1291,7 +1298,8 @@
       }
 
       if(TIMER_UI.isHost){
-        if(view.running && view.remaining === 0){
+        if(view.running && view.remaining === 0 && !TIMER_UI.__doneSent){
+          TIMER_UI.__doneSent = true;
           update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
         }
       }
@@ -2557,7 +2565,7 @@
       }
     }
 
-        function afterRender(room){
+    function afterRender(room){
       try{
         TIMER_UI.latestTimer = room.timer || {};
         requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
