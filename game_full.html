@@ -1429,18 +1429,11 @@
         TIMER_UI.lastSecond = null;
       }
 
+      // ✅✅✅ (تعديل) المؤقت بدون صوت rong نهائيًا
       if(view.done){
         clock.classList.add("doneFlashing");
-
-        // ✅ (صوت الجرس rong عند انتهاء المؤقت مرة واحدة)
-        if(!TIMER_UI.__rongPlayed){
-          TIMER_UI.__rongPlayed = true;
-          if(!playRong()) fallbackBeep();
-        }
-
       }else{
         clock.classList.remove("doneFlashing");
-        TIMER_UI.__rongPlayed = false;
       }
 
       const ring = document.getElementById("timerRingCircle");
@@ -1658,6 +1651,10 @@
     }
 
     let LAST_WIN_TS = 0;
+
+    // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله لتشغيل rong مرة واحدة فقط لكل ضغطة أول لاعب
+    let LAST_BUZZER_SIG = "";
+
     function showWin(team){
       if(!team) return;
       winBackdrop.style.display = "flex";
@@ -2687,12 +2684,24 @@
           if(!me) return;
 
           const buzzerRef = ref(db, `rooms/${code}/buzzer`);
-          await runTransaction(buzzerRef, (cur) => {
+
+          // ✅✅✅ (تعديل) تشغيل rong فقط إذا كنت "الأول" فعلاً (transaction committed)
+          const res = await runTransaction(buzzerRef, (cur) => {
             if(cur === null){
               return { pid, name: me.name, team: me.team, ts: Date.now() };
             }
             return;
           });
+
+          if(res && res.committed){
+            try{
+              const v = (res.snapshot && typeof res.snapshot.val === "function") ? res.snapshot.val() : null;
+              if(v && v.ts){
+                LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
+              }
+            }catch(e){}
+            if(!playRong()) fallbackBeep();
+          }
         });
       }
     }
@@ -2703,15 +2712,27 @@
         requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
       }catch(e){}
 
+      // ✅✅✅ (جديد) تشغيل rong عند "تسجيل أول لاعب" مرة واحدة لكل حدث buzzer
+      try{
+        const b = room.buzzer;
+        if(b && b.ts){
+          const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
+          if(sig && sig !== LAST_BUZZER_SIG){
+            LAST_BUZZER_SIG = sig;
+            if(!playRong()) fallbackBeep();
+          }
+        }
+      }catch(e){}
+
       try{
         const we = room.winEvent;
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
           showWin(we.team);
 
-          // ✅ (صوت الموسيقى vois عند الفوز)
+          // ✅ (صوت الموسيقى vois عند الفوز) + fallback beep فقط
           if(!playVois()){
-            if(!playRong()) fallbackBeep();
+            fallbackBeep();
           }
         }
       }catch(e){}
