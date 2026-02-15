@@ -12,16 +12,11 @@ const QUESTIONS_BANK_VERSION = "2026-02-15-1";
 window.QUESTIONS = window.QUESTIONS || {};
 const QUESTIONS = window.QUESTIONS;
 
-// ✅ علامة تحميل (تمنع تكرار تحميل نفس النسخة بدون قصد)
+// ✅ حارس يمنع تكرار تنفيذ الأسئلة لو انحط الملف مرتين بالغلط
 window.__QUESTIONS_BANK_LOADED__ = window.__QUESTIONS_BANK_LOADED__ || {};
-if (window.__QUESTIONS_BANK_LOADED__[QUESTIONS_BANK_VERSION]) {
-  console.warn("questions_bank.js already loaded:", QUESTIONS_BANK_VERSION);
-} else {
-  window.__QUESTIONS_BANK_LOADED__[QUESTIONS_BANK_VERSION] = Date.now();
-}
+const __QB_RUN_KEY__ = "QB_BANK_RUN@" + QUESTIONS_BANK_VERSION;
 
 // ✅ أدوات اختيارية (ما تغيّر أسئلتك الحالية)
-// تقدر تتجاهلها، أو تستخدمها لو تقسم البنك لعدة ملفات لاحقاً.
 window.QB = window.QB || {};
 window.QB.version = window.QB.version || QUESTIONS_BANK_VERSION;
 
@@ -53,6 +48,31 @@ window.QB.addMany = window.QB.addMany || function(letter, items){
   });
 };
 
+// ✅ (اختياري) Loader للمستقبل لو بتقسم البنك لملفات متعددة
+// مثال لاحقًا: QB.manifest = { "أ":"./banks/%D8%A3.js", ... } ثم QB.load("أ")
+window.QB.manifest = window.QB.manifest || {};
+window.QB._loaded = window.QB._loaded || {};
+window.QB.load = window.QB.load || function(letter){
+  try{
+    const url = window.QB.manifest?.[letter];
+    if(!url) return Promise.resolve(false);
+    if(window.QB._loaded[url]) return window.QB._loaded[url];
+
+    window.QB._loaded[url] = new Promise((resolve, reject)=>{
+      const s = document.createElement("script");
+      s.src = url + (url.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(QUESTIONS_BANK_VERSION);
+      s.async = true;
+      s.onload = ()=> resolve(true);
+      s.onerror = ()=> reject(new Error("QB load failed: " + url));
+      document.head.appendChild(s);
+    });
+
+    return window.QB._loaded[url];
+  }catch(e){
+    return Promise.reject(e);
+  }
+};
+
 // إحصائية سريعة للتأكد (اختياري)
 window.QB.stats = window.QB.stats || function(){
   let total = 0;
@@ -64,6 +84,15 @@ window.QB.stats = window.QB.stats || function(){
   });
   return { version: window.QB.version, total, per };
 };
+
+// ✅✅ هنا يبدأ بنك الأسئلة (لا تغيّر أسئلتك)
+// كل أسئلتك الحالية تحت هذا السطر بتبقى كما هي
+if (window.__QUESTIONS_BANK_LOADED__[__QB_RUN_KEY__]) {
+  console.warn("questions_bank.js already executed:", QUESTIONS_BANK_VERSION);
+} else {
+  window.__QUESTIONS_BANK_LOADED__[__QB_RUN_KEY__] = Date.now();
+
+  // ⬇️⬇️ ضع/اترك أسئلتك الحالية هنا كما هي (بدون أي تعديل)
 
 QUESTIONS["هـ"] = [
   // ====== الموجود سابقًا في كودك (مع تصحيح بسيط فقط) ======
@@ -3333,3 +3362,4 @@ QUESTIONS["هـ"] = [
   { q: "ما الاسم الذي يُستخدم في المحاسبة لوصف الحالة التي تزيد فيها التكاليف على الإيرادات؟", a: "خسارة" },
   { q: "ما المصطلح الاقتصادي الذي يُطلَق على تحويل ملكية المؤسسات والخدمات من القطاع الحكومي إلى القطاع الخاص؟", a: "خصخصة" }
 ];
+}
