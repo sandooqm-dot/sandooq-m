@@ -5,12 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>سباق الحروف</title>
 
-  <!-- ✅ (مهم) خط AA-GALAXY
-       ضع ملف الخط AA-GALAXY.otf في نفس مجلد هذا الملف (game.html) داخل GitHub -->
+  <!-- ✅ تحسين تحميل + كاش (نسخة الإصدار) -->
+  <meta name="theme-color" content="#7b1f63">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="//www.gstatic.com">
+  <link rel="preconnect" href="https://api.qrserver.com" crossorigin>
+  <link rel="dns-prefetch" href="//api.qrserver.com">
+
+  <!-- ✅ (مهم) خط AA-GALAXY (نفس الخط بدون تغيير) -->
+  <!-- ✅ ملاحظة: غيّر رقم الإصدار هنا إذا حدّثت ملفات (خرائط/لوجو/خط/بنك أسئلة) عشان كسر الكاش -->
+  <link rel="preload" href="AA-GALAXY.otf?v=2026-02-15-1" as="font" type="font/otf">
+  <link rel="preload" href="logo.png?v=2026-02-15-1" as="image" fetchpriority="high">
+
   <style>
     @font-face{
       font-family:"AA-GALAXY";
-      src:url("AA-GALAXY.otf") format("opentype");
+      src:url("AA-GALAXY.otf?v=2026-02-15-1") format("opentype");
       font-weight:400;
       font-style:normal;
       font-display:swap;
@@ -679,7 +689,7 @@
 
     a{color:inherit}
 
-    /* ✅ مودالات المشاركة وأسئلة المقدم والإعدادات (نتركها كما هي وظيفياً لكن نخلي الخط AA-GALAXY) */
+    /* ✅ مودالات المشاركة وأسئلة المقدم والإعدادات */
     .shareBackdrop,.cqBackdrop,.settingsBackdrop{
       position:fixed; inset:0;
       background:rgba(0,0,0,.45);
@@ -983,7 +993,7 @@
 <body>
   <header>
     <div class="headerRow">
-      <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
+      <img class="logo" src="logo.png?v=2026-02-15-1" alt="شعار صندوق المسابقات" width="72" height="72" decoding="async" loading="eager" fetchpriority="high">
       <h1>سباق الحروف</h1>
       <div id="gameName" class="gameName"></div>
     </div>
@@ -1019,6 +1029,17 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getDatabase, ref, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    // ✅ رقم إصدار للكاش + كسر كاش (غيّره فقط عند تحديث ملفات محلية: خرائط/لوجو/خط/بنك أسئلة)
+    const ASSET_VERSION = "2026-02-15-1";
+    const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
+
+    // ✅ تحميل بنك الأسئلة بڤيرجن (إذا فشل، نرجع للـ fallback)
+    try{
+      await import(`./questions_bank.js${vq}`);
+    }catch(e){
+      console.warn("questions_bank.js load failed (will use fallback questions).", e);
+    }
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -1065,13 +1086,11 @@
       }));
     }
 
-    import "./questions_bank.js";
-
     // استخدم بنك الأسئلة إذا موجود، وإلا استخدم الافتراضي
     const QUESTIONS = (window.QUESTIONS && Object.keys(window.QUESTIONS).length)
       ? window.QUESTIONS
       : DEFAULT_QUESTIONS;
-    
+
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
@@ -1250,11 +1269,9 @@
       const t = normalizeTimer(TIMER_UI.latestTimer || {});
       const view = computeTimerView(t);
 
-      // ✅ إصلاح: عند انتهاء المؤقت لازم يثبت الرقم 0 (حتى لو Firebase رجّع running=false)
       const displayNum = (view.done ? 0 : (view.running ? view.remaining : view.sel));
       numEl.textContent = String(displayNum);
 
-      // ✅ حماية: لا نرسل تحديث done أكثر من مرة عند الوصول لـ 0
       TIMER_UI.__doneSent = !!TIMER_UI.__doneSent;
       if((!view.running && !view.done) || (view.running && view.remaining > 0)){
         TIMER_UI.__doneSent = false;
@@ -1330,7 +1347,6 @@
       });
     }
 
-    /* ✅ (8) تهيئة السكور */
     function initScoresIfNeeded(room){
       if(role !== "host") return;
       if(!room) return;
@@ -1417,7 +1433,6 @@
       }
     }, true);
 
-    /* ✅ (2) نظام التولتيب */
     let TIP_OPEN = false;
     function closeTip(){
       TIP_OPEN = false;
@@ -1451,7 +1466,6 @@
       if(TIP_OPEN) closeTip();
     }, true);
 
-    /* ✅ (9) فحص اتصال الفوز على شبكة سداسية 5x5 */
     function neighborsHex(r,c){
       const odd = (r % 2) === 1;
       const out = [];
@@ -1532,12 +1546,7 @@
       winBackdrop.style.display = "none";
     });
 
-    /* ✅ إدارة أسئلة المقدم */
-    const CUSTOM_Q_UI = {
-      ready: false,
-      roomLatest: null,
-      els: {}
-    };
+    const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
 
     function autosizeTA(ta){
       if(!ta) return;
@@ -1689,12 +1698,7 @@
       return (m === "custom") ? "custom" : "default";
     }
 
-    /* ✅ إعدادات المقدم */
-    const SETTINGS_UI = {
-      ready:false,
-      els:{},
-      roomLatest:null
-    };
+    const SETTINGS_UI = { ready:false, els:{}, roomLatest:null };
 
     function ensureSettingsModal(){
       if(SETTINGS_UI.ready) return;
@@ -2005,10 +2009,7 @@
       `;
     }
 
-    const ANSWER_UI = {
-      revealed:false,
-      sig:""
-    };
+    const ANSWER_UI = { revealed:false, sig:"" };
 
     let SCORE_PICK_TEAM = null;
     function closeScorePicker(){
@@ -2091,7 +2092,7 @@
             <div class="mapOuter">
               <div id="mapScale" class="mapScale" style="--zoom:1">
                 <div id="mapBox" class="mapBox">
-                  <img id="mapImg" src="" alt="">
+                  <img id="mapImg" src="" alt="" decoding="async">
                   <svg id="overlay" class="overlaySvg"></svg>
                 </div>
               </div>
@@ -2249,13 +2250,14 @@
 
       const activeMap = Number(room.activeMap || 0);
 
-      const src = ([
+      // ✅ أسماء الخرائط كما طلبت + إضافة version للكاش
+      const srcBase = ([
         "maps/map1.jpeg",
         "maps/map2.jpeg",
         "maps/map3.jpeg"
       ][activeMap] || "maps/map1.jpeg");
 
-      mapImg.src = src;
+      mapImg.src = srcBase + vq;
 
       overlay.innerHTML = "";
       overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -2300,7 +2302,8 @@
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
         overlay.setAttribute("preserveAspectRatio", "none");
 
-        const bbox = BBOX_CACHE[src];
+        // ✅ مهم: نخزن bbox على اسم الملف الأساسي بدون query
+        const bbox = BBOX_CACHE[srcBase];
         if(!bbox) return;
 
         const x0 = bbox.x0 * W;
@@ -2329,7 +2332,7 @@
       }
 
       function onMapReady(){
-        if(!BBOX_CACHE[src]) BBOX_CACHE[src] = detectHexBBox(mapImg);
+        if(!BBOX_CACHE[srcBase]) BBOX_CACHE[srcBase] = detectHexBBox(mapImg);
         requestAnimationFrame(placeHexes);
       }
 
@@ -2581,7 +2584,6 @@
       }catch(e){}
     }
 
-    // ✅ الاستماع لتحديثات الغرفة + بناء الشاشة حسب الدور
     onValue(roomRef, (snap) => {
       const room = snap.val();
 
@@ -2590,9 +2592,7 @@
         return;
       }
 
-      // ✅ المقدم
       if(role === "host"){
-        // (اختياري) حماية: إذا عندك hostKey محفوظ في الغرفة
         if(room.hostKey && hostKey && String(room.hostKey) !== String(hostKey)){
           main.textContent = "ليس لديك صلاحية دخول كمقدم.";
           return;
@@ -2608,21 +2608,17 @@
         return;
       }
 
-      // ✅ اللاعب
       const players = room.players || {};
       let me = null;
 
-      // 1) من الرابط
       if(pid && players[pid]) me = players[pid];
 
-      // 2) احتياط: من التخزين المحلي لو pid ما وصل
       if(!me){
         const k = `sabaq_pid_${code}`;
         const stored = localStorage.getItem(k);
         if(stored && players[stored]) me = players[stored];
       }
 
-      // قبل بدء اللعبة: صفحة انتظار + زر شراء
       if(room.status !== "started"){
         renderWaiting("بانتظار بدء اللعبة...");
         afterRender(room);
