@@ -2557,7 +2557,7 @@
       }
     }
 
-    function afterRender(room){
+        function afterRender(room){
       try{
         TIMER_UI.latestTimer = room.timer || {};
         requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
@@ -2567,53 +2567,68 @@
         const we = room.winEvent;
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
-          showWin(String(we.team || ""));
+          showWin(we.team);
+          beep();
         }
       }catch(e){}
     }
 
+    // ✅ الاستماع لتحديثات الغرفة + بناء الشاشة حسب الدور
     onValue(roomRef, (snap) => {
-      if(!snap.exists()){
-        main.textContent = "اللعبة غير موجودة (رمز غير صحيح).";
-        setGameName("");
+      const room = snap.val();
+
+      if(!room){
+        renderWaiting("الغرفة غير موجودة.");
         return;
       }
 
-      const room = snap.val();
-      setGameName(room?.name);
-
+      // ✅ المقدم
       if(role === "host"){
-        if(!hostKey || hostKey !== room.presenterKey){
-          main.textContent = "صلاحية المقدم غير صحيحة.";
+        // (اختياري) حماية: إذا عندك hostKey محفوظ في الغرفة
+        if(room.hostKey && hostKey && String(room.hostKey) !== String(hostKey)){
+          main.textContent = "ليس لديك صلاحية دخول كمقدم.";
           return;
         }
 
-        if(room.status === "lobby"){
-          renderHostLobby(room);
-          return;
-        }else{
+        if(room.status === "started"){
           renderGame(room, null);
           afterRender(room);
-          return;
+        }else{
+          renderHostLobby(room);
+          afterRender(room);
         }
+        return;
       }
 
+      // ✅ اللاعب
       const players = room.players || {};
-      const me = pid ? players[pid] : null;
-      if(!pid || !me){
-        main.textContent = "بيانات اللاعب غير صحيحة.";
-        return;
+      let me = null;
+
+      // 1) من الرابط
+      if(pid && players[pid]) me = players[pid];
+
+      // 2) احتياط: من التخزين المحلي لو pid ما وصل
+      if(!me){
+        const k = `sabaq_pid_${code}`;
+        const stored = localStorage.getItem(k);
+        if(stored && players[stored]) me = players[stored];
       }
 
-      if(room.status === "lobby"){
-        renderWaiting("بانتظار بدء اللعبة من المقدم...");
-        return;
-      }else{
-        renderGame(room, me);
+      // قبل بدء اللعبة: صفحة انتظار + زر شراء
+      if(room.status !== "started"){
+        renderWaiting("بانتظار بدء اللعبة...");
         afterRender(room);
         return;
       }
+
+      renderGame(room, me);
+      afterRender(room);
+
+    }, (err) => {
+      console.error(err);
+      main.textContent = "تعذر الاتصال بالغرفة.";
     });
+
   </script>
 </body>
 </html>
