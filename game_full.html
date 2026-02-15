@@ -17,6 +17,10 @@
   <link rel="preload" href="AA-GALAXY.otf?v=2026-02-15-1" as="font" type="font/otf">
   <link rel="preload" href="logo.png?v=2026-02-15-1" as="image" fetchpriority="high">
 
+  <!-- ✅ (جديد) Preload للأصوات (لو ما كانت موجودة ما يضر) -->
+  <link rel="preload" href="rong.mp3?v=2026-02-15-1" as="audio">
+  <link rel="preload" href="vois.mp3?v=2026-02-15-1" as="audio">
+
   <style>
     @font-face{
       font-family:"AA-GALAXY";
@@ -1139,6 +1143,119 @@
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
 
+    // ✅✅✅ (تعديل الأصوات فقط) — جرس: rong / موسيقى: vois
+    const SOUND = (function(){
+      const bellCandidates  = ["rong.mp3","rong.wav","rong.m4a","rong.ogg"];
+      const musicCandidates = ["vois.mp3","vois.wav","vois.m4a","vois.ogg"];
+
+      function makeAudio(cands, opts){
+        const a = new Audio();
+        a.preload = "auto";
+        if(opts && "loop" in opts) a.loop = !!opts.loop;
+        if(opts && typeof opts.volume === "number") a.volume = Math.max(0, Math.min(1, opts.volume));
+
+        let i = 0;
+        const tryNext = () => {
+          if(i >= cands.length) return;
+          a.src = cands[i++] + vq;
+          try{ a.load(); }catch(e){}
+        };
+        a.addEventListener("error", () => { tryNext(); }, { passive:true });
+        tryNext();
+        return a;
+      }
+
+      const api = {
+        ready:false,
+        unlocked:false,
+        bell:null,
+        music:null,
+        init(){
+          if(this.ready) return;
+          this.ready = true;
+
+          this.bell  = makeAudio(bellCandidates,  { volume:0.95, loop:false });
+          this.music = makeAudio(musicCandidates, { volume:0.35, loop:false });
+
+          const unlock = () => {
+            if(this.unlocked) return;
+            this.unlocked = true;
+
+            // iOS/Safari: لازم Gesture قبل تشغيل الصوت
+            [this.bell, this.music].forEach(a => {
+              if(!a) return;
+              const v = Number.isFinite(a.volume) ? a.volume : 1;
+              try{
+                a.volume = 0;
+                const p = a.play();
+                const done = () => { try{ a.pause(); a.currentTime = 0; a.volume = v; }catch(e){} };
+                if(p && typeof p.then === "function"){
+                  p.then(done).catch(done);
+                }else{
+                  done();
+                }
+              }catch(e){}
+            });
+          };
+
+          window.addEventListener("pointerdown", unlock, { once:true, capture:true });
+          window.addEventListener("touchstart",  unlock, { once:true, capture:true });
+          window.addEventListener("click",       unlock, { once:true, capture:true });
+        },
+        playBell(){
+          this.init();
+          const a = this.bell;
+          if(!a) return false;
+          try{
+            a.pause();
+            a.currentTime = 0;
+            const p = a.play();
+            if(p && typeof p.catch === "function") p.catch(()=>{});
+            return true;
+          }catch(e){ return false; }
+        },
+        playMusic(){
+          this.init();
+          const a = this.music;
+          if(!a) return false;
+          try{
+            a.pause();
+            a.currentTime = 0;
+            const p = a.play();
+            if(p && typeof p.catch === "function") p.catch(()=>{});
+            return true;
+          }catch(e){ return false; }
+        }
+      };
+      return api;
+    })();
+
+    function playRong(){
+      try{ return SOUND.playBell(); }catch(e){ return false; }
+    }
+    function playVois(){
+      try{ return SOUND.playMusic(); }catch(e){ return false; }
+    }
+    // ✅ fallback قديم (Oscillator) لو ما توفرت الملفات
+    function fallbackBeep(){
+      try{
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return;
+        const ctx = new AC();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.value = 0.12;
+        o.connect(g); g.connect(ctx.destination);
+        o.start();
+        setTimeout(() => {
+          o.stop();
+          ctx.close();
+        }, 300);
+      }catch(e){}
+    }
+
     function setGameName(raw){
       if(!gameNameEl) return;
       const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
@@ -1314,8 +1431,16 @@
 
       if(view.done){
         clock.classList.add("doneFlashing");
+
+        // ✅ (صوت الجرس rong عند انتهاء المؤقت مرة واحدة)
+        if(!TIMER_UI.__rongPlayed){
+          TIMER_UI.__rongPlayed = true;
+          if(!playRong()) fallbackBeep();
+        }
+
       }else{
         clock.classList.remove("doneFlashing");
+        TIMER_UI.__rongPlayed = false;
       }
 
       const ring = document.getElementById("timerRingCircle");
@@ -1381,25 +1506,6 @@
       window[key] = true;
 
       update(ref(db, `rooms/${code}`), { scores: { green:0, orange:0 } });
-    }
-
-    function beep(){
-      try{
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if(!AC) return;
-        const ctx = new AC();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = "sine";
-        o.frequency.value = 880;
-        g.gain.value = 0.12;
-        o.connect(g); g.connect(ctx.destination);
-        o.start();
-        setTimeout(() => {
-          o.stop();
-          ctx.close();
-        }, 300);
-      }catch(e){}
     }
 
     function buildJoinUrl(roomCode){
@@ -2602,7 +2708,11 @@
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
           showWin(we.team);
-          beep();
+
+          // ✅ (صوت الموسيقى vois عند الفوز)
+          if(!playVois()){
+            if(!playRong()) fallbackBeep();
+          }
         }
       }catch(e){}
     }
