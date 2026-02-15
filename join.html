@@ -101,6 +101,27 @@
       user-select:none;
     }
   </style>
+
+  <!-- ✅ تسجيل Service Worker (مبكر + iOS-friendly) -->
+  <script>
+    (function () {
+      if (!("serviceWorker" in navigator)) return;
+      if (location.protocol !== "https:" && location.hostname !== "localhost") return;
+
+      // تسجيل مبكر، ومع fallback لو المتصفح ما يدعم updateViaCache
+      try{
+        navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" })
+          .catch(function(){});
+      }catch(e){
+        navigator.serviceWorker.register("./sw.js").catch(function(){});
+      }
+
+      // فحص تحديث بعد الجاهزية بدون إزعاج المستخدم
+      navigator.serviceWorker.ready
+        .then(function(reg){ try{ reg.update(); }catch(e){} })
+        .catch(function(){});
+    })();
+  </script>
 </head>
 <body>
   <header>
@@ -121,17 +142,6 @@
       <div class="note">تقدر تكتب الأرقام عربي أو إنجليزي</div>
     </div>
   </div>
-
-  <!-- ✅ تسجيل Service Worker (sw.js في جذر المستودع) -->
-  <script>
-    (function () {
-      if (!("serviceWorker" in navigator)) return;
-      if (location.protocol !== "https:" && location.hostname !== "localhost") return;
-
-      // ما نزعج المستخدم لو فشل
-      navigator.serviceWorker.register("./sw.js").catch(function(){});
-    })();
-  </script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -279,5 +289,7 @@
     nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
+
+  <!-- VERSION: join.html — v2 -->
 </body>
 </html>
