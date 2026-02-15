@@ -4,227 +4,272 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>سباق الحروف - جاري التحميل</title>
+
+  <!-- تقليل الكاش قدر الإمكان -->
+  <meta http-equiv="Cache-Control" content="no-store, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <style>
     :root{
-      /* ✅ عنابي قريب من الصورة */
-      --bg1:#4a1f2e;
-      --bg2:#6b2a3a;
-
-      --card:#ffffff;
-      --text:#222;
-      --muted:#6d6d6d;
-
-      --accent:#f4c400;
-      --btn:#1f4fa3;
-
+      --bgA:#7b3459;   /* عنابي فاتح */
+      --bgB:#4b1f36;   /* عنابي غامق */
       --white:#fff;
-      --shadow:0 14px 30px rgba(0,0,0,.22);
+      --shadow: rgba(0,0,0,.35);
+      --text:#ffffff;
+      --muted: rgba(255,255,255,.78);
+      --btnText:#111;
+      --btnBg:#ffffff;
+      --btnBorder:#1b1b1b;
+      --danger:#ffdddd;
+      --dangerText:#7a1a1a;
+      --card:#ffffff;
+      --cardText:#111;
+      --blue:#1f4fa3;
+      --yellow:#f4c400;
     }
 
+    *{box-sizing:border-box}
     body{
-      margin:0; min-height:100vh;
+      margin:0;
+      min-height:100vh;
       font-family: Arial, sans-serif;
+      color:var(--text);
       background:
-        radial-gradient(1200px 700px at 30% 10%, rgba(255,255,255,.10), transparent 60%),
-        linear-gradient(180deg,var(--bg2),var(--bg1));
-      padding:0;
-      box-sizing:border-box;
+        radial-gradient(1200px 700px at 25% 10%, rgba(255,255,255,.12), transparent 60%),
+        linear-gradient(135deg, var(--bgA), var(--bgB));
+      overflow-x:hidden;
     }
 
-    /* ✅ شاشة التحميل */
-    #loading{
-      position:fixed; inset:0;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:flex-start;
-      padding:34px 16px 22px;
-      box-sizing:border-box;
+    header{
+      position:relative;
+      padding:22px 16px 0;
+      text-align:center;
+    }
+    .logo{
+      position:absolute;
+      left:14px;
+      top:16px;
+      width:46px;
+      height:46px;
+      object-fit:contain;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,.25));
+      pointer-events:none;
+    }
+    .game-title{
+      display:inline-block;
+      padding:10px 16px;
+      border-radius:14px;
+      font-size:44px;
+      font-weight:900;
+      letter-spacing:.5px;
+      color:#fff;
+      text-shadow: 0 8px 16px rgba(0,0,0,.35);
+    }
+    .loading-text{
+      margin:10px 0 0;
+      font-size:16px;
+      font-weight:700;
+      color:var(--muted);
     }
 
-    .brandRow{
-      width:min(820px, 100%);
+    .center{
       display:flex;
       align-items:center;
       justify-content:center;
-      position:relative;
-      margin-top:4px;
+      min-height: calc(100vh - 170px);
+      padding:18px 12px;
     }
 
-    .brandLogo{
-      position:absolute;
-      left:0;
-      width:52px;height:52px;
-      object-fit:contain;
-      opacity:.95;
-      pointer-events:none;
-      filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
-    }
-
-    .brandTitle{
-      margin:0;
-      color:var(--white);
-      font-weight:900;
-      font-size:38px;
-      letter-spacing:.2px;
-      text-shadow:0 8px 18px rgba(0,0,0,.25);
-    }
-
-    .brandSub{
-      margin:10px 0 0;
-      color:rgba(255,255,255,.92);
-      font-weight:700;
-      font-size:16px;
-      text-shadow:0 6px 14px rgba(0,0,0,.22);
-    }
-
-    /* زر الرئيسية */
-    .homeBtn{
-      position:fixed;
-      left:16px;
-      bottom:16px;
-      border:0;
-      border-radius:18px;
-      padding:14px 18px;
-      font-weight:900;
-      font-size:18px;
-      background:#ffffff;
-      color:#111;
-      box-shadow:0 12px 22px rgba(0,0,0,.25);
-      cursor:pointer;
-    }
-
-    /* ✅ صندوق الخطأ (ما يظهر إلا لو فشل مرتين) */
-    .wrap{
-      width:min(520px,100%);
-      opacity:0;
-      pointer-events:none;
-      transition:.15s ease;
-      position:fixed;
-      left:50%;
-      top:56%;
-      transform:translate(-50%,-50%);
-      padding:0 12px;
-      box-sizing:border-box;
-      z-index:5;
-    }
-    .wrap.show{ opacity:1; pointer-events:auto; }
-
-    .card{
-      background:var(--card);
-      border-radius:18px;
-      padding:18px 16px;
-      box-shadow:var(--shadow);
-      text-align:center;
-    }
-
-    .top{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 6px}
-    .top img{width:44px;height:44px;object-fit:contain}
-
-    .title{margin:6px 0 8px;font-size:18px;font-weight:900;color:var(--text)}
-    .sub{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.6}
-
+    /* دائرة تحميل بسيطة */
     .spinner{
       width:34px;height:34px;border-radius:50%;
-      border:4px solid rgba(31,79,163,.18);
-      border-top-color: var(--btn);
-      margin:10px auto 14px;
+      border:4px solid rgba(255,255,255,.22);
+      border-top-color: rgba(255,255,255,.95);
       animation:spin .9s linear infinite;
+      margin:10px auto 0;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    /* مساعد صغير */
+    .hint{
+      margin-top:14px;
+      font-size:13px;
+      color:rgba(255,255,255,.72);
+      text-align:center;
+      line-height:1.7;
+    }
+    .hint a{
+      color:#fff;
+      text-decoration:underline;
+      font-weight:800;
+    }
+
+    /* زر الرئيسية مثل الصورة */
+    .home-btn{
+      position:fixed;
+      left:16px;
+      bottom:18px;
+      background:var(--btnBg);
+      color:var(--btnText);
+      border:2px solid var(--btnBorder);
+      border-radius:20px;
+      padding:12px 16px;
+      font-weight:900;
+      box-shadow:0 10px 22px rgba(0,0,0,.25);
+      cursor:pointer;
+      z-index:5;
+    }
+
+    footer{
+      position:fixed;
+      right:14px;
+      bottom:20px;
+      font-size:12px;
+      color:rgba(255,255,255,.8);
+      z-index:4;
+      text-shadow: 0 6px 12px rgba(0,0,0,.25);
+      user-select:none;
+    }
+
+    /* نافذة خطأ واضحة (تظهر فقط عند الحاجة) */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.35);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px 12px;
+      z-index:50;
+    }
+    .overlay.show{display:flex}
+
+    .card{
+      width:min(560px, 100%);
+      background:var(--card);
+      color:var(--cardText);
+      border-radius:18px;
+      padding:16px 14px;
+      box-shadow:0 16px 34px rgba(0,0,0,.35);
+      text-align:center;
+    }
+    .card h3{
+      margin:6px 0 10px;
+      font-size:18px;
+      font-weight:900;
+    }
+    .card p{
+      margin:0 0 12px;
+      color:#444;
+      line-height:1.7;
+      font-size:14px;
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
     .btn{
-      border:0; border-radius:12px;
+      border:0;
+      border-radius:12px;
       padding:12px 14px;
       font-weight:900;
       cursor:pointer;
       min-width:170px;
     }
-    .btn-primary{background:var(--btn);color:#fff}
-    .btn-accent{background:var(--accent);color:#111}
+    .btn-blue{background:var(--blue);color:#fff}
+    .btn-yellow{background:var(--yellow);color:#111}
+    .btn-white{background:#f1f1f1;color:#111}
 
-    .small{
-      font-size:12px;
-      color:#777;
+    .debug{
       margin-top:10px;
-      direction:ltr;
-      text-align:left;
-      white-space:pre-wrap
-    }
-
-    .copy{
-      position:fixed;
-      right:14px;
-      bottom:18px;
       font-size:12px;
-      color:rgba(255,255,255,.75);
-      text-shadow:0 6px 14px rgba(0,0,0,.25);
-      pointer-events:none;
+      color:#666;
+      word-break:break-word;
+      text-align:right;
+      background:#fafafa;
+      border:1px solid #eee;
+      padding:10px;
+      border-radius:12px;
+      display:none;
     }
+    .debug.show{display:block}
   </style>
 </head>
-<body>
 
-  <!-- ✅ شاشة التحميل -->
-  <div id="loading" aria-live="polite">
-    <div class="brandRow">
-      <img class="brandLogo" src="/logo.png" alt="Sandooq" />
-      <h1 class="brandTitle">سباق الحروف</h1>
+<body>
+  <!-- بصمة عشان نكشف لو فيه Rewrite يرجع لنفس الصفحة -->
+  <!-- GATEWAY_V3_SANDOOQ -->
+
+  <header>
+    <img class="logo" src="/logo.png" alt="Sandooq" />
+    <div class="game-title">سباق الحروف</div>
+    <div class="loading-text">جاري التحميل...</div>
+  </header>
+
+  <div class="center">
+    <div style="width:100%; text-align:center">
+      <div class="spinner" aria-label="loading"></div>
+
+      <div class="hint" id="hint">
+        إذا طول التحميل أكثر من 5 ثواني:
+        <br>
+        <a href="./game_full.html" id="manualOpen">افتح اللعبة يدويًا</a>
+        &nbsp;•&nbsp;
+        <a href="/activate" id="manualActivate">افتح صفحة التفعيل</a>
+      </div>
     </div>
-    <div class="brandSub">جاري التحميل...</div>
   </div>
 
-  <button class="homeBtn" id="homeBtn">الرئيسية</button>
-  <div class="copy">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
+  <button class="home-btn" id="homeBtn">الرئيسية</button>
+  <footer>© جميع الحقوق محفوظة لمتجر صندوق المسابقات</footer>
 
-  <!-- ✅ هذا الصندوق ما يظهر إلا لو صار خطأ فعلي بعد محاولتين -->
-  <div class="wrap" id="wrap">
+  <!-- Overlay عند الخطأ -->
+  <div class="overlay" id="ov">
     <div class="card">
-      <div class="top">
-        <img src="/logo.png" alt="Sandooq" />
-      </div>
-      <div class="title" id="t">تعذر الفتح</div>
-      <div class="spinner" id="sp"></div>
-      <p class="sub" id="m">فيه مشكلة مؤقتة. جرّب إعادة المحاولة.</p>
+      <h3 id="ovTitle">تعذر فتح اللعبة</h3>
+      <p id="ovMsg">فيه مشكلة مؤقتة. جرّب إعادة المحاولة.</p>
 
-      <div class="row">
-        <button class="btn btn-primary" id="retryBtn">إعادة المحاولة</button>
-        <button class="btn btn-accent" id="goActivateBtn">فتح صفحة التفعيل</button>
+      <div class="actions">
+        <button class="btn btn-blue" id="retryBtn">إعادة المحاولة</button>
+        <button class="btn btn-yellow" id="goActivateBtn">فتح صفحة التفعيل</button>
+        <button class="btn btn-white" id="openGameBtn">فتح اللعبة يدويًا</button>
       </div>
 
-      <div class="small" id="debug"></div>
+      <div class="debug" id="dbg"></div>
     </div>
   </div>
 
 <script>
 (function(){
-  const loading = document.getElementById("loading");
-  const wrap = document.getElementById("wrap");
-  const t = document.getElementById("t");
-  const m = document.getElementById("m");
-  const sp = document.getElementById("sp");
-  const debugEl = document.getElementById("debug");
+  const ov = document.getElementById("ov");
+  const ovTitle = document.getElementById("ovTitle");
+  const ovMsg = document.getElementById("ovMsg");
+  const dbg = document.getElementById("dbg");
   const retryBtn = document.getElementById("retryBtn");
-  const goActBtn = document.getElementById("goActivateBtn");
+  const goActivateBtn = document.getElementById("goActivateBtn");
+  const openGameBtn = document.getElementById("openGameBtn");
   const homeBtn = document.getElementById("homeBtn");
 
-  function showLoading(){ loading.style.display = "flex"; }
-  function hideLoading(){ loading.style.display = "none"; }
-
-  function showErrorUI(title, msg, dbg){
-    hideLoading();
-    t.textContent = title || "تعذر الفتح";
-    m.textContent = msg || "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.";
-    sp.style.display = "none";
-    debugEl.textContent = dbg || "";
-    wrap.classList.add("show");
+  function showOverlay(title, msg, debugText){
+    ovTitle.textContent = title || "تعذر فتح اللعبة";
+    ovMsg.textContent = msg || "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.";
+    if(debugText){
+      dbg.textContent = debugText;
+      dbg.classList.add("show");
+    }else{
+      dbg.textContent = "";
+      dbg.classList.remove("show");
+    }
+    ov.classList.add("show");
   }
 
-  function hideErrorUI(){
-    sp.style.display = "block";
-    debugEl.textContent = "";
-    wrap.classList.remove("show");
+  function hideOverlay(){
+    ov.classList.remove("show");
+    dbg.classList.remove("show");
+    dbg.textContent = "";
   }
 
   function ensureDeviceId(){
@@ -238,131 +283,167 @@
     return id;
   }
 
-  function go(url){
-    location.replace(url);
+  function token(){
+    return localStorage.getItem("sandooq_token_v1") || "";
   }
 
   function here(){
     return location.pathname + (location.search || "") + (location.hash || "");
   }
 
-  function targetGame(){
-    // ✅ مهم جدًا: ملف اللعبة الكبيرة بنفس مجلد game.html
-    const cur = new URL(location.href);
-    const u = new URL("./game_full.html", cur);
-
-    // انقل باراميترات الرابط الحالي + كسر الكاش
-    cur.searchParams.forEach((v,k)=>u.searchParams.set(k,v));
-    u.searchParams.set("_ts", Date.now().toString());
-
-    // انقل الهاش إن وجد
-    u.hash = cur.hash;
-
-    return u.toString();
+  function go(url){
+    location.replace(url);
   }
 
-  function withTimeout(promise, ms, label){
-    return Promise.race([
-      promise,
-      new Promise((_, rej) => setTimeout(() => rej(new Error((label||"TIMEOUT") + "_" + ms)), ms))
-    ]);
+  function buildActivateNext(){
+    return "/activate?next=" + encodeURIComponent(here());
   }
 
-  async function fetchMe(deviceId){
-    // ✅ جرّب GET أول، وإذا 405 جرّب POST
-    let res = await withTimeout(fetch("/api2/me", {
-      method: "GET",
-      headers: { "X-Device-Id": deviceId },
-      credentials: "include",
-      cache: "no-store"
-    }), 6500, "ME_GET_TIMEOUT");
+  function selfFingerprintInText(txt){
+    return (txt || "").includes("GATEWAY_V3_SANDOOQ");
+  }
 
-    if (res.status === 405) {
-      res = await withTimeout(fetch("/api2/me", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Device-Id": deviceId
-        },
-        credentials: "include",
-        cache: "no-store",
-        body: "{}"
-      }), 6500, "ME_POST_TIMEOUT");
+  async function probeHtml(url){
+    // نجيب جزء بسيط من الـ HTML عشان نعرف هل هو ملف اللعبة فعلاً أو Rewrite راجعنا لنفس البوابة
+    const u = url + (url.includes("?") ? "&" : "?") + "__probe=" + Date.now();
+    const res = await fetch(u, { cache:"no-store", credentials:"include" });
+    if(!res.ok) return { ok:false, status:res.status, url };
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    const txt = await res.text();
+    const isHtml = ct.includes("text/html") || txt.includes("<!DOCTYPE html") || txt.includes("<html");
+    if(!isHtml) return { ok:false, status:200, url, reason:"not_html" };
+    if(selfFingerprintInText(txt)) return { ok:false, status:200, url, reason:"rewrite_to_gateway" };
+    return { ok:true, status:200, url };
+  }
+
+  async function findGameFull(){
+    const candidates = [
+      "./game_full.html",
+      "/game_full.html",
+      "/app/game_full.html",
+      "./app/game_full.html"
+    ];
+
+    const tried = [];
+    for(const c of candidates){
+      try{
+        const r = await probeHtml(c);
+        tried.push(r);
+        if(r.ok) return { found:true, url:c, tried };
+      }catch(e){
+        tried.push({ ok:false, url:c, error:String(e && e.message ? e.message : e) });
+      }
+    }
+    return { found:false, url:"./game_full.html", tried };
+  }
+
+  async function fetchMe(){
+    const deviceId = ensureDeviceId();
+    const tkn = token();
+
+    const headers = { "X-Device-Id": deviceId };
+    if(tkn) headers["Authorization"] = "Bearer " + tkn;
+
+    // جرّب GET أول، ثم POST لو 405
+    let res = await fetch("/api2/me", {
+      method:"GET",
+      headers,
+      credentials:"include",
+      cache:"no-store"
+    });
+
+    if(res.status === 405){
+      res = await fetch("/api2/me", {
+        method:"POST",
+        headers: Object.assign({ "Content-Type":"application/json" }, headers),
+        credentials:"include",
+        cache:"no-store",
+        body:"{}"
+      });
     }
 
     let data = null;
-    try { data = await res.json(); } catch {}
-    return { res, data };
+    try{ data = await res.json(); }catch{}
+    return { res, data, deviceId, hasToken: !!tkn };
   }
 
-  async function checkOnce(){
-    const deviceId = ensureDeviceId();
-    const { res, data } = await fetchMe(deviceId);
-
-    // غير مسجّل / جلسة غير موجودة
-    if(!res.ok || !data || data.ok !== true){
-      const next = encodeURIComponent(here());
-      go("/activate?next=" + next);
-      return;
-    }
-
-    // مسجّل لكن غير مفعّل
-    if(!data.activated){
-      const next = encodeURIComponent(here());
-      go("/activate?next=" + next);
-      return;
-    }
-
-    // ✅ تمام: افتح اللعبة الكبيرة
-    go(targetGame());
-  }
-
-  async function checkWithRetry(){
-    // ✅ محاولة 1
+  async function openHomeSafely(){
+    // محاولة ذكية: لو المستخدم مفعّل نوديه الصفحة الرئيسية بدون لفّات
     try{
-      await checkOnce();
+      const { res, data } = await fetchMe();
+      if(res.ok && data && data.ok === true && data.activated){
+        // أفضل تخمين للصفحة الرئيسية داخل نفس المسار
+        go("./index.html");
+        return;
+      }
+    }catch{}
+    go(buildActivateNext());
+  }
+
+  async function run(){
+    hideOverlay();
+
+    // 1) تأكد أن game_full موجود فعلًا (عشان ما ندخل لوب)
+    const gf = await findGameFull();
+    if(!gf.found){
+      const debugText = JSON.stringify(gf.tried, null, 2);
+      showOverlay(
+        "ملف اللعبة الكبير غير موجود",
+        "ما قدرت ألقى game_full.html (أو فيه Rewrite يرجعنا لنفس البوابة). تأكد إن الملف مرفوع بنفس الاسم (حروف صغيرة) وفي نفس المستودع.",
+        debugText
+      );
+      openGameBtn.onclick = ()=> go("./game_full.html");
       return;
+    }
+
+    // 2) تحقق من الدخول/التفعيل
+    const { res, data, deviceId, hasToken } = await fetchMe();
+
+    if(!res.ok || !data || data.ok !== true){
+      // غير مسجّل/جلسة مفقودة
+      go(buildActivateNext());
+      return;
+    }
+
+    if(!data.activated){
+      // مسجّل لكن غير مفعّل
+      go(buildActivateNext());
+      return;
+    }
+
+    // 3) تمام: افتح اللعبة الكبيرة مع نفس query/hash
+    const target = gf.url + (location.search || "") + (location.hash || "");
+    go(target);
+  }
+
+  async function runWithRetry(){
+    try{
+      await run();
     }catch(e1){
-      // ✅ محاولة 2 بعد 500ms
       try{
         await new Promise(r=>setTimeout(r, 500));
-        await checkOnce();
-        return;
+        await run();
       }catch(e2){
-        showErrorUI(
-          "تعذر الفتح",
-          "ما قدرنا نتحقق من الدخول. جرّب إعادة المحاولة.",
-          "PATH: " + location.pathname + "\n" +
-          "TARGET: " + (new URL("./game_full.html", location.href)).pathname + "\n" +
-          "ERR: " + String((e2 && (e2.stack || e2.message)) ? (e2.stack || e2.message) : e2)
+        showOverlay(
+          "تعذر فتح اللعبة",
+          "صار خطأ أثناء التحميل. جرّب إعادة المحاولة.",
+          "err=" + String(e2 && e2.message ? e2.message : e2)
         );
       }
     }
   }
 
-  retryBtn.addEventListener("click", ()=>{
-    showLoading();
-    hideErrorUI();
-    checkWithRetry();
-  });
+  retryBtn.addEventListener("click", runWithRetry);
+  goActivateBtn.addEventListener("click", ()=> go(buildActivateNext()));
+  openGameBtn.addEventListener("click", ()=> go("./game_full.html"));
+  homeBtn.addEventListener("click", openHomeSafely);
 
-  goActBtn.addEventListener("click", ()=>{
-    const next = encodeURIComponent(here());
-    go("/activate?next=" + next);
-  });
-
-  homeBtn.addEventListener("click", ()=>{
-    // ✅ بدال "/" (اللي يودّيك للتفعيل ثم يرجعك)
-    // رجّعك لصفحة إدخال الاسم وعدد اللاعبين بنفس مجلدك
-    location.href = "./index.html";
-  });
-
-  showLoading();
-  checkWithRetry();
+  // ابدأ فورًا
+  runWithRetry();
 })();
 </script>
 
 </body>
 </html>
 
-<!-- game.html – إصدار 4 (Fix: targetGame نسبي + زر الرئيسية يروح index.html + Timeout لمنع تعليق جاري التحميل) -->
+<!-- game.html – إصدار 3 (بوابة + إرسال Authorization + فحص مسار game_full + شاشة تحميل عنابي) -->
