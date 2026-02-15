@@ -1,6 +1,6 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v5: supports sessions.token OR sessions.token_hash + schema cache (no PRAGMA spam)
+// v6: protects /app/* + root /game_full(.html) + schema cache (no PRAGMA spam)
 
 const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
 const schemaCache = new Map(); // table -> { ts, cols:Set }
@@ -240,8 +240,16 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅ الحماية فقط على /app وملفاته
-  if (!path.startsWith("/app")) return next();
+  // ✅ (تعديل v6) تحديد الصفحات المحمية
+  const protectRootGameFull =
+    path === "/game_full.html" ||
+    path === "/game_full" ||
+    path === "/game_full/";
+
+  const needsProtection = path.startsWith("/app") || protectRootGameFull;
+
+  // إذا ما يحتاج حماية، مرّره
+  if (!needsProtection) return next();
 
   // السماح لـ OPTIONS
   if (request.method === "OPTIONS") return next();
@@ -274,5 +282,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 5 (supports sessions.token_hash + schema cache)
+_middleware.js – إصدار 6 (protects /app/* + /game_full(.html))
 */
