@@ -1034,6 +1034,34 @@
     const ASSET_VERSION = "2026-02-15-1";
     const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
 
+    // ✅ (جديد) تسجيل Service Worker هنا أيضاً (حتى لو دخل المستخدم مباشرة بدون index.html)
+    (async () => {
+      try{
+        if(!("serviceWorker" in navigator)) return;
+        if(!window.isSecureContext && location.hostname !== "localhost") return;
+
+        const candidates = [
+          `./sw.js${vq}`,
+          `./service-worker.js${vq}`,
+        ];
+
+        let lastErr = null;
+        for(const url of candidates){
+          try{
+            const reg = await navigator.serviceWorker.register(url, { scope: "./" });
+            try{ reg?.update?.(); }catch(e){}
+            console.log("SW registered:", url);
+            return;
+          }catch(e){
+            lastErr = e;
+          }
+        }
+        console.warn("SW register failed.", lastErr);
+      }catch(e){
+        console.warn("SW register error.", e);
+      }
+    })();
+
     // ✅ تحميل بنك الأسئلة بڤيرجن (إذا فشل، نرجع للـ fallback)
     try{
       await import(`./questions_bank.js${vq}`);
