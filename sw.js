@@ -1,22 +1,16 @@
 /* Service Worker — Sabaq Alhorof
    - Precaches core files (maps/questions/font/logo)
    - Fast offline + safer updates (iOS-friendly)
-   - Cache versioning: يقرأها تلقائيًا من ?v= في رابط sw.js (أفضل)
+   - ✅ NEW: Fix versioned assets (?v=...) so updates actually arrive (SWR + canonical key)
 */
 
-const CACHE_PREFIX = "sabaq-alhorof";
-
-// ✅ يقرأ الإصدار من رابط sw.js نفسه: sw.js?v=ASSET_VERSION
-const SW_URL = new URL(self.location.href);
-const CACHE_VERSION = SW_URL.searchParams.get("v") || "2026-02-15-2";
-
+const CACHE_PREFIX  = "sabaq-alhorof";
+const CACHE_VERSION = "2026-02-15-3"; // ✅ حدّثناه لأننا عدّلنا sw.js
 const PRECACHE_NAME = `${CACHE_PREFIX}-precache-${CACHE_VERSION}`;
 const RUNTIME_NAME  = `${CACHE_PREFIX}-runtime-${CACHE_VERSION}`;
 
-// لو فتح صفحة غير موجودة بالكاش وهو أوفلاين، نرجعه لهذي
 const OFFLINE_FALLBACK_PAGE = "index.html";
 
-// الملفات الأساسية اللي نبغاها تشتغل أوفلاين
 const PRECACHE_URLS = [
   "./",
   "index.html",
@@ -35,17 +29,8 @@ const PRECACHE_URLS = [
 async function safePrecache(cache, urls){
   await Promise.all(urls.map(async (url) => {
     try{
-      // نخلي التحميل "مكسور كاش" من الطرف (CDN/Browser) بدون ما نخزن المفتاح بالـ query
-      const fetchUrl =
-        (typeof url === "string" && !/^https?:\/\//i.test(url) && url !== "./")
-          ? `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(CACHE_VERSION)}`
-          : url;
-
-      const res = await fetch(fetchUrl, { cache: "no-store" });
-
-      // نسمح بتخزين OPAQUE (للصور/بعض الطلبات) + OK
-      if(res && (res.ok || res.type === "opaque")){
-        // نخزن بمفتاح URL ثابت (بدون v=) عشان match يكون مضمون داخل نفس إصدار الـ SW
+      const res = await fetch(url, { cache: "no-store" });
+      if(res && res.ok){
         await cache.put(url, res);
       }
     }catch(e){}
@@ -62,7 +47,6 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
-    // تنظيف أي كاش قديم
     const keys = await caches.keys();
     await Promise.all(keys.map((k) => {
       if(k.startsWith(CACHE_PREFIX) && k !== PRECACHE_NAME && k !== RUNTIME_NAME){
@@ -70,7 +54,6 @@ self.addEventListener("activate", (event) => {
       }
     }));
 
-    // Navigation Preload (يساعد iOS/سفاري أحيانًا)
     try{
       if(self.registration.navigationPreload){
         await self.registration.navigationPreload.enable();
@@ -81,7 +64,6 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
-// (اختياري) لو بغينا لاحقًا نرسل رسالة من الصفحة لتحديث فوري
 self.addEventListener("message", (event) => {
   if(event.data && event.data.type === "SKIP_WAITING"){
     self.skipWaiting();
@@ -90,17 +72,44 @@ self.addEventListener("message", (event) => {
 
 async function cachePut(cacheName, requestKey, response){
   try{
-    if(!response) return;
-    if(!(response.ok || response.type === "opaque")) return;
+    if(!response || !response.ok) return;
     const cache = await caches.open(cacheName);
     await cache.put(requestKey, response);
   }catch(e){}
 }
 
-async function fromCache(request, opts){
-  // افتراضيًا: لا نتجاهل query (لكن نقدر نفعلها بالـ opts لو احتجنا)
-  const hit = await caches.match(request, opts || undefined);
-  return hit || null;
+function scopeBasePath(){
+  try{
+    return new URL(self.registration.scope).pathname; // ends with "/"
+  }catch(e){
+    return "/";
+  }
+}
+
+// يحوّل URL مطلق إلى مفتاح نسبي مثل: "maps/map1.jpeg" (بدون ?v=)
+function toCanonicalKey(urlObj){
+  const base = scopeBasePath();
+  let p = urlObj.pathname || "";
+  if(p.startsWith(base)) p = p.slice(base.length);
+  if(p.startsWith("/")) p = p.slice(1);
+  return p; // no search
+}
+
+// نطابق من RUNTIME أولاً ثم PRECACHE (عشان التحديثات الجديدة تغلب القديمة)
+async function matchKeyFirstRuntime(key, ignoreSearch=false){
+  try{
+    const runtime = await caches.open(RUNTIME_NAME);
+    const rHit = await runtime.match(key, { ignoreSearch });
+    if(rHit) return rHit;
+  }catch(e){}
+
+  try{
+    const pre = await caches.open(PRECACHE_NAME);
+    const pHit = await pre.match(key, { ignoreSearch });
+    if(pHit) return pHit;
+  }catch(e){}
+
+  return null;
 }
 
 function withTimeout(promise, ms){
@@ -111,32 +120,12 @@ function withTimeout(promise, ms){
   });
 }
 
-// Stale-While-Revalidate (مفيد لملفات ثقيلة مثل بنك الأسئلة وملفات الـ modules)
-async function staleWhileRevalidate(event, request){
-  const cached = await fromCache(request);
-  const fetchPromise = (async () => {
-    const res = await fetch(request);
-    await cachePut(RUNTIME_NAME, request, res.clone());
-    return res;
-  })();
-
-  if(cached){
-    event.waitUntil(fetchPromise.catch(()=>{}));
-    return cached;
-  }
-
-  return fetchPromise;
-}
-
-// للصفحات (HTML): Network-first لكن إذا النت بطيء نعطي الكاش بسرعة
+// HTML: Network-first لكن لو الشبكة تأخرت يرجع الكاش بسرعة
 async function navigateStrategy(event){
   const req = event.request;
-
-  // هنا نتجاهل query لأن بعض الروابط قد تجي بباراميترات، ونبغى نفس الصفحة تنفتح أوفلاين
-  const cached = await fromCache(req, { ignoreSearch: true });
+  const cached = await matchKeyFirstRuntime(req, true);
 
   const networkPromise = (async () => {
-    // لو فيه preload response استخدمه
     try{
       const preloaded = await event.preloadResponse;
       if(preloaded){
@@ -150,16 +139,14 @@ async function navigateStrategy(event){
     return res;
   })();
 
-  // إذا ما عندنا كاش: حاول شبكة، وإذا فشل رجّع fallback
   if(!cached){
     try{
       return await networkPromise;
     }catch(e){
-      return (await fromCache(OFFLINE_FALLBACK_PAGE, { ignoreSearch: true })) || new Response("Offline", { status: 503 });
+      return (await matchKeyFirstRuntime(OFFLINE_FALLBACK_PAGE, true)) || new Response("Offline", { status: 503 });
     }
   }
 
-  // إذا عندنا كاش: نعطي الشبكة فرصة قصيرة ثم نرجع الكاش لو تأخرت/فشلت
   try{
     return await withTimeout(networkPromise, 2500);
   }catch(e){
@@ -167,24 +154,49 @@ async function navigateStrategy(event){
   }
 }
 
-// للملفات الثابتة: Cache-first
-async function cacheFirst(request){
-  const cached = await fromCache(request, { ignoreSearch: true });
+// ✅ للملفات الثقيلة/المهمة (مع ?v=): Stale-While-Revalidate بمفتاح ثابت بدون query
+async function swrCanonical(event){
+  const req = event.request;
+  const url = new URL(req.url);
+  const key = toCanonicalKey(url);
+
+  const cached = await matchKeyFirstRuntime(key, false);
+
+  const fetchPromise = (async () => {
+    const res = await fetch(req); // نفس الطلب (مع ?v=) عشان يكسر كاش المتصفح/CDN
+    await cachePut(RUNTIME_NAME, key, res.clone()); // نخزّن تحت مفتاح ثابت بدون query
+    return res;
+  })().catch(() => null);
+
+  if(cached){
+    event.waitUntil(fetchPromise);
+    return cached;
+  }
+
+  const net = await fetchPromise;
+  if(net) return net;
+
+  return new Response("Offline", { status: 503 });
+}
+
+// لباقي الملفات الثابتة: Cache-first
+async function cacheFirst(req){
+  const cached = await matchKeyFirstRuntime(req, true);
   if(cached) return cached;
 
-  const res = await fetch(request);
-  await cachePut(RUNTIME_NAME, request, res.clone());
+  const res = await fetch(req);
+  await cachePut(RUNTIME_NAME, req, res.clone());
   return res;
 }
 
-// لباقي الطلبات: Network-first مع fallback للكاش
-async function networkFirst(request){
+// لباقي الطلبات: Network-first
+async function networkFirst(req){
   try{
-    const res = await fetch(request);
-    await cachePut(RUNTIME_NAME, request, res.clone());
+    const res = await fetch(req);
+    await cachePut(RUNTIME_NAME, req, res.clone());
     return res;
   }catch(e){
-    const cached = await fromCache(request, { ignoreSearch: true });
+    const cached = await matchKeyFirstRuntime(req, true);
     if(cached) return cached;
     throw e;
   }
@@ -192,61 +204,46 @@ async function networkFirst(request){
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-
-  // فقط GET
   if(req.method !== "GET") return;
 
   const url = new URL(req.url);
+  if(url.origin !== self.location.origin) return;
 
-  // تفادي خطأ (only-if-cached) لبعض المتصفحات
+  // تفادي خطأ (only-if-cached)
   if(req.cache === "only-if-cached" && req.mode !== "same-origin") return;
 
-  // ✅ (تقوية مهمة) اسمح بكاش Firebase Modules من gstatic عشان الأوفلاين ما يطلع بياض
-  const isGstaticFirebase =
-    url.origin === "https://www.gstatic.com" &&
-    url.pathname.startsWith("/firebasejs/");
+  // ✅ لا نتدخل أبدًا في ملفات الـ SW نفسها (عشان ما نعطل التحديث)
+  const path = url.pathname || "";
+  if(path.endsWith("/sw.js") || path.endsWith("/service-worker.js") || path.endsWith("/service-worker")){
+    return;
+  }
 
-  // ✅ QR (اختياري): ما هو ضروري للأوفلاين، بس ما يضر نخليه SWR إذا تبغى
-  const isQrServer =
-    url.origin === "https://api.qrserver.com" &&
-    url.pathname.startsWith("/v1/create-qr-code/");
-
-  // لو خارج الدومين وماهو ضمن القائمة: خلّه طبيعي
-  const isSameOrigin = (url.origin === self.location.origin);
-  if(!isSameOrigin && !isGstaticFirebase && !isQrServer) return;
-
-  // صفحات HTML (navigation أو Accept: text/html)
   const accept = req.headers.get("accept") || "";
   if(req.mode === "navigate" || accept.includes("text/html")){
     event.respondWith(navigateStrategy(event));
     return;
   }
 
-  // بنك الأسئلة: SWR (سريع + يحدّث نفسه)
-  if(isSameOrigin && url.pathname.endsWith("/questions_bank.js")){
-    event.respondWith(staleWhileRevalidate(event, req));
+  // ✅ ملفات نبيها تتحدث حتى لو كانت Cache موجودة (maps/logo/font/questions)
+  // (تشتغل مع ?v=ASSET_VERSION بشكل صحيح الآن)
+  const canonKey = toCanonicalKey(url);
+  const isHeavy =
+    canonKey === "questions_bank.js" ||
+    canonKey === "logo.png" ||
+    canonKey === "AA-GALAXY.otf" ||
+    canonKey.startsWith("maps/");
+
+  if(isHeavy){
+    event.respondWith(swrCanonical(event));
     return;
   }
 
-  // Firebase Modules: SWR (عشان أول مرة يخزنها، وبعدها تفتح أوفلاين بدون بياض)
-  if(isGstaticFirebase){
-    event.respondWith(staleWhileRevalidate(event, req));
-    return;
-  }
-
-  // QR: Cache-first أو SWR (اختياري)
-  if(isQrServer){
-    event.respondWith(staleWhileRevalidate(event, req));
-    return;
-  }
-
-  // Static assets: Cache-first
-  const dest = req.destination; // "image" | "script" | "style" | "font" | ...
+  // باقي الـ static: Cache-first
+  const dest = req.destination; // image | script | style | font | ...
   if(dest === "image" || dest === "font" || dest === "script" || dest === "style"){
     event.respondWith(cacheFirst(req));
     return;
   }
 
-  // باقي الطلبات: Network-first
   event.respondWith(networkFirst(req));
 });
