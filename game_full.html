@@ -1026,6 +1026,27 @@
     </div>
   </div>
 
+  <!-- ✅ (مهم) تسجيل Service Worker بدري قبل أي imports (نفس فكرة index/join) -->
+  <script>
+    (function(){
+      try{
+        if(!("serviceWorker" in navigator)) return;
+        if(!window.isSecureContext && location.hostname !== "localhost") return;
+
+        var ASSET_VERSION = "2026-02-15-1";
+        var vq = "?v=" + encodeURIComponent(ASSET_VERSION);
+
+        navigator.serviceWorker
+          .register("./sw.js" + vq, { scope: "./" })
+          .then(function(reg){ try{ reg && reg.update && reg.update(); }catch(e){} })
+          .catch(function(err){ console.warn("SW register failed.", err); });
+
+      }catch(e){
+        console.warn("SW register error.", e);
+      }
+    })();
+  </script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getDatabase, ref, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
@@ -1034,33 +1055,7 @@
     const ASSET_VERSION = "2026-02-15-1";
     const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
 
-    // ✅ (جديد) تسجيل Service Worker هنا أيضاً (حتى لو دخل المستخدم مباشرة بدون index.html)
-    (async () => {
-      try{
-        if(!("serviceWorker" in navigator)) return;
-        if(!window.isSecureContext && location.hostname !== "localhost") return;
-
-        const candidates = [
-          `./sw.js${vq}`,
-          `./service-worker.js${vq}`,
-        ];
-
-        let lastErr = null;
-        for(const url of candidates){
-          try{
-            const reg = await navigator.serviceWorker.register(url, { scope: "./" });
-            try{ reg?.update?.(); }catch(e){}
-            console.log("SW registered:", url);
-            return;
-          }catch(e){
-            lastErr = e;
-          }
-        }
-        console.warn("SW register failed.", lastErr);
-      }catch(e){
-        console.warn("SW register error.", e);
-      }
-    })();
+    // ✅ (تم) تسجيل Service Worker تم نقله لسكربت قبل الـmodule لتسجيله بدري مثل index/join
 
     // ✅ تحميل بنك الأسئلة بڤيرجن (إذا فشل، نرجع للـ fallback)
     try{
