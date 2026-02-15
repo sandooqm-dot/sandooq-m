@@ -2582,21 +2582,13 @@
       }
     }
 
-    function safeApplyTimerDom(){
+    function afterRender(room){
+  // تحديثات بعد ما الواجهة تكون موجودة
   try{
-    // لا تحاول تحدث timer إلا إذا عناصره موجودة فعلًا
-    if (
-      document.getElementById("timerValue") ||
-      document.getElementById("timerText")  ||
-      document.getElementById("timerCircle")||
-      document.getElementById("timerRing")
-    ){
-      applyTimerDom();
-    }
+    TIMER_UI.latestTimer = room.timer || {};
+    requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
   }catch(e){}
-}
 
-function safeShowWin(room){
   try{
     const we = room.winEvent;
     if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
@@ -2610,85 +2602,47 @@ onValue(roomRef, (snap) => {
   if(!snap.exists()){
     main.textContent = "اللعبة غير موجودة (رمز غير صحيح).";
     setGameName("");
-    UI_STATE.phase = null;
-    UI_STATE.activeMap = null;
     return;
   }
 
   const room = snap.val();
   setGameName(room?.name);
 
-  // ✅ تحديثات “آمنة” (ما تكسر الصفحة لو عناصر DOM غير موجودة)
-  TIMER_UI.latestTimer = room.timer || {};
-  safeApplyTimerDom();
-  safeShowWin(room);
-
-  // تحقق صلاحية المقدم
+  // ✅ تحقق صلاحية المقدم
   if(role === "host"){
     if(!hostKey || hostKey !== room.presenterKey){
-      if(UI_STATE.phase !== "hostInvalid"){
-        main.textContent = "صلاحية المقدم غير صحيحة.";
-        UI_STATE.phase = "hostInvalid";
-      }
+      main.textContent = "صلاحية المقدم غير صحيحة.";
       return;
     }
-  }
 
-  // تحقق اللاعب
-  let me = null;
-  if(role !== "host"){
-    const players = room.players || {};
-    me = pid ? players[pid] : null;
-    if(!pid || !me){
-      if(UI_STATE.phase !== "playerInvalid"){
-        main.textContent = "بيانات اللاعب غير صحيحة.";
-        UI_STATE.phase = "playerInvalid";
-      }
+    // لوبي/لعبة
+    if(room.status === "lobby"){
+      renderHostLobby(room);
+      // (اختياري) لا يحتاج afterRender هنا
       return;
-    }
-  }
-
-  const phase = getPhase(room);
-  const activeMap = Number(room.activeMap || 0);
-
-  // لوبي المقدم (كما هو)
-  if(phase === "hostLobby"){
-    renderHostLobby(room);
-    UI_STATE.phase = phase;
-    UI_STATE.activeMap = activeMap;
-    return;
-  }
-
-  const needFullRender =
-    (UI_STATE.phase !== phase) ||
-    ((phase === "hostGame" || phase === "playerGame") && UI_STATE.activeMap !== activeMap);
-
-  if(needFullRender){
-    if(phase === "hostGame"){
+    }else{
       renderGame(room, null);
-    }else if(phase === "playerWait"){
-      renderWaiting("بانتظار بدء اللعبة من المقدم...");
-    }else if(phase === "playerGame"){
-      renderGame(room, me);
+      afterRender(room);
+      return;
     }
+  }
 
-    UI_STATE.phase = phase;
-    UI_STATE.activeMap = activeMap;
-
-    // ✅ بعد الرندر الآن عناصر المؤقت موجودة غالبًا
-    TIMER_UI.latestTimer = room.timer || {};
-    safeApplyTimerDom();
-    safeShowWin(room);
-
-    if(phase === "hostGame" || phase === "playerGame"){
-      patchGameUI(room, me);
-    }
+  // ✅ تحقق اللاعب
+  const players = room.players || {};
+  const me = pid ? players[pid] : null;
+  if(!pid || !me){
+    main.textContent = "بيانات اللاعب غير صحيحة.";
     return;
   }
 
-  // نفس الشاشة ونفس الخريطة: تحديث خفيف فقط
-  if(phase === "hostGame" || phase === "playerGame"){
-    patchGameUI(room, me);
+  // انتظار/لعبة
+  if(room.status === "lobby"){
+    renderWaiting("بانتظار بدء اللعبة من المقدم...");
+    return;
+  }else{
+    renderGame(room, me);
+    afterRender(room);
+    return;
   }
 });
       const room = snap.val();
