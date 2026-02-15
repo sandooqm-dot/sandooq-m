@@ -1026,18 +1026,19 @@
     </div>
   </div>
 
-  <!-- ✅ (مهم) تسجيل Service Worker بدري قبل أي imports (نفس فكرة index/join) -->
+  <!-- ✅ (مهم) تسجيل Service Worker بدري قبل أي imports (منظّم + مربوط بنسخة SW) -->
   <script>
     (function(){
       try{
         if(!("serviceWorker" in navigator)) return;
         if(!window.isSecureContext && location.hostname !== "localhost") return;
 
-        var ASSET_VERSION = "2026-02-15-1";
-        var vq = "?v=" + encodeURIComponent(ASSET_VERSION);
+        // ✅ نسخة خاصة للـ SW فقط (عشان تحديث sw.js يضمن يوصل حتى لو ما غيّرت ASSET_VERSION)
+        var SW_VERSION = "2026-02-15-2";
+        var swq = "?v=" + encodeURIComponent(SW_VERSION);
 
         navigator.serviceWorker
-          .register("./sw.js" + vq, { scope: "./" })
+          .register("./sw.js" + swq, { scope: "./" })
           .then(function(reg){ try{ reg && reg.update && reg.update(); }catch(e){} })
           .catch(function(err){ console.warn("SW register failed.", err); });
 
@@ -1054,8 +1055,6 @@
     // ✅ رقم إصدار للكاش + كسر كاش (غيّره فقط عند تحديث ملفات محلية: خرائط/لوجو/خط/بنك أسئلة)
     const ASSET_VERSION = "2026-02-15-1";
     const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
-
-    // ✅ (تم) تسجيل Service Worker تم نقله لسكربت قبل الـmodule لتسجيله بدري مثل index/join
 
     // ✅ تحميل بنك الأسئلة بڤيرجن (إذا فشل، نرجع للـ fallback)
     try{
@@ -1224,7 +1223,7 @@
         x0: minX / cw,
         y0: minY / ch,
         x1: (maxX + 1) / cw,
-        y1: (maxY + 1) / ch,
+        y1: (maxY + 1) / cw,
       };
     }
 
@@ -1767,7 +1766,7 @@
                 <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
                 <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للأبيض.</li>
                 <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
-                <li><b>المؤقت:</b> اضغط على دائرة المؤقت لبدء العد. اضغط مرة ثانية لتصفير المؤقت.</li>
+                <li><b>المؤقت:</b> (لتخفيف الضغط وقت الزحمة) نخزّن في Firebase فقط: <span dir="ltr">bellStartAt</span> (وقت بدء الجرس — يفضّل Server Timestamp) + <span dir="ltr">durationMs</span> + <span dir="ltr">status</span> (running / stopped). وباقي العدّ يصير محلي على الأجهزة.</li>
                 <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
                 <li><b>تغيير الخريطة:</b> للتنقل بين الخرائط الثلاث.</li>
               </ul>
