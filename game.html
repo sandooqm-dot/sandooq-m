@@ -6,7 +6,7 @@
   <title>سباق الحروف - جاري التحميل</title>
   <style>
     :root{
-      /* ✅ عنابي قريب من اللي بالصورة */
+      /* ✅ عنابي قريب من الصورة */
       --bg1:#4a1f2e;
       --bg2:#6b2a3a;
 
@@ -31,7 +31,7 @@
       box-sizing:border-box;
     }
 
-    /* ✅ شاشة التحميل (تظهر دائمًا مثل الصورة) */
+    /* ✅ شاشة التحميل */
     #loading{
       position:fixed; inset:0;
       display:flex;
@@ -78,7 +78,7 @@
       text-shadow:0 6px 14px rgba(0,0,0,.22);
     }
 
-    /* زر الرئيسية مثل الصورة */
+    /* زر الرئيسية */
     .homeBtn{
       position:fixed;
       left:16px;
@@ -144,9 +144,15 @@
     .btn-primary{background:var(--btn);color:#fff}
     .btn-accent{background:var(--accent);color:#111}
 
-    .small{font-size:12px;color:#777;margin-top:10px;direction:ltr;text-align:left;white-space:pre-wrap}
+    .small{
+      font-size:12px;
+      color:#777;
+      margin-top:10px;
+      direction:ltr;
+      text-align:left;
+      white-space:pre-wrap
+    }
 
-    /* حقوق بسيطة أسفل يمين مثل لقطة الألعاب عادة */
     .copy{
       position:fixed;
       right:14px;
@@ -203,12 +209,8 @@
   const goActBtn = document.getElementById("goActivateBtn");
   const homeBtn = document.getElementById("homeBtn");
 
-  function showLoading(){
-    loading.style.display = "flex";
-  }
-  function hideLoading(){
-    loading.style.display = "none";
-  }
+  function showLoading(){ loading.style.display = "flex"; }
+  function hideLoading(){ loading.style.display = "none"; }
 
   function showErrorUI(title, msg, dbg){
     hideLoading();
@@ -245,28 +247,47 @@
   }
 
   function targetGame(){
-    // ننقل نفس الـ query/الهاش للملف الكبير
-    return "/game_full.html" + (location.search || "") + (location.hash || "");
+    // ✅ مهم جدًا: ملف اللعبة الكبيرة بنفس مجلد game.html
+    const cur = new URL(location.href);
+    const u = new URL("./game_full.html", cur);
+
+    // انقل باراميترات الرابط الحالي + كسر الكاش
+    cur.searchParams.forEach((v,k)=>u.searchParams.set(k,v));
+    u.searchParams.set("_ts", Date.now().toString());
+
+    // انقل الهاش إن وجد
+    u.hash = cur.hash;
+
+    return u.toString();
+  }
+
+  function withTimeout(promise, ms, label){
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error((label||"TIMEOUT") + "_" + ms)), ms))
+    ]);
   }
 
   async function fetchMe(deviceId){
     // ✅ جرّب GET أول، وإذا 405 جرّب POST
-    let res = await fetch("/api2/me", {
+    let res = await withTimeout(fetch("/api2/me", {
       method: "GET",
       headers: { "X-Device-Id": deviceId },
-      credentials: "include"
-    });
+      credentials: "include",
+      cache: "no-store"
+    }), 6500, "ME_GET_TIMEOUT");
 
     if (res.status === 405) {
-      res = await fetch("/api2/me", {
+      res = await withTimeout(fetch("/api2/me", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Device-Id": deviceId
         },
         credentials: "include",
+        cache: "no-store",
         body: "{}"
-      });
+      }), 6500, "ME_POST_TIMEOUT");
     }
 
     let data = null;
@@ -276,7 +297,6 @@
 
   async function checkOnce(){
     const deviceId = ensureDeviceId();
-
     const { res, data } = await fetchMe(deviceId);
 
     // غير مسجّل / جلسة غير موجودة
@@ -293,7 +313,7 @@
       return;
     }
 
-    // ✅ تمام: افتح اللعبة الكبيرة فورًا
+    // ✅ تمام: افتح اللعبة الكبيرة
     go(targetGame());
   }
 
@@ -311,8 +331,10 @@
       }catch(e2){
         showErrorUI(
           "تعذر الفتح",
-          "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.",
-          String((e2 && (e2.stack || e2.message)) ? (e2.stack || e2.message) : e2)
+          "ما قدرنا نتحقق من الدخول. جرّب إعادة المحاولة.",
+          "PATH: " + location.pathname + "\n" +
+          "TARGET: " + (new URL("./game_full.html", location.href)).pathname + "\n" +
+          "ERR: " + String((e2 && (e2.stack || e2.message)) ? (e2.stack || e2.message) : e2)
         );
       }
     }
@@ -330,11 +352,11 @@
   });
 
   homeBtn.addEventListener("click", ()=>{
-    // ✅ الرئيسية (الصفحة الرئيسية للموقع/اللعبة)
-    location.href = "/";
+    // ✅ بدال "/" (اللي يودّيك للتفعيل ثم يرجعك)
+    // رجّعك لصفحة إدخال الاسم وعدد اللاعبين بنفس مجلدك
+    location.href = "./index.html";
   });
 
-  // ✅ ابدأ فورًا
   showLoading();
   checkWithRetry();
 })();
@@ -343,4 +365,4 @@
 </body>
 </html>
 
-<!-- game.html – إصدار 3 (بوابة تحقق صامتة + شاشة تحميل عنابية مثل الصورة + الخطأ يظهر فقط بعد فشل مرتين) -->
+<!-- game.html – إصدار 4 (Fix: targetGame نسبي + زر الرئيسية يروح index.html + Timeout لمنع تعليق جاري التحميل) -->
