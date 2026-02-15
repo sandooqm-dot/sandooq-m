@@ -3,46 +3,132 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>جاري فتح اللعبة</title>
+  <title>سباق الحروف - جاري التحميل</title>
   <style>
     :root{
-      --bg1:#4b2a4e;
-      --bg2:#6b3b6a;
+      /* ✅ عنابي قريب من اللي بالصورة */
+      --bg1:#4a1f2e;
+      --bg2:#6b2a3a;
+
       --card:#ffffff;
       --text:#222;
-      --muted:#666;
+      --muted:#6d6d6d;
+
       --accent:#f4c400;
       --btn:#1f4fa3;
+
+      --white:#fff;
+      --shadow:0 14px 30px rgba(0,0,0,.22);
     }
+
     body{
       margin:0; min-height:100vh;
       font-family: Arial, sans-serif;
-      background: radial-gradient(1200px 700px at 30% 10%, rgba(255,255,255,.10), transparent 60%),
-                  linear-gradient(180deg,var(--bg2),var(--bg1));
-      display:flex; align-items:center; justify-content:center;
-      padding:18px 12px; box-sizing:border-box;
+      background:
+        radial-gradient(1200px 700px at 30% 10%, rgba(255,255,255,.10), transparent 60%),
+        linear-gradient(180deg,var(--bg2),var(--bg1));
+      padding:0;
+      box-sizing:border-box;
     }
-    /* ✅ افتراضيًا نخلي الواجهة “غير ملحوظة” */
-    .wrap{ width:min(520px,100%); opacity:0; pointer-events:none; transition:.15s ease; }
-    .show{ opacity:1; pointer-events:auto; }
+
+    /* ✅ شاشة التحميل (تظهر دائمًا مثل الصورة) */
+    #loading{
+      position:fixed; inset:0;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-start;
+      padding:34px 16px 22px;
+      box-sizing:border-box;
+    }
+
+    .brandRow{
+      width:min(820px, 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+      margin-top:4px;
+    }
+
+    .brandLogo{
+      position:absolute;
+      left:0;
+      width:52px;height:52px;
+      object-fit:contain;
+      opacity:.95;
+      pointer-events:none;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+    }
+
+    .brandTitle{
+      margin:0;
+      color:var(--white);
+      font-weight:900;
+      font-size:38px;
+      letter-spacing:.2px;
+      text-shadow:0 8px 18px rgba(0,0,0,.25);
+    }
+
+    .brandSub{
+      margin:10px 0 0;
+      color:rgba(255,255,255,.92);
+      font-weight:700;
+      font-size:16px;
+      text-shadow:0 6px 14px rgba(0,0,0,.22);
+    }
+
+    /* زر الرئيسية مثل الصورة */
+    .homeBtn{
+      position:fixed;
+      left:16px;
+      bottom:16px;
+      border:0;
+      border-radius:18px;
+      padding:14px 18px;
+      font-weight:900;
+      font-size:18px;
+      background:#ffffff;
+      color:#111;
+      box-shadow:0 12px 22px rgba(0,0,0,.25);
+      cursor:pointer;
+    }
+
+    /* ✅ صندوق الخطأ (ما يظهر إلا لو فشل مرتين) */
+    .wrap{
+      width:min(520px,100%);
+      opacity:0;
+      pointer-events:none;
+      transition:.15s ease;
+      position:fixed;
+      left:50%;
+      top:56%;
+      transform:translate(-50%,-50%);
+      padding:0 12px;
+      box-sizing:border-box;
+      z-index:5;
+    }
+    .wrap.show{ opacity:1; pointer-events:auto; }
 
     .card{
       background:var(--card);
       border-radius:18px;
       padding:18px 16px;
-      box-shadow:0 14px 30px rgba(0,0,0,.22);
+      box-shadow:var(--shadow);
       text-align:center;
     }
-    .top{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 8px}
-    .top img{width:40px;height:40px;object-fit:contain}
-    .title{margin:6px 0 8px;font-size:18px;font-weight:800;color:var(--text)}
+
+    .top{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 6px}
+    .top img{width:44px;height:44px;object-fit:contain}
+
+    .title{margin:6px 0 8px;font-size:18px;font-weight:900;color:var(--text)}
     .sub{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.6}
 
     .spinner{
       width:34px;height:34px;border-radius:50%;
       border:4px solid rgba(31,79,163,.18);
       border-top-color: var(--btn);
-      margin:8px auto 12px;
+      margin:10px auto 14px;
       animation:spin .9s linear infinite;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -51,16 +137,40 @@
     .btn{
       border:0; border-radius:12px;
       padding:12px 14px;
-      font-weight:800;
+      font-weight:900;
       cursor:pointer;
       min-width:170px;
     }
     .btn-primary{background:var(--btn);color:#fff}
     .btn-accent{background:var(--accent);color:#111}
-    .small{font-size:12px;color:#777;margin-top:10px}
+
+    .small{font-size:12px;color:#777;margin-top:10px;direction:ltr;text-align:left;white-space:pre-wrap}
+
+    /* حقوق بسيطة أسفل يمين مثل لقطة الألعاب عادة */
+    .copy{
+      position:fixed;
+      right:14px;
+      bottom:18px;
+      font-size:12px;
+      color:rgba(255,255,255,.75);
+      text-shadow:0 6px 14px rgba(0,0,0,.25);
+      pointer-events:none;
+    }
   </style>
 </head>
 <body>
+
+  <!-- ✅ شاشة التحميل -->
+  <div id="loading" aria-live="polite">
+    <div class="brandRow">
+      <img class="brandLogo" src="/logo.png" alt="Sandooq" />
+      <h1 class="brandTitle">سباق الحروف</h1>
+    </div>
+    <div class="brandSub">جاري التحميل...</div>
+  </div>
+
+  <button class="homeBtn" id="homeBtn">الرئيسية</button>
+  <div class="copy">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
 
   <!-- ✅ هذا الصندوق ما يظهر إلا لو صار خطأ فعلي بعد محاولتين -->
   <div class="wrap" id="wrap">
@@ -83,6 +193,7 @@
 
 <script>
 (function(){
+  const loading = document.getElementById("loading");
   const wrap = document.getElementById("wrap");
   const t = document.getElementById("t");
   const m = document.getElementById("m");
@@ -90,13 +201,28 @@
   const debugEl = document.getElementById("debug");
   const retryBtn = document.getElementById("retryBtn");
   const goActBtn = document.getElementById("goActivateBtn");
+  const homeBtn = document.getElementById("homeBtn");
+
+  function showLoading(){
+    loading.style.display = "flex";
+  }
+  function hideLoading(){
+    loading.style.display = "none";
+  }
 
   function showErrorUI(title, msg, dbg){
+    hideLoading();
     t.textContent = title || "تعذر الفتح";
     m.textContent = msg || "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.";
     sp.style.display = "none";
     debugEl.textContent = dbg || "";
     wrap.classList.add("show");
+  }
+
+  function hideErrorUI(){
+    sp.style.display = "block";
+    debugEl.textContent = "";
+    wrap.classList.remove("show");
   }
 
   function ensureDeviceId(){
@@ -119,12 +245,12 @@
   }
 
   function targetGame(){
-    // ننقل نفس الـ query للملف الكبير
+    // ننقل نفس الـ query/الهاش للملف الكبير
     return "/game_full.html" + (location.search || "") + (location.hash || "");
   }
 
   async function fetchMe(deviceId){
-    // ✅ جرّب GET أول (أسرع/أخف)، وإذا رجع 405 جرّب POST
+    // ✅ جرّب GET أول، وإذا 405 جرّب POST
     let res = await fetch("/api2/me", {
       method: "GET",
       headers: { "X-Device-Id": deviceId },
@@ -153,7 +279,7 @@
 
     const { res, data } = await fetchMe(deviceId);
 
-    // غير مسجّل/جلسة غير موجودة
+    // غير مسجّل / جلسة غير موجودة
     if(!res.ok || !data || data.ok !== true){
       const next = encodeURIComponent(here());
       go("/activate?next=" + next);
@@ -183,19 +309,18 @@
         await checkOnce();
         return;
       }catch(e2){
-        // ✅ هنا فقط نظهر واجهة الخطأ (نادر)
         showErrorUI(
           "تعذر الفتح",
           "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.",
-          String((e2 && e2.message) ? e2.message : e2)
+          String((e2 && (e2.stack || e2.message)) ? (e2.stack || e2.message) : e2)
         );
       }
     }
   }
 
   retryBtn.addEventListener("click", ()=>{
-    sp.style.display = "block";
-    wrap.classList.remove("show");
+    showLoading();
+    hideErrorUI();
     checkWithRetry();
   });
 
@@ -204,7 +329,13 @@
     go("/activate?next=" + next);
   });
 
-  // ✅ ابدأ فورًا (بدون ما يلاحظ المستخدم)
+  homeBtn.addEventListener("click", ()=>{
+    // ✅ الرئيسية (الصفحة الرئيسية للموقع/اللعبة)
+    location.href = "/";
+  });
+
+  // ✅ ابدأ فورًا
+  showLoading();
   checkWithRetry();
 })();
 </script>
@@ -212,4 +343,4 @@
 </body>
 </html>
 
-<!-- game.html – إصدار 2 (بوابة تحقق صامتة + ما تظهر إلا عند فشل مرتين) -->
+<!-- game.html – إصدار 3 (بوابة تحقق صامتة + شاشة تحميل عنابية مثل الصورة + الخطأ يظهر فقط بعد فشل مرتين) -->
