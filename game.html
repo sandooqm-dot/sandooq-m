@@ -10,6 +10,28 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
+  <!-- ✅ (مهم) تسجيل Service Worker بدري (نفس فكرة index/join/game_full) -->
+  <script>
+  (function(){
+    try{
+      if(!("serviceWorker" in navigator)) return;
+      if(!window.isSecureContext && location.hostname !== "localhost") return;
+
+      // استخدم نفس رقم إصدار ملفاتك لكسر الكاش عند الحاجة
+      var ASSET_VERSION = "2026-02-15-1";
+      var vq = "?v=" + encodeURIComponent(ASSET_VERSION);
+
+      navigator.serviceWorker
+        .register("./sw.js" + vq, { scope: "./" })
+        .then(function(reg){ try{ reg && reg.update && reg.update(); }catch(e){} })
+        .catch(function(err){ console.warn("SW register failed.", err); });
+
+    }catch(e){
+      console.warn("SW register error.", e);
+    }
+  })();
+  </script>
+
   <style>
     :root{
       --bgA:#7b3459;   /* عنابي فاتح */
@@ -446,4 +468,4 @@
 </body>
 </html>
 
-<!-- game.html – إصدار 3 (بوابة + إرسال Authorization + فحص مسار game_full + شاشة تحميل عنابي) -->
+<!-- game.html – إصدار 4 (SW مبكر + بوابة + إرسال Authorization + فحص مسار game_full + شاشة تحميل عنابي) -->
