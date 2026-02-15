@@ -5,8 +5,65 @@
 */
 "use strict";
 
+// ✅ نفس فكرة ASSET_VERSION في game_full.html (اختياري: غيّره عند تحديث بنك الأسئلة)
+const QUESTIONS_BANK_VERSION = "2026-02-15-1";
+
+// ✅ مخزن الأسئلة (مشترك بين أي أجزاء/ملفات لو قررت تقسم البنك لاحقاً)
 window.QUESTIONS = window.QUESTIONS || {};
 const QUESTIONS = window.QUESTIONS;
+
+// ✅ علامة تحميل (تمنع تكرار تحميل نفس النسخة بدون قصد)
+window.__QUESTIONS_BANK_LOADED__ = window.__QUESTIONS_BANK_LOADED__ || {};
+if (window.__QUESTIONS_BANK_LOADED__[QUESTIONS_BANK_VERSION]) {
+  console.warn("questions_bank.js already loaded:", QUESTIONS_BANK_VERSION);
+} else {
+  window.__QUESTIONS_BANK_LOADED__[QUESTIONS_BANK_VERSION] = Date.now();
+}
+
+// ✅ أدوات اختيارية (ما تغيّر أسئلتك الحالية)
+// تقدر تتجاهلها، أو تستخدمها لو تقسم البنك لعدة ملفات لاحقاً.
+window.QB = window.QB || {};
+window.QB.version = window.QB.version || QUESTIONS_BANK_VERSION;
+
+// يضمن أن QUESTIONS[letter] مصفوفة
+window.QB.ensure = window.QB.ensure || function(letter){
+  if (!QUESTIONS[letter] || !Array.isArray(QUESTIONS[letter])) QUESTIONS[letter] = [];
+  return QUESTIONS[letter];
+};
+
+// إضافة سؤال واحد: { q, a }
+window.QB.add = window.QB.add || function(letter, q, a){
+  const arr = window.QB.ensure(letter);
+  const qq = String(q ?? "").trim();
+  const aa = String(a ?? "").trim();
+  if (qq || aa) arr.push({ q: qq, a: aa });
+};
+
+// إضافة دفعة (تقبل [{q,a},..] أو [[q,a],..])
+window.QB.addMany = window.QB.addMany || function(letter, items){
+  const arr = window.QB.ensure(letter);
+  (items || []).forEach(it => {
+    if (!it) return;
+    let q = "", a = "";
+    if (Array.isArray(it)) { q = it[0]; a = it[1]; }
+    else if (typeof it === "object") { q = it.q; a = it.a; }
+    const qq = String(q ?? "").trim();
+    const aa = String(a ?? "").trim();
+    if (qq || aa) arr.push({ q: qq, a: aa });
+  });
+};
+
+// إحصائية سريعة للتأكد (اختياري)
+window.QB.stats = window.QB.stats || function(){
+  let total = 0;
+  const per = {};
+  Object.keys(QUESTIONS).forEach(L=>{
+    if (!Array.isArray(QUESTIONS[L])) return;
+    per[L] = QUESTIONS[L].length;
+    total += QUESTIONS[L].length;
+  });
+  return { version: window.QB.version, total, per };
+};
 
 QUESTIONS["هـ"] = [
   // ====== الموجود سابقًا في كودك (مع تصحيح بسيط فقط) ======
