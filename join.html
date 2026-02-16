@@ -194,6 +194,40 @@
       return (g <= o) ? "green" : "orange";
     }
 
+    // ✅✅ إضافة مهمة: تثبيت “هوية اللاعب” محليًا (Cookie + Storage)
+    // هذا يمنع أي صفحة لاحقًا من اعتباره “غير مسجّل” وترسله لتسجيل الدخول
+    function setCookie(name, value, maxAgeSeconds){
+      const parts = [
+        `${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`,
+        "Path=/",
+        `Max-Age=${Math.max(60, Number(maxAgeSeconds || 86400))}`,
+        "SameSite=Lax"
+      ];
+      if (location.protocol === "https:") parts.push("Secure");
+      document.cookie = parts.join("; ");
+    }
+
+    function markAsGuestPlayer(code, pid){
+      // كوكي
+      setCookie("sandooq_guest_player", "1", 60 * 60 * 12); // 12 ساعة
+      setCookie("sandooq_role", "player", 60 * 60 * 12);
+      setCookie("sandooq_room_code", code, 60 * 60 * 12);
+      setCookie("sandooq_pid", pid, 60 * 60 * 12);
+
+      // localStorage / sessionStorage (لأي صفحة تعتمد عليها)
+      try{
+        localStorage.setItem("sandooq_guest_player", "1");
+        localStorage.setItem("sandooq_role", "player");
+        localStorage.setItem("sandooq_room_code", code);
+        localStorage.setItem("sandooq_pid", pid);
+
+        sessionStorage.setItem("sandooq_guest_player", "1");
+        sessionStorage.setItem("sandooq_role", "player");
+        sessionStorage.setItem("sandooq_room_code", code);
+        sessionStorage.setItem("sandooq_pid", pid);
+      }catch(e){}
+    }
+
     async function join(){
       clearError();
 
@@ -243,11 +277,20 @@
           joinedAt: Date.now()
         });
 
-        // ✅✅ التعديل المطلوب فقط: تحويله إلى صفحة الانتظار play.html بدل game.html
+        // ✅✅ أهم سطرين: علّم الجهاز أنه “لاعب ضيف” قبل الانتقال للانتظار
+        markAsGuestPlayer(code, pid);
+
+        // تحويله إلى صفحة الانتظار play.html
         const u = new URL("play.html", location.href);
         u.searchParams.set("role", "player");
         u.searchParams.set("code", code);
         u.searchParams.set("pid", pid);
+
+        // إشارات إضافية (لو أي صفحة ثانية تعتمد عليها)
+        u.searchParams.set("guest", "1");
+        u.searchParams.set("player", "1");
+        u.searchParams.set("view", "player");
+
         location.href = u.toString();
 
       }catch(e){
@@ -269,6 +312,6 @@
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vOldStyle-1 (Redirect to play.html) -->
+  <!-- VERSION: join.html — vFixGuest-2 (Set guest cookies/storage before redirect) -->
 </body>
 </html>
