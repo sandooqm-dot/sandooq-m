@@ -101,27 +101,6 @@
       user-select:none;
     }
   </style>
-
-  <!-- ✅ تسجيل Service Worker (مبكر + iOS-friendly) -->
-  <script>
-    (function () {
-      if (!("serviceWorker" in navigator)) return;
-      if (location.protocol !== "https:" && location.hostname !== "localhost") return;
-
-      // تسجيل مبكر، ومع fallback لو المتصفح ما يدعم updateViaCache
-      try{
-        navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" })
-          .catch(function(){});
-      }catch(e){
-        navigator.serviceWorker.register("./sw.js").catch(function(){});
-      }
-
-      // فحص تحديث بعد الجاهزية بدون إزعاج المستخدم
-      navigator.serviceWorker.ready
-        .then(function(reg){ try{ reg.update(); }catch(e){} })
-        .catch(function(){});
-    })();
-  </script>
 </head>
 <body>
   <header>
@@ -145,7 +124,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -204,9 +183,11 @@
       return (Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4));
     }
 
-    function pickTeamFromPlayers(players){
+    async function pickTeam(room){
+      // اختيار فريق مبدئي (الأقل عددًا)
+      const players = room?.players || {};
       let g = 0, o = 0;
-      for(const id in (players || {})){
+      for(const id in players){
         if(players[id]?.team === "orange") o++;
         else if(players[id]?.team === "green") g++;
       }
@@ -236,8 +217,7 @@
 
       try{
         // تحقق من وجود الغرفة
-        const roomRef = ref(db, `rooms/${code}`);
-        const roomSnap = await get(roomRef);
+        const roomSnap = await get(ref(db, `rooms/${code}`));
         if(!roomSnap.exists()){
           showError("رمز اللعبة غير صحيح أو الغرفة غير موجودة");
           return;
@@ -250,34 +230,20 @@
           return;
         }
 
+        const team = await pickTeam(room);
         const pid = genPid();
-        const now = Date.now();
 
         // حفظ الاسم محلياً
         localStorage.setItem("sandooq_last_player_name", name);
 
-        // ✅✅ منع مضبوط: حد أقصى 13 لاعب عبر Transaction
-        const playersRef = ref(db, `rooms/${code}/players`);
-        const tx = await runTransaction(playersRef, (players) => {
-          if(players === null) players = {};
+        // إضافة اللاعب للغرفة
+        await update(ref(db, `rooms/${code}/players/${pid}`), {
+          name,
+          team,
+          joinedAt: Date.now()
+        });
 
-          const count = Object.keys(players).length;
-          if(count >= 13){
-            // إلغاء العملية (no commit)
-            return;
-          }
-
-          const team = pickTeamFromPlayers(players);
-          players[pid] = { name, team, joinedAt: now };
-          return players;
-        }, { applyLocally:false });
-
-        if(!tx.committed){
-          showError("الغرفة ممتلئة");
-          return;
-        }
-
-        // ✅✅ التعديل المتفق عليه: اللاعب يروح لصفحة الانتظار play.html (بدل game_full.html المحمي)
+        // ✅✅ التعديل المطلوب فقط: تحويله إلى صفحة الانتظار play.html بدل game.html
         const u = new URL("play.html", location.href);
         u.searchParams.set("role", "player");
         u.searchParams.set("code", code);
@@ -303,6 +269,6 @@
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — v4 (Redirect to play.html waiting page; keep room code field) -->
+  <!-- VERSION: join.html — vOldStyle-1 (Redirect to play.html) -->
 </body>
 </html>
