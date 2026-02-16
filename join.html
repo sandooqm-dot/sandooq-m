@@ -277,8 +277,8 @@
           return;
         }
 
-        // ✅ تحويله لصفحة اللعبة (نسخة الإنتاج)
-        const u = new URL("game_full.html", location.href);
+        // ✅✅ (التعديل المطلوب) تحويله لصفحة الانتظار بدل game_full.html
+        const u = new URL("play.html", location.href);
         u.searchParams.set("role", "player");
         u.searchParams.set("code", code);
         u.searchParams.set("pid", pid);
@@ -303,6 +303,6 @@
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — v3 (Max 13 players via Transaction) -->
+  <!-- VERSION: join.html — v4 (Redirect players to play.html instead of game_full.html) -->
 </body>
 </html>
