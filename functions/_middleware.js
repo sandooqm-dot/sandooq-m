@@ -1,8 +1,9 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v8: خيار يسمح للاعبين (guests) بالدخول للصفحات الخاصة باللاعب بدون المرور على التأمين، مع بقاء المقدم محمي
+// v8: Fix لاعبين الانتظار -> اللعبة: السماح للاعب بالدخول حتى لو انتقل للعبة بدون role بالـ URL
+//     (نعتمد على role=player أو Referer من play/waiting أو Cookie خفيف للاعب)
 
-const ALLOW_GUEST_PLAYERS = true; // ✅ غيّره إلى false لو تبغى ترجع التأمين على اللاعبين
+const ALLOW_GUEST_PLAYERS = true;
 
 const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
 const schemaCache = new Map(); // table -> { ts, cols:Set }
@@ -225,62 +226,47 @@ function redirectToActivate(url) {
   }));
 }
 
-// ✅ تحديد إن كان الطلب “لاعب” (Guest Player) — يسمح له بدون تأمين
-function isGuestPlayer(url) {
-  const sp = url.searchParams;
-  const role = (sp.get("role") || "").toLowerCase();
-
-  // إشارات صريحة
+// ✅ تحديد إن كان الطلب “لاعب” حتى لو ما انحط role=player في رابط صفحة اللعبة
+function isGuestPlayerRequest(request, url) {
+  // 1) من الـ URL
+  const role = (url.searchParams.get("role") || "").toLowerCase();
   if (role === "player") return true;
-  if (sp.get("player") === "1") return true;
-  if (sp.get("guest") === "1") return true;
-  if ((sp.get("view") || "").toLowerCase() === "player") return true;
 
-  // إشارة ضمنية: وجود room/roomId غالباً لاعب (وأغلب الوقت المقدم أصلاً معه توكن)
-  const hasRoom = sp.has("room") || sp.has("roomId") || sp.has("r") || sp.has("code");
-  const hostHint =
-    role === "host" ||
-    sp.get("host") === "1" ||
-    sp.get("presenter") === "1";
+  // 2) من Cookie (اختياري لو تحب تستخدمه لاحقًا)
+  const cRole =
+    (getCookie(request, "sandooq_role") || getCookie(request, "sandooq_player_role") || "").toLowerCase();
+  if (cRole === "player") return true;
 
-  if (hasRoom && !hostHint) return true;
+  const cGuest = (getCookie(request, "sandooq_guest_player") || getCookie(request, "sandooq_guest") || "");
+  if (cGuest === "1" || cGuest.toLowerCase() === "true") return true;
+
+  // 3) من Referer (هذا هو المهم لحالتك: play.html -> game_full.html بدون باراميترات)
+  const ref = request.headers.get("referer") || request.headers.get("Referer") || "";
+  if (ref) {
+    // fallback سريع
+    if (ref.includes("role=player")) return true;
+
+    try {
+      const ru = new URL(ref);
+      const rRole = (ru.searchParams.get("role") || "").toLowerCase();
+      if (rRole === "player") return true;
+
+      const fromWaiting =
+        ru.pathname.endsWith("/play.html") ||
+        ru.pathname.endsWith("/waiting.html") ||
+        ru.pathname.endsWith("/join.html");
+
+      // إذا جاي من صفحة انتظار/انضمام ومعه pid+code نعتبره لاعب
+      if (fromWaiting) {
+        const pid = ru.searchParams.get("pid");
+        const code = ru.searchParams.get("code") || ru.searchParams.get("room") || ru.searchParams.get("roomId");
+        if (pid && code) return true;
+      }
+    } catch {}
+  }
 
   return false;
 }
-
-// ✅ صفحات/مسارات اللاعب التي نسمح لها بدون تأمين (حتى لو كانت تحت /app)
-const GUEST_PLAYER_ALLOWED_PATHS = new Set([
-  "/game_full.html",
-  "/game_full",
-  "/game_full/",
-  "/game.html",
-  "/game",
-  "/game/",
-  "/join.html",
-  "/join",
-  "/join/",
-  "/waiting.html",
-  "/waiting",
-  "/waiting/",
-  "/player.html",
-  "/player",
-  "/player/",
-  "/app/game_full.html",
-  "/app/game_full",
-  "/app/game_full/",
-  "/app/game.html",
-  "/app/game",
-  "/app/game/",
-  "/app/join.html",
-  "/app/join",
-  "/app/join/",
-  "/app/waiting.html",
-  "/app/waiting",
-  "/app/waiting/",
-  "/app/player.html",
-  "/app/player",
-  "/app/player/",
-]);
 
 export async function onRequest(context) {
   const { request, env, next } = context;
@@ -308,9 +294,9 @@ export async function onRequest(context) {
     path === "/app/game_full" ||
     path === "/app/game_full/";
 
-  // ✅✅ خيار: السماح للاعبين بالدخول بدون تأمين (وهذا يحل مشكلة انتقالهم لتسجيل الدخول عند بدء اللعبة)
-  if (ALLOW_GUEST_PLAYERS) {
-    if ((protectGameFull || GUEST_PLAYER_ALLOWED_PATHS.has(path)) && isGuestPlayer(url)) {
+  // ✅✅ إصلاح المشكلة: السماح للاعب يدخل صفحة اللعبة حتى لو الرابط ما فيه role=player
+  if (ALLOW_GUEST_PLAYERS && protectGameFull) {
+    if (isGuestPlayerRequest(request, url)) {
       return next();
     }
   }
@@ -351,5 +337,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 8 (Guest Players Option + keep presenter protected)
+_middleware.js – إصدار 8 (Fix: allow players via role/cookie/referer so they don't get sent to /activate)
 */
