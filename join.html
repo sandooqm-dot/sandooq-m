@@ -108,6 +108,7 @@
       if (!("serviceWorker" in navigator)) return;
       if (location.protocol !== "https:" && location.hostname !== "localhost") return;
 
+      // تسجيل مبكر، ومع fallback لو المتصفح ما يدعم updateViaCache
       try{
         navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" })
           .catch(function(){});
@@ -115,6 +116,7 @@
         navigator.serviceWorker.register("./sw.js").catch(function(){});
       }
 
+      // فحص تحديث بعد الجاهزية بدون إزعاج المستخدم
       navigator.serviceWorker.ready
         .then(function(reg){ try{ reg.update(); }catch(e){} })
         .catch(function(){});
@@ -131,6 +133,7 @@
     <div class="card">
       <input id="playerName" class="input" type="text" placeholder="اسم اللاعب" autocomplete="name" />
 
+      <!-- ✅ خانة رمز اللعبة تحت اسم اللاعب -->
       <input id="roomCode" class="input" type="text" inputmode="numeric" placeholder="ادخل رمز اللعبة" maxlength="6" />
 
       <button id="joinBtn" class="btn">دخول</button>
@@ -165,8 +168,10 @@
     const btn = document.getElementById("joinBtn");
     const err = document.getElementById("err");
 
+    // تعبئة الرمز تلقائياً لو جاي من رابط/باركود
     if(codeFromLink) codeEl.value = codeFromLink;
 
+    // تذكّر آخر اسم (اختياري ومفيد)
     const lastName = localStorage.getItem("sandooq_last_player_name");
     if(lastName && !nameEl.value) nameEl.value = lastName;
 
@@ -180,6 +185,7 @@
     }
 
     function normalizeDigits(s){
+      // يحوّل الأرقام العربية/الفارسية إلى إنجليزية
       const map = {
         "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
         "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
@@ -212,6 +218,8 @@
 
       const name = (nameEl.value || "").trim();
       const code = cleanCode(codeEl.value);
+
+      // اعكس للواجهة القيمة المنظفة
       codeEl.value = code;
 
       if(!name){
@@ -227,6 +235,7 @@
       btn.textContent = "جاري الدخول...";
 
       try{
+        // تحقق من وجود الغرفة
         const roomRef = ref(db, `rooms/${code}`);
         const roomSnap = await get(roomRef);
         if(!roomSnap.exists()){
@@ -235,6 +244,7 @@
         }
         const room = roomSnap.val();
 
+        // منع الدخول إذا ما فيه حالة صحيحة (اختياري)
         if(room.status !== "lobby" && room.status !== "started"){
           showError("الغرفة غير جاهزة حالياً");
           return;
@@ -243,14 +253,17 @@
         const pid = genPid();
         const now = Date.now();
 
+        // حفظ الاسم محلياً
         localStorage.setItem("sandooq_last_player_name", name);
 
+        // ✅✅ منع مضبوط: حد أقصى 13 لاعب عبر Transaction
         const playersRef = ref(db, `rooms/${code}/players`);
         const tx = await runTransaction(playersRef, (players) => {
           if(players === null) players = {};
 
           const count = Object.keys(players).length;
           if(count >= 13){
+            // إلغاء العملية (no commit)
             return;
           }
 
@@ -264,11 +277,11 @@
           return;
         }
 
-        // ✅✅ التعديل الوحيد: اللاعب يروح لصفحة الانتظار play.html (بدل game_full.html المحمي)
+        // ✅✅ التعديل المتفق عليه: اللاعب يروح لصفحة الانتظار play.html (بدل game_full.html المحمي)
         const u = new URL("play.html", location.href);
+        u.searchParams.set("role", "player");
         u.searchParams.set("code", code);
         u.searchParams.set("pid", pid);
-        u.searchParams.set("role", "player");
         location.href = u.toString();
 
       }catch(e){
@@ -279,6 +292,7 @@
       }
     }
 
+    // تنسيق الكود أثناء الكتابة
     codeEl.addEventListener("input", () => {
       const v = cleanCode(codeEl.value);
       codeEl.value = v;
@@ -289,6 +303,6 @@
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — v4 (Redirect to play.html waiting page; no activate for guests) -->
+  <!-- VERSION: join.html — v4 (Redirect to play.html waiting page; keep room code field) -->
 </body>
 </html>
