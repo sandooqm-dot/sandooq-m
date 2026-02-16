@@ -1,6 +1,6 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v6: protects /app/* + root /game_full(.html) + schema cache (no PRAGMA spam)
+// v7: allow guest player pages (join/play/game) to bypass activate redirect
 
 const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
 const schemaCache = new Map(); // table -> { ts, cols:Set }
@@ -240,7 +240,23 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅ (تعديل v6) تحديد الصفحات المحمية
+  // ✅✅ (الجديد) صفحات اللاعبين الضيوف — لا تمر على activate نهائيًا
+  const GUEST_ALLOW = new Set([
+    "/join.html", "/join",
+    "/play.html", "/play",
+    "/game.html", "/game",
+
+    // لو صار عندك أي تحويلات تخليها تحت /app
+    "/app/join.html", "/app/join",
+    "/app/play.html", "/app/play",
+    "/app/game.html", "/app/game",
+  ]);
+
+  if (GUEST_ALLOW.has(path)) {
+    return next();
+  }
+
+  // ✅ تحديد الصفحات المحمية
   const protectRootGameFull =
     path === "/game_full.html" ||
     path === "/game_full" ||
@@ -282,5 +298,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 6 (protects /app/* + /game_full(.html))
+_middleware.js – إصدار 7 (Guest bypass for join/play/game)
 */
