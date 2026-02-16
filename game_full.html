@@ -108,13 +108,15 @@
       font-size:54px;
       line-height:1.02;
       font-weight:900;
-      text-shadow:0 10px 22px rgba(0,0,0,.35);
+      text-shadow:none; /* ✅ (7) إزالة ظل عنوان “سباق الحروف” */
       direction:rtl;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
       padding-top:6px;
     }
+
+    /* ✅ (6) إزالة الإطار الأسود حول اسم اللعبة + النص أصفر بدون ظل */
     .gameName{
       flex:0 0 auto;
       width:min(30vw, 190px);
@@ -122,14 +124,15 @@
       padding:10px 10px;
       border-radius:10px;
       background:rgba(0,0,0,.10);
-      border:4px solid rgba(0,0,0,.85);
-      color:#fff;
+      border:none;                 /* ✅ إزالة البوردَر فقط */
+      color:#ffd54a;               /* ✅ أصفر واضح ومرتب */
       font-weight:900;
       line-height:1.2;
       text-align:center;
       overflow:hidden;
       direction:rtl;
       box-shadow:0 8px 18px rgba(0,0,0,.22);
+      text-shadow:none;            /* ✅ بدون ظل */
     }
     .gameName:empty{display:none;}
     .gnText{
@@ -140,6 +143,7 @@
       word-break:break-word;
       white-space:normal;
       font-size:18px;
+      text-shadow:none;            /* ✅ بدون ظل */
     }
 
     .wrap{ width:95%; max-width:900px; margin:0 auto; }
@@ -290,7 +294,7 @@
       align-items:center;
       justify-content:center;
       gap:14px;
-      direction:rtl; /* لكي ترتيبها يكون من اليمين لليسار */
+      direction:rtl;
       flex-wrap:nowrap;
       width:min(92vw, 760px);
     }
@@ -399,7 +403,7 @@
       text-align:right;
     }
 
-    /* ✅ لوحة النتائج (8) */
+    /* ✅ لوحة النتائج */
     .scoreBoard{
       width:min(92vw, 760px);
       margin:10px auto 6px;
@@ -444,44 +448,52 @@
     .scoreBox.clickable{ cursor:pointer; }
     .scoreBox:active{ transform: translateY(1px); }
 
-    .scorePickerBackdrop{
+    /* ✅ (4) Stepper للأسكور: سهم فوق/تحت */
+    .scoreStepBackdrop{
       position:fixed;
       inset:0;
-      background:rgba(0,0,0,.45);
+      background:rgba(0,0,0,0); /* شفاف */
       display:none;
+      z-index:26000;
+    }
+    .scoreStepper{
+      position:fixed;
+      display:flex;
+      flex-direction:column;
       align-items:center;
-      justify-content:center;
-      z-index:25000;
-      padding:14px;
+      gap:8px;
+      width:72px;
+      user-select:none;
     }
-    .scorePicker{
-      width:min(92vw, 420px);
-      background:#fff;
-      color:#111;
-      border-radius:18px;
-      padding:14px;
-      border:6px solid rgba(0,0,0,.85);
-      box-shadow:0 24px 36px rgba(0,0,0,.28);
-      text-align:center;
-    }
-    .scoreGrid{
-      display:grid;
-      grid-template-columns:repeat(5, 1fr);
-      gap:10px;
-      margin-top:12px;
-    }
-    .scoreNumBtn{
-      height:54px;
-      border-radius:16px;
+    .scoreStepBtn{
+      width:64px;
+      height:44px;
+      border-radius:14px;
       border:4px solid rgba(0,0,0,.85);
       background:#ffd54a;
       color:#111;
-      font-size:22px;
+      font-size:28px;
       font-weight:900;
       cursor:pointer;
       box-shadow:0 8px 0 rgba(0,0,0,.18);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
-    .scoreNumBtn:active{ transform: translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.18); }
+    .scoreStepBtn:active{ transform: translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.18); }
+    .scoreStepVal{
+      width:64px;
+      height:56px;
+      border-radius:14px;
+      border:4px solid rgba(0,0,0,.85);
+      background:#fff;
+      color:#111;
+      font-size:28px;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 10px 18px rgba(0,0,0,.20);
+    }
 
     /* ✅ شريط اسم أول لاعب (pill) */
     .firstPressBar{
@@ -599,10 +611,23 @@
       50%  { box-shadow:0 0 0 10px rgba(255,255,255,.35), 0 18px 30px rgba(0,0,0,.25); }
       100% { box-shadow:0 0 0 0 rgba(255,255,255,.0), 0 18px 30px rgba(0,0,0,.25); }
     }
-    .timerClockBtn.doneFlashing{
-      animation: timerFlash .55s linear infinite;
-      background:#ff2d2d;
+    /* ✅ (3) وميض أبيض/أحمر عند انتهاء المؤقت */
+    @keyframes timerFlashBg{
+      0%,49% { background:#ff2d2d; }
+      50%,100% { background:#ffffff; }
     }
+    @keyframes timerFlashNum{
+      0%,49% { color:#fff; }
+      50%,100% { color:#111; }
+    }
+    .timerClockBtn.doneFlashing{
+      animation: timerFlash .55s linear infinite, timerFlashBg .55s linear infinite;
+    }
+    .timerClockBtn.doneFlashing .timerNumber{
+      animation: timerFlashNum .55s linear infinite;
+      text-shadow:none;
+    }
+
     .timerPlayerView{ pointer-events:none; user-select:none; }
 
     /* ✅ بطاقة السؤال مثل الصورة (مستطيل أبيض بإطار أسود ثقيل) */
@@ -621,12 +646,12 @@
       line-height:1.45;
       font-size:34px;
       font-weight:900;
-      color:#111; /* ✅ (3) أسود بدل أحمر */
+      color:#111;
       margin:0 0 12px;
       text-shadow:0 8px 16px rgba(0,0,0,.10);
     }
 
-    /* ✅ (5) زر تفاعلي للجواب */
+    /* ✅ زر تفاعلي للجواب */
     .answerBtn{
       margin:0 auto;
       width:min(86%, 420px);
@@ -808,6 +833,11 @@
       box-shadow:0 8px 0 rgba(0,0,0,.18);
       border:4px solid rgba(0,0,0,.85);
     }
+    .cqAddBtn.disabled{
+      opacity:.55;
+      cursor:not-allowed;
+      filter:saturate(.75);
+    }
     .cqAddWrap{display:flex;justify-content:center;margin-top:2px}
     .cqSaveFixed{
       position:sticky;
@@ -891,7 +921,7 @@
     }
     .timerMiniItem:active{ transform: translateY(1px); }
 
-    /* ✅ (9) احتفال الفوز */
+    /* ✅ (5) احتفال الفوز الجديد (5 ثواني) + قصاصات */
     .winBackdrop{
       position:fixed;
       inset:0;
@@ -901,7 +931,32 @@
       justify-content:center;
       z-index:40000;
       padding:14px;
+      overflow:hidden;
     }
+    .confettiRain{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      overflow:hidden;
+      z-index:40001;
+    }
+    .confettiPiece{
+      position:absolute;
+      top:-24px;
+      width:10px;
+      height:16px;
+      border-radius:3px;
+      opacity:.95;
+      transform:translate3d(0,0,0) rotate(0deg);
+      animation: confettiFall var(--dur, 3.6s) linear forwards;
+      will-change: transform;
+    }
+    @keyframes confettiFall{
+      to{
+        transform: translate3d(var(--dx, 0px), 112vh, 0) rotate(720deg);
+      }
+    }
+
     .winModal{
       width:min(92vw, 520px);
       background:#fff;
@@ -909,35 +964,22 @@
       border-radius:22px;
       border:8px solid rgba(0,0,0,.85);
       box-shadow:0 28px 44px rgba(0,0,0,.32);
-      padding:18px 14px;
+      padding:18px 14px 20px;
       text-align:center;
       position:relative;
       overflow:hidden;
+      z-index:40002;
     }
-    .winTitle{
-      font-size:34px;
+    .winCongrats{
+      font-size:56px;       /* ✅ “مبرووك” كبيرة */
       font-weight:900;
-      margin:0 0 8px;
+      margin:2px 0 10px;
+      letter-spacing:.2px;
     }
-    .winSub{
-      font-size:18px;
+    .winWinner{
+      font-size:34px;       /* ✅ “فاز الفريق ...” أكبر وواضح */
       font-weight:900;
       margin:0;
-      opacity:.85;
-    }
-    .confetti{
-      position:absolute;
-      inset:-30px -30px auto -30px;
-      height:220px;
-      pointer-events:none;
-      opacity:.85;
-      background:
-        radial-gradient(circle at 10% 20%, rgba(255,45,45,.65) 0 6px, transparent 7px),
-        radial-gradient(circle at 30% 40%, rgba(26,163,74,.65) 0 6px, transparent 7px),
-        radial-gradient(circle at 55% 25%, rgba(242,140,0,.65) 0 6px, transparent 7px),
-        radial-gradient(circle at 75% 45%, rgba(125,211,252,.65) 0 6px, transparent 7px),
-        radial-gradient(circle at 90% 30%, rgba(255,215,80,.65) 0 6px, transparent 7px);
-      filter: blur(.2px);
     }
 
     /* ✅ (6) تحسين Landscape */
@@ -1013,20 +1055,21 @@
   <!-- ✅ نافذة شرح ? -->
   <div id="tipPopup" class="tipPopup"></div>
 
-  <!-- ✅ نافذة اختيار نقاط السكور -->
-  <div id="scorePickerBackdrop" class="scorePickerBackdrop">
-    <div class="scorePicker">
-      <div id="scorePickerTitle" style="font-weight:900;font-size:20px">اختر النقاط</div>
-      <div class="scoreGrid" id="scoreGrid"></div>
+  <!-- ✅ (4) Stepper للأسكور -->
+  <div id="scoreStepBackdrop" class="scoreStepBackdrop">
+    <div id="scoreStepper" class="scoreStepper" role="dialog" aria-label="تعديل النقاط">
+      <button id="scoreStepUp" class="scoreStepBtn" type="button" aria-label="زيادة النقاط">▲</button>
+      <div id="scoreStepVal" class="scoreStepVal">0</div>
+      <button id="scoreStepDown" class="scoreStepBtn" type="button" aria-label="إنقاص النقاط">▼</button>
     </div>
   </div>
 
-  <!-- ✅ احتفال الفوز -->
+  <!-- ✅ (5) احتفال الفوز -->
   <div id="winBackdrop" class="winBackdrop">
+    <div id="confettiRain" class="confettiRain"></div>
     <div class="winModal">
-      <div class="confetti"></div>
-      <div id="winTitle" class="winTitle">فاز الفريق!</div>
-      <p id="winSub" class="winSub">مبروك 🎉</p>
+      <div id="winCongrats" class="winCongrats">مبرووك</div>
+      <p id="winWinner" class="winWinner">فاز الفريق</p>
     </div>
   </div>
 
@@ -1059,8 +1102,6 @@
     const ASSET_VERSION = "2026-02-15-1";
     const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
 
-    // ✅ (تم) تسجيل Service Worker تم نقله لسكربت قبل الـmodule لتسجيله بدري مثل index/join
-
     // ✅ تحميل بنك الأسئلة بڤيرجن (إذا فشل، نرجع للـ fallback)
     try{
       await import(`./questions_bank.js${vq}`);
@@ -1077,6 +1118,12 @@
       messagingSenderId: "1053646928152",
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
+
+    // ✅ (2) حد أقصى للغرفة
+    const MAX_PLAYERS = 13;
+
+    // ✅ (9) حد للأسئلة الخاصة
+    const MAX_CUSTOM_PER_LETTER = 7;
 
     const MAPS = [
       [
@@ -1132,13 +1179,21 @@
 
     const tipPopup = document.getElementById("tipPopup");
 
-    const scorePickerBackdrop = document.getElementById("scorePickerBackdrop");
-    const scoreGrid = document.getElementById("scoreGrid");
-    const scorePickerTitle = document.getElementById("scorePickerTitle");
+    // ✅ (4) Stepper DOM
+    const scoreStepBackdrop = document.getElementById("scoreStepBackdrop");
+    const scoreStepper = document.getElementById("scoreStepper");
+    const scoreStepVal = document.getElementById("scoreStepVal");
+    const scoreStepUp = document.getElementById("scoreStepUp");
+    const scoreStepDown = document.getElementById("scoreStepDown");
 
+    let SCORE_STEP_TEAM = null;
+    let SCORE_STEP_VALUE = 0;
+
+    // ✅ (5) Win DOM
     const winBackdrop = document.getElementById("winBackdrop");
-    const winTitle = document.getElementById("winTitle");
-    const winSub = document.getElementById("winSub");
+    const confettiRain = document.getElementById("confettiRain");
+    const winCongrats = document.getElementById("winCongrats");
+    const winWinner = document.getElementById("winWinner");
 
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
@@ -1175,7 +1230,7 @@
           this.ready = true;
 
           this.bell  = makeAudio(bellCandidates,  { volume:0.95, loop:false });
-          this.music = makeAudio(musicCandidates, { volume:0.35, loop:false });
+          this.music = makeAudio(musicCandidates, { volume:0.95, loop:false }); // ✅ (5) صوت عالي
 
           const unlock = () => {
             if(this.unlocked) return;
@@ -1236,6 +1291,28 @@
     function playVois(){
       try{ return SOUND.playMusic(); }catch(e){ return false; }
     }
+
+    // ✅ (5) تشغيل vois لمدة 5 ثواني فقط
+    let VOIS_STOP_T = null;
+    function stopVois(){
+      try{
+        const a = SOUND.music;
+        if(!a) return;
+        a.pause();
+        a.currentTime = 0;
+      }catch(e){}
+      if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
+      VOIS_STOP_T = null;
+    }
+    function playVoisFor(ms){
+      SOUND.init();
+      const ok = playVois();
+      if(!ok) return false;
+      if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
+      VOIS_STOP_T = setTimeout(() => { stopVois(); }, Math.max(0, Number(ms)||0));
+      return true;
+    }
+
     // ✅ fallback قديم (Oscillator) لو ما توفرت الملفات
     function fallbackBeep(){
       try{
@@ -1341,7 +1418,7 @@
         x0: minX / cw,
         y0: minY / ch,
         x1: (maxX + 1) / cw,
-        y1: (maxY + 1) / ch,  /* ✅✅✅ FIX: كان /cw وخرب توزيع الخلايا */
+        y1: (maxY + 1) / ch,
       };
     }
 
@@ -1429,7 +1506,6 @@
         TIMER_UI.lastSecond = null;
       }
 
-      // ✅✅✅ (تعديل) المؤقت بدون صوت rong نهائيًا
       if(view.done){
         clock.classList.add("doneFlashing");
       }else{
@@ -1652,24 +1728,174 @@
 
     let LAST_WIN_TS = 0;
 
-    // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله لتشغيل rong مرة واحدة فقط لكل ضغطة أول لاعب
+    // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
+
+    // ✅ (3) تتبع آخر جرس شغّل المؤقت تلقائياً
+    let LAST_AUTO_TIMER_SIG = "";
+
+    // ✅ (2) منع الزيادة عن 13 لاعب (قصّ الزائدين بأقدم joinedAt)
+    let PRUNE_IN_FLIGHT = false;
+    let LAST_PRUNE_AT = 0;
+
+    async function prunePlayersIfOverLimit(room){
+      try{
+        if(PRUNE_IN_FLIGHT) return;
+        const now = Date.now();
+        if(now - LAST_PRUNE_AT < 800) return;
+
+        const players = room?.players || {};
+        const count = Object.keys(players).length;
+        if(count <= MAX_PLAYERS) return;
+
+        PRUNE_IN_FLIGHT = true;
+        LAST_PRUNE_AT = now;
+
+        const playersRef = ref(db, `rooms/${code}/players`);
+        await runTransaction(playersRef, (cur) => {
+          if(!cur || typeof cur !== "object") return cur;
+
+          const entries = Object.entries(cur).map(([id,p]) => ({
+            id,
+            joinedAt: Number(p?.joinedAt || 0)
+          }));
+
+          entries.sort((a,b) => (a.joinedAt - b.joinedAt) || (String(a.id).localeCompare(String(b.id))));
+          const keep = entries.slice(0, MAX_PLAYERS).map(x => x.id);
+
+          const out = {};
+          for(const id of keep){
+            out[id] = cur[id];
+          }
+          return out;
+        }, { applyLocally:false });
+
+      }catch(e){
+        // تجاهل
+      }finally{
+        PRUNE_IN_FLIGHT = false;
+      }
+    }
+
+    // ✅ (4) Stepper للأرقام
+    function closeScoreStepper(){
+      scoreStepBackdrop.style.display = "none";
+      SCORE_STEP_TEAM = null;
+    }
+    scoreStepBackdrop.addEventListener("click", (e) => {
+      if(e.target === scoreStepBackdrop) closeScoreStepper();
+    });
+
+    function clamp(n, min, max){
+      n = Number(n);
+      if(!Number.isFinite(n)) n = 0;
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function openScoreStepper(team, anchorEl, currentVal){
+      SCORE_STEP_TEAM = team;
+      SCORE_STEP_VALUE = clamp(currentVal, 0, 999);
+
+      scoreStepVal.textContent = String(SCORE_STEP_VALUE);
+
+      // تموضع حول مربع النتيجة
+      const r = anchorEl.getBoundingClientRect();
+      const pad = 10;
+      const stepW = 72;
+      const top = clamp((r.top - 50), pad, window.innerHeight - 170);
+      const left = clamp((r.left + (r.width/2) - (stepW/2)), pad, window.innerWidth - stepW - pad);
+
+      scoreStepper.style.top = `${top}px`;
+      scoreStepper.style.left = `${left}px`;
+
+      scoreStepBackdrop.style.display = "block";
+    }
+
+    async function applyScoreDelta(delta){
+      if(role !== "host") return;
+      if(!SCORE_STEP_TEAM) return;
+
+      SCORE_STEP_VALUE = clamp(SCORE_STEP_VALUE + delta, 0, 999);
+      scoreStepVal.textContent = String(SCORE_STEP_VALUE);
+
+      try{
+        await update(ref(db, `rooms/${code}/scores`), { [SCORE_STEP_TEAM]: SCORE_STEP_VALUE });
+      }catch(e){}
+    }
+
+    scoreStepUp.addEventListener("click", (e) => { e.stopPropagation(); applyScoreDelta(+1); });
+    scoreStepDown.addEventListener("click", (e) => { e.stopPropagation(); applyScoreDelta(-1); });
+
+    // ✅ (5) قصاصات
+    let WIN_HIDE_T = null;
+    function clearConfetti(){
+      try{ confettiRain.innerHTML = ""; }catch(e){}
+    }
+    function startConfetti(durationMs){
+      clearConfetti();
+      const colors = ["#ff2d2d","#1aa34a","#f28c00","#7dd3fc","#ffd54a","#8b5cf6","#ffffff"];
+      const N = 120;
+
+      for(let i=0;i<N;i++){
+        const p = document.createElement("div");
+        p.className = "confettiPiece";
+        const left = Math.random() * 100;
+        const dx = (Math.random()*140 - 70).toFixed(0) + "px";
+        const dur = (2.8 + Math.random()*2.2).toFixed(2) + "s";
+        const delay = (Math.random()*0.7).toFixed(2) + "s";
+        const w = (6 + Math.random()*8).toFixed(0) + "px";
+        const h = (10 + Math.random()*14).toFixed(0) + "px";
+        const bg = colors[Math.floor(Math.random()*colors.length)];
+
+        p.style.left = left + "vw";
+        p.style.width = w;
+        p.style.height = h;
+        p.style.background = bg;
+        p.style.setProperty("--dx", dx);
+        p.style.setProperty("--dur", dur);
+        p.style.animationDelay = delay;
+
+        confettiRain.appendChild(p);
+      }
+
+      setTimeout(() => { clearConfetti(); }, Math.max(0, Number(durationMs)||0));
+    }
 
     function showWin(team){
       if(!team) return;
+
+      if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
+      stopVois();
+
       winBackdrop.style.display = "flex";
+
+      winCongrats.textContent = "مبرووك";
       if(team === "green"){
-        winTitle.textContent = "فاز الفريق الأخضر!";
-        winSub.textContent = "مبروك 🎉";
+        winWinner.textContent = "فاز الفريق الأخضر";
       }else{
-        winTitle.textContent = "فاز الفريق البرتقالي!";
-        winSub.textContent = "مبروك 🎉";
+        winWinner.textContent = "فاز الفريق البرتقالي";
       }
-      setTimeout(()=> { winBackdrop.style.display = "none"; }, 2300);
+
+      startConfetti(5000);
+
+      // ✅ (5) تشغيل الصوت 5 ثواني
+      if(!playVoisFor(5000)){
+        fallbackBeep();
+      }
+
+      WIN_HIDE_T = setTimeout(()=> {
+        winBackdrop.style.display = "none";
+        clearConfetti();
+        stopVois();
+      }, 5000);
     }
 
     winBackdrop.addEventListener("click", () => {
       winBackdrop.style.display = "none";
+      clearConfetti();
+      stopVois();
+      if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
+      WIN_HIDE_T = null;
     });
 
     const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
@@ -1718,7 +1944,8 @@
       const pairsWrap = document.createElement("div");
       pairsWrap.className = "cqPairs";
 
-      const existing = getCustomList(room, letter);
+      // ✅ (9) قصّ العرض/التحميل على 7
+      const existing = getCustomList(room, letter).slice(0, MAX_CUSTOM_PER_LETTER);
       if(existing.length){
         existing.forEach(obj => pairsWrap.appendChild(createPairEl(String(obj.q||""), String(obj.a||""))));
       }else{
@@ -1742,8 +1969,27 @@
       body.appendChild(saveBtn);
       body.appendChild(savedMsg);
 
-      addWrap.querySelector(".cqAddBtn").addEventListener("click", () => {
+      const addBtn = addWrap.querySelector(".cqAddBtn");
+
+      function refreshAddState(){
+        const count = pairsWrap.querySelectorAll(".cqPair").length;
+        if(count >= MAX_CUSTOM_PER_LETTER){
+          addBtn.classList.add("disabled");
+        }else{
+          addBtn.classList.remove("disabled");
+        }
+      }
+      refreshAddState();
+
+      addBtn.addEventListener("click", () => {
+        const count = pairsWrap.querySelectorAll(".cqPair").length;
+        if(count >= MAX_CUSTOM_PER_LETTER){
+          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة لهذا الحرف`;
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+          return;
+        }
         pairsWrap.appendChild(createPairEl("", ""));
+        refreshAddState();
       });
 
       saveBtn.addEventListener("click", async () => {
@@ -1754,11 +2000,20 @@
           if(q || a) out.push({ q, a });
         });
 
+        // ✅ (9) حد 7 — لا نحفظ أكثر
+        if(out.length > MAX_CUSTOM_PER_LETTER){
+          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة فقط`;
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+          return;
+        }
+
         await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
         await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
 
         savedMsg.textContent = "تم الحفظ ✅";
         setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+
+        refreshAddState();
       });
     }
 
@@ -1870,7 +2125,7 @@
                 <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
                 <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للأبيض.</li>
                 <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
-                <li><b>المؤقت:</b> اضغط على دائرة المؤقت لبدء العد. اضغط مرة ثانية لتصفير المؤقت.</li>
+                <li><b>المؤقت:</b> يبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
                 <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
                 <li><b>تغيير الخريطة:</b> للتنقل بين الخرائط الثلاث.</li>
               </ul>
@@ -2137,38 +2392,6 @@
 
     const ANSWER_UI = { revealed:false, sig:"" };
 
-    let SCORE_PICK_TEAM = null;
-    function closeScorePicker(){
-      scorePickerBackdrop.style.display = "none";
-      SCORE_PICK_TEAM = null;
-    }
-    scorePickerBackdrop.addEventListener("click", (e) => {
-      if(e.target === scorePickerBackdrop) closeScorePicker();
-    });
-
-    function openScorePicker(team){
-      SCORE_PICK_TEAM = team;
-      scorePickerTitle.textContent = (team === "green") ? "نقاط الفريق الأخضر" : "نقاط الفريق البرتقالي";
-
-      scoreGrid.innerHTML = "";
-      const nums = Array.from({length:21}, (_,i)=>i);
-      nums.forEach(n=>{
-        const b = document.createElement("button");
-        b.className = "scoreNumBtn";
-        b.type = "button";
-        b.textContent = String(n);
-        b.addEventListener("click", async () => {
-          if(role !== "host") return;
-          if(!SCORE_PICK_TEAM) return;
-          await update(ref(db, `rooms/${code}/scores`), { [SCORE_PICK_TEAM]: n });
-          closeScorePicker();
-        });
-        scoreGrid.appendChild(b);
-      });
-
-      scorePickerBackdrop.style.display = "flex";
-    }
-
     function renderGame(room, me){
       main.classList.add("inGame");
       setGameName(room?.name);
@@ -2282,7 +2505,7 @@
             ${isHost ? `
               <div class="questionCard">
                 <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
-                <button id="ansBtn" class="answerBtn red" type="button">اضغط للإجابة</button>
+                <button id="ansBtn" class="answerBtn red" type="button">إظهار الإجابة</button> <!-- ✅ (8) تغيير النص فقط -->
               </div>
             ` : `
               <div class="playerBtnWrap">
@@ -2315,11 +2538,12 @@
         });
       });
 
+      // ✅ (4) Stepper: فتح الأسهم فوق/تحت
       if(isHost){
         const sG = document.getElementById("scoreGreen");
         const sO = document.getElementById("scoreOrange");
-        if(sG) sG.addEventListener("click", () => openScorePicker("green"));
-        if(sO) sO.addEventListener("click", () => openScorePicker("orange"));
+        if(sG) sG.addEventListener("click", () => openScoreStepper("green", sG, sg));
+        if(sO) sO.addEventListener("click", () => openScoreStepper("orange", sO, so));
       }
 
       if(isHost){
@@ -2330,6 +2554,7 @@
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
+            // ✅ (3) تصفير المؤقت وإيقاف الوميض بالضغط على المؤقت نفسه
             if(t.running || t.done){
               await update(ref(db, `rooms/${code}/timer`), {
                 running:false,
@@ -2340,6 +2565,7 @@
               return;
             }
 
+            // (يبقى موجود كخيار يدوي، لكن التفعيل الأساسي صار تلقائي عند أول جرس)
             await update(ref(db, `rooms/${code}/timer`), {
               sel,
               dur: sel,
@@ -2428,7 +2654,6 @@
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
         overlay.setAttribute("preserveAspectRatio", "none");
 
-        // ✅ مهم: نخزن bbox على اسم الملف الأساسي بدون query
         const bbox = BBOX_CACHE[srcBase];
         if(!bbox) return;
 
@@ -2555,7 +2780,7 @@
             }else{
               ansBtn.classList.remove("green");
               ansBtn.classList.add("red");
-              ansBtn.textContent = "اضغط للإجابة";
+              ansBtn.textContent = "إظهار الإجابة"; /* ✅ (8) النص فقط */
             }
 
             ansBtn.onclick = (e) => {
@@ -2685,7 +2910,6 @@
 
           const buzzerRef = ref(db, `rooms/${code}/buzzer`);
 
-          // ✅✅✅ (تعديل) تشغيل rong فقط إذا كنت "الأول" فعلاً (transaction committed)
           const res = await runTransaction(buzzerRef, (cur) => {
             if(cur === null){
               return { pid, name: me.name, team: me.team, ts: Date.now() };
@@ -2712,7 +2936,41 @@
         requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
       }catch(e){}
 
-      // ✅✅✅ (جديد) تشغيل rong عند "تسجيل أول لاعب" مرة واحدة لكل حدث buzzer
+      // ✅ (2) قصّ اللاعبين إذا تجاوزوا 13
+      try{
+        prunePlayersIfOverLimit(room);
+      }catch(e){}
+
+      // ✅ (3) تشغيل المؤقت تلقائياً عند اعتماد أول لاعب يضغط الجرس
+      try{
+        if(role === "host"){
+          const b = room.buzzer;
+          const t = normalizeTimer(room.timer || {});
+          if(b && b.ts){
+            const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
+            if(sig && sig !== LAST_AUTO_TIMER_SIG){
+              LAST_AUTO_TIMER_SIG = sig;
+
+              // يبدأ فقط لو المؤقت مو شغال وما انتهى
+              if(!t.running && !t.done){
+                const sel = Number(t.sel || 10);
+                update(ref(db, `rooms/${code}/timer`), {
+                  sel,
+                  dur: sel,
+                  running: true,
+                  done: false,
+                  startTs: Date.now()
+                });
+              }
+            }
+          }else{
+            // إذا تفّضى البزر، نخلي السيق قابل للتجدد
+            LAST_AUTO_TIMER_SIG = "";
+          }
+        }
+      }catch(e){}
+
+      // ✅ تشغيل rong عند "تسجيل أول لاعب" مرة واحدة لكل حدث buzzer
       try{
         const b = room.buzzer;
         if(b && b.ts){
@@ -2729,11 +2987,6 @@
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
           showWin(we.team);
-
-          // ✅ (صوت الموسيقى vois عند الفوز) + fallback beep فقط
-          if(!playVois()){
-            fallbackBeep();
-          }
         }
       }catch(e){}
     }
@@ -2745,6 +2998,11 @@
         renderWaiting("الغرفة غير موجودة.");
         return;
       }
+
+      // ✅ (2) قصّ فوري إذا تعدى الحد
+      try{
+        prunePlayersIfOverLimit(room);
+      }catch(e){}
 
       if(role === "host"){
         if(room.hostKey && hostKey && String(room.hostKey) !== String(hostKey)){
@@ -2763,6 +3021,8 @@
       }
 
       const players = room.players || {};
+      const playerCount = Object.keys(players).length;
+
       let me = null;
 
       if(pid && players[pid]) me = players[pid];
@@ -2773,8 +3033,22 @@
         if(stored && players[stored]) me = players[stored];
       }
 
+      // ✅ (2) إذا الغرفة ممتلئة وما لقيت بياناتي -> “الغرفة ممتلئة”
+      if(!me && playerCount >= MAX_PLAYERS){
+        renderWaiting("الغرفة ممتلئة");
+        afterRender(room);
+        return;
+      }
+
       if(room.status !== "started"){
         renderWaiting("بانتظار بدء اللعبة...");
+        afterRender(room);
+        return;
+      }
+
+      // ✅ (2) إذا بدأ اللعب لكن الغرفة ممتلئة وأنا خارج القائمة (تم قصّي)
+      if(!me && playerCount >= MAX_PLAYERS){
+        renderWaiting("الغرفة ممتلئة");
         afterRender(room);
         return;
       }
@@ -2788,5 +3062,7 @@
     });
 
   </script>
+
+  <!-- VERSION: game_full.html — v2026-02-16-1 -->
 </body>
 </html>
