@@ -1,6 +1,8 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v7: allow guests (players) to access /game_full when role=player, keep presenter protected
+// v8: خيار يسمح للاعبين (guests) بالدخول للصفحات الخاصة باللاعب بدون المرور على التأمين، مع بقاء المقدم محمي
+
+const ALLOW_GUEST_PLAYERS = true; // ✅ غيّره إلى false لو تبغى ترجع التأمين على اللاعبين
 
 const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
 const schemaCache = new Map(); // table -> { ts, cols:Set }
@@ -223,6 +225,63 @@ function redirectToActivate(url) {
   }));
 }
 
+// ✅ تحديد إن كان الطلب “لاعب” (Guest Player) — يسمح له بدون تأمين
+function isGuestPlayer(url) {
+  const sp = url.searchParams;
+  const role = (sp.get("role") || "").toLowerCase();
+
+  // إشارات صريحة
+  if (role === "player") return true;
+  if (sp.get("player") === "1") return true;
+  if (sp.get("guest") === "1") return true;
+  if ((sp.get("view") || "").toLowerCase() === "player") return true;
+
+  // إشارة ضمنية: وجود room/roomId غالباً لاعب (وأغلب الوقت المقدم أصلاً معه توكن)
+  const hasRoom = sp.has("room") || sp.has("roomId") || sp.has("r") || sp.has("code");
+  const hostHint =
+    role === "host" ||
+    sp.get("host") === "1" ||
+    sp.get("presenter") === "1";
+
+  if (hasRoom && !hostHint) return true;
+
+  return false;
+}
+
+// ✅ صفحات/مسارات اللاعب التي نسمح لها بدون تأمين (حتى لو كانت تحت /app)
+const GUEST_PLAYER_ALLOWED_PATHS = new Set([
+  "/game_full.html",
+  "/game_full",
+  "/game_full/",
+  "/game.html",
+  "/game",
+  "/game/",
+  "/join.html",
+  "/join",
+  "/join/",
+  "/waiting.html",
+  "/waiting",
+  "/waiting/",
+  "/player.html",
+  "/player",
+  "/player/",
+  "/app/game_full.html",
+  "/app/game_full",
+  "/app/game_full/",
+  "/app/game.html",
+  "/app/game",
+  "/app/game/",
+  "/app/join.html",
+  "/app/join",
+  "/app/join/",
+  "/app/waiting.html",
+  "/app/waiting",
+  "/app/waiting/",
+  "/app/player.html",
+  "/app/player",
+  "/app/player/",
+]);
+
 export async function onRequest(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
@@ -241,20 +300,22 @@ export async function onRequest(context) {
   }
 
   // ✅ تحديد الصفحات المحمية
-  const protectRootGameFull =
+  const protectGameFull =
     path === "/game_full.html" ||
     path === "/game_full" ||
-    path === "/game_full/";
+    path === "/game_full/" ||
+    path === "/app/game_full.html" ||
+    path === "/app/game_full" ||
+    path === "/app/game_full/";
 
-  // ✅✅ أهم إصلاح: اللاعب ضيف (role=player) ما يدخل صفحة التفعيل حتى لو game_full محمي للمقدم
-  if (protectRootGameFull) {
-    const role = (url.searchParams.get("role") || "").toLowerCase();
-    if (role === "player") {
+  // ✅✅ خيار: السماح للاعبين بالدخول بدون تأمين (وهذا يحل مشكلة انتقالهم لتسجيل الدخول عند بدء اللعبة)
+  if (ALLOW_GUEST_PLAYERS) {
+    if ((protectGameFull || GUEST_PLAYER_ALLOWED_PATHS.has(path)) && isGuestPlayer(url)) {
       return next();
     }
   }
 
-  const needsProtection = path.startsWith("/app") || protectRootGameFull;
+  const needsProtection = path.startsWith("/app") || protectGameFull;
 
   // إذا ما يحتاج حماية، مرّره
   if (!needsProtection) return next();
@@ -290,5 +351,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 7 (guests role=player bypass for /game_full)
+_middleware.js – إصدار 8 (Guest Players Option + keep presenter protected)
 */
