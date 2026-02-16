@@ -4,79 +4,159 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>بانتظار بدء اللعبة</title>
+
   <style>
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("AA-GALAXY.otf") format("opentype");
+      font-weight:400;
+      font-style:normal;
+      font-display:swap;
+    }
+
     :root{
-      --bg:#1f4fa3;
+      --bg1:#7b1f63;
+      --bg2:#5f214f;
+      --bg3:#3a1234;
+
+      --white:#fff;
       --yellow:#f4c400;
-      --card:#ffffff;
-      --text:#111;
-      --border:#e6dfc8;
+
+      --purpleBtn:#6d28d9;
+      --purpleBtn2:#7c3aed;
+
+      --shadow: 0 16px 30px rgba(0,0,0,.30);
     }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+
     body{
-      margin:0; min-height:100vh;
-      background:radial-gradient(circle at 30% 20%, rgba(255,255,255,.08), transparent 45%),
-                 radial-gradient(circle at 70% 30%, rgba(244,196,0,.10), transparent 45%),
-                 var(--bg);
-      font-family:Arial, sans-serif;
-      display:flex; align-items:center; justify-content:center;
-      padding:16px;
-    }
-    .box{
-      width:min(520px, 92vw);
-      background:var(--card);
-      border-radius:16px;
-      border:2px solid var(--border);
-      padding:22px 16px;
+      margin:0;
+      color:#fff;
       text-align:center;
-      box-shadow:0 12px 30px rgba(0,0,0,.18);
+      font-family:"AA-GALAXY", Arial, sans-serif;
+
+      background:
+        radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
+        radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
+        linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
+
+      min-height: 100svh;
+      min-height: 100dvh;
+
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-start;
+
+      padding-top: calc(22px + env(safe-area-inset-top));
+      padding-bottom: calc(18px + env(safe-area-inset-bottom));
+      padding-left:16px;
+      padding-right:16px;
     }
-    .logo{ width:54px;height:54px;object-fit:contain; display:block;margin:0 auto 10px; }
-    h2{ margin:6px 0 6px; font-size:20px; color:#111; }
-    p{ margin:0; font-size:14px; color:#444; }
+
+    .topLogo{
+      width:90px;
+      height:90px;
+      object-fit:contain;
+      display:block;
+      margin:0 auto 14px;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
+    }
+
+    .center{
+      flex:1;
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:12px;
+      transform: translateY(-12px);
+    }
+
+    .title{
+      font-size:22px;
+      line-height:1.2;
+      margin:0;
+      text-shadow: 0 8px 18px rgba(0,0,0,.35);
+    }
+
+    .sub{
+      margin:0;
+      font-size:14px;
+      opacity:.9;
+      text-shadow: 0 8px 18px rgba(0,0,0,.35);
+    }
+
     .spinner{
       width:18px;height:18px;border-radius:50%;
-      border:3px solid #ddd;border-top-color:#1f4fa3;
-      display:inline-block; vertical-align:-4px;
-      margin-left:6px;
+      border:3px solid rgba(255,255,255,.35);
+      border-top-color:#fff;
+      display:inline-block;
+      vertical-align:-4px;
+      margin-right:8px;
       animation:spin .8s linear infinite;
     }
     @keyframes spin{to{transform:rotate(360deg)}}
-    .row{ display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
-    .btn{
-      border:0; cursor:pointer;
-      padding:12px 14px;
+
+    .buyBtn{
+      width:min(320px, 70vw);
+      height:46px;
+      border:none;
       border-radius:12px;
-      font-size:15px;
-      font-weight:700;
+      background: linear-gradient(180deg, var(--purpleBtn2), var(--purpleBtn));
+      color:#fff;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      font-size:16px;
+      cursor:pointer;
+      box-shadow: var(--shadow);
     }
-    .btnPrimary{ background:var(--yellow); color:#000; }
-    .btnGhost{ background:#eef2ff; color:#1f4fa3; }
-    .small{ margin-top:10px; font-size:12px; color:#777; }
+
+    .footer{
+      width:100%;
+      text-align:center;
+      font-size:12px;
+      opacity:.92;
+      padding-top:10px;
+    }
+
+    .err{
+      display:none;
+      width:min(520px, 92vw);
+      background: rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:14px;
+      padding:10px 12px;
+      font-size:13px;
+      box-shadow: 0 10px 22px rgba(0,0,0,.20);
+    }
   </style>
 </head>
+
 <body>
-  <div class="box">
-    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
-    <h2>بانتظار بدء اللعبة <span class="spinner" aria-hidden="true"></span></h2>
-    <p id="msg">بانتظار المقدم يبدأ اللعب…</p>
+  <!-- اللوجو أعلى الصفحة بالمنتصف -->
+  <img class="topLogo" src="logo.png" alt="شعار صندوق المسابقات">
 
-    <!-- ✅ زر شراء اللعبة (مثل ما طلبت) -->
-    <div class="row">
-      <button class="btn btnGhost" id="buyBtn">لشراء اللعبة اضغط هنا</button>
-    </div>
+  <div class="center">
+    <p class="title"><span class="spinner" aria-hidden="true"></span>بانتظار المقدم لبدء اللعبة</p>
+    <p class="sub" id="msg">لحظة...</p>
 
-    <!-- أزرار مساعدة تظهر فقط عند وجود مشكلة -->
-    <div class="row" id="actions" style="display:none">
-      <button class="btn btnGhost" id="backJoin">رجوع</button>
-      <button class="btn btnPrimary" id="retry">تحديث</button>
-    </div>
+    <!-- زر شراء اللعبة (منتصف الشاشة وحجمه أصغر) -->
+    <button class="buyBtn" id="buyBtn">لشراء اللعبة اضغط هنا</button>
 
-    <div class="small">© صندوق المسابقات</div>
+    <div class="err" id="errBox"></div>
   </div>
+
+  <!-- الحقوق أسفل الصفحة بالمنتصف -->
+  <div class="footer">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    const BUY_URL = "https://sandooq-m.com";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -91,82 +171,65 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    const msg = document.getElementById("msg");
+    const errBox = document.getElementById("errBox");
+    const buyBtn = document.getElementById("buyBtn");
+
+    buyBtn.addEventListener("click", () => {
+      window.open(BUY_URL, "_blank", "noopener,noreferrer");
+    });
+
+    function normalizeDigits(s){
+      const map = {
+        "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+        "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+      };
+      return String(s || "").replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
+    }
+
+    function cleanCode(s){
+      return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
+    }
+
+    function showErr(text){
+      errBox.textContent = text;
+      errBox.style.display = "block";
+    }
+
+    // نجيب بيانات الغرفة من الرابط (بدون عرضها للاعب)
     const params = new URLSearchParams(location.search);
-    const code = (params.get("code") || "").trim();
-    const pid  = (params.get("pid")  || "").trim();
-    const role = (params.get("role") || "player").trim();
+    const code = cleanCode(params.get("code") || "");
+    const pid  = (params.get("pid") || "").trim();
 
-    const msgEl = document.getElementById("msg");
-    const actionsEl = document.getElementById("actions");
+    // نخزنها (مخفية) للاحتياط بدون ما نعرضها
+    if(code) sessionStorage.setItem("room_code", code);
+    if(pid)  sessionStorage.setItem("player_pid", pid);
 
-    const BUY_URL  = "https://sandooq-m.com";
-    const JOIN_URL = "join.html";
-    const GAME_URL = "game.html"; // ✅ اللاعب يروح للعبة غير المحمية (بدون activate)
-
-    document.getElementById("buyBtn").onclick = () => window.open(BUY_URL, "_blank", "noopener,noreferrer");
-
-    document.getElementById("backJoin").onclick = () => {
-      const u = new URL(JOIN_URL, location.href);
-      if(code) u.searchParams.set("code", code);
-      location.href = u.toString();
-    };
-
-    document.getElementById("retry").onclick = async () => {
-      try{
-        actionsEl.style.display = "none";
-        msgEl.textContent = "بانتظار المقدم يبدأ اللعب…";
-        if(!code) throw new Error("NO_CODE");
-        const snap = await get(ref(db, `rooms/${code}`));
-        if(!snap.exists()) throw new Error("ROOM_NOT_FOUND");
-        const room = snap.val() || {};
-        if(room.status === "started") goGame();
-      }catch(e){
-        showProblem();
-      }
-    };
-
-    function showProblem(){
-      msgEl.textContent = "ما قدرنا نجيب حالة الغرفة الآن. جرّب تحديث.";
-      actionsEl.style.display = "flex";
-    }
-
-    function goGame(){
-      const u = new URL(GAME_URL, location.href);
-      u.searchParams.set("role", role || "player");
-      u.searchParams.set("code", code);
-      if(pid) u.searchParams.set("pid", pid);
-      location.replace(u.toString());
-    }
-
-    // ✅ لو الرابط ناقص، لا نوديه لأي تفعيل — نخليه يرجع لصفحة الدخول
-    if(!code){
-      msgEl.textContent = "الرابط غير مكتمل. ارجع لصفحة الدخول وأدخل رمز اللعبة.";
-      actionsEl.style.display = "flex";
+    if(code.length !== 6){
+      msg.textContent = "افتح الرابط من المقدم";
+      showErr("رمز الغرفة غير موجود في الرابط.");
     }else{
-      const roomRef = ref(db, `rooms/${code}`);
-      onValue(roomRef, (snap) => {
-        if(!snap.exists()){
-          msgEl.textContent = "رمز اللعبة غير صحيح أو الغرفة غير موجودة.";
-          actionsEl.style.display = "flex";
-          return;
-        }
-        const room = snap.val() || {};
-        const st = room.status;
+      msg.textContent = "بانتظار المقدم يبدأ اللعبة...";
+      const statusRef = ref(db, `rooms/${code}/status`);
 
+      onValue(statusRef, (snap) => {
+        const st = snap.val();
+
+        // عند بدء اللعبة: ننقل اللاعب لصفحة اللعب (وليس play.html)
         if(st === "started"){
-          msgEl.textContent = "تم بدء اللعبة… جاري الدخول";
-          goGame();
-          return;
+          msg.textContent = "جاري فتح اللعبة...";
+          const u = new URL("game.html", location.href);
+          u.searchParams.set("role", "player");
+          u.searchParams.set("code", code);
+          if(pid) u.searchParams.set("pid", pid);
+          location.replace(u.toString());
         }
-
-        // أي حالة غير started = انتظار
-        msgEl.textContent = "بانتظار المقدم يبدأ اللعب…";
-      }, () => {
-        showProblem();
+      }, (err) => {
+        showErr("صار خطأ في الاتصال. حاول تحدّث الصفحة.");
       });
     }
   </script>
 
-  <!-- VERSION: play.html — v2 (Guest waiting via Firebase; redirect to game.html; keep old style + buy button) -->
+  <!-- VERSION: play.html — v2 (Style match + no room code shown + redirect to game.html on started) -->
 </body>
 </html>
