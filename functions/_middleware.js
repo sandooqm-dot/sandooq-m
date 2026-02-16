@@ -1,9 +1,27 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v7: allow guest player pages (join/play/game) to bypass activate redirect
+// v7: allow GUEST player pages (join/play/game) without redirect to /activate
 
 const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
 const schemaCache = new Map(); // table -> { ts, cols:Set }
+
+// ✅ صفحات الضيوف (لازم ما تمر على التفعيل أبدًا حتى لو كانت داخل /app بسبب redirects)
+const PUBLIC_GUEST_PATHS = new Set([
+  "/join.html",
+  "/play.html",
+  "/game.html",
+  "/join",
+  "/play",
+  "/game",
+
+  // احتياط لو عندك Redirect يودّيهم داخل /app
+  "/app/join.html",
+  "/app/play.html",
+  "/app/game.html",
+  "/app/join",
+  "/app/play",
+  "/app/game",
+]);
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -240,19 +258,8 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅✅ (الجديد) صفحات اللاعبين الضيوف — لا تمر على activate نهائيًا
-  const GUEST_ALLOW = new Set([
-    "/join.html", "/join",
-    "/play.html", "/play",
-    "/game.html", "/game",
-
-    // لو صار عندك أي تحويلات تخليها تحت /app
-    "/app/join.html", "/app/join",
-    "/app/play.html", "/app/play",
-    "/app/game.html", "/app/game",
-  ]);
-
-  if (GUEST_ALLOW.has(path)) {
+  // ✅✅ NEW: صفحات الضيوف ما لها أي علاقة بالتفعيل
+  if (PUBLIC_GUEST_PATHS.has(path)) {
     return next();
   }
 
@@ -298,5 +305,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 7 (Guest bypass for join/play/game)
+_middleware.js – إصدار 7 (allow guest join/play/game; protects /app/* + /game_full(.html))
 */
