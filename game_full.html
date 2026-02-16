@@ -2407,6 +2407,132 @@
 
     const ANSWER_UI = { revealed:false, sig:"" };
 
+    // ✅✅✅ (حل الرمشة): نرسم واجهة اللعب مرة واحدة ونحدّث العناصر فقط
+    const GAME_UI = {
+      built: false,
+      layoutKey: "",
+      refs: {},
+      latestRoom: null,
+      latestMe: null,
+      srcBase: "",
+      activeMap: 0,
+      resizeBound: false
+    };
+
+    function getMapSrcBase(activeMap){
+      return ([
+        "maps/map1.jpeg",
+        "maps/map2.jpeg",
+        "maps/map3.jpeg"
+      ][activeMap] || "maps/map1.jpeg");
+    }
+
+    function applyZoomFix(){
+      const r = GAME_UI.refs;
+      if(!r.mapScale || !r.zoom) return;
+
+      const mapBox = document.getElementById("mapBox");
+      const mapOuter = document.querySelector(".mapOuter");
+      if(!mapBox || !mapOuter) return;
+
+      const z = Number(r.zoom.value || 1);
+      r.mapScale.style.setProperty("--zoom", z);
+
+      const baseH = mapBox.offsetHeight || 0;
+      const extra = Math.max(0, baseH * (z - 1));
+      mapOuter.style.marginBottom = `${extra}px`;
+    }
+
+    function placeHexes(){
+      const r = GAME_UI.refs;
+      if(!r.mapImg || !r.overlay || !r.cells || !r.cells.length) return;
+
+      const W = r.mapImg.clientWidth;
+      const H = r.mapImg.clientHeight;
+      if(!W || !H) return;
+
+      r.overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      r.overlay.setAttribute("preserveAspectRatio", "none");
+
+      const base = GAME_UI.srcBase || getMapSrcBase(GAME_UI.activeMap || 0);
+      const bbox = BBOX_CACHE[base];
+      if(!bbox) return;
+
+      const x0 = bbox.x0 * W;
+      const y0 = bbox.y0 * H;
+      const x1 = bbox.x1 * W;
+      const y1 = bbox.y1 * H;
+
+      const gridW = x1 - x0;
+      const gridH = y1 - y0;
+
+      const w = gridW / 5.5;
+      const h = gridH / 4.0;
+      const stepY = h * 0.75;
+
+      let i = 0;
+      for(let row=0; row<5; row++){
+        for(let col=0; col<5; col++){
+          const left = x0 + col*w + (row%2)*(w/2);
+          const top  = y0 + row*stepY;
+          r.cells[i++].setAttribute("points", hexPointsPointyTop(left, top, w, h));
+        }
+      }
+
+      applyZoomFix();
+    }
+
+    function onMapReady(){
+      const r = GAME_UI.refs;
+      if(!r.mapImg) return;
+
+      const base = GAME_UI.srcBase || getMapSrcBase(GAME_UI.activeMap || 0);
+      if(!BBOX_CACHE[base]) BBOX_CACHE[base] = detectHexBBox(r.mapImg);
+
+      requestAnimationFrame(() => {
+        try{ placeHexes(); }catch(e){}
+        try{ applyZoomFix(); }catch(e){}
+      });
+    }
+
+    function ensureResizeBound(){
+      if(GAME_UI.resizeBound) return;
+      GAME_UI.resizeBound = true;
+      window.addEventListener("resize", () => {
+        try{ placeHexes(); }catch(e){}
+        try{ applyZoomFix(); }catch(e){}
+      }, { passive:true });
+    }
+
+    function ensureMapSrc(activeMap){
+      const r = GAME_UI.refs;
+      if(!r.mapImg) return;
+
+      const base = getMapSrcBase(activeMap);
+      GAME_UI.activeMap = activeMap;
+
+      if(GAME_UI.srcBase !== base){
+        GAME_UI.srcBase = base;
+        r.mapImg.src = base + vq;
+      }
+    }
+
+    function updateOverlayStates(room){
+      const r = GAME_UI.refs;
+      if(!r.cells || !r.cells.length) return;
+
+      const activeMap = Number(room.activeMap || 0);
+      const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
+
+      r.cells.forEach(cell => {
+        const rr = Number(cell.getAttribute("data-row"));
+        const cc = Number(cell.getAttribute("data-col"));
+        const k = cellKey(rr,cc);
+        const st = Number(mapStates?.[k] ?? 0);
+        setStateClass(cell, st);
+      });
+    }
+
     function renderGame(room, me){
       main.classList.add("inGame");
       setGameName(room?.name);
@@ -2417,159 +2543,211 @@
       initTimerDefaultsIfNeeded(room);
       initScoresIfNeeded(room);
 
+      GAME_UI.latestRoom = room || {};
+      GAME_UI.latestMe = me || null;
+
       const qMode = getQuestionMode(room);
-
-      const ICON_GEAR = `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-1,7.43,7.43,0,0,0-.05-1l2.11-1.65a.5.5,0,0,0,.12-.63l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.28,7.28,0,0,0-1.73-1l-.38-2.65A.5.5,0,0,0,11.7,1H7.3a.5.5,0,0,0-.49.42L6.43,4.07a7.28,7.28,0,0,0-1.73,1l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.63L1.86,10a7.43,7.43,0,0,0-.05,1,7.43,7.43,0,0,0,.05,1L-.25,14.59a.5.5,0,0,0-.12.63l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.28,7.28,0,0,0,1.73,1l.38,2.65A.5.5,0,0,0,7.3,23h4.4a.5.5,0,0,0,.49-.42l.38-2.65a7.28,7.28,0,0,0,1.73-1l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.63ZM9.5,15.5A3.5,3.5,0,1,1,13,12,3.5,3.5,0,0,1,9.5,15.5Z"></path>
-        </svg>
-      `;
-      const ICON_SWAP = `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M16 3h5v5h-2V6.41l-3.29 3.3-1.42-1.42L17.59 5H16V3z"></path>
-          <path d="M4 7h4.59l9.7 9.7-1.42 1.42L7.76 9H4V7z"></path>
-          <path d="M4 15h4.59l2.12 2.12-1.42 1.42L7.76 17H4v-2z"></path>
-          <path d="M16 16h1.59l-2.3-2.29 1.42-1.42L19 14.59V13h2v5h-5v-2z"></path>
-        </svg>
-      `;
-      const ICON_CLEAR = `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.71 2.88 18.29 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"></path>
-        </svg>
-      `;
-      const ICON_Q = `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M19 2H8C6.9 2 6 2.9 6 4V16c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h11v12z"></path>
-          <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"></path>
-        </svg>
-      `;
-
-      const modeBtnTitle = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
-
       const scores = room.scores || { green:0, orange:0 };
       const sg = Number(scores.green ?? 0);
       const so = Number(scores.orange ?? 0);
 
-      main.innerHTML = `
-        <div class="gameLayout">
-          <div class="landRight">
-            <div class="mapOuter">
-              <div id="mapScale" class="mapScale" style="--zoom:1">
-                <div id="mapBox" class="mapBox">
-                  <img id="mapImg" src="" alt="" decoding="async">
-                  <svg id="overlay" class="overlaySvg"></svg>
+      const layoutKey = isHost ? "host" : "player";
+      const needBuild = (!GAME_UI.built) || (GAME_UI.layoutKey !== layoutKey);
+
+      if(needBuild){
+        GAME_UI.built = true;
+        GAME_UI.layoutKey = layoutKey;
+        GAME_UI.refs = {};
+
+        const ICON_GEAR = `
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-1,7.43,7.43,0,0,0-.05-1l2.11-1.65a.5.5,0,0,0,.12-.63l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.28,7.28,0,0,0-1.73-1l-.38-2.65A.5.5,0,0,0,11.7,1H7.3a.5.5,0,0,0-.49.42L6.43,4.07a7.28,7.28,0,0,0-1.73,1l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.63L1.86,10a7.43,7.43,0,0,0-.05,1,7.43,7.43,0,0,0,.05,1L-.25,14.59a.5.5,0,0,0-.12.63l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.28,7.28,0,0,0,1.73,1l.38,2.65A.5.5,0,0,0,7.3,23h4.4a.5.5,0,0,0,.49-.42l.38-2.65a7.28,7.28,0,0,0,1.73-1l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.63ZM9.5,15.5A3.5,3.5,0,1,1,13,12,3.5,3.5,0,0,1,9.5,15.5Z"></path>
+          </svg>
+        `;
+        const ICON_SWAP = `
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M16 3h5v5h-2V6.41l-3.29 3.3-1.42-1.42L17.59 5H16V3z"></path>
+            <path d="M4 7h4.59l9.7 9.7-1.42 1.42L7.76 9H4V7z"></path>
+            <path d="M4 15h4.59l2.12 2.12-1.42 1.42L7.76 17H4v-2z"></path>
+            <path d="M16 16h1.59l-2.3-2.29 1.42-1.42L19 14.59V13h2v5h-5v-2z"></path>
+          </svg>
+        `;
+        const ICON_CLEAR = `
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.71 2.88 18.29 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"></path>
+          </svg>
+        `;
+        const ICON_Q = `
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 2H8C6.9 2 6 2.9 6 4V16c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h11v12z"></path>
+            <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"></path>
+          </svg>
+        `;
+
+        const modeBtnTitle = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
+
+        main.innerHTML = `
+          <div class="gameLayout">
+            <div class="landRight">
+              <div class="mapOuter">
+                <div id="mapScale" class="mapScale" style="--zoom:1">
+                  <div id="mapBox" class="mapBox">
+                    <img id="mapImg" src="" alt="" decoding="async">
+                    <svg id="overlay" class="overlaySvg"></svg>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="mapToolsRow">
-              <div class="zoomWrap">
-                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
-              </div>
-
-              ${isHost ? `
-                <button id="mapBtn" class="circleBtn" type="button" aria-label="تغيير الخريطة" title="تغيير الخريطة">
-                  ${ICON_SWAP}
-                  <span class="helpDot" data-tip="تغيير الخريطة: التنقل بين الخرائط الثلاث.">؟</span>
-                </button>
-              ` : ``}
-
-              ${isHost ? `
-                <button id="clearBoardBtn" class="circleBtn" type="button" aria-label="تفريغ الخريطة" title="تفريغ الخريطة">
-                  ${ICON_CLEAR}
-                  <span class="helpDot" data-tip="تفريغ الخريطة: مسح ألوان الخلايا وإرجاعها للوضع الافتراضي.">؟</span>
-                </button>
-              ` : ``}
-
-              ${isHost ? `
-                <button id="qModeBtn" class="circleBtn ${qMode === "custom" ? "cyan" : ""}" type="button" aria-label="تغيير نوع الأسئلة" title="${modeBtnTitle}">
-                  ${ICON_Q}
-                  <span class="helpDot" data-tip="تغيير نوع الأسئلة: التبديل بين أسئلة اللعبة وأسئلة المقدم الخاصة.">؟</span>
-                </button>
-              ` : ``}
-
-              ${isHost ? `<button id="settingsBtn" class="circleBtn" type="button" aria-label="الاعدادات" title="الاعدادات">${ICON_GEAR}</button>` : ``}
-            </div>
-
-            <div class="scoreBoard">
-              <div class="teamPill green">الفريق الأخضر</div>
-              <div id="scoreGreen" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(sg) ? sg : 0}</div>
-              <div id="scoreOrange" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(so) ? so : 0}</div>
-              <div class="teamPill orange">الفريق البرتقالي</div>
-            </div>
-          </div>
-
-          <div class="landLeft">
-            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
-
-            <div class="controlsRow">
-              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
-
-              <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
-                <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
-                  <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
-                    <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
-                  </svg>
-                  <span id="timerNumber" class="timerNumber">10</span>
-                </button>
-              </div>
-
-              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
-            </div>
-
-            ${isHost ? `
-              <div class="questionCard">
-                <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
-                <button id="ansBtn" class="answerBtn red" type="button">إظهار الإجابة</button> <!-- ✅ (8) تغيير النص فقط -->
-              </div>
-            ` : `
-              <div class="playerBtnWrap">
-                <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
-                ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
-                <div class="buyNowWrap">
-                  <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+              <div class="mapToolsRow">
+                <div class="zoomWrap">
+                  <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
                 </div>
+
+                ${isHost ? `
+                  <button id="mapBtn" class="circleBtn" type="button" aria-label="تغيير الخريطة" title="تغيير الخريطة">
+                    ${ICON_SWAP}
+                    <span class="helpDot" data-tip="تغيير الخريطة: التنقل بين الخرائط الثلاث.">؟</span>
+                  </button>
+                ` : ``}
+
+                ${isHost ? `
+                  <button id="clearBoardBtn" class="circleBtn" type="button" aria-label="تفريغ الخريطة" title="تفريغ الخريطة">
+                    ${ICON_CLEAR}
+                    <span class="helpDot" data-tip="تفريغ الخريطة: مسح ألوان الخلايا وإرجاعها للوضع الافتراضي.">؟</span>
+                  </button>
+                ` : ``}
+
+                ${isHost ? `
+                  <button id="qModeBtn" class="circleBtn ${qMode === "custom" ? "cyan" : ""}" type="button" aria-label="تغيير نوع الأسئلة" title="${modeBtnTitle}">
+                    ${ICON_Q}
+                    <span class="helpDot" data-tip="تغيير نوع الأسئلة: التبديل بين أسئلة اللعبة وأسئلة المقدم الخاصة.">؟</span>
+                  </button>
+                ` : ``}
+
+                ${isHost ? `<button id="settingsBtn" class="circleBtn" type="button" aria-label="الاعدادات" title="الاعدادات">${ICON_GEAR}</button>` : ``}
               </div>
-            `}
+
+              <div class="scoreBoard">
+                <div class="teamPill green">الفريق الأخضر</div>
+                <div id="scoreGreen" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(sg) ? sg : 0}</div>
+                <div id="scoreOrange" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(so) ? so : 0}</div>
+                <div class="teamPill orange">الفريق البرتقالي</div>
+              </div>
+            </div>
+
+            <div class="landLeft">
+              <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+
+              <div class="controlsRow">
+                ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
+
+                <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
+                  <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
+                    <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
+                      <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+                    </svg>
+                    <span id="timerNumber" class="timerNumber">10</span>
+                  </button>
+                </div>
+
+                ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
+              </div>
+
+              ${isHost ? `
+                <div class="questionCard">
+                  <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
+                  <button id="ansBtn" class="answerBtn red" type="button">إظهار الإجابة</button>
+                </div>
+              ` : `
+                <div class="playerBtnWrap">
+                  <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
+                  ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
+                  <div class="buyNowWrap">
+                    <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+                  </div>
+                </div>
+              `}
+            </div>
           </div>
-        </div>
-      `;
+        `;
 
-      TIMER_UI.latestTimer = room.timer || {};
-      TIMER_UI.isHost = isHost;
-      ensureTimerTicker();
-      applyTimerDom();
+        // Cache refs
+        const r = GAME_UI.refs;
+        r.mapScale = document.getElementById("mapScale");
+        r.mapImg = document.getElementById("mapImg");
+        r.overlay = document.getElementById("overlay");
+        r.zoom = document.getElementById("zoom");
+        r.mapBtn = document.getElementById("mapBtn");
+        r.clearBoardBtn = document.getElementById("clearBoardBtn");
+        r.qModeBtn = document.getElementById("qModeBtn");
+        r.settingsBtn = document.getElementById("settingsBtn");
+        r.scoreGreen = document.getElementById("scoreGreen");
+        r.scoreOrange = document.getElementById("scoreOrange");
+        r.firstPressBar = document.getElementById("firstPressBar");
+        r.nextQ = document.getElementById("nextQ");
+        r.freezeBtn = document.getElementById("freezeBtn");
+        r.qText = document.getElementById("qText");
+        r.ansBtn = document.getElementById("ansBtn");
+        r.buzzBtn = document.getElementById("buzzBtn");
+        r.timerClock = document.getElementById("timerClock");
 
-      main.querySelectorAll(".helpDot").forEach(dot => {
-        dot.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const txt = dot.getAttribute("data-tip") || "";
-          if(TIP_OPEN && tipPopup.style.display === "block"){
-            closeTip();
-            return;
+        // Build overlay cells ONCE
+        if(r.overlay){
+          r.overlay.innerHTML = "";
+          r.overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+          const svgNS = "http://www.w3.org/2000/svg";
+          for(let row=0; row<5; row++){
+            for(let col=0; col<5; col++){
+              const poly = document.createElementNS(svgNS, "polygon");
+              poly.classList.add("cell", "state0");
+              poly.setAttribute("data-row", row);
+              poly.setAttribute("data-col", col);
+              r.overlay.appendChild(poly);
+            }
           }
-          openTip(dot, txt);
+          r.cells = Array.from(r.overlay.querySelectorAll(".cell"));
+          r.overlay.style.pointerEvents = isHost ? "auto" : "none";
+        }
+
+        // Help dots listeners ONCE
+        main.querySelectorAll(".helpDot").forEach(dot => {
+          dot.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const txt = dot.getAttribute("data-tip") || "";
+            if(TIP_OPEN && tipPopup.style.display === "block"){
+              closeTip();
+              return;
+            }
+            openTip(dot, txt);
+          });
         });
-      });
 
-      // ✅ (4) Stepper: فتح الأسهم فوق/تحت
-      if(isHost){
-        const sG = document.getElementById("scoreGreen");
-        const sO = document.getElementById("scoreOrange");
-        if(sG) sG.addEventListener("click", () => openScoreStepper("green", sG, sg));
-        if(sO) sO.addEventListener("click", () => openScoreStepper("orange", sO, so));
-      }
+        // Scores stepper listeners ONCE
+        if(isHost){
+          if(r.scoreGreen){
+            r.scoreGreen.addEventListener("click", () => {
+              const rr = GAME_UI.latestRoom || {};
+              const v = Number(rr?.scores?.green ?? 0);
+              openScoreStepper("green", r.scoreGreen, v);
+            });
+          }
+          if(r.scoreOrange){
+            r.scoreOrange.addEventListener("click", () => {
+              const rr = GAME_UI.latestRoom || {};
+              const v = Number(rr?.scores?.orange ?? 0);
+              openScoreStepper("orange", r.scoreOrange, v);
+            });
+          }
+        }
 
-      if(isHost){
-        const clock = document.getElementById("timerClock");
-        if(clock){
-          clock.addEventListener("click", async (e) => {
+        // Timer click ONCE
+        if(isHost && r.timerClock){
+          r.timerClock.addEventListener("click", async (e) => {
             e.stopPropagation();
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
-            // ✅ (3) تصفير المؤقت وإيقاف الوميض بالضغط على المؤقت نفسه
             if(t.running || t.done){
               await update(ref(db, `rooms/${code}/timer`), {
                 running:false,
@@ -2580,7 +2758,6 @@
               return;
             }
 
-            // (يبقى موجود كخيار يدوي، لكن التفعيل الأساسي صار تلقائي عند أول جرس)
             await update(ref(db, `rooms/${code}/timer`), {
               sel,
               dur: sel,
@@ -2590,136 +2767,229 @@
             });
           });
         }
-      }
 
-      if(isHost){
-        const settingsBtn = document.getElementById("settingsBtn");
-        if(settingsBtn){
-          settingsBtn.addEventListener("click", () => openSettings(room));
+        // Settings ONCE
+        if(isHost && r.settingsBtn){
+          r.settingsBtn.addEventListener("click", () => openSettings(GAME_UI.latestRoom || {}));
         }
-      }
 
-      if(isHost){
-        const qModeBtn = document.getElementById("qModeBtn");
-        if(qModeBtn){
-          qModeBtn.addEventListener("click", async () => {
-            const cur = getQuestionMode(room);
+        // Question mode toggle ONCE
+        if(isHost && r.qModeBtn){
+          r.qModeBtn.addEventListener("click", async () => {
+            const rr = GAME_UI.latestRoom || {};
+            const cur = getQuestionMode(rr);
             const next = (cur === "custom") ? "default" : "custom";
             await update(ref(db, `rooms/${code}`), { questionMode: next });
           });
         }
-      }
 
-      const mapImg = document.getElementById("mapImg");
-      const overlay = document.getElementById("overlay");
-      const mapScale = document.getElementById("mapScale");
-      const zoom = document.getElementById("zoom");
-
-      const activeMap = Number(room.activeMap || 0);
-
-      // ✅ أسماء الخرائط كما طلبت + إضافة version للكاش
-      const srcBase = ([
-        "maps/map1.jpeg",
-        "maps/map2.jpeg",
-        "maps/map3.jpeg"
-      ][activeMap] || "maps/map1.jpeg");
-
-      mapImg.src = srcBase + vq;
-
-      overlay.innerHTML = "";
-      overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-      const svgNS = "http://www.w3.org/2000/svg";
-      for(let row=0; row<5; row++){
-        for(let col=0; col<5; col++){
-          const poly = document.createElementNS(svgNS, "polygon");
-          poly.classList.add("cell", "state0");
-          poly.setAttribute("data-row", row);
-          poly.setAttribute("data-col", col);
-          overlay.appendChild(poly);
-        }
-      }
-
-      overlay.style.pointerEvents = isHost ? "auto" : "none";
-
-      const ZOOM_KEY = `sabaq_zoom_${code}`;
-      const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
-      if(zoom && Number.isFinite(savedZoom) && savedZoom >= 0.8 && savedZoom <= 1.35){
-        zoom.value = String(savedZoom);
-      }
-
-      function applyZoomFix(){
-        const mapBox = document.getElementById("mapBox");
-        const mapOuter = document.querySelector(".mapOuter");
-        if(!mapBox || !mapOuter) return;
-
-        const z = Number(zoom.value || 1);
-        mapScale.style.setProperty("--zoom", z);
-
-        const baseH = mapBox.offsetHeight || 0;
-        const extra = Math.max(0, baseH * (z - 1));
-        mapOuter.style.marginBottom = `${extra}px`;
-      }
-
-      function placeHexes(){
-        const W = mapImg.clientWidth;
-        const H = mapImg.clientHeight;
-        if(!W || !H) return;
-
-        overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
-        overlay.setAttribute("preserveAspectRatio", "none");
-
-        const bbox = BBOX_CACHE[srcBase];
-        if(!bbox) return;
-
-        const x0 = bbox.x0 * W;
-        const y0 = bbox.y0 * H;
-        const x1 = bbox.x1 * W;
-        const y1 = bbox.y1 * H;
-
-        const gridW = x1 - x0;
-        const gridH = y1 - y0;
-
-        const w = gridW / 5.5;
-        const h = gridH / 4.0;
-        const stepY = h * 0.75;
-
-        const cells = overlay.querySelectorAll(".cell");
-        let i = 0;
-        for(let row=0; row<5; row++){
-          for(let col=0; col<5; col++){
-            const left = x0 + col*w + (row%2)*(w/2);
-            const top  = y0 + row*stepY;
-            cells[i++].setAttribute("points", hexPointsPointyTop(left, top, w, h));
+        // Zoom ONCE
+        const ZOOM_KEY = `sabaq_zoom_${code}`;
+        if(r.zoom){
+          const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
+          if(Number.isFinite(savedZoom) && savedZoom >= 0.8 && savedZoom <= 1.35){
+            r.zoom.value = String(savedZoom);
           }
+          r.zoom.addEventListener("input", () => {
+            const z = Number(r.zoom.value || 1);
+            localStorage.setItem(ZOOM_KEY, String(z));
+            applyZoomFix();
+          });
         }
 
-        applyZoomFix();
+        // Map change ONCE
+        if(isHost && r.mapBtn){
+          r.mapBtn.addEventListener("click", async () => {
+            closeTip();
+            const rr = GAME_UI.latestRoom || {};
+            const activeMap = Number(rr.activeMap || 0);
+            const next = (activeMap + 1) % 3;
+            await update(roomRef, {
+              activeMap: next,
+              buzzer: null,
+              current: { letter: null, qIndex: 0, row: null, col: null, map: next },
+              winState: null
+            });
+          });
+        }
+
+        // Freeze toggle ONCE
+        if(isHost && r.freezeBtn){
+          r.freezeBtn.addEventListener("click", async () => {
+            const rr = GAME_UI.latestRoom || {};
+            await update(roomRef, { freeze: !rr.freeze, buzzer: null });
+          });
+        }
+
+        // Next question ONCE
+        if(isHost && r.nextQ){
+          r.nextQ.addEventListener("click", async () => {
+            const rr = GAME_UI.latestRoom || {};
+            const cur = rr.current || {};
+            if(!cur.letter) return;
+
+            const mode = getQuestionMode(rr);
+            const list = (mode === "custom") ? getCustomList(rr, cur.letter) : (QUESTIONS[cur.letter] || []);
+            if(!list.length) return;
+
+            const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
+            await update(roomRef, { current: { ...cur, qIndex: nextIndex } });
+          });
+        }
+
+        // Clear board ONCE
+        if(isHost && r.clearBoardBtn){
+          r.clearBoardBtn.addEventListener("click", async () => {
+            closeTip();
+            const rr = GAME_UI.latestRoom || {};
+            const activeMap = Number(rr.activeMap || 0);
+            const updates = {};
+            updates[`rooms/${code}/mapStates/${activeMap}`] = null;
+            updates[`rooms/${code}/buzzer`] = null;
+            updates[`rooms/${code}/winState`] = null;
+            await update(ref(db), updates);
+          });
+        }
+
+        // First press bar reset ONCE
+        if(isHost && r.firstPressBar){
+          r.firstPressBar.addEventListener("click", async () => {
+            try{ await update(roomRef, { buzzer: null }); }catch(e){}
+          });
+        }
+
+        // Overlay click delegation ONCE
+        if(isHost && r.overlay){
+          r.overlay.addEventListener("click", async (e) => {
+            const cell = e.target?.closest?.(".cell");
+            if(!cell) return;
+
+            e.preventDefault();
+
+            const rr = GAME_UI.latestRoom || {};
+            if(rr.status !== "started") return;
+
+            const activeMap = Number(rr.activeMap || 0);
+            const mapStates = (rr.mapStates && rr.mapStates[String(activeMap)]) ? rr.mapStates[String(activeMap)] : {};
+
+            const row = Number(cell.getAttribute("data-row"));
+            const col = Number(cell.getAttribute("data-col"));
+            const k = cellKey(row,col);
+
+            const st = Number(mapStates?.[k] ?? 0);
+            const next = (st + 1) % 4;
+
+            const letter = MAPS[activeMap][row][col];
+
+            const nextStates = { ...(mapStates || {}) };
+            nextStates[k] = next;
+
+            const winners = computeWinners(nextStates);
+            const prevWin = (rr.winState && rr.winState[String(activeMap)]) ? rr.winState[String(activeMap)] : { greenWin:false, orangeWin:false };
+
+            let winEvent = null;
+            const greenNew = !!winners.greenWin && !prevWin.greenWin;
+            const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
+
+            if(greenNew || orangeNew){
+              let team = null;
+              if(next === 2 && greenNew) team = "green";
+              else if(next === 3 && orangeNew) team = "orange";
+              else team = greenNew ? "green" : "orange";
+
+              winEvent = { team, ts: Date.now(), map: activeMap };
+            }
+
+            const updates = {};
+            updates[`rooms/${code}/mapStates/${activeMap}/${k}`] = next;
+            updates[`rooms/${code}/buzzer`] = null;
+            updates[`rooms/${code}/current`] = { letter, qIndex: 0, row, col, map: activeMap };
+            updates[`rooms/${code}/winState/${activeMap}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
+            if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
+
+            await update(ref(db), updates);
+          });
+        }
+
+        // Buzz button ONCE
+        if(!isHost && r.buzzBtn){
+          r.buzzBtn.addEventListener("click", async () => {
+            const rr = GAME_UI.latestRoom || {};
+            const mm = GAME_UI.latestMe;
+
+            if(rr.status !== "started") return;
+            if(rr.freeze) return;
+            if(!mm) return;
+
+            const buzzerRef = ref(db, `rooms/${code}/buzzer`);
+
+            const res = await runTransaction(buzzerRef, (cur) => {
+              if(cur === null){
+                return { pid, name: mm.name, team: mm.team, ts: Date.now() };
+              }
+              return;
+            });
+
+            if(res && res.committed){
+              try{
+                const v = (res.snapshot && typeof res.snapshot.val === "function") ? res.snapshot.val() : null;
+                if(v && v.ts){
+                  LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
+                }
+              }catch(e){}
+              if(!playRong()) fallbackBeep();
+            }
+          });
+        }
+
+        // Map image load ONCE
+        if(r.mapImg){
+          r.mapImg.addEventListener("load", onMapReady);
+        }
+
+        ensureResizeBound();
       }
 
-      function onMapReady(){
-        if(!BBOX_CACHE[srcBase]) BBOX_CACHE[srcBase] = detectHexBBox(mapImg);
-        requestAnimationFrame(placeHexes);
+      // --------- تحديثات بدون إعادة بناء DOM (هنا اختفت الرمشة) ---------
+
+      // Timer update
+      TIMER_UI.latestTimer = room.timer || {};
+      TIMER_UI.isHost = isHost;
+      ensureTimerTicker();
+      applyTimerDom();
+
+      // Update qMode button (class/title) + freeze btn state
+      const r = GAME_UI.refs;
+
+      if(isHost && r.qModeBtn){
+        const modeBtnTitle = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
+        r.qModeBtn.classList.toggle("cyan", qMode === "custom");
+        r.qModeBtn.setAttribute("title", modeBtnTitle);
       }
 
-      if(mapImg.complete) onMapReady();
-      else mapImg.addEventListener("load", onMapReady, { once:true });
+      if(isHost && r.freezeBtn){
+        r.freezeBtn.classList.toggle("red", !!room.freeze);
+      }
 
-      window.addEventListener("resize", () => {
-        placeHexes();
-        applyZoomFix();
-      });
+      // Update scores text
+      if(r.scoreGreen) r.scoreGreen.textContent = String(Number.isFinite(sg) ? sg : 0);
+      if(r.scoreOrange) r.scoreOrange.textContent = String(Number.isFinite(so) ? so : 0);
 
-      const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
-      overlay.querySelectorAll(".cell").forEach(cell => {
-        const r = Number(cell.getAttribute("data-row"));
-        const c = Number(cell.getAttribute("data-col"));
-        const k = cellKey(r,c);
-        const st = Number(mapStates?.[k] ?? 0);
-        setStateClass(cell, st);
-      });
+      // Ensure map src only when changed
+      const activeMap = Number(room.activeMap || 0);
+      ensureMapSrc(activeMap);
 
-      const firstPressBar = document.getElementById("firstPressBar");
+      // If first time src set and complete -> ensure bbox/place
+      if(r.mapImg && r.mapImg.complete){
+        if(!BBOX_CACHE[GAME_UI.srcBase]) BBOX_CACHE[GAME_UI.srcBase] = detectHexBBox(r.mapImg);
+        requestAnimationFrame(() => { try{ placeHexes(); }catch(e){} });
+      }
+
+      // Update overlay states only
+      updateOverlayStates(room);
+
+      // First press bar update
+      const firstPressBar = r.firstPressBar;
       const buzzer = room.buzzer;
       if(buzzer && buzzer.name && firstPressBar){
         firstPressBar.classList.add("filled");
@@ -2731,18 +3001,10 @@
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
-      // ✅ (تعديل 1) تصفير/إخفاء اسم أول لاعب بضغطة على الشريط (للمقدم فقط)
-      if(isHost && firstPressBar){
-        firstPressBar.addEventListener("click", async () => {
-          try{
-            await update(roomRef, { buzzer: null });
-          }catch(e){}
-        });
-      }
-
-      if(isHost){
-        const qText = document.getElementById("qText");
-        const ansBtn  = document.getElementById("ansBtn");
+      // Host question + answer btn update
+      if(isHost && r.qText){
+        const qText = r.qText;
+        const ansBtn = r.ansBtn;
         const cur = room.current || {};
 
         let curQ = "";
@@ -2804,153 +3066,54 @@
             }else{
               ansBtn.classList.remove("green");
               ansBtn.classList.add("red");
-              ansBtn.textContent = "إظهار الإجابة"; /* ✅ (8) النص فقط */
+              ansBtn.textContent = "إظهار الإجابة";
             }
 
-            ansBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if(ANSWER_UI.revealed) return;
-              ANSWER_UI.revealed = true;
-              ansBtn.classList.remove("red");
-              ansBtn.classList.add("green");
-              ansBtn.textContent = curA;
-            };
+            if(!ansBtn.__bound){
+              ansBtn.__bound = true;
+              ansBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const rr = GAME_UI.latestRoom || {};
+                const cur2 = rr.current || {};
+                if(!cur2.letter) return;
+
+                // نحسب الإجابة من آخر room لضمان التطابق
+                let curA2 = "";
+                const mode2 = getQuestionMode(rr);
+                if(mode2 === "custom"){
+                  const list2 = getCustomList(rr, cur2.letter);
+                  if(list2.length){
+                    const idx2 = Number(cur2.qIndex || 0) % list2.length;
+                    curA2 = (list2[idx2]?.a ?? "").trim();
+                  }
+                }else{
+                  const list2 = QUESTIONS[cur2.letter] || [];
+                  if(list2.length){
+                    const idx2 = Number(cur2.qIndex || 0) % list2.length;
+                    curA2 = (list2[idx2]?.a ?? "").trim();
+                  }
+                }
+
+                if(!curA2) return;
+                if(ANSWER_UI.revealed) return;
+
+                ANSWER_UI.revealed = true;
+                ansBtn.classList.remove("red");
+                ansBtn.classList.add("green");
+                ansBtn.textContent = curA2;
+              });
+            }
           }else{
             ansBtn.style.display = "none";
           }
         }
       }
 
-      zoom.addEventListener("input", () => {
-        const z = Number(zoom.value || 1);
-        localStorage.setItem(ZOOM_KEY, String(z));
-        applyZoomFix();
-      });
-
-      const mapBtn = document.getElementById("mapBtn");
-      if(mapBtn){
-        mapBtn.addEventListener("click", async () => {
-          closeTip();
-          const next = (activeMap + 1) % 3;
-          await update(roomRef, {
-            activeMap: next,
-            buzzer: null,
-            current: { letter: null, qIndex: 0, row: null, col: null, map: next },
-            winState: null
-          });
-        });
-      }
-
-      const freezeBtn = document.getElementById("freezeBtn");
-      if(freezeBtn){
-        freezeBtn.addEventListener("click", async () => {
-          await update(roomRef, { freeze: !room.freeze, buzzer: null });
-        });
-      }
-
-      const nextQ = document.getElementById("nextQ");
-      if(nextQ){
-        nextQ.addEventListener("click", async () => {
-          const cur = room.current || {};
-          if(!cur.letter) return;
-
-          const mode = getQuestionMode(room);
-          const list = (mode === "custom") ? getCustomList(room, cur.letter) : (QUESTIONS[cur.letter] || []);
-          if(!list.length) return;
-
-          const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
-          await update(roomRef, { current: { ...cur, qIndex: nextIndex } });
-        });
-      }
-
-      const clearBoardBtn = document.getElementById("clearBoardBtn");
-      if(clearBoardBtn){
-        clearBoardBtn.addEventListener("click", async () => {
-          closeTip();
-          const updates = {};
-          updates[`rooms/${code}/mapStates/${activeMap}`] = null;
-          updates[`rooms/${code}/buzzer`] = null;
-          updates[`rooms/${code}/winState`] = null;
-          await update(ref(db), updates);
-        });
-      }
-
-      if(isHost){
-        overlay.querySelectorAll(".cell").forEach(cell => {
-          cell.addEventListener("click", async (e) => {
-            e.preventDefault();
-            if(room.status !== "started") return;
-
-            const r = Number(cell.getAttribute("data-row"));
-            const c = Number(cell.getAttribute("data-col"));
-            const k = cellKey(r,c);
-
-            const st = Number(mapStates?.[k] ?? 0);
-            const next = (st + 1) % 4;
-
-            const letter = MAPS[activeMap][r][c];
-
-            const nextStates = { ...(mapStates || {}) };
-            nextStates[k] = next;
-
-            const winners = computeWinners(nextStates);
-            const prevWin = (room.winState && room.winState[String(activeMap)]) ? room.winState[String(activeMap)] : { greenWin:false, orangeWin:false };
-
-            let winEvent = null;
-            const greenNew = !!winners.greenWin && !prevWin.greenWin;
-            const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
-
-            if(greenNew || orangeNew){
-              let team = null;
-              if(next === 2 && greenNew) team = "green";
-              else if(next === 3 && orangeNew) team = "orange";
-              else team = greenNew ? "green" : "orange";
-
-              winEvent = { team, ts: Date.now(), map: activeMap };
-            }
-
-            const updates = {};
-            updates[`rooms/${code}/mapStates/${activeMap}/${k}`] = next;
-            updates[`rooms/${code}/buzzer`] = null;
-            updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: r, col: c, map: activeMap };
-            updates[`rooms/${code}/winState/${activeMap}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
-            if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
-
-            await update(ref(db), updates);
-          });
-        });
-      }
-
-      const buzzBtn = document.getElementById("buzzBtn");
-      if(buzzBtn){
+      // Player buzz disabled state update (بدون إعادة بناء)
+      if(!isHost && r.buzzBtn){
         const disabled = (!started) || room.freeze || !me || !me.name;
-        if(disabled) buzzBtn.classList.add("disabled");
-
-        buzzBtn.addEventListener("click", async () => {
-          if(!started) return;
-          if(room.freeze) return;
-          if(!me) return;
-
-          const buzzerRef = ref(db, `rooms/${code}/buzzer`);
-
-          const res = await runTransaction(buzzerRef, (cur) => {
-            if(cur === null){
-              return { pid, name: me.name, team: me.team, ts: Date.now() };
-            }
-            return;
-          });
-
-          if(res && res.committed){
-            try{
-              const v = (res.snapshot && typeof res.snapshot.val === "function") ? res.snapshot.val() : null;
-              if(v && v.ts){
-                LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
-              }
-            }catch(e){}
-            if(!playRong()) fallbackBeep();
-          }
-        });
+        r.buzzBtn.classList.toggle("disabled", !!disabled);
       }
     }
 
@@ -3028,6 +3191,7 @@
 
       if(!room){
         renderWaiting("الغرفة غير موجودة.");
+        GAME_UI.built = false; // لو كانت مبنية قبل
         return;
       }
 
@@ -3046,6 +3210,8 @@
           renderGame(room, null);
           afterRender(room);
         }else{
+          // خروج من واجهة اللعب -> نسمح بإعادة بناء عند الرجوع
+          GAME_UI.built = false;
           renderHostLobby(room);
           afterRender(room);
         }
@@ -3067,12 +3233,14 @@
 
       // ✅ (2) إذا الغرفة ممتلئة وما لقيت بياناتي -> “الغرفة ممتلئة”
       if(!me && playerCount >= MAX_PLAYERS){
+        GAME_UI.built = false;
         renderWaiting("الغرفة ممتلئة");
         afterRender(room);
         return;
       }
 
       if(room.status !== "started"){
+        GAME_UI.built = false;
         renderWaiting("بانتظار بدء اللعبة...");
         afterRender(room);
         return;
@@ -3080,6 +3248,7 @@
 
       // ✅ (2) إذا بدأ اللعب لكن الغرفة ممتلئة وأنا خارج القائمة (تم قصّي)
       if(!me && playerCount >= MAX_PLAYERS){
+        GAME_UI.built = false;
         renderWaiting("الغرفة ممتلئة");
         afterRender(room);
         return;
@@ -3095,6 +3264,6 @@
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-02-16-2 -->
+  <!-- VERSION: game_full.html — v2026-02-17-1 (No-Flicker UI) -->
 </body>
 </html>
