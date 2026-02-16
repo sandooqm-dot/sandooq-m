@@ -1,27 +1,9 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v7: allow GUEST player pages (join/play/game) without redirect to /activate
+// v7: يسمح للاعبين الضيوف بدخول game_full.html فقط إذا role=player ومعه code+pid (بدون تفعيل)
 
 const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
 const schemaCache = new Map(); // table -> { ts, cols:Set }
-
-// ✅ صفحات الضيوف (لازم ما تمر على التفعيل أبدًا حتى لو كانت داخل /app بسبب redirects)
-const PUBLIC_GUEST_PATHS = new Set([
-  "/join.html",
-  "/play.html",
-  "/game.html",
-  "/join",
-  "/play",
-  "/game",
-
-  // احتياط لو عندك Redirect يودّيهم داخل /app
-  "/app/join.html",
-  "/app/play.html",
-  "/app/game.html",
-  "/app/join",
-  "/app/play",
-  "/app/game",
-]);
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -258,11 +240,6 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅✅ NEW: صفحات الضيوف ما لها أي علاقة بالتفعيل
-  if (PUBLIC_GUEST_PATHS.has(path)) {
-    return next();
-  }
-
   // ✅ تحديد الصفحات المحمية
   const protectRootGameFull =
     path === "/game_full.html" ||
@@ -270,6 +247,20 @@ export async function onRequest(context) {
     path === "/game_full/";
 
   const needsProtection = path.startsWith("/app") || protectRootGameFull;
+
+  // ✅✅ NEW (v7): السماح للاعب الضيف فقط بالدخول لـ game_full بدون تفعيل
+  // شرطنا: role=player + code 6 أرقام + pid موجود
+  if (protectRootGameFull) {
+    const role = String(url.searchParams.get("role") || "");
+    const code = String(url.searchParams.get("code") || "");
+    const pid  = String(url.searchParams.get("pid")  || "");
+    const okCode = /^[0-9]{6}$/.test(code);
+    const okPid  = pid && pid.length >= 6;
+
+    if (role === "player" && okCode && okPid) {
+      return next();
+    }
+  }
 
   // إذا ما يحتاج حماية، مرّره
   if (!needsProtection) return next();
@@ -305,5 +296,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 7 (allow guest join/play/game; protects /app/* + /game_full(.html))
+_middleware.js – إصدار 7 (protects /app/* + /game_full(.html) BUT allows guest players with role=player+code+pid)
 */
