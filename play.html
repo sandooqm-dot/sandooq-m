@@ -5,103 +5,95 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>بانتظار بدء اللعبة</title>
 
-  <meta name="theme-color" content="#7b1f63">
-
-  <!-- خط اللعبة -->
-  <link rel="preload" href="AA-GALAXY.otf?v=2026-02-15-1" as="font" type="font/otf" crossorigin>
-  <link rel="preload" href="logo.png?v=2026-02-15-1" as="image" fetchpriority="high">
-
   <style>
     @font-face{
       font-family:"AA-GALAXY";
-      src:url("AA-GALAXY.otf?v=2026-02-15-1") format("opentype");
+      src:url("AA-GALAXY.otf") format("opentype");
       font-weight:400;
       font-style:normal;
       font-display:swap;
     }
 
     :root{
-      /* نفس ألوان game_full.html */
       --bg1:#7b1f63;
       --bg2:#5f214f;
       --bg3:#3a1234;
 
-      --card:#ffffff;
-      --text:#111;
-      --muted:#6b7280;
+      --white:#fff;
+      --yellow:#f4c400;
+
+      --purpleBtn:#6d28d9;
+      --purpleBtn2:#7c3aed;
 
       --shadow: 0 16px 30px rgba(0,0,0,.30);
-
-      /* زر الشراء البنفسجي */
-      --buy:#7c3aed;
-      --buy2:#6d28d9;
     }
 
     *{ box-sizing:border-box; }
     html,body{ height:100%; }
 
-    html{
-      background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
-    }
-
     body{
       margin:0;
-      min-height:100svh;
-      min-height:100dvh;
-
-      font-family:"AA-GALAXY", Arial, sans-serif;
       color:#fff;
+      text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
 
       background:
         radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
         radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
         linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
 
+      min-height: 100svh;
+      min-height: 100dvh;
+
       display:flex;
+      flex-direction:column;
       align-items:center;
-      justify-content:center;
-      padding:18px;
+      justify-content:flex-start;
 
-      -webkit-font-smoothing:antialiased;
-      text-rendering:optimizeLegibility;
+      padding-top: calc(22px + env(safe-area-inset-top));
+      padding-bottom: calc(18px + env(safe-area-inset-bottom));
+      padding-left:16px;
+      padding-right:16px;
     }
 
-    .box{
-      width:min(620px, 92vw);
-      background:var(--card);
-      color:var(--text);
-      border-radius:20px;
-      padding:26px 18px 18px;
-      text-align:center;
-      box-shadow:var(--shadow);
-    }
-
-    .logo{
-      width:74px;
-      height:74px;
+    .topLogo{
+      width:90px;
+      height:90px;
       object-fit:contain;
       display:block;
-      margin:0 auto 10px;
+      margin:0 auto 14px;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
     }
 
-    h2{
-      margin:8px 0 6px;
+    .center{
+      flex:1;
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:12px;
+      transform: translateY(-12px);
+    }
+
+    .title{
       font-size:22px;
-      color:#111;
-      font-weight:800;
+      line-height:1.2;
+      margin:0;
+      text-shadow: 0 8px 18px rgba(0,0,0,.35);
     }
 
-    p{
+    .sub{
       margin:0;
       font-size:14px;
-      color:#444;
-      line-height:1.6;
+      opacity:.9;
+      text-shadow: 0 8px 18px rgba(0,0,0,.35);
     }
 
     .spinner{
       width:18px;height:18px;border-radius:50%;
-      border:3px solid #ddd;
-      border-top-color: var(--bg1);
+      border:3px solid rgba(255,255,255,.35);
+      border-top-color:#fff;
       display:inline-block;
       vertical-align:-4px;
       margin-right:8px;
@@ -110,57 +102,61 @@
     @keyframes spin{to{transform:rotate(360deg)}}
 
     .buyBtn{
-      margin:16px auto 0;
-      width:min(520px, 92vw);
-      border:0;
-      cursor:pointer;
-      padding:14px 16px;
-      border-radius:14px;
-      font-size:16px;
-      font-weight:900;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-
-      background: linear-gradient(180deg, var(--buy) 0%, var(--buy2) 100%);
+      width:min(320px, 70vw);
+      height:46px;
+      border:none;
+      border-radius:12px;
+      background: linear-gradient(180deg, var(--purpleBtn2), var(--purpleBtn));
       color:#fff;
-      box-shadow:0 10px 22px rgba(124,58,237,.25);
-    }
-    .buyBtn:active{ transform:translateY(1px); }
-
-    .small{
-      margin-top:12px;
-      font-size:12px;
-      color:#777;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      font-size:16px;
+      cursor:pointer;
+      box-shadow: var(--shadow);
     }
 
-    .codeLine{
-      margin-top:8px;
+    .footer{
+      width:100%;
+      text-align:center;
       font-size:12px;
-      color:#666;
+      opacity:.92;
+      padding-top:10px;
     }
 
-    .hint{
-      margin-top:10px;
-      font-size:12px;
-      color:#6b7280;
+    .err{
+      display:none;
+      width:min(520px, 92vw);
+      background: rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:14px;
+      padding:10px 12px;
+      font-size:13px;
+      box-shadow: 0 10px 22px rgba(0,0,0,.20);
     }
   </style>
 </head>
+
 <body>
-  <div class="box">
-    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
-    <h2><span class="spinner" aria-hidden="true"></span>بانتظار بدء اللعبة</h2>
-    <p id="msg">بانتظار المقدم يبدأ اللعبة…</p>
-    <div class="codeLine" id="codeLine" style="display:none;"></div>
+  <!-- اللوجو أعلى الصفحة بالمنتصف -->
+  <img class="topLogo" src="logo.png" alt="شعار صندوق المسابقات">
 
-    <button class="buyBtn" id="buyBtn" type="button">لشراء اللعبة اضغط هنا</button>
+  <div class="center">
+    <p class="title"><span class="spinner" aria-hidden="true"></span>بانتظار المقدم لبدء اللعبة</p>
+    <p class="sub" id="msg">لحظة...</p>
 
-    <div class="small">© صندوق المسابقات</div>
-    <div class="hint" id="hint" style="display:none;"></div>
+    <!-- زر شراء اللعبة (منتصف الشاشة وحجمه أصغر) -->
+    <button class="buyBtn" id="buyBtn">لشراء اللعبة اضغط هنا</button>
+
+    <div class="err" id="errBox"></div>
   </div>
+
+  <!-- الحقوق أسفل الصفحة بالمنتصف -->
+  <div class="footer">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    const BUY_URL = "https://sandooq-m.com";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -175,13 +171,13 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const msgEl = document.getElementById("msg");
-    const codeLine = document.getElementById("codeLine");
-    const hint = document.getElementById("hint");
+    const msg = document.getElementById("msg");
+    const errBox = document.getElementById("errBox");
+    const buyBtn = document.getElementById("buyBtn");
 
-    document.getElementById("buyBtn").onclick = () => {
-      window.open("https://sandooq-m.com", "_blank", "noopener,noreferrer");
-    };
+    buyBtn.addEventListener("click", () => {
+      window.open(BUY_URL, "_blank", "noopener,noreferrer");
+    });
 
     function normalizeDigits(s){
       const map = {
@@ -190,52 +186,50 @@
       };
       return String(s || "").replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
     }
+
     function cleanCode(s){
       return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
     }
 
-    const params = new URLSearchParams(location.search);
-    const code = cleanCode(params.get("code") || params.get("room") || params.get("c") || "");
-    const pid  = (params.get("pid") || "").trim();
-
-    if(code){
-      codeLine.style.display = "block";
-      codeLine.textContent = "رمز الغرفة: " + code;
+    function showErr(text){
+      errBox.textContent = text;
+      errBox.style.display = "block";
     }
 
-    if(!code){
-      msgEl.textContent = "الرابط ناقص (رمز الغرفة غير موجود).";
-      hint.style.display = "block";
-      hint.textContent = "ارجع وافتح رابط الـ QR من جديد.";
-    } else {
-      // تأكد الغرفة موجودة (اختياري)
-      try{
-        const roomSnap = await get(ref(db, `rooms/${code}`));
-        if(!roomSnap.exists()){
-          msgEl.textContent = "الغرفة غير موجودة أو انتهت.";
-          hint.style.display = "block";
-          hint.textContent = "تأكد من رمز الغرفة أو افتح الرابط الصحيح.";
-        }
-      }catch(e){}
+    // نجيب بيانات الغرفة من الرابط (بدون عرضها للاعب)
+    const params = new URLSearchParams(location.search);
+    const code = cleanCode(params.get("code") || "");
+    const pid  = (params.get("pid") || "").trim();
 
-      // راقب حالة الغرفة: إذا started ننقلهم
+    // نخزنها (مخفية) للاحتياط بدون ما نعرضها
+    if(code) sessionStorage.setItem("room_code", code);
+    if(pid)  sessionStorage.setItem("player_pid", pid);
+
+    if(code.length !== 6){
+      msg.textContent = "افتح الرابط من المقدم";
+      showErr("رمز الغرفة غير موجود في الرابط.");
+    }else{
+      msg.textContent = "بانتظار المقدم يبدأ اللعبة...";
       const statusRef = ref(db, `rooms/${code}/status`);
+
       onValue(statusRef, (snap) => {
         const st = snap.val();
+
+        // عند بدء اللعبة: ننقل اللاعب لصفحة اللعب (وليس play.html)
         if(st === "started"){
-          msgEl.textContent = "بدأت اللعبة… جاري الدخول";
-          const u = new URL("game.html", location.href); // game.html بوابة لـ game_full
+          msg.textContent = "جاري فتح اللعبة...";
+          const u = new URL("game.html", location.href);
           u.searchParams.set("role", "player");
           u.searchParams.set("code", code);
           if(pid) u.searchParams.set("pid", pid);
           location.replace(u.toString());
         }
       }, (err) => {
-        msgEl.textContent = "صار خطأ بالاتصال، حاول تحديث الصفحة.";
+        showErr("صار خطأ في الاتصال. حاول تحدّث الصفحة.");
       });
     }
   </script>
 
-  <!-- VERSION: play.html — v2 (Style matches game_full + Buy button; waits for started then goes to game.html) -->
+  <!-- VERSION: play.html — v2 (Style match + no room code shown + redirect to game.html on started) -->
 </body>
 </html>
