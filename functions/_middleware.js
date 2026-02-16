@@ -1,7 +1,7 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v8: Fix نهائي لمشكلة اللاعبين: السماح للاعب بالوصول لـ /app و /game_full حتى لو التحويل صار بدون role بالـ URL
-//     نعتمد على: role=player أو (pid+code) أو Referer من play/waiting أو Cookie (اختياري)
+// v9: Fix أقوى لمشكلة اللاعبين: السماح للاعب بالوصول لـ /app و /game_full حتى لو اختفت query أو ما انرسلت cookies الخاصة بالدور
+//     نعتمد على: role=player أو flags (guest/player/view=player) أو (pid+code) أو Cookies (role/guest OR pid+room_code) أو Referer انتظار/انضمام
 
 const ALLOW_GUEST_PLAYERS = true;
 
@@ -225,39 +225,50 @@ function redirectToActivate(url) {
 function isGuestPlayerRequest(request, url) {
   const sp = url.searchParams;
 
-  // (1) role صريح
+  // (0) Flags سريعة (أنت ترسلها من join.html)
+  const view = (sp.get("view") || "").toLowerCase();
+  if (view === "player") return true;
+
   const role = (sp.get("role") || "").toLowerCase();
   if (role === "player") return true;
 
-  // (2) pid + code (كثير من صفحات الانتظار تنقلها)
+  const guestFlag = (sp.get("guest") || sp.get("player") || sp.get("isPlayer") || "").toLowerCase();
+  if (guestFlag === "1" || guestFlag === "true" || guestFlag === "yes") return true;
+
+  // (1) pid + code
   const pid = sp.get("pid");
   const code = sp.get("code") || sp.get("room") || sp.get("roomId");
   if (pid && code) return true;
 
-  // (3) كوكي اختياري لو استُخدم لاحقًا
+  // (2) Cookies للدور (القديمة)
   const cRole = (getCookie(request, "sandooq_role") || "").toLowerCase();
   if (cRole === "player") return true;
-  const cGuest = getCookie(request, "sandooq_guest_player");
-  if (cGuest === "1" || (cGuest || "").toLowerCase() === "true") return true;
 
-  // (4) Referer من play/waiting/join
+  const cGuest = (getCookie(request, "sandooq_guest_player") || "").toLowerCase();
+  if (cGuest === "1" || cGuest === "true" || cGuest === "yes") return true;
+
+  // (3) Cookies بديلة: pid + room_code (أنت تخزنهم)
+  const cPid = getCookie(request, "sandooq_pid");
+  const cCode = getCookie(request, "sandooq_room_code");
+  if (cPid && cCode) return true;
+
+  // (4) Referer من صفحات انتظار/انضمام (أوسع من السابق)
   const ref = request.headers.get("referer") || request.headers.get("Referer") || "";
   if (ref) {
-    if (ref.includes("role=player")) return true;
+    if (ref.includes("role=player") || ref.includes("guest=1") || ref.includes("player=1") || ref.includes("view=player")) return true;
 
     try {
       const ru = new URL(ref);
       const rRole = (ru.searchParams.get("role") || "").toLowerCase();
-      if (rRole === "player") return true;
+      const rView = (ru.searchParams.get("view") || "").toLowerCase();
+      const rGuest = (ru.searchParams.get("guest") || ru.searchParams.get("player") || "").toLowerCase();
 
-      const fromWaiting =
-        ru.pathname.endsWith("/play.html") ||
-        ru.pathname.endsWith("/waiting.html") ||
-        ru.pathname.endsWith("/join.html");
+      if (rRole === "player" || rView === "player" || rGuest === "1" || rGuest === "true") return true;
 
+      const fromWaiting = /\/(play|waiting|wait|lobby|join)\.html$/i.test(ru.pathname);
       const rpid = ru.searchParams.get("pid");
       const rcode = ru.searchParams.get("code") || ru.searchParams.get("room") || ru.searchParams.get("roomId");
-      if (fromWaiting && rpid && rcode) return true;
+      if (fromWaiting && ( (rpid && rcode) || (rcode && (rGuest === "1" || rRole === "player" || rView === "player")) )) return true;
     } catch {}
   }
 
@@ -289,7 +300,7 @@ export async function onRequest(context) {
 
   const protectApp = path.startsWith("/app");
 
-  // ✅✅ أهم إصلاح: السماح للاعب (guest) بالدخول بدون تأمين للعبة حتى لو التحويل صار بدون role
+  // ✅✅ أهم إصلاح: السماح للاعب (guest) بالدخول بدون تأمين للعبة
   if (ALLOW_GUEST_PLAYERS) {
     if ((protectRootGameFull || protectApp) && isGuestPlayerRequest(request, url)) {
       return next();
@@ -332,5 +343,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 8 (Fix: allow guest players into /app or /game_full via role/pid+code/referer/cookie)
+_middleware.js – إصدار 9 (Fix: stronger guest player detection: flags + pid+code cookies + wider referer)
 */
