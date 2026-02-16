@@ -1,7 +1,7 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v8: Fix لاعبين الانتظار -> اللعبة: السماح للاعب بالدخول حتى لو انتقل للعبة بدون role بالـ URL
-//     (نعتمد على role=player أو Referer من play/waiting أو Cookie خفيف للاعب)
+// v8: Fix نهائي لمشكلة اللاعبين: السماح للاعب بالوصول لـ /app و /game_full حتى لو التحويل صار بدون role بالـ URL
+//     نعتمد على: role=player أو (pid+code) أو Referer من play/waiting أو Cookie (اختياري)
 
 const ALLOW_GUEST_PLAYERS = true;
 
@@ -73,7 +73,6 @@ async function findSessionEmail(DB, env, token) {
 
   // 1) sessions.token (الأسلوب الحالي عندك)
   if (cols.has("token")) {
-    // أعمدة الإيميل المحتملة
     if (cols.has("email")) {
       const row = await DB.prepare(
         `SELECT email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
@@ -100,7 +99,6 @@ async function findSessionEmail(DB, env, token) {
     const pepper = String(env?.SESSION_PEPPER || "sess_pepper_v1");
     const tokenHash = await sha256Hex(token + "|" + pepper);
 
-    // أعمدة الإيميل المحتملة
     if (cols.has("email")) {
       const row = await DB.prepare(
         `SELECT email FROM sessions WHERE token_hash = ? LIMIT 1`
@@ -177,10 +175,8 @@ async function isActivatedViaUsers(DB, email) {
 async function isActivated(DB, email) {
   email = normalizeEmail(email);
 
-  // 0) الأفضل: users
   if (await isActivatedViaUsers(DB, email)) return true;
 
-  // 1) activations
   const aCols = await getCols(DB, "activations");
   if (aCols.size) {
     const where = [];
@@ -197,7 +193,6 @@ async function isActivated(DB, email) {
     }
   }
 
-  // 2) codes
   const cCols = await getCols(DB, "codes");
   if (cCols.size) {
     const where = [];
@@ -226,24 +221,28 @@ function redirectToActivate(url) {
   }));
 }
 
-// ✅ تحديد إن كان الطلب “لاعب” حتى لو ما انحط role=player في رابط صفحة اللعبة
+// ✅ تحديد اللاعب حتى لو صفحة اللعبة فُتحت بدون role بالـ URL
 function isGuestPlayerRequest(request, url) {
-  // 1) من الـ URL
-  const role = (url.searchParams.get("role") || "").toLowerCase();
+  const sp = url.searchParams;
+
+  // (1) role صريح
+  const role = (sp.get("role") || "").toLowerCase();
   if (role === "player") return true;
 
-  // 2) من Cookie (اختياري لو تحب تستخدمه لاحقًا)
-  const cRole =
-    (getCookie(request, "sandooq_role") || getCookie(request, "sandooq_player_role") || "").toLowerCase();
+  // (2) pid + code (كثير من صفحات الانتظار تنقلها)
+  const pid = sp.get("pid");
+  const code = sp.get("code") || sp.get("room") || sp.get("roomId");
+  if (pid && code) return true;
+
+  // (3) كوكي اختياري لو استُخدم لاحقًا
+  const cRole = (getCookie(request, "sandooq_role") || "").toLowerCase();
   if (cRole === "player") return true;
+  const cGuest = getCookie(request, "sandooq_guest_player");
+  if (cGuest === "1" || (cGuest || "").toLowerCase() === "true") return true;
 
-  const cGuest = (getCookie(request, "sandooq_guest_player") || getCookie(request, "sandooq_guest") || "");
-  if (cGuest === "1" || cGuest.toLowerCase() === "true") return true;
-
-  // 3) من Referer (هذا هو المهم لحالتك: play.html -> game_full.html بدون باراميترات)
+  // (4) Referer من play/waiting/join
   const ref = request.headers.get("referer") || request.headers.get("Referer") || "";
   if (ref) {
-    // fallback سريع
     if (ref.includes("role=player")) return true;
 
     try {
@@ -256,12 +255,9 @@ function isGuestPlayerRequest(request, url) {
         ru.pathname.endsWith("/waiting.html") ||
         ru.pathname.endsWith("/join.html");
 
-      // إذا جاي من صفحة انتظار/انضمام ومعه pid+code نعتبره لاعب
-      if (fromWaiting) {
-        const pid = ru.searchParams.get("pid");
-        const code = ru.searchParams.get("code") || ru.searchParams.get("room") || ru.searchParams.get("roomId");
-        if (pid && code) return true;
-      }
+      const rpid = ru.searchParams.get("pid");
+      const rcode = ru.searchParams.get("code") || ru.searchParams.get("room") || ru.searchParams.get("roomId");
+      if (fromWaiting && rpid && rcode) return true;
     } catch {}
   }
 
@@ -286,22 +282,21 @@ export async function onRequest(context) {
   }
 
   // ✅ تحديد الصفحات المحمية
-  const protectGameFull =
+  const protectRootGameFull =
     path === "/game_full.html" ||
     path === "/game_full" ||
-    path === "/game_full/" ||
-    path === "/app/game_full.html" ||
-    path === "/app/game_full" ||
-    path === "/app/game_full/";
+    path === "/game_full/";
 
-  // ✅✅ إصلاح المشكلة: السماح للاعب يدخل صفحة اللعبة حتى لو الرابط ما فيه role=player
-  if (ALLOW_GUEST_PLAYERS && protectGameFull) {
-    if (isGuestPlayerRequest(request, url)) {
+  const protectApp = path.startsWith("/app");
+
+  // ✅✅ أهم إصلاح: السماح للاعب (guest) بالدخول بدون تأمين للعبة حتى لو التحويل صار بدون role
+  if (ALLOW_GUEST_PLAYERS) {
+    if ((protectRootGameFull || protectApp) && isGuestPlayerRequest(request, url)) {
       return next();
     }
   }
 
-  const needsProtection = path.startsWith("/app") || protectGameFull;
+  const needsProtection = protectApp || protectRootGameFull;
 
   // إذا ما يحتاج حماية، مرّره
   if (!needsProtection) return next();
@@ -337,5 +332,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 8 (Fix: allow players via role/cookie/referer so they don't get sent to /activate)
+_middleware.js – إصدار 8 (Fix: allow guest players into /app or /game_full via role/pid+code/referer/cookie)
 */
