@@ -124,15 +124,15 @@
       padding:10px 10px;
       border-radius:10px;
       background:rgba(0,0,0,.10);
-      border:none;                 /* ✅ إزالة البوردَر فقط */
-      color:#ffd54a;               /* ✅ أصفر واضح ومرتب */
+      border:none;
+      color:#ffd54a;
       font-weight:900;
       line-height:1.2;
       text-align:center;
       overflow:hidden;
       direction:rtl;
       box-shadow:0 8px 18px rgba(0,0,0,.22);
-      text-shadow:none;            /* ✅ بدون ظل */
+      text-shadow:none;
     }
     .gameName:empty{display:none;}
     .gnText{
@@ -143,7 +143,7 @@
       word-break:break-word;
       white-space:normal;
       font-size:18px;
-      text-shadow:none;            /* ✅ بدون ظل */
+      text-shadow:none;
     }
 
     .wrap{ width:95%; max-width:900px; margin:0 auto; }
@@ -189,8 +189,8 @@
       position:fixed;
       right:18px;
       bottom:24px;
-      color:rgba(255,255,255,.70); /* ✅ أخف */
-      font-size:14px;             /* ✅ أصغر */
+      color:rgba(255,255,255,.70);
+      font-size:14px;
       font-weight:700;
       z-index:20000;
       text-shadow:0 8px 18px rgba(0,0,0,.30);
@@ -452,7 +452,7 @@
     .scoreStepBackdrop{
       position:fixed;
       inset:0;
-      background:rgba(0,0,0,0); /* شفاف */
+      background:rgba(0,0,0,0);
       display:none;
       z-index:26000;
     }
@@ -971,13 +971,13 @@
       z-index:40002;
     }
     .winCongrats{
-      font-size:56px;       /* ✅ “مبرووك” كبيرة */
+      font-size:56px;
       font-weight:900;
       margin:2px 0 10px;
       letter-spacing:.2px;
     }
     .winWinner{
-      font-size:34px;       /* ✅ “فاز الفريق ...” أكبر وواضح */
+      font-size:34px;
       font-weight:900;
       margin:0;
     }
@@ -1098,11 +1098,9 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getDatabase, ref, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-    // ✅ رقم إصدار للكاش + كسر كاش (غيّره فقط عند تحديث ملفات محلية: خرائط/لوجو/خط/بنك أسئلة)
     const ASSET_VERSION = "2026-02-15-1";
     const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
 
-    // ✅ تحميل بنك الأسئلة بڤيرجن (إذا فشل، نرجع للـ fallback)
     try{
       await import(`./questions_bank.js${vq}`);
     }catch(e){
@@ -1119,10 +1117,7 @@
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
 
-    // ✅ (2) حد أقصى للغرفة
     const MAX_PLAYERS = 13;
-
-    // ✅ (9) حد للأسئلة الخاصة
     const MAX_CUSTOM_PER_LETTER = 7;
 
     const MAPS = [
@@ -1151,7 +1146,6 @@
 
     const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
 
-    // أسئلة افتراضية (Fallback) إذا ما كان فيه بنك أسئلة
     const DEFAULT_QUESTIONS = {};
     for(const L of ALL_LETTERS){
       DEFAULT_QUESTIONS[L] = Array.from({length:25}, (_,i) => ({
@@ -1160,7 +1154,6 @@
       }));
     }
 
-    // استخدم بنك الأسئلة إذا موجود، وإلا استخدم الافتراضي
     const QUESTIONS = (window.QUESTIONS && Object.keys(window.QUESTIONS).length)
       ? window.QUESTIONS
       : DEFAULT_QUESTIONS;
@@ -1176,10 +1169,8 @@
 
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
-
     const tipPopup = document.getElementById("tipPopup");
 
-    // ✅ (4) Stepper DOM
     const scoreStepBackdrop = document.getElementById("scoreStepBackdrop");
     const scoreStepper = document.getElementById("scoreStepper");
     const scoreStepVal = document.getElementById("scoreStepVal");
@@ -1189,7 +1180,6 @@
     let SCORE_STEP_TEAM = null;
     let SCORE_STEP_VALUE = 0;
 
-    // ✅ (5) Win DOM
     const winBackdrop = document.getElementById("winBackdrop");
     const confettiRain = document.getElementById("confettiRain");
     const winCongrats = document.getElementById("winCongrats");
@@ -1198,7 +1188,12 @@
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
 
-    // ✅✅✅ (تعديل الأصوات فقط) — جرس: rong / موسيقى: vois
+    // ✅✅✅ منع الوميض: نخزن آخر room/me عشان الـ handlers ما تعتمد على نسخة قديمة
+    let ROOM_LATEST = null;
+    let ME_LATEST = null;
+    function roomNow(){ return ROOM_LATEST || {}; }
+    function meNow(){ return ME_LATEST; }
+
     const SOUND = (function(){
       const bellCandidates  = ["rong.mp3","rong.wav","rong.m4a","rong.ogg"];
       const musicCandidates = ["vois.mp3","vois.wav","vois.m4a","vois.ogg"];
@@ -1230,13 +1225,12 @@
           this.ready = true;
 
           this.bell  = makeAudio(bellCandidates,  { volume:0.95, loop:false });
-          this.music = makeAudio(musicCandidates, { volume:0.95, loop:false }); // ✅ (5) صوت عالي
+          this.music = makeAudio(musicCandidates, { volume:0.95, loop:false });
 
           const unlock = () => {
             if(this.unlocked) return;
             this.unlocked = true;
 
-            // iOS/Safari: لازم Gesture قبل تشغيل الصوت
             [this.bell, this.music].forEach(a => {
               if(!a) return;
               const v = Number.isFinite(a.volume) ? a.volume : 1;
@@ -1285,14 +1279,9 @@
       return api;
     })();
 
-    function playRong(){
-      try{ return SOUND.playBell(); }catch(e){ return false; }
-    }
-    function playVois(){
-      try{ return SOUND.playMusic(); }catch(e){ return false; }
-    }
+    function playRong(){ try{ return SOUND.playBell(); }catch(e){ return false; } }
+    function playVois(){ try{ return SOUND.playMusic(); }catch(e){ return false; } }
 
-    // ✅ (5) تشغيل vois لمدة 5 ثواني فقط
     let VOIS_STOP_T = null;
     function stopVois(){
       try{
@@ -1313,7 +1302,6 @@
       return true;
     }
 
-    // ✅ fallback قديم (Oscillator) لو ما توفرت الملفات
     function fallbackBeep(){
       try{
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -1418,7 +1406,7 @@
         x0: minX / cw,
         y0: minY / ch,
         x1: (maxX + 1) / cw,
-        y1: (maxY + 1) / ch,
+        y1: (maxY + 1) / ch,   /* ✅ إصلاحك: كان /cw */
       };
     }
 
@@ -1438,6 +1426,64 @@
         [x,       y + h*0.25],
       ];
       return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
+    }
+
+    // ✅✅✅ (جديد) دوال ثابتة لتحديث الخريطة بدون إعادة رسم الصفحة (عشان تختفي “الرمشة”)
+    function applyZoomFix(){
+      const mapScale = document.getElementById("mapScale");
+      const zoom = document.getElementById("zoom");
+      const mapBox = document.getElementById("mapBox");
+      const mapOuter = document.querySelector(".mapOuter");
+      if(!mapScale || !zoom || !mapBox || !mapOuter) return;
+
+      const z = Number(zoom.value || 1);
+      mapScale.style.setProperty("--zoom", z);
+
+      const baseH = mapBox.offsetHeight || 0;
+      const extra = Math.max(0, baseH * (z - 1));
+      mapOuter.style.marginBottom = `${extra}px`;
+    }
+
+    function placeHexes(){
+      const mapImg = document.getElementById("mapImg");
+      const overlay = document.getElementById("overlay");
+      if(!mapImg || !overlay) return;
+
+      const W = mapImg.clientWidth;
+      const H = mapImg.clientHeight;
+      if(!W || !H) return;
+
+      overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      overlay.setAttribute("preserveAspectRatio", "none");
+
+      const srcBase = mapImg.dataset.srcBase || "";
+      const bbox = BBOX_CACHE[srcBase];
+      if(!bbox) return;
+
+      const x0 = bbox.x0 * W;
+      const y0 = bbox.y0 * H;
+      const x1 = bbox.x1 * W;
+      const y1 = bbox.y1 * H;
+
+      const gridW = x1 - x0;
+      const gridH = y1 - y0;
+
+      const w = gridW / 5.5;
+      const h = gridH / 4.0;
+      const stepY = h * 0.75;
+
+      const cells = overlay.querySelectorAll(".cell");
+      let i = 0;
+      for(let row=0; row<5; row++){
+        for(let col=0; col<5; col++){
+          const left = x0 + col*w + (row%2)*(w/2);
+          const top  = y0 + row*stepY;
+          if(cells[i]) cells[i].setAttribute("points", hexPointsPointyTop(left, top, w, h));
+          i++;
+        }
+      }
+
+      applyZoomFix();
     }
 
     const TIMER_UI = {
@@ -1727,14 +1773,9 @@
     }
 
     let LAST_WIN_TS = 0;
-
-    // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
-
-    // ✅ (3) تتبع آخر جرس شغّل المؤقت تلقائياً
     let LAST_AUTO_TIMER_SIG = "";
 
-    // ✅ (2) منع الزيادة عن 13 لاعب (قصّ الزائدين بأقدم joinedAt)
     let PRUNE_IN_FLIGHT = false;
     let LAST_PRUNE_AT = 0;
 
@@ -1771,13 +1812,11 @@
         }, { applyLocally:false });
 
       }catch(e){
-        // تجاهل
       }finally{
         PRUNE_IN_FLIGHT = false;
       }
     }
 
-    // ✅ (4) Stepper للأرقام
     function closeScoreStepper(){
       scoreStepBackdrop.style.display = "none";
       SCORE_STEP_TEAM = null;
@@ -1798,7 +1837,6 @@
 
       scoreStepVal.textContent = String(SCORE_STEP_VALUE);
 
-      // تموضع حول مربع النتيجة
       const r = anchorEl.getBoundingClientRect();
       const pad = 10;
       const stepW = 72;
@@ -1826,7 +1864,6 @@
     scoreStepUp.addEventListener("click", (e) => { e.stopPropagation(); applyScoreDelta(+1); });
     scoreStepDown.addEventListener("click", (e) => { e.stopPropagation(); applyScoreDelta(-1); });
 
-    // ✅ (5) قصاصات
     let WIN_HIDE_T = null;
     function clearConfetti(){
       try{ confettiRain.innerHTML = ""; }catch(e){}
@@ -1878,7 +1915,6 @@
 
       startConfetti(5000);
 
-      // ✅ (5) تشغيل الصوت 5 ثواني
       if(!playVoisFor(5000)){
         fallbackBeep();
       }
@@ -1944,7 +1980,6 @@
       const pairsWrap = document.createElement("div");
       pairsWrap.className = "cqPairs";
 
-      // ✅ (9) قصّ العرض/التحميل على 7
       const existing = getCustomList(room, letter).slice(0, MAX_CUSTOM_PER_LETTER);
       if(existing.length){
         existing.forEach(obj => pairsWrap.appendChild(createPairEl(String(obj.q||""), String(obj.a||""))));
@@ -2000,7 +2035,6 @@
           if(q || a) out.push({ q, a });
         });
 
-        // ✅ (9) حد 7 — لا نحفظ أكثر
         if(out.length > MAX_CUSTOM_PER_LETTER){
           savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة فقط`;
           setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
@@ -2392,7 +2426,215 @@
 
     const ANSWER_UI = { revealed:false, sig:"" };
 
+    // ✅✅✅ تحديث سؤال/إجابة المقدم بدون إعادة رسم الصفحة
+    function updateHostQuestionUI(room){
+      const qText = document.getElementById("qText");
+      const ansBtn  = document.getElementById("ansBtn");
+      if(!qText || !ansBtn) return;
+
+      const cur = room.current || {};
+      let curQ = "";
+      let curA = "";
+      let hasQuestion = false;
+
+      if(cur.letter){
+        const mode = getQuestionMode(room);
+
+        let list = [];
+        if(mode === "custom"){
+          list = getCustomList(room, cur.letter);
+          if(!list.length){
+            curQ = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
+            curA = "";
+            hasQuestion = true;
+          }else{
+            const idx = Number(cur.qIndex || 0) % list.length;
+            const item = list[idx];
+            curQ = item?.q ?? "—";
+            curA = (item?.a ?? "").trim();
+            hasQuestion = true;
+          }
+        }else{
+          list = QUESTIONS[cur.letter] || [];
+          if(!list.length){
+            curQ = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
+            curA = "";
+            hasQuestion = true;
+          }else{
+            const idx = Number(cur.qIndex || 0) % list.length;
+            const item = list[idx];
+            curQ = item?.q ?? "—";
+            curA = (item?.a ?? "").trim();
+            hasQuestion = true;
+          }
+        }
+      }else{
+        curQ = "اختر حرفًا من الخريطة";
+        curA = "";
+        hasQuestion = false;
+      }
+
+      qText.textContent = curQ;
+
+      const sig = `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number(room.customQuestionsUpdatedAt||0)}`;
+      if(ANSWER_UI.sig !== sig){
+        ANSWER_UI.sig = sig;
+        ANSWER_UI.revealed = false;
+      }
+
+      if(hasQuestion && curA){
+        ansBtn.style.display = "block";
+        if(ANSWER_UI.revealed){
+          ansBtn.classList.remove("red");
+          ansBtn.classList.add("green");
+          ansBtn.textContent = curA;
+        }else{
+          ansBtn.classList.remove("green");
+          ansBtn.classList.add("red");
+          ansBtn.textContent = "إظهار الإجابة";
+        }
+
+        ansBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if(ANSWER_UI.revealed) return;
+          ANSWER_UI.revealed = true;
+          ansBtn.classList.remove("red");
+          ansBtn.classList.add("green");
+          ansBtn.textContent = curA;
+        };
+      }else{
+        ansBtn.style.display = "none";
+      }
+    }
+
+    // ✅✅✅ تحديث واجهة اللعب بدون إعادة رسم (يمنع “الرمشة”)
+    function updateGameUI(room, me){
+      try{ setGameName(room?.name); }catch(e){}
+
+      const isHost = (role === "host");
+
+      // scores
+      try{
+        const sg = Number(room?.scores?.green ?? 0);
+        const so = Number(room?.scores?.orange ?? 0);
+        const sGEl = document.getElementById("scoreGreen");
+        const sOEl = document.getElementById("scoreOrange");
+        if(sGEl) sGEl.textContent = String(Number.isFinite(sg) ? sg : 0);
+        if(sOEl) sOEl.textContent = String(Number.isFinite(so) ? so : 0);
+      }catch(e){}
+
+      // freeze btn style
+      try{
+        const freezeBtn = document.getElementById("freezeBtn");
+        if(freezeBtn) freezeBtn.classList.toggle("red", !!room.freeze);
+      }catch(e){}
+
+      // qMode btn style
+      try{
+        const qModeBtn = document.getElementById("qModeBtn");
+        if(qModeBtn){
+          const qMode = getQuestionMode(room);
+          qModeBtn.classList.toggle("cyan", qMode === "custom");
+          qModeBtn.title = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
+        }
+      }catch(e){}
+
+      // first press bar
+      try{
+        const firstPressBar = document.getElementById("firstPressBar");
+        const buzzer = room.buzzer;
+        if(firstPressBar){
+          if(buzzer && buzzer.name){
+            firstPressBar.classList.add("filled");
+            firstPressBar.style.background = teamColor(buzzer.team);
+            firstPressBar.textContent = buzzer.name;
+          }else{
+            firstPressBar.classList.remove("filled");
+            firstPressBar.style.background = "rgba(255,255,255,.16)";
+            firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
+          }
+        }
+      }catch(e){}
+
+      // timer
+      try{
+        TIMER_UI.latestTimer = room.timer || {};
+        TIMER_UI.isHost = isHost;
+        applyTimerDom();
+      }catch(e){}
+
+      // map source + bbox + placement
+      try{
+        const mapImg = document.getElementById("mapImg");
+        const overlay = document.getElementById("overlay");
+        if(mapImg && overlay){
+          const activeMap = Number(room.activeMap || 0);
+          const srcBase = ([
+            "maps/map1.jpeg",
+            "maps/map2.jpeg",
+            "maps/map3.jpeg"
+          ][activeMap] || "maps/map1.jpeg");
+
+          const curBase = mapImg.dataset.srcBase || "";
+          if(curBase !== srcBase){
+            mapImg.dataset.srcBase = srcBase;
+            mapImg.src = srcBase + vq;
+
+            const expected = srcBase;
+            const onLoad = () => {
+              if(mapImg.dataset.srcBase !== expected) return;
+              if(!BBOX_CACHE[expected]) BBOX_CACHE[expected] = detectHexBBox(mapImg);
+              requestAnimationFrame(placeHexes);
+            };
+            if(mapImg.complete) onLoad();
+            else mapImg.addEventListener("load", onLoad, { once:true });
+          }else{
+            requestAnimationFrame(placeHexes);
+          }
+
+          // update states
+          const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
+          overlay.querySelectorAll(".cell").forEach(cell => {
+            const r = Number(cell.getAttribute("data-row"));
+            const c = Number(cell.getAttribute("data-col"));
+            const k = cellKey(r,c);
+            const st = Number(mapStates?.[k] ?? 0);
+            setStateClass(cell, st);
+          });
+
+          overlay.style.pointerEvents = isHost ? "auto" : "none";
+        }
+      }catch(e){}
+
+      // host question UI
+      if(isHost){
+        try{ updateHostQuestionUI(room); }catch(e){}
+      }else{
+        // player buzz disabled state
+        try{
+          const buzzBtn = document.getElementById("buzzBtn");
+          if(buzzBtn){
+            const started = (room.status === "started");
+            const disabled = (!started) || room.freeze || !me || !me.name;
+            buzzBtn.classList.toggle("disabled", !!disabled);
+          }
+        }catch(e){}
+      }
+    }
+
     function renderGame(room, me){
+      // ✅ تحديث آخر نسخة قبل أي شيء
+      ROOM_LATEST = room || null;
+      ME_LATEST = me || null;
+
+      // ✅ منع الوميض: إذا واجهة اللعب موجودة بالفعل → نحدّث فقط ونطلع
+      const already = !!document.getElementById("mapImg") && !!document.getElementById("overlay") && main.classList.contains("inGame");
+      if(already){
+        updateGameUI(room, me);
+        return;
+      }
+
       main.classList.add("inGame");
       setGameName(room?.name);
 
@@ -2505,7 +2747,7 @@
             ${isHost ? `
               <div class="questionCard">
                 <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
-                <button id="ansBtn" class="answerBtn red" type="button">إظهار الإجابة</button> <!-- ✅ (8) تغيير النص فقط -->
+                <button id="ansBtn" class="answerBtn red" type="button">إظهار الإجابة</button>
               </div>
             ` : `
               <div class="playerBtnWrap">
@@ -2538,12 +2780,11 @@
         });
       });
 
-      // ✅ (4) Stepper: فتح الأسهم فوق/تحت
       if(isHost){
         const sG = document.getElementById("scoreGreen");
         const sO = document.getElementById("scoreOrange");
-        if(sG) sG.addEventListener("click", () => openScoreStepper("green", sG, sg));
-        if(sO) sO.addEventListener("click", () => openScoreStepper("orange", sO, so));
+        if(sG) sG.addEventListener("click", () => openScoreStepper("green", sG, Number(sG.textContent||0)));
+        if(sO) sO.addEventListener("click", () => openScoreStepper("orange", sO, Number(sO.textContent||0)));
       }
 
       if(isHost){
@@ -2554,7 +2795,6 @@
             const t = normalizeTimer(TIMER_UI.latestTimer || {});
             const sel = Number(t.sel || 10);
 
-            // ✅ (3) تصفير المؤقت وإيقاف الوميض بالضغط على المؤقت نفسه
             if(t.running || t.done){
               await update(ref(db, `rooms/${code}/timer`), {
                 running:false,
@@ -2565,7 +2805,6 @@
               return;
             }
 
-            // (يبقى موجود كخيار يدوي، لكن التفعيل الأساسي صار تلقائي عند أول جرس)
             await update(ref(db, `rooms/${code}/timer`), {
               sel,
               dur: sel,
@@ -2580,7 +2819,7 @@
       if(isHost){
         const settingsBtn = document.getElementById("settingsBtn");
         if(settingsBtn){
-          settingsBtn.addEventListener("click", () => openSettings(room));
+          settingsBtn.addEventListener("click", () => openSettings(roomNow()));
         }
       }
 
@@ -2588,7 +2827,8 @@
         const qModeBtn = document.getElementById("qModeBtn");
         if(qModeBtn){
           qModeBtn.addEventListener("click", async () => {
-            const cur = getQuestionMode(room);
+            const r = roomNow();
+            const cur = getQuestionMode(r);
             const next = (cur === "custom") ? "default" : "custom";
             await update(ref(db, `rooms/${code}`), { questionMode: next });
           });
@@ -2602,13 +2842,13 @@
 
       const activeMap = Number(room.activeMap || 0);
 
-      // ✅ أسماء الخرائط كما طلبت + إضافة version للكاش
       const srcBase = ([
         "maps/map1.jpeg",
         "maps/map2.jpeg",
         "maps/map3.jpeg"
       ][activeMap] || "maps/map1.jpeg");
 
+      mapImg.dataset.srcBase = srcBase;
       mapImg.src = srcBase + vq;
 
       overlay.innerHTML = "";
@@ -2633,57 +2873,9 @@
         zoom.value = String(savedZoom);
       }
 
-      function applyZoomFix(){
-        const mapBox = document.getElementById("mapBox");
-        const mapOuter = document.querySelector(".mapOuter");
-        if(!mapBox || !mapOuter) return;
-
-        const z = Number(zoom.value || 1);
-        mapScale.style.setProperty("--zoom", z);
-
-        const baseH = mapBox.offsetHeight || 0;
-        const extra = Math.max(0, baseH * (z - 1));
-        mapOuter.style.marginBottom = `${extra}px`;
-      }
-
-      function placeHexes(){
-        const W = mapImg.clientWidth;
-        const H = mapImg.clientHeight;
-        if(!W || !H) return;
-
-        overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
-        overlay.setAttribute("preserveAspectRatio", "none");
-
-        const bbox = BBOX_CACHE[srcBase];
-        if(!bbox) return;
-
-        const x0 = bbox.x0 * W;
-        const y0 = bbox.y0 * H;
-        const x1 = bbox.x1 * W;
-        const y1 = bbox.y1 * H;
-
-        const gridW = x1 - x0;
-        const gridH = y1 - y0;
-
-        const w = gridW / 5.5;
-        const h = gridH / 4.0;
-        const stepY = h * 0.75;
-
-        const cells = overlay.querySelectorAll(".cell");
-        let i = 0;
-        for(let row=0; row<5; row++){
-          for(let col=0; col<5; col++){
-            const left = x0 + col*w + (row%2)*(w/2);
-            const top  = y0 + row*stepY;
-            cells[i++].setAttribute("points", hexPointsPointyTop(left, top, w, h));
-          }
-        }
-
-        applyZoomFix();
-      }
-
       function onMapReady(){
-        if(!BBOX_CACHE[srcBase]) BBOX_CACHE[srcBase] = detectHexBBox(mapImg);
+        const curBase = mapImg.dataset.srcBase || srcBase;
+        if(!BBOX_CACHE[curBase]) BBOX_CACHE[curBase] = detectHexBBox(mapImg);
         requestAnimationFrame(placeHexes);
       }
 
@@ -2704,99 +2896,8 @@
         setStateClass(cell, st);
       });
 
-      const firstPressBar = document.getElementById("firstPressBar");
-      const buzzer = room.buzzer;
-      if(buzzer && buzzer.name && firstPressBar){
-        firstPressBar.classList.add("filled");
-        firstPressBar.style.background = teamColor(buzzer.team);
-        firstPressBar.textContent = buzzer.name;
-      }else if(firstPressBar){
-        firstPressBar.classList.remove("filled");
-        firstPressBar.style.background = "rgba(255,255,255,.16)";
-        firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
-      }
-
-      if(isHost){
-        const qText = document.getElementById("qText");
-        const ansBtn  = document.getElementById("ansBtn");
-        const cur = room.current || {};
-
-        let curQ = "";
-        let curA = "";
-        let hasQuestion = false;
-
-        if(cur.letter){
-          const mode = getQuestionMode(room);
-
-          let list = [];
-          if(mode === "custom"){
-            list = getCustomList(room, cur.letter);
-            if(!list.length){
-              curQ = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
-              curA = "";
-              hasQuestion = true;
-            }else{
-              const idx = Number(cur.qIndex || 0) % list.length;
-              const item = list[idx];
-              curQ = item?.q ?? "—";
-              curA = (item?.a ?? "").trim();
-              hasQuestion = true;
-            }
-          }else{
-            list = QUESTIONS[cur.letter] || [];
-            if(!list.length){
-              curQ = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
-              curA = "";
-              hasQuestion = true;
-            }else{
-              const idx = Number(cur.qIndex || 0) % list.length;
-              const item = list[idx];
-              curQ = item?.q ?? "—";
-              curA = (item?.a ?? "").trim();
-              hasQuestion = true;
-            }
-          }
-        }else{
-          curQ = "اختر حرفًا من الخريطة";
-          curA = "";
-          hasQuestion = false;
-        }
-
-        qText.textContent = curQ;
-
-        const sig = `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number(room.customQuestionsUpdatedAt||0)}`;
-        if(ANSWER_UI.sig !== sig){
-          ANSWER_UI.sig = sig;
-          ANSWER_UI.revealed = false;
-        }
-
-        if(ansBtn){
-          if(hasQuestion && curA){
-            ansBtn.style.display = "block";
-            if(ANSWER_UI.revealed){
-              ansBtn.classList.remove("red");
-              ansBtn.classList.add("green");
-              ansBtn.textContent = curA;
-            }else{
-              ansBtn.classList.remove("green");
-              ansBtn.classList.add("red");
-              ansBtn.textContent = "إظهار الإجابة"; /* ✅ (8) النص فقط */
-            }
-
-            ansBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if(ANSWER_UI.revealed) return;
-              ANSWER_UI.revealed = true;
-              ansBtn.classList.remove("red");
-              ansBtn.classList.add("green");
-              ansBtn.textContent = curA;
-            };
-          }else{
-            ansBtn.style.display = "none";
-          }
-        }
-      }
+      // تحديث الشريط/السؤال أول مرة
+      updateGameUI(room, me);
 
       zoom.addEventListener("input", () => {
         const z = Number(zoom.value || 1);
@@ -2808,7 +2909,9 @@
       if(mapBtn){
         mapBtn.addEventListener("click", async () => {
           closeTip();
-          const next = (activeMap + 1) % 3;
+          const r = roomNow();
+          const am = Number(r.activeMap || 0);
+          const next = (am + 1) % 3;
           await update(roomRef, {
             activeMap: next,
             buzzer: null,
@@ -2821,18 +2924,20 @@
       const freezeBtn = document.getElementById("freezeBtn");
       if(freezeBtn){
         freezeBtn.addEventListener("click", async () => {
-          await update(roomRef, { freeze: !room.freeze, buzzer: null });
+          const r = roomNow();
+          await update(roomRef, { freeze: !r.freeze, buzzer: null });
         });
       }
 
       const nextQ = document.getElementById("nextQ");
       if(nextQ){
         nextQ.addEventListener("click", async () => {
-          const cur = room.current || {};
+          const r = roomNow();
+          const cur = r.current || {};
           if(!cur.letter) return;
 
-          const mode = getQuestionMode(room);
-          const list = (mode === "custom") ? getCustomList(room, cur.letter) : (QUESTIONS[cur.letter] || []);
+          const mode = getQuestionMode(r);
+          const list = (mode === "custom") ? getCustomList(r, cur.letter) : (QUESTIONS[cur.letter] || []);
           if(!list.length) return;
 
           const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
@@ -2844,8 +2949,10 @@
       if(clearBoardBtn){
         clearBoardBtn.addEventListener("click", async () => {
           closeTip();
+          const r = roomNow();
+          const am = Number(r.activeMap || 0);
           const updates = {};
-          updates[`rooms/${code}/mapStates/${activeMap}`] = null;
+          updates[`rooms/${code}/mapStates/${am}`] = null;
           updates[`rooms/${code}/buzzer`] = null;
           updates[`rooms/${code}/winState`] = null;
           await update(ref(db), updates);
@@ -2856,22 +2963,27 @@
         overlay.querySelectorAll(".cell").forEach(cell => {
           cell.addEventListener("click", async (e) => {
             e.preventDefault();
-            if(room.status !== "started") return;
 
-            const r = Number(cell.getAttribute("data-row"));
-            const c = Number(cell.getAttribute("data-col"));
-            const k = cellKey(r,c);
+            const r0 = roomNow();
+            if(r0.status !== "started") return;
 
-            const st = Number(mapStates?.[k] ?? 0);
+            const activeMapNow = Number(r0.activeMap || 0);
+            const mapStatesNow = (r0.mapStates && r0.mapStates[String(activeMapNow)]) ? r0.mapStates[String(activeMapNow)] : {};
+
+            const rr = Number(cell.getAttribute("data-row"));
+            const cc = Number(cell.getAttribute("data-col"));
+            const k = cellKey(rr,cc);
+
+            const st = Number(mapStatesNow?.[k] ?? 0);
             const next = (st + 1) % 4;
 
-            const letter = MAPS[activeMap][r][c];
+            const letter = MAPS[activeMapNow][rr][cc];
 
-            const nextStates = { ...(mapStates || {}) };
+            const nextStates = { ...(mapStatesNow || {}) };
             nextStates[k] = next;
 
             const winners = computeWinners(nextStates);
-            const prevWin = (room.winState && room.winState[String(activeMap)]) ? room.winState[String(activeMap)] : { greenWin:false, orangeWin:false };
+            const prevWin = (r0.winState && r0.winState[String(activeMapNow)]) ? r0.winState[String(activeMapNow)] : { greenWin:false, orangeWin:false };
 
             let winEvent = null;
             const greenNew = !!winners.greenWin && !prevWin.greenWin;
@@ -2883,14 +2995,14 @@
               else if(next === 3 && orangeNew) team = "orange";
               else team = greenNew ? "green" : "orange";
 
-              winEvent = { team, ts: Date.now(), map: activeMap };
+              winEvent = { team, ts: Date.now(), map: activeMapNow };
             }
 
             const updates = {};
-            updates[`rooms/${code}/mapStates/${activeMap}/${k}`] = next;
+            updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = next;
             updates[`rooms/${code}/buzzer`] = null;
-            updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: r, col: c, map: activeMap };
-            updates[`rooms/${code}/winState/${activeMap}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
+            updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: rr, col: cc, map: activeMapNow };
+            updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
             if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
 
             await update(ref(db), updates);
@@ -2904,15 +3016,18 @@
         if(disabled) buzzBtn.classList.add("disabled");
 
         buzzBtn.addEventListener("click", async () => {
-          if(!started) return;
-          if(room.freeze) return;
-          if(!me) return;
+          const r0 = roomNow();
+          const me0 = meNow();
+
+          if(r0.status !== "started") return;
+          if(r0.freeze) return;
+          if(!me0) return;
 
           const buzzerRef = ref(db, `rooms/${code}/buzzer`);
 
           const res = await runTransaction(buzzerRef, (cur) => {
             if(cur === null){
-              return { pid, name: me.name, team: me.team, ts: Date.now() };
+              return { pid, name: me0.name, team: me0.team, ts: Date.now() };
             }
             return;
           });
@@ -2936,12 +3051,10 @@
         requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
       }catch(e){}
 
-      // ✅ (2) قصّ اللاعبين إذا تجاوزوا 13
       try{
         prunePlayersIfOverLimit(room);
       }catch(e){}
 
-      // ✅ (3) تشغيل المؤقت تلقائياً عند اعتماد أول لاعب يضغط الجرس
       try{
         if(role === "host"){
           const b = room.buzzer;
@@ -2951,7 +3064,6 @@
             if(sig && sig !== LAST_AUTO_TIMER_SIG){
               LAST_AUTO_TIMER_SIG = sig;
 
-              // يبدأ فقط لو المؤقت مو شغال وما انتهى
               if(!t.running && !t.done){
                 const sel = Number(t.sel || 10);
                 update(ref(db, `rooms/${code}/timer`), {
@@ -2964,13 +3076,11 @@
               }
             }
           }else{
-            // إذا تفّضى البزر، نخلي السيق قابل للتجدد
             LAST_AUTO_TIMER_SIG = "";
           }
         }
       }catch(e){}
 
-      // ✅ تشغيل rong عند "تسجيل أول لاعب" مرة واحدة لكل حدث buzzer
       try{
         const b = room.buzzer;
         if(b && b.ts){
@@ -2993,18 +3103,20 @@
 
     onValue(roomRef, (snap) => {
       const room = snap.val();
+      ROOM_LATEST = room || null;
 
       if(!room){
         renderWaiting("الغرفة غير موجودة.");
         return;
       }
 
-      // ✅ (2) قصّ فوري إذا تعدى الحد
       try{
         prunePlayersIfOverLimit(room);
       }catch(e){}
 
       if(role === "host"){
+        ME_LATEST = null;
+
         if(room.hostKey && hostKey && String(room.hostKey) !== String(hostKey)){
           main.textContent = "ليس لديك صلاحية دخول كمقدم.";
           return;
@@ -3033,7 +3145,8 @@
         if(stored && players[stored]) me = players[stored];
       }
 
-      // ✅ (2) إذا الغرفة ممتلئة وما لقيت بياناتي -> “الغرفة ممتلئة”
+      ME_LATEST = me || null;
+
       if(!me && playerCount >= MAX_PLAYERS){
         renderWaiting("الغرفة ممتلئة");
         afterRender(room);
@@ -3046,7 +3159,6 @@
         return;
       }
 
-      // ✅ (2) إذا بدأ اللعب لكن الغرفة ممتلئة وأنا خارج القائمة (تم قصّي)
       if(!me && playerCount >= MAX_PLAYERS){
         renderWaiting("الغرفة ممتلئة");
         afterRender(room);
@@ -3063,6 +3175,6 @@
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-02-16-1 -->
+  <!-- VERSION: game_full.html — v2026-02-16-2 -->
 </body>
 </html>
