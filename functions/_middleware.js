@@ -1,6 +1,6 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v7: يسمح للاعبين الضيوف بدخول game_full.html فقط إذا role=player ومعه code+pid (بدون تفعيل)
+// v7: allow guests (players) to access /game_full when role=player, keep presenter protected
 
 const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
 const schemaCache = new Map(); // table -> { ts, cols:Set }
@@ -246,21 +246,15 @@ export async function onRequest(context) {
     path === "/game_full" ||
     path === "/game_full/";
 
-  const needsProtection = path.startsWith("/app") || protectRootGameFull;
-
-  // ✅✅ NEW (v7): السماح للاعب الضيف فقط بالدخول لـ game_full بدون تفعيل
-  // شرطنا: role=player + code 6 أرقام + pid موجود
+  // ✅✅ أهم إصلاح: اللاعب ضيف (role=player) ما يدخل صفحة التفعيل حتى لو game_full محمي للمقدم
   if (protectRootGameFull) {
-    const role = String(url.searchParams.get("role") || "");
-    const code = String(url.searchParams.get("code") || "");
-    const pid  = String(url.searchParams.get("pid")  || "");
-    const okCode = /^[0-9]{6}$/.test(code);
-    const okPid  = pid && pid.length >= 6;
-
-    if (role === "player" && okCode && okPid) {
+    const role = (url.searchParams.get("role") || "").toLowerCase();
+    if (role === "player") {
       return next();
     }
   }
+
+  const needsProtection = path.startsWith("/app") || protectRootGameFull;
 
   // إذا ما يحتاج حماية، مرّره
   if (!needsProtection) return next();
@@ -296,5 +290,5 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 7 (protects /app/* + /game_full(.html) BUT allows guest players with role=player+code+pid)
+_middleware.js – إصدار 7 (guests role=player bypass for /game_full)
 */
