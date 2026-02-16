@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>جاري فتح اللعبة</title>
+  <title>بانتظار بدء اللعبة</title>
   <style>
     :root{
       --bg:#1f4fa3;
@@ -32,7 +32,7 @@
     }
     .logo{ width:54px;height:54px;object-fit:contain; display:block;margin:0 auto 10px; }
     h2{ margin:6px 0 6px; font-size:20px; color:#111; }
-    p{ margin:0; font-size:14px; color:#444; }
+    p{ margin:0; font-size:14px; color:#444; line-height:1.6; }
     .spinner{
       width:18px;height:18px;border-radius:50%;
       border:3px solid #ddd;border-top-color:#1f4fa3;
@@ -53,67 +53,121 @@
     .btnGhost{ background:#eef2ff; color:#1f4fa3; }
     .small{ margin-top:10px; font-size:12px; color:#777; }
   </style>
+
+  <!-- ✅ تسجيل Service Worker (مبكر + iOS-friendly) -->
+  <script>
+    (function () {
+      if (!("serviceWorker" in navigator)) return;
+      if (location.protocol !== "https:" && location.hostname !== "localhost") return;
+
+      try{
+        navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" })
+          .catch(function(){});
+      }catch(e){
+        navigator.serviceWorker.register("./sw.js").catch(function(){});
+      }
+
+      navigator.serviceWorker.ready
+        .then(function(reg){ try{ reg.update(); }catch(e){} })
+        .catch(function(){});
+    })();
+  </script>
 </head>
 <body>
   <div class="box">
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
-    <h2>جاري فتح اللعبة <span class="spinner" aria-hidden="true"></span></h2>
-    <p id="msg">لحظة..</p>
+    <h2>بانتظار بدء اللعبة <span class="spinner" aria-hidden="true"></span></h2>
+    <p id="msg">لحظة.. يتم تجهيز الغرفة</p>
 
     <div class="row" id="actions" style="display:none">
-      <button class="btn btnPrimary" id="goActivate">اذهب لصفحة التفعيل</button>
-      <button class="btn btnGhost" id="openGame">فتح اللعبة</button>
+      <button class="btn btnPrimary" id="retry">تحديث</button>
+      <button class="btn btnGhost" id="back">رجوع</button>
     </div>
 
     <div class="small">© صندوق المسابقات</div>
   </div>
 
-  <script>
-    const ACTIVATE_URL = "/activate.html";
-    const GAME_URL = "/game_full.html";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-    // نجيب أي توكن محفوظ (حسب المفاتيح المحتملة)
-    function getAnyToken(){
-      const keys = [
-        "JWT","jwt","token","access_token","AUTH_TOKEN",
-        "SANDOOQ_JWT","SANDOOQ_TOKEN","sandooq_jwt","sandooq_token"
-      ];
-      for(const k of keys){
-        const v = localStorage.getItem(k);
-        if(v && String(v).trim().length > 10) return String(v).trim();
-      }
-      return "";
-    }
-
-    // ✅ منع اللوب: لو حاولنا نفتح اللعبة قبل أقل من 3 ثواني و رجعنا هنا، نوقف ونعرض أزرار
-    const lastTry = Number(sessionStorage.getItem("LAST_GAME_TRY") || "0");
-    const now = Date.now();
-
-    const token = getAnyToken();
-
-    function showActions(text){
-      document.getElementById("msg").textContent = text;
-      document.getElementById("actions").style.display = "flex";
-    }
-
-    document.getElementById("goActivate").onclick = ()=> location.href = ACTIVATE_URL;
-    document.getElementById("openGame").onclick = ()=> {
-      sessionStorage.setItem("LAST_GAME_TRY", String(Date.now()));
-      location.href = GAME_URL;
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
+      authDomain: "sabaq-alhorof.firebaseapp.com",
+      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "sabaq-alhorof",
+      storageBucket: "sabaq-alhorof.firebasestorage.app",
+      messagingSenderId: "1053646928152",
+      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
 
-    if(!token){
-      // ما فيه تفعيل
-      location.replace(ACTIVATE_URL);
+    const params = new URLSearchParams(location.search);
+    const code = (params.get("code") || "").trim();
+    const pid  = (params.get("pid")  || "").trim();
+    const role = (params.get("role") || "player").trim();
+
+    const msgEl = document.getElementById("msg");
+    const actions = document.getElementById("actions");
+
+    function showActions(text){
+      msgEl.textContent = text;
+      actions.style.display = "flex";
+    }
+
+    document.getElementById("retry").onclick = ()=> location.reload();
+    document.getElementById("back").onclick  = ()=> {
+      // يرجع لصفحة الدخول مع تمرير الكود لو موجود
+      const u = new URL("join.html", location.href);
+      if (code) u.searchParams.set("code", code);
+      location.href = u.toString();
+    };
+
+    // ✅ لا يوجد أي تحويل لصفحة /activate هنا — الضيوف فقط ينتظرون
+    if(!/^[0-9]{6}$/.test(code) || !pid){
+      showActions("الرابط ناقص (رمز الغرفة أو معرف اللاعب غير موجود). اضغط رجوع وأدخل من جديد.");
     }else{
-      // فيه تفعيل
-      if(now - lastTry < 3000){
-        showActions("واضح فيه تحويل رايح-جاي. اضغط (فتح اللعبة) وإذا رجعك هنا فالتشييك داخل game_full.html يحتاج ضبط.");
-      }else{
-        sessionStorage.setItem("LAST_GAME_TRY", String(Date.now()));
-        location.replace(GAME_URL);
-      }
+      msgEl.textContent = "بانتظار المقدم يبدأ اللعبة… لا تقفل الصفحة";
+      const app = initializeApp(firebaseConfig);
+      const db  = getDatabase(app);
+
+      const roomRef = ref(db, `rooms/${code}`);
+
+      let redirected = false;
+
+      onValue(roomRef, (snap) => {
+        if(!snap.exists()){
+          showActions("الغرفة غير موجودة أو انتهت. اضغط رجوع.");
+          return;
+        }
+
+        const room = snap.val() || {};
+        const st = String(room.status || "lobby");
+
+        if(st === "started"){
+          if(redirected) return;
+          redirected = true;
+
+          // ✅ عند بدء اللعبة: ادخل صفحة اللعب (وضع اللاعب)
+          const u = new URL("game_full.html", location.href);
+          u.searchParams.set("role", role || "player");
+          u.searchParams.set("code", code);
+          u.searchParams.set("pid", pid);
+          location.replace(u.toString());
+          return;
+        }
+
+        // باقي الحالات: خلي اللاعب ينتظر
+        if(st === "lobby"){
+          msgEl.textContent = "بانتظار المقدم يبدأ اللعبة…";
+        }else{
+          msgEl.textContent = "بانتظار تجهيز الغرفة…";
+        }
+      }, (err) => {
+        showActions("صار خطأ بالاتصال. اضغط تحديث.");
+      });
     }
   </script>
+
+  <!-- VERSION: play.html — v2 (Guest waiting; NO redirect to /activate; redirect to game_full when started) -->
 </body>
 </html>
