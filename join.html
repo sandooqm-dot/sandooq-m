@@ -194,8 +194,7 @@
       return (g <= o) ? "green" : "orange";
     }
 
-    // ✅✅ إضافة مهمة: تثبيت “هوية اللاعب” محليًا (Cookie + Storage)
-    // هذا يمنع أي صفحة لاحقًا من اعتباره “غير مسجّل” وترسله لتسجيل الدخول
+    // ✅ تثبيت هوية اللاعب (Cookie + Storage) — احتياط لأي صفحة ثانية تعتمد عليها
     function setCookie(name, value, maxAgeSeconds){
       const parts = [
         `${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`,
@@ -208,13 +207,11 @@
     }
 
     function markAsGuestPlayer(code, pid){
-      // كوكي
-      setCookie("sandooq_guest_player", "1", 60 * 60 * 12); // 12 ساعة
+      setCookie("sandooq_guest_player", "1", 60 * 60 * 12);
       setCookie("sandooq_role", "player", 60 * 60 * 12);
       setCookie("sandooq_room_code", code, 60 * 60 * 12);
       setCookie("sandooq_pid", pid, 60 * 60 * 12);
 
-      // localStorage / sessionStorage (لأي صفحة تعتمد عليها)
       try{
         localStorage.setItem("sandooq_guest_player", "1");
         localStorage.setItem("sandooq_role", "player");
@@ -258,7 +255,6 @@
         }
         const room = roomSnap.val();
 
-        // منع الدخول إذا ما فيه حالة صحيحة (اختياري)
         if(room.status !== "lobby" && room.status !== "started"){
           showError("الغرفة غير جاهزة حالياً");
           return;
@@ -267,7 +263,6 @@
         const team = await pickTeam(room);
         const pid = genPid();
 
-        // حفظ الاسم محلياً
         localStorage.setItem("sandooq_last_player_name", name);
 
         // إضافة اللاعب للغرفة
@@ -277,16 +272,15 @@
           joinedAt: Date.now()
         });
 
-        // ✅✅ أهم سطرين: علّم الجهاز أنه “لاعب ضيف” قبل الانتقال للانتظار
+        // ✅ علّم الجهاز أنه لاعب
         markAsGuestPlayer(code, pid);
 
-        // تحويله إلى صفحة الانتظار play.html
-        const u = new URL("play.html", location.href);
+        // ✅✅ الحل: لا نرسل اللاعب لصفحة play.html نهائيًا (اللي عندك هي اللي تسبب تحويله لتسجيل الدخول عند بدء اللعبة)
+        // نخليه يدخل game_full مباشرة بوضع لاعب — وراح ينتظر داخلها إلى أن يبدأ المقدم
+        const u = new URL("game_full.html", location.href);
         u.searchParams.set("role", "player");
         u.searchParams.set("code", code);
         u.searchParams.set("pid", pid);
-
-        // إشارات إضافية (لو أي صفحة ثانية تعتمد عليها)
         u.searchParams.set("guest", "1");
         u.searchParams.set("player", "1");
         u.searchParams.set("view", "player");
@@ -301,7 +295,6 @@
       }
     }
 
-    // تنسيق الكود أثناء الكتابة
     codeEl.addEventListener("input", () => {
       const v = cleanCode(codeEl.value);
       codeEl.value = v;
@@ -312,6 +305,6 @@
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vFixGuest-2 (Set guest cookies/storage before redirect) -->
+  <!-- VERSION: join.html — vFix-DirectToGameFull-3 (Skip play.html) -->
 </body>
 </html>
