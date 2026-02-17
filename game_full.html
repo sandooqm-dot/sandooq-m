@@ -986,13 +986,13 @@
       z-index:40002;
     }
     .winCongrats{
-      font-size:56px;
+      font-size:56px;       /* ✅ “مبرووك” كبيرة */
       font-weight:900;
       margin:2px 0 10px;
       letter-spacing:.2px;
     }
     .winWinner{
-      font-size:34px;
+      font-size:34px;       /* ✅ “فاز الفريق ...” أكبر وواضح */
       font-weight:900;
       margin:0;
     }
@@ -1064,8 +1064,7 @@
     <div id="main" class="card">جاري التحميل...</div>
   </div>
 
-  <!-- ✅ (تعديل الخطة) زر الرئيسية يظهر للمقدم فقط -->
-  <button id="homeBtn" class="footerBtn" onclick="location.href='index.html'">الرئيسية</button>
+  <button class="footerBtn" onclick="location.href='index.html'">الرئيسية</button>
   <div class="rights">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
 
   <!-- ✅ نافذة شرح ? -->
@@ -1193,12 +1192,6 @@
     const main = document.getElementById("main");
     const gameNameEl = document.getElementById("gameName");
 
-    // ✅ (تعديل الخطة) إخفاء زر الرئيسية للاعبين فقط
-    const homeBtn = document.getElementById("homeBtn");
-    if(role !== "host" && homeBtn){
-      homeBtn.style.display = "none";
-    }
-
     const tipPopup = document.getElementById("tipPopup");
 
     // ✅ (4) Stepper DOM
@@ -1252,12 +1245,13 @@
           this.ready = true;
 
           this.bell  = makeAudio(bellCandidates,  { volume:0.95, loop:false });
-          this.music = makeAudio(musicCandidates, { volume:0.95, loop:false });
+          this.music = makeAudio(musicCandidates, { volume:0.95, loop:false }); // ✅ (5) صوت عالي
 
           const unlock = () => {
             if(this.unlocked) return;
             this.unlocked = true;
 
+            // iOS/Safari: لازم Gesture قبل تشغيل الصوت
             [this.bell, this.music].forEach(a => {
               if(!a) return;
               const v = Number.isFinite(a.volume) ? a.volume : 1;
@@ -1354,12 +1348,6 @@
       }catch(e){}
     }
 
-    function escapeHtml(s){
-      return String(s ?? "").replace(/[&<>"']/g, c => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-      }[c]));
-    }
-
     function setGameName(raw){
       if(!gameNameEl) return;
       const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
@@ -1428,6 +1416,12 @@
 
     function teamColor(team){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
+    }
+
+    function escapeHtml(s){
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[c]));
     }
 
     function cellKey(row,col){ return `${row}-${col}`; }
@@ -1509,9 +1503,7 @@
       tick: null,
       lastSecond: null,
       latestTimer: null,
-      isHost: false,
-      __doneSent: false,
-      __buzzerCleared: false
+      isHost: false
     };
 
     function normalizeTimer(t){
@@ -1556,10 +1548,9 @@
       const displayNum = (view.done ? 0 : (view.running ? view.remaining : view.sel));
       numEl.textContent = String(displayNum);
 
-      // reset flags when timer resets
+      TIMER_UI.__doneSent = !!TIMER_UI.__doneSent;
       if((!view.running && !view.done) || (view.running && view.remaining > 0)){
         TIMER_UI.__doneSent = false;
-        TIMER_UI.__buzzerCleared = false;
       }
 
       numEl.classList.toggle("last5", !!view.inLast5);
@@ -1600,19 +1591,9 @@
       }
 
       if(TIMER_UI.isHost){
-        // ✅ (تعديل الخطة) عند وصول المؤقت لـ 0: نوقف المؤقت + نعلّم done + نصفر الجرس (مرة واحدة بدون سبام)
         if(view.running && view.remaining === 0 && !TIMER_UI.__doneSent){
           TIMER_UI.__doneSent = true;
-          TIMER_UI.__buzzerCleared = true;
-
-          const ups = {};
-          ups[`rooms/${code}/timer/running`] = false;
-          ups[`rooms/${code}/timer/done`] = true;
-          ups[`rooms/${code}/buzzer`] = null;
-          update(ref(db), ups).catch(()=>{});
-        }else if(view.done && !TIMER_UI.__buzzerCleared){
-          TIMER_UI.__buzzerCleared = true;
-          update(ref(db, `rooms/${code}`), { buzzer: null }).catch(()=>{});
+          update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
         }
       }
     }
@@ -1699,6 +1680,13 @@
       if(el){
         e.preventDefault();
         openStoreUrl();
+      }
+      const a = e.target?.closest?.("a[href]");
+      if(a){
+        const href = (a.getAttribute("href") || "").trim();
+        if(href.includes("sandooq-m.com") && !/^https?:\/\//i.test(href)){
+          a.setAttribute("href", "https://" + href.replace(/^\/+/, ""));
+        }
       }
     }, true);
 
@@ -1798,11 +1786,12 @@
     }
 
     let LAST_WIN_TS = 0;
-    let LAST_BUZZER_SIG = "";
-    let LAST_AUTO_TIMER_SIG = "";
 
-    // ✅ (منع السبام) قفل ضغط محلي بسيط
-    let BUZZ_LOCAL_LOCK_UNTIL = 0;
+    // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
+    let LAST_BUZZER_SIG = "";
+
+    // ✅ (3) تتبع آخر جرس شغّل المؤقت تلقائياً
+    let LAST_AUTO_TIMER_SIG = "";
 
     // ✅ (2) منع الزيادة عن 13 لاعب (قصّ الزائدين بأقدم joinedAt)
     let PRUNE_IN_FLIGHT = false;
@@ -1841,6 +1830,7 @@
         }, { applyLocally:false });
 
       }catch(e){
+        // تجاهل
       }finally{
         PRUNE_IN_FLIGHT = false;
       }
@@ -1867,6 +1857,7 @@
 
       scoreStepVal.textContent = String(SCORE_STEP_VALUE);
 
+      // تموضع حول مربع النتيجة
       const r = anchorEl.getBoundingClientRect();
       const pad = 10;
       const stepW = 72;
@@ -1946,6 +1937,7 @@
 
       startConfetti(5000);
 
+      // ✅ (5) تشغيل الصوت 5 ثواني
       if(!playVoisFor(5000)){
         fallbackBeep();
       }
@@ -1965,6 +1957,498 @@
       WIN_HIDE_T = null;
     });
 
+    const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
+
+    function autosizeTA(ta){
+      if(!ta) return;
+      ta.style.height = "auto";
+      ta.style.height = Math.min(240, ta.scrollHeight) + "px";
+    }
+
+    function getCustomList(room, letter){
+      const cq = room?.customQuestions || {};
+      const v = cq?.[letter];
+      if(Array.isArray(v)) return v.filter(x => x && (x.q || x.a));
+      if(v && typeof v === "object") return [v].filter(x => x && (x.q || x.a));
+      return [];
+    }
+
+    function createPairEl(qVal="", aVal=""){
+      const wrap = document.createElement("div");
+      wrap.className = "cqPair";
+      wrap.innerHTML = `
+        <div class="cqLbl">السؤال</div>
+        <textarea class="cqTA cqQ" rows="1" placeholder="اكتب هنا السؤال"></textarea>
+        <div class="cqLbl">الجواب</div>
+        <textarea class="cqTA cqA" rows="1" placeholder="اكتب هنا الجواب"></textarea>
+      `;
+      const q = wrap.querySelector(".cqQ");
+      const a = wrap.querySelector(".cqA");
+      q.value = qVal || "";
+      a.value = aVal || "";
+      requestAnimationFrame(()=>{ autosizeTA(q); autosizeTA(a); });
+
+      [q,a].forEach(ta=>{
+        ta.addEventListener("input", ()=> autosizeTA(ta));
+      });
+
+      return wrap;
+    }
+
+    function buildLetterEditor(item, letter, room){
+      const body = item.querySelector(".cqLetterBody");
+      if(!body) return;
+      body.innerHTML = "";
+
+      const pairsWrap = document.createElement("div");
+      pairsWrap.className = "cqPairs";
+
+      // ✅ (9) قصّ العرض/التحميل على 7
+      const existing = getCustomList(room, letter).slice(0, MAX_CUSTOM_PER_LETTER);
+      if(existing.length){
+        existing.forEach(obj => pairsWrap.appendChild(createPairEl(String(obj.q||""), String(obj.a||""))));
+      }else{
+        pairsWrap.appendChild(createPairEl("", ""));
+      }
+
+      const addWrap = document.createElement("div");
+      addWrap.className = "cqAddWrap";
+      addWrap.innerHTML = `<button class="cqAddBtn" type="button" aria-label="إضافة سؤال">+</button>`;
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btnYellow cqSaveFixed";
+      saveBtn.type = "button";
+      saveBtn.textContent = "حفظ";
+
+      const savedMsg = document.createElement("div");
+      savedMsg.className = "cqSavedMsg";
+
+      body.appendChild(pairsWrap);
+      body.appendChild(addWrap);
+      body.appendChild(saveBtn);
+      body.appendChild(savedMsg);
+
+      const addBtn = addWrap.querySelector(".cqAddBtn");
+
+      function refreshAddState(){
+        const count = pairsWrap.querySelectorAll(".cqPair").length;
+        if(count >= MAX_CUSTOM_PER_LETTER){
+          addBtn.classList.add("disabled");
+        }else{
+          addBtn.classList.remove("disabled");
+        }
+      }
+      refreshAddState();
+
+      addBtn.addEventListener("click", () => {
+        const count = pairsWrap.querySelectorAll(".cqPair").length;
+        if(count >= MAX_CUSTOM_PER_LETTER){
+          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة لهذا الحرف`;
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+          return;
+        }
+        pairsWrap.appendChild(createPairEl("", ""));
+        refreshAddState();
+      });
+
+      saveBtn.addEventListener("click", async () => {
+        const out = [];
+        pairsWrap.querySelectorAll(".cqPair").forEach(p => {
+          const q = (p.querySelector(".cqQ")?.value || "").trim();
+          const a = (p.querySelector(".cqA")?.value || "").trim();
+          if(q || a) out.push({ q, a });
+        });
+
+        // ✅ (9) حد 7 — لا نحفظ أكثر
+        if(out.length > MAX_CUSTOM_PER_LETTER){
+          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة فقط`;
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+          return;
+        }
+
+        await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
+        await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
+
+        savedMsg.textContent = "تم الحفظ ✅";
+        setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+
+        refreshAddState();
+      });
+    }
+
+    function ensureCustomQuestionsModal(){
+      if(CUSTOM_Q_UI.ready) return;
+
+      const backdrop = document.createElement("div");
+      backdrop.id = "cqBackdrop";
+      backdrop.className = "cqBackdrop";
+      backdrop.innerHTML = `
+        <div class="cqModal" role="dialog" aria-modal="true" aria-label="أسئلة المقدم">
+          <button id="cqClose" class="cqCloseRed" aria-label="إغلاق">X</button>
+          <div class="cqTitle">أسئلة خاصة للمقدم</div>
+          <div class="cqHint">اضغط على الحرف لفتح صفحة أسئلته. يمكنك إضافة أكثر من سؤال وجواب لنفس الحرف.</div>
+          <div id="cqList"></div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const cqList = backdrop.querySelector("#cqList");
+      cqList.innerHTML = GAME_LETTERS.map(L => `
+        <details class="cqItem" data-letter="${escapeHtml(L)}">
+          <summary>حرف ${escapeHtml(L)}</summary>
+          <div class="cqLetterBody"></div>
+        </details>
+      `).join("");
+
+      function close(){
+        backdrop.style.display = "none";
+        cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
+      }
+
+      backdrop.querySelector("#cqClose").addEventListener("click", close);
+      backdrop.addEventListener("click", (e) => {
+        if(e.target === backdrop) close();
+      });
+
+      cqList.querySelectorAll(".cqItem").forEach(det => {
+        det.addEventListener("toggle", () => {
+          if(!det.open) return;
+          cqList.querySelectorAll(".cqItem").forEach(o => {
+            if(o !== det) o.removeAttribute("open");
+          });
+          const letter = det.getAttribute("data-letter");
+          buildLetterEditor(det, letter, CUSTOM_Q_UI.roomLatest || {});
+        });
+      });
+
+      CUSTOM_Q_UI.ready = true;
+      CUSTOM_Q_UI.els = { backdrop, cqList };
+    }
+
+    function openCustomQuestionsModal(room){
+      ensureCustomQuestionsModal();
+      CUSTOM_Q_UI.roomLatest = room || {};
+      const { backdrop, cqList } = CUSTOM_Q_UI.els;
+      cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
+      backdrop.style.display = "flex";
+    }
+
+    function getQuestionMode(room){
+      const m = String(room?.questionMode || "default");
+      return (m === "custom") ? "custom" : "default";
+    }
+
+    const SETTINGS_UI = { ready:false, els:{}, roomLatest:null };
+
+    function ensureSettingsModal(){
+      if(SETTINGS_UI.ready) return;
+
+      const bd = document.createElement("div");
+      bd.id = "settingsBackdrop";
+      bd.className = "settingsBackdrop";
+      bd.innerHTML = `
+        <div class="settingsPanel" role="dialog" aria-modal="true" aria-label="الإعدادات">
+          <div id="settingsMenu">
+            <button id="sHelp" class="settingsBtn" type="button">التعليمات</button>
+            <button id="sTimer" class="settingsBtn" type="button">تعديل المؤقت</button>
+            <button id="sAddQ" class="settingsBtn" type="button">اضافة الاسئلة</button>
+            <button id="sMore" class="settingsBtn" type="button">العابنا الاخرى</button>
+
+            <div id="timerMiniPicker" class="timerMiniPicker" aria-label="اختيار وقت المؤقت">
+              <div class="timerMiniList">
+                <button class="timerMiniItem" data-t="10" type="button">١٠</button>
+                <button class="timerMiniItem" data-t="15" type="button">١٥</button>
+                <button class="timerMiniItem" data-t="20" type="button">٢٠</button>
+                <button class="timerMiniItem" data-t="25" type="button">٢٥</button>
+                <button class="timerMiniItem" data-t="30" type="button">٣٠</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="helpView" class="settingsView">
+            <h3>تعليمات اللعبة</h3>
+            <div style="line-height:1.75;font-weight:700">
+              <p><b>فكرة اللعبة:</b> يختار المقدم حرفًا من الخريطة، ثم يظهر سؤال لهذا الحرف. أول لاعب يضغط زر الإجابة يظهر اسمه في الشريط.</p>
+
+              <p><b>طريقة اللعب باختصار:</b></p>
+              <ul>
+                <li>المقدم يضغط على خلية حرف في الخريطة لاختيار الحرف.</li>
+                <li>يظهر السؤال داخل بطاقة السؤال.</li>
+                <li>اللاعبون يضغطون زر "اضغط هنا للإجابة". أول لاعب يضغط يظهر اسمه.</li>
+                <li>المقدم يقرر النقاط ويحدّث النتيجة من مربعات النقاط.</li>
+              </ul>
+
+              <p><b>شرح الأزرار للمقدم:</b></p>
+              <ul>
+                <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
+                <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
+                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للأبيض.</li>
+                <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
+                <li><b>المؤقت:</b> يبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
+                <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
+                <li><b>تغيير الخريطة:</b> للتنقل بين الخرائط الثلاث.</li>
+              </ul>
+            </div>
+            <button id="helpBack" class="settingsBackMini" type="button">رجوع</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(bd);
+
+      function closeSettings(){
+        bd.style.display = "none";
+        bd.querySelector("#helpView").style.display = "none";
+        bd.querySelector("#settingsMenu").style.display = "flex";
+        const tm = bd.querySelector("#timerMiniPicker");
+        if(tm) tm.style.display = "none";
+      }
+
+      bd.addEventListener("click", (e) => {
+        if(e.target === bd) closeSettings();
+      });
+
+      bd.querySelector("#helpBack").addEventListener("click", () => {
+        bd.querySelector("#helpView").style.display = "none";
+        bd.querySelector("#settingsMenu").style.display = "flex";
+      });
+
+      bd.querySelector("#sHelp").addEventListener("click", () => {
+        bd.querySelector("#settingsMenu").style.display = "none";
+        bd.querySelector("#helpView").style.display = "block";
+      });
+
+      bd.querySelector("#sMore").addEventListener("click", () => {
+        closeSettings();
+        openStoreUrl();
+      });
+
+      bd.querySelector("#sAddQ").addEventListener("click", () => {
+        const room = SETTINGS_UI.roomLatest || {};
+        closeSettings();
+        openCustomQuestionsModal(room);
+      });
+
+      bd.querySelector("#sTimer").addEventListener("click", () => {
+        const tm = bd.querySelector("#timerMiniPicker");
+        if(!tm) return;
+        tm.style.display = (tm.style.display === "block") ? "none" : "block";
+      });
+
+      bd.querySelectorAll(".timerMiniItem").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const v = Number(btn.getAttribute("data-t"));
+          if(![10,15,20,25,30].includes(v)) return;
+
+          await update(ref(db, `rooms/${code}/timer`), {
+            sel: v,
+            dur: v,
+            running: false,
+            done: false,
+            startTs: 0
+          });
+
+          const tm = bd.querySelector("#timerMiniPicker");
+          if(tm) tm.style.display = "none";
+        });
+      });
+
+      SETTINGS_UI.ready = true;
+      SETTINGS_UI.els = { backdrop: bd, closeSettings };
+    }
+
+    function openSettings(room){
+      ensureSettingsModal();
+      SETTINGS_UI.roomLatest = room || {};
+      SETTINGS_UI.els.backdrop.style.display = "flex";
+      SETTINGS_UI.els.backdrop.querySelector("#settingsMenu").style.display = "flex";
+    }
+
+    function renderHostLobby(room){
+      main.classList.remove("inGame");
+      const players = room.players || {};
+      const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
+
+      const green = list.filter(p => p.team === "green");
+      const orange = list.filter(p => p.team === "orange");
+
+      main.innerHTML = `
+        <div class="lobbyCard">
+          <div class="codeBox">رمز اللعبة</div>
+          <div class="codeNum">${escapeHtml(room.code || code)}</div>
+          <div class="smallNote">شارك الرمز مع اللاعبين للدخول</div>
+
+          <div style="height:12px"></div>
+
+          <div class="teams">
+            <div class="teamCol teamGreen">
+              <div class="teamTitle">الفريق الأخضر</div>
+              <div id="greenList"></div>
+            </div>
+            <div class="teamCol teamOrange">
+              <div class="teamTitle">الفريق البرتقالي</div>
+              <div id="orangeList"></div>
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="row">
+            <button id="shareBtn" class="btn btnYellow">مشاركة اللعبة للاعبين</button>
+            <button id="startBtn" class="btn btnGreen">ابدأ اللعبة</button>
+          </div>
+
+          <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
+
+          <div id="shareBackdrop" class="shareBackdrop">
+            <div class="shareModal">
+              <button id="shareClose" class="shareClose" aria-label="إغلاق">×</button>
+              <div class="shareTitle">مشاركة اللعبة</div>
+
+              <div class="shareChoices">
+                <button id="shareQrBtn" class="btn btnOrange">باركود</button>
+                <button id="shareCodeBtn" class="btn btnGreen">رمز</button>
+                <button id="shareLinkBtn" class="btn btnYellow">رابط</button>
+              </div>
+
+              <div id="shareQrPanel" class="sharePanel">
+                <img id="qrImg" class="qrImg" alt="QR">
+                <div class="shareSmall" id="joinUrlTxt"></div>
+                <div class="row" style="justify-content:center;margin-top:10px">
+                  <button id="copyJoinBtn1" class="btn btnYellow">نسخ الرابط</button>
+                </div>
+                <div class="shareSmall">امسح الباركود أو افتح الرابط للانتقال لصفحة كتابة الاسم</div>
+              </div>
+
+              <div id="shareCodePanel" class="sharePanel">
+                <div class="codeBox" style="text-align:center">رمز الغرفة</div>
+                <div class="shareCodeBig">${escapeHtml(room.code || code)}</div>
+              </div>
+
+              <div id="shareLinkPanel" class="sharePanel">
+                <div class="codeBox" style="text-align:center">رابط الدخول</div>
+                <div class="shareSmall" id="joinUrlTxt2"></div>
+                <div class="row" style="justify-content:center;margin-top:10px">
+                  <button id="copyJoinBtn2" class="btn btnYellow">نسخ الرابط</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const greenList = document.getElementById("greenList");
+      const orangeList = document.getElementById("orangeList");
+
+      function draw(colEl, arr){
+        colEl.innerHTML = arr.map(p => `<div class="playerItem" data-id="${escapeHtml(p.id)}">${escapeHtml(p.name)}</div>`).join("") || `<div class="smallNote">لا يوجد</div>`;
+      }
+      draw(greenList, green);
+      draw(orangeList, orange);
+
+      main.querySelectorAll(".playerItem").forEach(el => {
+        el.addEventListener("click", async () => {
+          const id = el.getAttribute("data-id");
+          const p = players[id];
+          if(!p) return;
+          const newTeam = (p.team === "green") ? "orange" : "green";
+          await update(ref(db, `rooms/${code}/players/${id}`), { team: newTeam });
+        });
+      });
+
+      document.getElementById("startBtn").addEventListener("click", async () => {
+        await update(roomRef, {
+          status: "started",
+          activeMap: 0,
+          freeze: false,
+          buzzer: null,
+          scores: { green:0, orange:0 },
+          winEvent: null,
+          winState: null,
+          current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
+        });
+      });
+
+      const shareBackdrop = document.getElementById("shareBackdrop");
+      const shareBtn = document.getElementById("shareBtn");
+      const shareClose = document.getElementById("shareClose");
+      const shareQrBtn = document.getElementById("shareQrBtn");
+      const shareCodeBtn = document.getElementById("shareCodeBtn");
+      const shareLinkBtn = document.getElementById("shareLinkBtn");
+      const shareQrPanel = document.getElementById("shareQrPanel");
+      const shareCodePanel = document.getElementById("shareCodePanel");
+      const shareLinkPanel = document.getElementById("shareLinkPanel");
+      const qrImg = document.getElementById("qrImg");
+      const joinUrlTxt = document.getElementById("joinUrlTxt");
+      const joinUrlTxt2 = document.getElementById("joinUrlTxt2");
+      const copyJoinBtn1 = document.getElementById("copyJoinBtn1");
+      const copyJoinBtn2 = document.getElementById("copyJoinBtn2");
+
+      const joinUrl = buildJoinUrl(room.code || code);
+      const qrUrl = buildQrUrl(joinUrl);
+
+      function showPanel(which){
+        shareQrPanel.style.display = (which === "qr") ? "block" : "none";
+        shareCodePanel.style.display = (which === "code") ? "block" : "none";
+        shareLinkPanel.style.display = (which === "link") ? "block" : "none";
+      }
+
+      function openShare(){
+        shareBackdrop.style.display = "flex";
+        showPanel("code");
+      }
+      function closeShare(){
+        shareBackdrop.style.display = "none";
+      }
+
+      shareBtn.addEventListener("click", openShare);
+      shareClose.addEventListener("click", closeShare);
+      shareBackdrop.addEventListener("click", (e) => {
+        if(e.target === shareBackdrop) closeShare();
+      });
+
+      shareQrBtn.addEventListener("click", () => {
+        showPanel("qr");
+        qrImg.src = qrUrl;
+        joinUrlTxt.textContent = joinUrl;
+      });
+
+      shareCodeBtn.addEventListener("click", () => {
+        showPanel("code");
+      });
+
+      shareLinkBtn.addEventListener("click", () => {
+        showPanel("link");
+        joinUrlTxt2.textContent = joinUrl;
+      });
+
+      if(copyJoinBtn1){
+        copyJoinBtn1.addEventListener("click", async () => {
+          const ok = await copyText(joinUrl);
+          copyJoinBtn1.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyJoinBtn1.textContent = "نسخ الرابط", 1200);
+        });
+      }
+      if(copyJoinBtn2){
+        copyJoinBtn2.addEventListener("click", async () => {
+          const ok = await copyText(joinUrl);
+          copyJoinBtn2.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyJoinBtn2.textContent = "نسخ الرابط", 1200);
+        });
+      }
+    }
+
+    function renderWaiting(msg){
+      main.classList.remove("inGame");
+      main.innerHTML = `
+        <div class="lobbyCard">
+          <div class="smallNote" style="font-size:20px">${escapeHtml(msg)}</div>
+          <div class="buyNowWrap">
+            <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
+          </div>
+        </div>
+      `;
+    }
+
     const ANSWER_UI = { revealed:false, sig:"" };
 
     // ✅✅✅ (جديد) رسم واجهة اللعب مرة واحدة فقط (بدون رمشة)
@@ -1980,7 +2464,7 @@
       initTimerDefaultsIfNeeded(room);
       initScoresIfNeeded(room);
 
-      const qMode = (String(room?.questionMode || "default") === "custom") ? "custom" : "default";
+      const qMode = getQuestionMode(room);
 
       const ICON_GEAR = `
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -2063,8 +2547,7 @@
           </div>
 
           <div class="landLeft">
-            <!-- ✅ (تعديل الخطة) إخفاء شريط اسم أول لاعب عند اللاعبين -->
-            <div id="firstPressBar" class="firstPressBar"${isHost ? "" : " style='display:none'"}>اسم اللاعب الذي يضغط أولاً</div>
+            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
 
             <div class="controlsRow">
               ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
@@ -2099,6 +2582,7 @@
         </div>
       `;
 
+      // ✅ حفظ مراجع DOM للتحديث بدون إعادة رسم
       GAME_UI.els.mapImg = document.getElementById("mapImg");
       GAME_UI.els.overlay = document.getElementById("overlay");
       GAME_UI.els.mapScale = document.getElementById("mapScale");
@@ -2226,11 +2710,13 @@
         });
       }
 
+      // ✅ تحديثات (مؤقت) أولية
       TIMER_UI.latestTimer = room.timer || {};
       TIMER_UI.isHost = isHost;
       ensureTimerTicker();
       applyTimerDom();
 
+      // ✅ Tooltips
       main.querySelectorAll(".helpDot").forEach(dot => {
         dot.addEventListener("click", (e) => {
           e.preventDefault();
@@ -2244,6 +2730,7 @@
         });
       });
 
+      // ✅ Stepper
       if(isHost){
         const sG = GAME_UI.els.scoreGreen;
         const sO = GAME_UI.els.scoreOrange;
@@ -2251,6 +2738,7 @@
         if(sO) sO.addEventListener("click", () => openScoreStepper("orange", sO, Number(sO.textContent||0)));
       }
 
+      // ✅ Timer click (host)
       if(isHost && GAME_UI.els.timerClock){
         GAME_UI.els.timerClock.addEventListener("click", async (e) => {
           e.stopPropagation();
@@ -2277,7 +2765,130 @@
         });
       }
 
-      // ✅ Player buzzer (مع منع السبام)
+      // ✅ Settings
+      if(isHost && GAME_UI.els.settingsBtn){
+        GAME_UI.els.settingsBtn.addEventListener("click", () => openSettings(LIVE.room));
+      }
+
+      // ✅ Q Mode toggle
+      if(isHost && GAME_UI.els.qModeBtn){
+        GAME_UI.els.qModeBtn.addEventListener("click", async () => {
+          const cur = getQuestionMode(LIVE.room);
+          const next = (cur === "custom") ? "default" : "custom";
+          await update(ref(db, `rooms/${code}`), { questionMode: next });
+        });
+      }
+
+      // ✅ Zoom
+      if(zoom){
+        zoom.addEventListener("input", () => {
+          const z = Number(zoom.value || 1);
+          localStorage.setItem(ZOOM_KEY, String(z));
+          applyZoomFix();
+        });
+      }
+
+      // ✅ Map swap
+      if(isHost && GAME_UI.els.mapBtn){
+        GAME_UI.els.mapBtn.addEventListener("click", async () => {
+          closeTip();
+          const curMap = Number(LIVE.room.activeMap || 0);
+          const next = (curMap + 1) % 3;
+          await update(roomRef, {
+            activeMap: next,
+            buzzer: null,
+            current: { letter: null, qIndex: 0, row: null, col: null, map: next },
+            winState: null
+          });
+        });
+      }
+
+      // ✅ Freeze
+      if(isHost && GAME_UI.els.freezeBtn){
+        GAME_UI.els.freezeBtn.addEventListener("click", async () => {
+          await update(roomRef, { freeze: !LIVE.room.freeze, buzzer: null });
+        });
+      }
+
+      // ✅ Next Q
+      if(isHost && GAME_UI.els.nextQ){
+        GAME_UI.els.nextQ.addEventListener("click", async () => {
+          const cur = LIVE.room.current || {};
+          if(!cur.letter) return;
+
+          const mode = getQuestionMode(LIVE.room);
+          const list = (mode === "custom") ? getCustomList(LIVE.room, cur.letter) : (QUESTIONS[cur.letter] || []);
+          if(!list.length) return;
+
+          const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
+          await update(roomRef, { current: { ...cur, qIndex: nextIndex } });
+        });
+      }
+
+      // ✅ Clear board
+      if(isHost && GAME_UI.els.clearBoardBtn){
+        GAME_UI.els.clearBoardBtn.addEventListener("click", async () => {
+          closeTip();
+          const curMap = Number(LIVE.room.activeMap || 0);
+          const updates = {};
+          updates[`rooms/${code}/mapStates/${curMap}`] = null;
+          updates[`rooms/${code}/buzzer`] = null;
+          updates[`rooms/${code}/winState`] = null;
+          await update(ref(db), updates);
+        });
+      }
+
+      // ✅ Overlay cell click (host)
+      if(isHost){
+        GAME_UI.cells.forEach(cell => {
+          cell.addEventListener("click", async (e) => {
+            e.preventDefault();
+            if(LIVE.room.status !== "started") return;
+
+            const r = Number(cell.getAttribute("data-row"));
+            const c = Number(cell.getAttribute("data-col"));
+            const k = cellKey(r,c);
+
+            const activeMapNow = Number(LIVE.room.activeMap || 0);
+            const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
+
+            const st = Number(mapStatesNow?.[k] ?? 0);
+            const next = (st + 1) % 4;
+
+            const letter = MAPS[activeMapNow][r][c];
+
+            const nextStates = { ...(mapStatesNow || {}) };
+            nextStates[k] = next;
+
+            const winners = computeWinners(nextStates);
+            const prevWin = (LIVE.room.winState && LIVE.room.winState[String(activeMapNow)]) ? LIVE.room.winState[String(activeMapNow)] : { greenWin:false, orangeWin:false };
+
+            let winEvent = null;
+            const greenNew = !!winners.greenWin && !prevWin.greenWin;
+            const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
+
+            if(greenNew || orangeNew){
+              let team = null;
+              if(next === 2 && greenNew) team = "green";
+              else if(next === 3 && orangeNew) team = "orange";
+              else team = greenNew ? "green" : "orange";
+
+              winEvent = { team, ts: Date.now(), map: activeMapNow };
+            }
+
+            const updates = {};
+            updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = next;
+            updates[`rooms/${code}/buzzer`] = null;
+            updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: r, col: c, map: activeMapNow };
+            updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
+            if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
+
+            await update(ref(db), updates);
+          });
+        });
+      }
+
+      // ✅ Player buzzer
       if(GAME_UI.els.buzzBtn){
         GAME_UI.els.buzzBtn.addEventListener("click", async () => {
           const rr = LIVE.room;
@@ -2285,12 +2896,7 @@
 
           if(rr.status !== "started") return;
           if(rr.freeze) return;
-          if(rr.buzzer) return;                // ✅ (منع السبام) لا Transaction إذا فيه جرس
           if(!mm) return;
-
-          const now = Date.now();
-          if(now < BUZZ_LOCAL_LOCK_UNTIL) return;
-          BUZZ_LOCAL_LOCK_UNTIL = now + 500;   // ✅ (منع سبام محلي)
 
           const buzzerRef = ref(db, `rooms/${code}/buzzer`);
 
@@ -2314,11 +2920,6 @@
       }
     }
 
-    function getQuestionMode(room){
-      const m = String(room?.questionMode || "default");
-      return (m === "custom") ? "custom" : "default";
-    }
-
     // ✅ تحديث واجهة اللعب بدون إعادة بناء (يمنع الرمشة)
     function updateGameUI(){
       if(!GAME_UI.mounted) return;
@@ -2329,28 +2930,204 @@
 
       setGameName(room?.name);
 
+      // Timer
       TIMER_UI.latestTimer = room.timer || {};
       TIMER_UI.isHost = isHost;
       ensureTimerTicker();
       applyTimerDom();
 
+      // Scores
       const sg = Number(room?.scores?.green ?? 0);
       const so = Number(room?.scores?.orange ?? 0);
       if(GAME_UI.els.scoreGreen) GAME_UI.els.scoreGreen.textContent = String(Number.isFinite(sg) ? sg : 0);
       if(GAME_UI.els.scoreOrange) GAME_UI.els.scoreOrange.textContent = String(Number.isFinite(so) ? so : 0);
 
+      // Freeze UI
       if(isHost && GAME_UI.els.freezeBtn){
         GAME_UI.els.freezeBtn.classList.toggle("red", !!room.freeze);
       }
 
-      // ✅ (منع السبام) تعطيل زر اللاعب إذا فيه جرس
-      if(!isHost && GAME_UI.els.buzzBtn){
-        const me = LIVE.me;
-        const disabled = (!started) || room.freeze || !!room.buzzer || !me || !me.name;
-        GAME_UI.els.buzzBtn.classList.toggle("disabled", !!disabled);
-        GAME_UI.els.buzzBtn.style.pointerEvents = disabled ? "none" : "auto";
+      // Q mode button
+      if(isHost && GAME_UI.els.qModeBtn){
+        const qMode = getQuestionMode(room);
+        GAME_UI.els.qModeBtn.classList.toggle("cyan", qMode === "custom");
+        GAME_UI.els.qModeBtn.title = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
       }
 
+      // First press bar
+      const firstPressBar = GAME_UI.els.firstPressBar;
+      const buzzer = room.buzzer;
+      if(buzzer && buzzer.name && firstPressBar){
+        firstPressBar.classList.add("filled");
+        firstPressBar.style.background = teamColor(buzzer.team);
+        firstPressBar.textContent = buzzer.name;
+      }else if(firstPressBar){
+        firstPressBar.classList.remove("filled");
+        firstPressBar.style.background = "rgba(255,255,255,.16)";
+        firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
+      }
+
+      // ✅ (تعديل 1) تصفير/إخفاء اسم أول لاعب بضغطة على الشريط (للمقدم فقط) — يركب مرة
+      if(isHost && firstPressBar && !firstPressBar.__clearHooked){
+        firstPressBar.__clearHooked = true;
+        firstPressBar.addEventListener("click", async () => {
+          try{ await update(roomRef, { buzzer: null }); }catch(e){}
+        });
+      }
+
+      // Map image change (when activeMap changes)
+      const activeMap = Number(room.activeMap || 0);
+      const srcBase = ([
+        "maps/map1.jpeg",
+        "maps/map2.jpeg",
+        "maps/map3.jpeg"
+      ][activeMap] || "maps/map1.jpeg");
+
+      if(GAME_UI.activeMap !== activeMap || GAME_UI.srcBase !== srcBase){
+        GAME_UI.activeMap = activeMap;
+        GAME_UI.srcBase = srcBase;
+
+        if(GAME_UI.els.mapImg){
+          const img = GAME_UI.els.mapImg;
+          img.src = srcBase + vq;
+
+          // بعد تبديل الصورة، نعيد حساب مكان الخلايا بعد التحميل
+          const onL = () => { try{ GAME_UI.onMapReady && GAME_UI.onMapReady(); }catch(e){} };
+          if(img.complete) onL();
+          else img.addEventListener("load", onL, { once:true });
+        }
+      }
+
+      // Map states update
+      const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
+      if(GAME_UI.cells && GAME_UI.cells.length){
+        for(const cell of GAME_UI.cells){
+          const r = Number(cell.getAttribute("data-row"));
+          const c = Number(cell.getAttribute("data-col"));
+          const k = cellKey(r,c);
+          const st = Number(mapStates?.[k] ?? 0);
+          setStateClass(cell, st);
+        }
+      }
+
+      // Host question + answer UI
+      if(isHost){
+        const qText = GAME_UI.els.qText;
+        const ansBtn  = GAME_UI.els.ansBtn;
+        const cur = room.current || {};
+
+        let curQ = "";
+        let curA = "";
+        let hasQuestion = false;
+
+        if(cur.letter){
+          const mode = getQuestionMode(room);
+
+          let list = [];
+          if(mode === "custom"){
+            list = getCustomList(room, cur.letter);
+            if(!list.length){
+              curQ = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
+              curA = "";
+              hasQuestion = true;
+            }else{
+              const idx = Number(cur.qIndex || 0) % list.length;
+              const item = list[idx];
+              curQ = item?.q ?? "—";
+              curA = (item?.a ?? "").trim();
+              hasQuestion = true;
+            }
+          }else{
+            list = QUESTIONS[cur.letter] || [];
+            if(!list.length){
+              curQ = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
+              curA = "";
+              hasQuestion = true;
+            }else{
+              const idx = Number(cur.qIndex || 0) % list.length;
+              const item = list[idx];
+              curQ = item?.q ?? "—";
+              curA = (item?.a ?? "").trim();
+              hasQuestion = true;
+            }
+          }
+        }else{
+          curQ = "اختر حرفًا من الخريطة";
+          curA = "";
+          hasQuestion = false;
+        }
+
+        if(qText) qText.textContent = curQ;
+
+        const sig = `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number(room.customQuestionsUpdatedAt||0)}`;
+        if(ANSWER_UI.sig !== sig){
+          ANSWER_UI.sig = sig;
+          ANSWER_UI.revealed = false;
+        }
+
+        if(ansBtn){
+          if(hasQuestion && curA){
+            ansBtn.style.display = "block";
+            if(ANSWER_UI.revealed){
+              ansBtn.classList.remove("red");
+              ansBtn.classList.add("green");
+              ansBtn.textContent = curA;
+            }else{
+              ansBtn.classList.remove("green");
+              ansBtn.classList.add("red");
+              ansBtn.textContent = "إظهار الإجابة";
+            }
+
+            if(!ansBtn.__hooked){
+              ansBtn.__hooked = true;
+              ansBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if(ANSWER_UI.revealed) return;
+                ANSWER_UI.revealed = true;
+
+                // نعيد القراءة من LIVE حتى لو تغيّر السؤال بسرعة
+                const rr = LIVE.room;
+                const cc = rr.current || {};
+                if(!cc.letter) return;
+
+                let list = [];
+                const mode = getQuestionMode(rr);
+                if(mode === "custom"){
+                  list = getCustomList(rr, cc.letter);
+                }else{
+                  list = QUESTIONS[cc.letter] || [];
+                }
+                if(!list.length) return;
+
+                const idx = Number(cc.qIndex || 0) % list.length;
+                const item = list[idx];
+                const a = (item?.a ?? "").trim();
+                if(!a) return;
+
+                ansBtn.classList.remove("red");
+                ansBtn.classList.add("green");
+                ansBtn.textContent = a;
+              });
+            }
+          }else{
+            ansBtn.style.display = "none";
+          }
+        }
+      }
+
+      // Player button disabled state (no re-render)
+      if(!isHost && GAME_UI.els.buzzBtn){
+        const me = LIVE.me;
+        const disabled = (!started) || room.freeze || !me || !me.name;
+        GAME_UI.els.buzzBtn.classList.toggle("disabled", !!disabled);
+      }
+
+      // settings room latest
+      SETTINGS_UI.roomLatest = room;
+      CUSTOM_Q_UI.roomLatest = room;
+
+      // apply zoom fix (safe)
       try{ GAME_UI.applyZoomFix && GAME_UI.applyZoomFix(); }catch(e){}
     }
 
@@ -2360,9 +3137,10 @@
         requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
       }catch(e){}
 
+      // ✅ (2) قصّ اللاعبين إذا تجاوزوا 13
       try{ prunePlayersIfOverLimit(room); }catch(e){}
 
-      // ✅ تشغيل المؤقت تلقائياً عند اعتماد أول لاعب يضغط الجرس
+      // ✅ (3) تشغيل المؤقت تلقائياً عند اعتماد أول لاعب يضغط الجرس
       try{
         if(role === "host"){
           const b = room.buzzer;
@@ -2389,6 +3167,26 @@
         }
       }catch(e){}
 
+      // ✅ (تعديل 2) تشغيل rong فقط عند جهاز اللاعب الذي ضغط أولاً
+      try{
+        const b = room.buzzer;
+        if(b && b.ts){
+          const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
+          if(sig && sig !== LAST_BUZZER_SIG){
+            LAST_BUZZER_SIG = sig;
+
+            if(role !== "host"){
+              const myPid = pid || localStorage.getItem(`sabaq_pid_${code}`) || "";
+              if(myPid && String(b.pid||"") === String(myPid)){
+                if(!playRong()) fallbackBeep();
+              }
+            }
+          }
+        }else{
+          LAST_BUZZER_SIG = "";
+        }
+      }catch(e){}
+
       try{
         const we = room.winEvent;
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
@@ -2398,7 +3196,7 @@
       }catch(e){}
     }
 
-    // ✅✅✅ (مهم) بدل onValue على الغرفة كاملة: نستمع على مسارات صغيرة فقط
+    // ✅✅✅ (مهم) بدل onValue على الغرفة كاملة: نستمع على مسارات صغيرة فقط (تقليل صرفية + يمنع الرمشة)
     let UN_SUB_MAP = null;
     let UN_SUB_WIN = null;
 
@@ -2425,6 +3223,7 @@
 
     function getMeFromPlayers(players){
       if(!players) return null;
+
       if(pid && players[pid]) return players[pid];
 
       const k = `sabaq_pid_${code}`;
@@ -2443,32 +3242,24 @@
       });
     }
 
-    function renderWaiting(msg){
-      main.classList.remove("inGame");
-      main.innerHTML = `
-        <div class="lobbyCard">
-          <div class="smallNote" style="font-size:20px">${escapeHtml(msg)}</div>
-          <div class="buyNowWrap">
-            <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
-          </div>
-        </div>
-      `;
-    }
-
     function renderFromLive(){
       const room = LIVE.room || {};
-      const players = room.players || {};
 
+      // وجود الغرفة (تقريبي)
+      const players = room.players || {};
       const hasAny =
         room.status !== null ||
         room.hostKey !== null ||
         (players && Object.keys(players).length > 0);
 
       if(!hasAny){
-        // اترك شاشة "جاري التحميل..." الافتراضية
+        renderWaiting("الغرفة غير موجودة.");
+        VIEW.type = "wait";
+        VIEW.waitingMsg = "الغرفة غير موجودة.";
         return;
       }
 
+      // Host auth
       if(role === "host"){
         if(room.hostKey && hostKey && String(room.hostKey) !== String(hostKey)){
           main.textContent = "ليس لديك صلاحية دخول كمقدم.";
@@ -2477,31 +3268,75 @@
         }
       }
 
+      // حد اللاعبين
       try{ prunePlayersIfOverLimit(room); }catch(e){}
 
+      // Player me
       LIVE.me = (role === "host") ? null : getMeFromPlayers(players);
 
-      if(room.status !== "started"){
-        if(role === "host"){
-          // (اختصار) في حال اللوبي
-          if(VIEW.type !== "host_lobby"){
-            renderWaiting("بانتظار تجهيز اللوبي...");
+      // Views
+      if(role === "host"){
+        if(room.status === "started"){
+          if(VIEW.type !== "host_game"){
+            // mount مرة واحدة فقط
+            renderGame(room, null);
+            VIEW.type = "host_game";
+          }
+          updateGameUI();
+          afterRender(room);
+          return;
+        }else{
+          const sig = Object.entries(players)
+            .map(([id,p]) => `${id}:${p?.team||""}:${p?.name||""}:${Number(p?.joinedAt||0)}`)
+            .sort()
+            .join("|");
+
+          if(VIEW.type !== "host_lobby" || VIEW.lobbySig !== sig){
+            VIEW.lobbySig = sig;
+            renderHostLobby(room);
             VIEW.type = "host_lobby";
           }
-        }else{
-          if(VIEW.type !== "wait" || VIEW.waitingMsg !== "بانتظار بدء اللعبة..."){
-            VIEW.waitingMsg = "بانتظار بدء اللعبة...";
-            renderWaiting("بانتظار بدء اللعبة...");
-            VIEW.type = "wait";
-          }
+          afterRender(room);
+          return;
+        }
+      }
+
+      // Player branch
+      const playerCount = Object.keys(players).length;
+
+      if(!LIVE.me && playerCount >= MAX_PLAYERS){
+        if(VIEW.type !== "wait" || VIEW.waitingMsg !== "الغرفة ممتلئة"){
+          VIEW.waitingMsg = "الغرفة ممتلئة";
+          renderWaiting("الغرفة ممتلئة");
+          VIEW.type = "wait";
         }
         afterRender(room);
         return;
       }
 
-      if(VIEW.type !== (role === "host" ? "host_game" : "player_game")){
+      if(room.status !== "started"){
+        if(VIEW.type !== "wait" || VIEW.waitingMsg !== "بانتظار بدء اللعبة..."){
+          VIEW.waitingMsg = "بانتظار بدء اللعبة...";
+          renderWaiting("بانتظار بدء اللعبة...");
+          VIEW.type = "wait";
+        }
+        afterRender(room);
+        return;
+      }
+
+      if(!LIVE.me && playerCount >= MAX_PLAYERS){
+        if(VIEW.type !== "wait" || VIEW.waitingMsg !== "الغرفة ممتلئة"){
+          VIEW.waitingMsg = "الغرفة ممتلئة";
+          renderWaiting("الغرفة ممتلئة");
+          VIEW.type = "wait";
+        }
+        afterRender(room);
+        return;
+      }
+
+      if(VIEW.type !== "player_game"){
         renderGame(room, LIVE.me);
-        VIEW.type = (role === "host" ? "host_game" : "player_game");
+        VIEW.type = "player_game";
       }
       updateGameUI();
       afterRender(room);
@@ -2509,6 +3344,7 @@
 
     // ✅ تشغيل listeners مجزأة (أقل تحميل)
     function startRoomListeners(){
+      // status
       onValue(ref(db, `rooms/${code}/status`), (s) => {
         LIVE.room.status = s.val();
         scheduleRender();
@@ -2516,21 +3352,25 @@
         main.textContent = "تعذر الاتصال بالغرفة.";
       });
 
+      // hostKey
       onValue(ref(db, `rooms/${code}/hostKey`), (s) => {
         LIVE.room.hostKey = s.val();
         scheduleRender();
       });
 
+      // name
       onValue(ref(db, `rooms/${code}/name`), (s) => {
         LIVE.room.name = s.val();
         scheduleRender();
       });
 
+      // players
       onValue(ref(db, `rooms/${code}/players`), (s) => {
         LIVE.room.players = s.val() || {};
         scheduleRender();
       });
 
+      // activeMap (مع إعادة ربط mapStates / winState)
       onValue(ref(db, `rooms/${code}/activeMap`), (s) => {
         const v = Number(s.val() || 0);
         LIVE.room.activeMap = v;
@@ -2538,61 +3378,69 @@
         scheduleRender();
       });
 
+      // freeze
       onValue(ref(db, `rooms/${code}/freeze`), (s) => {
         LIVE.room.freeze = !!s.val();
         scheduleRender();
       });
 
+      // scores
       onValue(ref(db, `rooms/${code}/scores`), (s) => {
         LIVE.room.scores = s.val() || { green:0, orange:0 };
         scheduleRender();
       });
 
+      // buzzer
       onValue(ref(db, `rooms/${code}/buzzer`), (s) => {
         LIVE.room.buzzer = s.val();
         scheduleRender();
       });
 
+      // current
       onValue(ref(db, `rooms/${code}/current`), (s) => {
-        LIVE.room.current = s.val() || { letter:null, qIndex:0, row:null, col:null, map:0 };
+        LIVE.room.current = s.val() || { letter:null, qIndex:0, row:null, col:null, map: Number(LIVE.room.activeMap||0) };
         scheduleRender();
       });
 
+      // timer
       onValue(ref(db, `rooms/${code}/timer`), (s) => {
         LIVE.room.timer = s.val() || { sel:10, dur:10, running:false, startTs:0, done:false };
         scheduleRender();
       });
 
+      // questionMode
       onValue(ref(db, `rooms/${code}/questionMode`), (s) => {
-        LIVE.room.questionMode = s.val() || "default";
+        LIVE.room.questionMode = String(s.val() || "default");
         scheduleRender();
       });
 
+      // customQuestions
       onValue(ref(db, `rooms/${code}/customQuestions`), (s) => {
         LIVE.room.customQuestions = s.val() || {};
         scheduleRender();
       });
 
+      // customQuestionsUpdatedAt
       onValue(ref(db, `rooms/${code}/customQuestionsUpdatedAt`), (s) => {
         LIVE.room.customQuestionsUpdatedAt = Number(s.val() || 0);
         scheduleRender();
       });
 
+      // winEvent
       onValue(ref(db, `rooms/${code}/winEvent`), (s) => {
         LIVE.room.winEvent = s.val();
         scheduleRender();
       });
+
+      // attach initial map listeners
+      attachMapListeners(Number(LIVE.room.activeMap || 0));
     }
 
-    // حفظ pid للاعب (إن وجد)
-    try{
-      if(role !== "host"){
-        const k = `sabaq_pid_${code}`;
-        if(pid) localStorage.setItem(k, pid);
-      }
-    }catch(e){}
-
     startRoomListeners();
+    scheduleRender();
+
   </script>
+
+  <!-- VERSION: game_full.html — v2026-02-17-1 -->
 </body>
 </html>
