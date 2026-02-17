@@ -1064,7 +1064,7 @@
     <div id="main" class="card">جاري التحميل...</div>
   </div>
 
-  <button id="homeBtn" class="footerBtn" onclick="location.href='index.html'">الرئيسية</button>
+  <button class="footerBtn" onclick="location.href='index.html'">الرئيسية</button>
   <div class="rights">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
 
   <!-- ✅ نافذة شرح ? -->
@@ -1186,8 +1186,6 @@
     const params = new URLSearchParams(location.search);
     const role = params.get("role");
     const code = params.get("code");
-    const homeBtn = document.getElementById("homeBtn");
-    if(homeBtn && role !== "host") homeBtn.style.display = "none";
     const hostKey = params.get("key");
     const pid = params.get("pid");
 
@@ -1593,17 +1591,12 @@
       }
 
       if(TIMER_UI.isHost){
-  if(view.running && view.remaining === 0 && !TIMER_UI.__doneSent){
-    TIMER_UI.__doneSent = true;
-
-    // ✅ تصفير الجرس + تثبيت انتهاء المؤقت
-    const updates = {};
-    updates[`rooms/${code}/timer/running`] = false;
-    updates[`rooms/${code}/timer/done`] = true;
-    updates[`rooms/${code}/buzzer`] = null;
-    update(ref(db), updates);
-  }
-}
+        if(view.running && view.remaining === 0 && !TIMER_UI.__doneSent){
+          TIMER_UI.__doneSent = true;
+          update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
+        }
+      }
+    }
 
     function ensureTimerTicker(){
       if(TIMER_UI.tick) return;
