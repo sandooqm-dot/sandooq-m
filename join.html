@@ -136,6 +136,8 @@
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
 
+    const MAX_PLAYERS = 13; // ✅ 13 لاعب + المقدم = 14
+
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
@@ -206,23 +208,48 @@
       document.cookie = parts.join("; ");
     }
 
-    function markAsGuestPlayer(code, pid){
+    function markAsGuestPlayer(code, pid, name, team){
+      // Cookies الأساسية
       setCookie("sandooq_guest_player", "1", 60 * 60 * 12);
       setCookie("sandooq_role", "player", 60 * 60 * 12);
       setCookie("sandooq_room_code", code, 60 * 60 * 12);
       setCookie("sandooq_pid", pid, 60 * 60 * 12);
 
+      // Cookies إضافية (احتياط)
+      if(name) setCookie("sandooq_player_name", name, 60 * 60 * 12);
+      if(team) setCookie("sandooq_player_team", team, 60 * 60 * 12);
+
       try{
+        // مفاتيحنا الرسمية
         localStorage.setItem("sandooq_guest_player", "1");
         localStorage.setItem("sandooq_role", "player");
         localStorage.setItem("sandooq_room_code", code);
         localStorage.setItem("sandooq_pid", pid);
+        if(name) localStorage.setItem("sandooq_player_name", name);
+        if(team) localStorage.setItem("sandooq_player_team", team);
 
         sessionStorage.setItem("sandooq_guest_player", "1");
         sessionStorage.setItem("sandooq_role", "player");
         sessionStorage.setItem("sandooq_room_code", code);
         sessionStorage.setItem("sandooq_pid", pid);
+        if(name) sessionStorage.setItem("sandooq_player_name", name);
+        if(team) sessionStorage.setItem("sandooq_player_team", team);
+
+        // مفاتيح احتياط شائعة (عشان أي كود داخل game_full ما يطيح)
+        localStorage.setItem("roomCode", code);
+        localStorage.setItem("playerName", name || "");
+        sessionStorage.setItem("roomCode", code);
+        sessionStorage.setItem("playerName", name || "");
       }catch(e){}
+    }
+
+    function getStoredPidForRoom(code){
+      try{
+        const storedCode = localStorage.getItem("sandooq_room_code");
+        const storedPid  = localStorage.getItem("sandooq_pid");
+        if(storedCode === code && storedPid) return storedPid;
+      }catch(e){}
+      return "";
     }
 
     async function join(){
@@ -260,23 +287,36 @@
           return;
         }
 
+        const playersObj = room?.players || {};
+        const playersCount = Object.keys(playersObj).length;
+
+        // ✅ إعادة استخدام PID لنفس الجهاز داخل نفس الغرفة (يمنع تكرار لاعب + يقلل صرفية)
+        const storedPid = getStoredPidForRoom(code);
+        const reuse = !!(storedPid && playersObj[storedPid]);
+        const pid = reuse ? storedPid : genPid();
+
+        // ✅ حد أقصى 13 لاعب (إذا ما كان إعادة دخول)
+        if(!reuse && playersCount >= MAX_PLAYERS){
+          showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
+          return;
+        }
+
         const team = await pickTeam(room);
-        const pid = genPid();
 
         localStorage.setItem("sandooq_last_player_name", name);
 
-        // إضافة اللاعب للغرفة
+        // إضافة/تحديث اللاعب (نفس PID إذا كان موجود)
         await update(ref(db, `rooms/${code}/players/${pid}`), {
           name,
           team,
-          joinedAt: Date.now()
+          joinedAt: reuse ? (playersObj[pid]?.joinedAt || Date.now()) : Date.now(),
+          lastSeenAt: Date.now()
         });
 
-        // ✅ علّم الجهاز أنه لاعب
-        markAsGuestPlayer(code, pid);
+        // ✅ علّم الجهاز أنه لاعب + ثبّت مفاتيح احتياط
+        markAsGuestPlayer(code, pid, name, team);
 
-        // ✅✅ الحل: لا نرسل اللاعب لصفحة play.html نهائيًا (اللي عندك هي اللي تسبب تحويله لتسجيل الدخول عند بدء اللعبة)
-        // نخليه يدخل game_full مباشرة بوضع لاعب — وراح ينتظر داخلها إلى أن يبدأ المقدم
+        // دخول مباشر للعبة (بدون play.html)
         const u = new URL("game_full.html", location.href);
         u.searchParams.set("role", "player");
         u.searchParams.set("code", code);
@@ -305,6 +345,6 @@
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vFix-DirectToGameFull-3 (Skip play.html) -->
+  <!-- VERSION: join.html — vMax13Players-ReusePID-1 -->
 </body>
 </html>
