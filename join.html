@@ -4,99 +4,136 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>الدخول إلى لعبة</title>
+
+  <!-- ✅ تسريع تحميل Firebase + فتح اللعبة -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="//www.gstatic.com">
+  <link rel="preload" href="game_full.html" as="document">
+
   <style>
     :root{
-      --bg:#1f4fa3;
+      /* ✅ تغيير لون وخط صفحة اللاعبين + إزالة مربع الرمز */
+      --bg:#7b1f63;        /* نفس ثيم اللعبة */
       --yellow:#f4c400;
-      --card:#ffffff;
-      --text:#111;
-      --muted:#6b7280;
+      --text:#ffffff;
+      --muted:rgba(255,255,255,.78);
+      --inputBg:rgba(255,255,255,.12);
+      --inputBd:rgba(255,255,255,.22);
+      --shadow:0 14px 36px rgba(0,0,0,.25);
     }
+
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("AA-GALAXY.otf") format("opentype");
+      font-display:swap;
+    }
+
     body{
       margin:0;
       font-family: Arial, sans-serif;
       background: var(--bg);
-      color:#fff;
+      color: var(--text);
       text-align:center;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      justify-content:flex-start;
     }
+
     header{
-      position:relative;
-      padding:18px 14px 0;
-      min-height:72px;
+      padding:22px 14px 0;
     }
     .logo{
-      position:absolute;
-      left:14px;
-      top:14px;
-      width:56px;
-      height:56px;
+      width:86px;
+      height:86px;
       object-fit:contain;
+      display:block;
+      margin:0 auto 10px;
+      pointer-events:none;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.22));
     }
     h1{
-      margin:18px 0 10px;
+      margin:6px 0 0;
       color: var(--yellow);
-      font-size:30px;
+      font-size:34px;
       letter-spacing:.2px;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      text-shadow:0 8px 18px rgba(0,0,0,.18);
     }
+
     .wrap{
       width:95%;
-      max-width:820px;
-      margin:0 auto;
-    }
-    .card{
-      background:var(--card);
-      color:var(--text);
-      border-radius:18px;
-      padding:18px 16px;
+      max-width:720px;
+      margin:18px auto 24px;
+      padding:0 10px;
       box-sizing:border-box;
-      margin:14px auto 24px;
-      box-shadow:0 10px 30px rgba(0,0,0,.18);
     }
+
+    /* ✅ إزالة “المربع الأبيض” والاكتفاء بتخطيط أنيق */
+    .panel{
+      background: rgba(0,0,0,.08);
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:18px;
+      padding:18px 16px 16px;
+      box-shadow: var(--shadow);
+      box-sizing:border-box;
+    }
+
     .input{
       width:min(92vw, 680px);
       max-width:680px;
-      height:54px;
-      border:none;
+      height:56px;
+      border:1px solid var(--inputBd);
       outline:none;
-      border-radius:14px;
-      background:#f3f5f9;
+      border-radius:16px;
+      background: var(--inputBg);
+      color:#fff;
       padding:0 16px;
-      font-size:16px;
+      font-size:17px;
       box-sizing:border-box;
-      margin:10px auto;
+      margin:10px auto 6px;
       text-align:right;
     }
+    .input::placeholder{ color: rgba(255,255,255,.75); }
+
     .btn{
       width:min(92vw, 680px);
       max-width:680px;
-      height:56px;
+      height:58px;
       border:none;
-      border-radius:14px;
+      border-radius:16px;
       background:var(--yellow);
       color:#000;
-      font-weight:bold;
-      font-size:18px;
+      font-weight:900;
+      font-size:19px;
       cursor:pointer;
-      margin:10px auto 0;
+      margin:12px auto 0;
+      box-shadow:0 14px 28px rgba(0,0,0,.22);
     }
-    .note{
+
+    .hint{
       margin-top:10px;
       font-size:13px;
-      color:var(--muted);
+      color: var(--muted);
     }
+
     .error{
-      margin-top:10px;
+      margin:12px auto 0;
       font-size:14px;
       color:#b91c1c;
       background:#fee2e2;
       border:1px solid #fecaca;
       padding:10px 12px;
-      border-radius:12px;
+      border-radius:14px;
       display:none;
       text-align:center;
+      width:min(92vw, 680px);
+      max-width:680px;
+      box-sizing:border-box;
     }
+
     .loading{
-      opacity:.65;
+      opacity:.75;
       pointer-events:none;
       user-select:none;
     }
@@ -104,18 +141,19 @@
 </head>
 <body>
   <header>
+    <!-- ✅ اللوجو أعلى الصفحة في المنتصف -->
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
     <h1>الدخول إلى لعبة</h1>
   </header>
 
   <div class="wrap">
-    <div class="card">
-      <input id="playerName" class="input" type="text" placeholder="اسم اللاعب" autocomplete="name" />
-      <input id="roomCode" class="input" type="text" inputmode="numeric" placeholder="ادخل رمز اللعبة" maxlength="6" />
+    <div class="panel">
+      <input id="playerName" class="input" type="text" placeholder="اكتب اسمك هنا.." autocomplete="name" />
+      <!-- ✅ تم إزالة مربع كتابة رمز الغرفة للاعبين -->
       <button id="joinBtn" class="btn">دخول</button>
 
       <div id="err" class="error"></div>
-      <div class="note">تقدر تكتب الأرقام عربي أو إنجليزي</div>
+      <div class="hint" id="hintText"></div>
     </div>
   </div>
 
@@ -140,11 +178,9 @@
     const codeFromLink = params.get("code") || "";
 
     const nameEl = document.getElementById("playerName");
-    const codeEl = document.getElementById("roomCode");
     const btn = document.getElementById("joinBtn");
     const err = document.getElementById("err");
-
-    if(codeFromLink) codeEl.value = codeFromLink;
+    const hintText = document.getElementById("hintText");
 
     const lastName = localStorage.getItem("sandooq_last_player_name");
     if(lastName && !nameEl.value) nameEl.value = lastName;
@@ -168,6 +204,14 @@
 
     function cleanCode(s){
       return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
+    }
+
+    const roomCode = cleanCode(codeFromLink);
+
+    if(!roomCode){
+      hintText.textContent = "افتح رابط الانضمام من المقدم أو امسح الباركود.";
+    }else{
+      hintText.textContent = "جاهز — اكتب اسمك واضغط دخول.";
     }
 
     function genPid(){
@@ -211,15 +255,12 @@
       clearError();
 
       const name = (nameEl.value || "").trim();
-      const code = cleanCode(codeEl.value);
-      codeEl.value = code;
-
       if(!name){
         showError("اكتب اسم اللاعب");
         return;
       }
-      if(code.length !== 6){
-        showError("اكتب رمز اللعبة (6 أرقام)");
+      if(roomCode.length !== 6){
+        showError("افتح رابط الانضمام الصحيح من المقدم (رمز الغرفة غير موجود)");
         return;
       }
 
@@ -228,9 +269,9 @@
 
       try{
         // تحقق من وجود الغرفة
-        const roomSnap = await get(ref(db, `rooms/${code}`));
+        const roomSnap = await get(ref(db, `rooms/${roomCode}`));
         if(!roomSnap.exists()){
-          showError("رمز اللعبة غير صحيح أو الغرفة غير موجودة");
+          showError("الرابط غير صحيح أو الغرفة غير موجودة");
           return;
         }
         const room = roomSnap.val();
@@ -243,8 +284,8 @@
         const pid = genPid();
         localStorage.setItem("sandooq_last_player_name", name);
 
-        // ✅ حد أقصى: 13 لاعب (والمقدم = 14)
-        const playersRef = ref(db, `rooms/${code}/players`);
+        // ✅ حد أقصى: 13 لاعب
+        const playersRef = ref(db, `rooms/${roomCode}/players`);
         const tx = await runTransaction(playersRef, (players) => {
           players = players || {};
           const ids = Object.keys(players);
@@ -275,12 +316,12 @@
         }
 
         // ✅ علّم الجهاز أنه لاعب
-        markAsGuestPlayer(code, pid);
+        markAsGuestPlayer(roomCode, pid);
 
-        // دخول مباشر لـ game_full بوضعيّة لاعب
+        // دخول مباشر لـ game_full بوضعيّة لاعب (بدون شاشة انتظار إضافية)
         const u = new URL("game_full.html", location.href);
         u.searchParams.set("role", "player");
-        u.searchParams.set("code", code);
+        u.searchParams.set("code", roomCode);
         u.searchParams.set("pid", pid);
         u.searchParams.set("guest", "1");
         u.searchParams.set("player", "1");
@@ -295,15 +336,10 @@
       }
     }
 
-    codeEl.addEventListener("input", () => {
-      codeEl.value = cleanCode(codeEl.value);
-    });
-
     btn.addEventListener("click", join);
     nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
-    codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vRoomCap13-Transaction-1 -->
+  <!-- VERSION: join.html — vPlayerUI-NoCodeBox-FastJoin-2 -->
 </body>
 </html>
