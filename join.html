@@ -111,10 +111,7 @@
   <div class="wrap">
     <div class="card">
       <input id="playerName" class="input" type="text" placeholder="اسم اللاعب" autocomplete="name" />
-
-      <!-- ✅ خانة رمز اللعبة تحت اسم اللاعب -->
       <input id="roomCode" class="input" type="text" inputmode="numeric" placeholder="ادخل رمز اللعبة" maxlength="6" />
-
       <button id="joinBtn" class="btn">دخول</button>
 
       <div id="err" class="error"></div>
@@ -124,7 +121,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
@@ -135,8 +132,6 @@
       messagingSenderId: "1053646928152",
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
-
-    const MAX_PLAYERS = 13; // ✅ 13 لاعب + المقدم = 14
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
@@ -149,10 +144,8 @@
     const btn = document.getElementById("joinBtn");
     const err = document.getElementById("err");
 
-    // تعبئة الرمز تلقائياً لو جاي من رابط/باركود
     if(codeFromLink) codeEl.value = codeFromLink;
 
-    // تذكّر آخر اسم (اختياري ومفيد)
     const lastName = localStorage.getItem("sandooq_last_player_name");
     if(lastName && !nameEl.value) nameEl.value = lastName;
 
@@ -166,7 +159,6 @@
     }
 
     function normalizeDigits(s){
-      // يحوّل الأرقام العربية/الفارسية إلى إنجليزية
       const map = {
         "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
         "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
@@ -185,18 +177,6 @@
       return (Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4));
     }
 
-    async function pickTeam(room){
-      // اختيار فريق مبدئي (الأقل عددًا)
-      const players = room?.players || {};
-      let g = 0, o = 0;
-      for(const id in players){
-        if(players[id]?.team === "orange") o++;
-        else if(players[id]?.team === "green") g++;
-      }
-      return (g <= o) ? "green" : "orange";
-    }
-
-    // ✅ تثبيت هوية اللاعب (Cookie + Storage) — احتياط لأي صفحة ثانية تعتمد عليها
     function setCookie(name, value, maxAgeSeconds){
       const parts = [
         `${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`,
@@ -208,48 +188,23 @@
       document.cookie = parts.join("; ");
     }
 
-    function markAsGuestPlayer(code, pid, name, team){
-      // Cookies الأساسية
+    function markAsGuestPlayer(code, pid){
       setCookie("sandooq_guest_player", "1", 60 * 60 * 12);
       setCookie("sandooq_role", "player", 60 * 60 * 12);
       setCookie("sandooq_room_code", code, 60 * 60 * 12);
       setCookie("sandooq_pid", pid, 60 * 60 * 12);
 
-      // Cookies إضافية (احتياط)
-      if(name) setCookie("sandooq_player_name", name, 60 * 60 * 12);
-      if(team) setCookie("sandooq_player_team", team, 60 * 60 * 12);
-
       try{
-        // مفاتيحنا الرسمية
         localStorage.setItem("sandooq_guest_player", "1");
         localStorage.setItem("sandooq_role", "player");
         localStorage.setItem("sandooq_room_code", code);
         localStorage.setItem("sandooq_pid", pid);
-        if(name) localStorage.setItem("sandooq_player_name", name);
-        if(team) localStorage.setItem("sandooq_player_team", team);
 
         sessionStorage.setItem("sandooq_guest_player", "1");
         sessionStorage.setItem("sandooq_role", "player");
         sessionStorage.setItem("sandooq_room_code", code);
         sessionStorage.setItem("sandooq_pid", pid);
-        if(name) sessionStorage.setItem("sandooq_player_name", name);
-        if(team) sessionStorage.setItem("sandooq_player_team", team);
-
-        // مفاتيح احتياط شائعة (عشان أي كود داخل game_full ما يطيح)
-        localStorage.setItem("roomCode", code);
-        localStorage.setItem("playerName", name || "");
-        sessionStorage.setItem("roomCode", code);
-        sessionStorage.setItem("playerName", name || "");
       }catch(e){}
-    }
-
-    function getStoredPidForRoom(code){
-      try{
-        const storedCode = localStorage.getItem("sandooq_room_code");
-        const storedPid  = localStorage.getItem("sandooq_pid");
-        if(storedCode === code && storedPid) return storedPid;
-      }catch(e){}
-      return "";
     }
 
     async function join(){
@@ -257,8 +212,6 @@
 
       const name = (nameEl.value || "").trim();
       const code = cleanCode(codeEl.value);
-
-      // اعكس للواجهة القيمة المنظفة
       codeEl.value = code;
 
       if(!name){
@@ -287,36 +240,44 @@
           return;
         }
 
-        const playersObj = room?.players || {};
-        const playersCount = Object.keys(playersObj).length;
+        const pid = genPid();
+        localStorage.setItem("sandooq_last_player_name", name);
 
-        // ✅ إعادة استخدام PID لنفس الجهاز داخل نفس الغرفة (يمنع تكرار لاعب + يقلل صرفية)
-        const storedPid = getStoredPidForRoom(code);
-        const reuse = !!(storedPid && playersObj[storedPid]);
-        const pid = reuse ? storedPid : genPid();
+        // ✅ حد أقصى: 13 لاعب (والمقدم = 14)
+        const playersRef = ref(db, `rooms/${code}/players`);
+        const tx = await runTransaction(playersRef, (players) => {
+          players = players || {};
+          const ids = Object.keys(players);
+          if(ids.length >= 13){
+            return; // abort
+          }
 
-        // ✅ حد أقصى 13 لاعب (إذا ما كان إعادة دخول)
-        if(!reuse && playersCount >= MAX_PLAYERS){
+          // اختيار فريق (الأقل عددًا)
+          let g = 0, o = 0;
+          for(const id of ids){
+            if(players[id]?.team === "orange") o++;
+            else if(players[id]?.team === "green") g++;
+          }
+          const team = (g <= o) ? "green" : "orange";
+
+          players[pid] = {
+            name,
+            team,
+            joinedAt: Date.now()
+          };
+
+          return players;
+        }, { applyLocally:false });
+
+        if(!tx.committed){
           showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
           return;
         }
 
-        const team = await pickTeam(room);
+        // ✅ علّم الجهاز أنه لاعب
+        markAsGuestPlayer(code, pid);
 
-        localStorage.setItem("sandooq_last_player_name", name);
-
-        // إضافة/تحديث اللاعب (نفس PID إذا كان موجود)
-        await update(ref(db, `rooms/${code}/players/${pid}`), {
-          name,
-          team,
-          joinedAt: reuse ? (playersObj[pid]?.joinedAt || Date.now()) : Date.now(),
-          lastSeenAt: Date.now()
-        });
-
-        // ✅ علّم الجهاز أنه لاعب + ثبّت مفاتيح احتياط
-        markAsGuestPlayer(code, pid, name, team);
-
-        // دخول مباشر للعبة (بدون play.html)
+        // دخول مباشر لـ game_full بوضعيّة لاعب
         const u = new URL("game_full.html", location.href);
         u.searchParams.set("role", "player");
         u.searchParams.set("code", code);
@@ -324,7 +285,6 @@
         u.searchParams.set("guest", "1");
         u.searchParams.set("player", "1");
         u.searchParams.set("view", "player");
-
         location.href = u.toString();
 
       }catch(e){
@@ -336,8 +296,7 @@
     }
 
     codeEl.addEventListener("input", () => {
-      const v = cleanCode(codeEl.value);
-      codeEl.value = v;
+      codeEl.value = cleanCode(codeEl.value);
     });
 
     btn.addEventListener("click", join);
@@ -345,6 +304,6 @@
     codeEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vMax13Players-ReusePID-1 -->
+  <!-- VERSION: join.html — vRoomCap13-Transaction-1 -->
 </body>
 </html>
