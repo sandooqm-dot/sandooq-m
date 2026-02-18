@@ -10,6 +10,13 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
+  <!-- ✅ (تسريع) تجهيز اتصالات Firebase مبكر -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="//www.gstatic.com">
+
+  <!-- ✅ (تسريع) تنزيل ملف اللعبة الكبيرة بدري -->
+  <link rel="preload" href="./game_full.html" as="document">
+
   <!-- ✅ (مهم) تسجيل Service Worker بدري (نفس فكرة index/join/game_full) -->
   <script>
   (function(){
@@ -275,6 +282,9 @@
   const openGameBtn = document.getElementById("openGameBtn");
   const homeBtn = document.getElementById("homeBtn");
 
+  const qs = new URLSearchParams(location.search);
+  const DBG = qs.get("dbg") === "1";
+
   function showOverlay(title, msg, debugText){
     ovTitle.textContent = title || "تعذر فتح اللعبة";
     ovMsg.textContent = msg || "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.";
@@ -325,11 +335,24 @@
     return (txt || "").includes("GATEWAY_V3_SANDOOQ");
   }
 
+  function dbgLog(t){
+    if(!DBG) return;
+    try{
+      const el = document.getElementById("dbg");
+      if(el){
+        el.textContent = String(t || "");
+        el.classList.add("show");
+      }
+    }catch(e){}
+  }
+
   async function probeHtml(url){
-    // نجيب جزء بسيط من الـ HTML عشان نعرف هل هو ملف اللعبة فعلاً أو Rewrite راجعنا لنفس البوابة
+    // ✅ (تسريع/تقليل تكلفة) نجيب جزء صغير فقط (Range) بدل تحميل الملف كله
     const u = url + (url.includes("?") ? "&" : "?") + "__probe=" + Date.now();
-    const res = await fetch(u, { cache:"no-store", credentials:"include" });
+    const headers = { "Range": "bytes=0-4096" };
+    const res = await fetch(u, { cache:"no-store", credentials:"include", headers });
     if(!res.ok) return { ok:false, status:res.status, url };
+
     const ct = (res.headers.get("content-type") || "").toLowerCase();
     const txt = await res.text();
     const isHtml = ct.includes("text/html") || txt.includes("<!DOCTYPE html") || txt.includes("<html");
@@ -338,7 +361,28 @@
     return { ok:true, status:200, url };
   }
 
-  async function findGameFull(){
+  async function quickHeadOk(url){
+    try{
+      const u = url + (url.includes("?") ? "&" : "?") + "__h=" + Date.now();
+      const res = await fetch(u, { method:"HEAD", cache:"no-store", credentials:"include" });
+      if(res && res.ok) return true;
+    }catch(e){}
+    return false;
+  }
+
+  async function findGameFullFast(){
+    // ✅ المسار الطبيعي: لا نلف — نجرب HEAD سريع على ./game_full.html
+    const primary = "./game_full.html";
+    const tried = [];
+
+    const headOk = await quickHeadOk(primary);
+    tried.push({ url: primary, headOk });
+
+    if(headOk){
+      return { found:true, url: primary, tried };
+    }
+
+    // fallback: نفس منطقك السابق لكن بـ probe (Range)
     const candidates = [
       "./game_full.html",
       "/game_full.html",
@@ -346,7 +390,6 @@
       "./app/game_full.html"
     ];
 
-    const tried = [];
     for(const c of candidates){
       try{
         const r = await probeHtml(c);
@@ -356,7 +399,8 @@
         tried.push({ ok:false, url:c, error:String(e && e.message ? e.message : e) });
       }
     }
-    return { found:false, url:"./game_full.html", tried };
+
+    return { found:false, url: primary, tried };
   }
 
   async function fetchMe(){
@@ -394,7 +438,6 @@
     try{
       const { res, data } = await fetchMe();
       if(res.ok && data && data.ok === true && data.activated){
-        // أفضل تخمين للصفحة الرئيسية داخل نفس المسار
         go("./index.html");
         return;
       }
@@ -405,8 +448,13 @@
   async function run(){
     hideOverlay();
 
-    // 1) تأكد أن game_full موجود فعلًا (عشان ما ندخل لوب)
-    const gf = await findGameFull();
+    // ✅ (تسريع) شغّل فحص game_full + فحص /me بالتوازي
+    const [gf, me] = await Promise.all([
+      findGameFullFast(),
+      fetchMe()
+    ]);
+
+    // 1) game_full موجود؟
     if(!gf.found){
       const debugText = JSON.stringify(gf.tried, null, 2);
       showOverlay(
@@ -419,16 +467,14 @@
     }
 
     // 2) تحقق من الدخول/التفعيل
-    const { res, data, deviceId, hasToken } = await fetchMe();
+    const { res, data } = me;
 
     if(!res.ok || !data || data.ok !== true){
-      // غير مسجّل/جلسة مفقودة
       go(buildActivateNext());
       return;
     }
 
     if(!data.activated){
-      // مسجّل لكن غير مفعّل
       go(buildActivateNext());
       return;
     }
@@ -443,7 +489,7 @@
       await run();
     }catch(e1){
       try{
-        await new Promise(r=>setTimeout(r, 500));
+        await new Promise(r=>setTimeout(r, 350));
         await run();
       }catch(e2){
         showOverlay(
@@ -468,4 +514,4 @@
 </body>
 </html>
 
-<!-- game.html – إصدار 4 (SW مبكر + بوابة + إرسال Authorization + فحص مسار game_full + شاشة تحميل عنابي) -->
+<!-- VERSION: game.html – vGatewayFastParallel-5 -->
