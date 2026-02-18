@@ -15,7 +15,7 @@
     try{
       if(!("serviceWorker" in navigator)) return;
       if(!window.isSecureContext && location.hostname !== "localhost") return;
-      var ASSET_VERSION = "2026-02-18-1";
+      var ASSET_VERSION = "2026-02-18-2";
       var vq = "?v=" + encodeURIComponent(ASSET_VERSION);
       navigator.serviceWorker
         .register("./sw.js" + vq, { scope: "./" })
@@ -27,21 +27,21 @@
 
   <style>
     :root{
-      --bg1:#120617;
-      --bg2:#2b0e2b;
-      --accent:#f4c400;
-      --card: rgba(255,255,255,.08);
-      --bd: rgba(255,255,255,.16);
-      --txt:#ffffff;
-      --muted: rgba(255,255,255,.72);
-      --shadow: 0 18px 55px rgba(0,0,0,.45);
+      --bg:#7b1f63;
+      --bg2:#5f214f;
+      --yellow:#f4c400;
+      --txt:#fff;
+      --muted:rgba(255,255,255,.78);
+      --shadow:0 18px 55px rgba(0,0,0,.35);
+
       --green:#16a34a;
       --orange:#f28c00;
-      --yellow:#f4c400;
-      --cell0: rgba(255,255,255,.12);
-      --cell1: rgba(244,196,0,.92);
-      --cell2: rgba(22,163,74,.95);
-      --cell3: rgba(242,140,0,.95);
+
+      --cell0:#ffffff;
+      --cell1:#f4c400;
+      --cell2:#16a34a;
+      --cell3:#f28c00;
+      --cellStroke: rgba(0,0,0,.28);
     }
 
     @font-face{
@@ -50,218 +50,191 @@
       font-display:swap;
     }
 
-    *{ box-sizing:border-box; }
+    *{box-sizing:border-box}
     body{
       margin:0;
       min-height:100vh;
-      color:var(--txt);
-      font-family: "AA-GALAXY", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
       background:
-        radial-gradient(1200px 700px at 20% 15%, rgba(255,255,255,.10), transparent 60%),
+        radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.10), transparent 60%),
         radial-gradient(900px 650px at 80% 70%, rgba(255,255,255,.07), transparent 55%),
-        linear-gradient(135deg, var(--bg2), var(--bg1));
+        linear-gradient(135deg, var(--bg), var(--bg2));
+      color:var(--txt);
+      font-family:"AA-GALAXY", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
       overflow:hidden;
     }
 
-    header{
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:14px;
-      padding:14px 14px 6px;
-      position:relative;
-    }
-    .logo{
-      width:44px;height:44px;object-fit:contain;
-      filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
-      user-select:none; pointer-events:none;
-    }
-    .title{
-      font-size:30px;
-      color:var(--accent);
-      letter-spacing:.3px;
-      text-shadow:0 12px 22px rgba(0,0,0,.35);
-      margin:0;
-      line-height:1;
-    }
-
-    /* زر إعدادات (على نفس جهاز التلفاز فقط) */
-    .gearBtn{
-      position:absolute;
-      left:12px;
-      top:12px;
-      width:42px;height:42px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.18);
-      background: rgba(0,0,0,.18);
-      color:#fff;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      cursor:pointer;
-      box-shadow: 0 12px 28px rgba(0,0,0,.25);
-      font-size:18px;
-    }
-
-    .layout{
-      height: calc(100vh - 62px);
-      padding:10px 12px 14px;
+    /* Top bar */
+    .topbar{
+      height:74px;
       display:grid;
-      grid-template-columns: 1fr 380px;
-      gap:12px;
-      align-items:stretch;
+      grid-template-columns: 120px 1fr auto;
+      align-items:center;
+      padding:10px 14px;
+      gap:10px;
+    }
+
+    .logo{
+      width:56px;height:56px;object-fit:contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.28));
+      user-select:none; pointer-events:none;
+      justify-self:start;
+    }
+
+    .gameName{
+      text-align:center;
+      font-size:34px;
+      color:#fff;
+      text-shadow:0 12px 22px rgba(0,0,0,.28);
+      letter-spacing:.3px;
+      line-height:1;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      padding:0 6px;
+    }
+
+    .rightBox{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      justify-self:end;
+      flex-wrap:nowrap;
+    }
+
+    .scores{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .scoreChip{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.18);
+      box-shadow: 0 14px 32px rgba(0,0,0,.20);
+      min-width: 132px;
+      justify-content:center;
+    }
+    .scoreChip .label{
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+      font-size:14px;
+      color:rgba(255,255,255,.86);
+      white-space:nowrap;
+    }
+    .scoreChip .num{
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:1000;
+      font-size:28px;
+      line-height:1;
+      min-width: 22px;
+      text-align:center;
+    }
+    .scoreChip.green .num{ color: var(--green); }
+    .scoreChip.orange .num{ color: var(--orange); }
+
+    .zoomWrap{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.18);
+      box-shadow: 0 14px 32px rgba(0,0,0,.20);
+      user-select:none;
+    }
+    .zoomWrap .zLabel{
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+      font-size:13px;
+      color:rgba(255,255,255,.86);
+      white-space:nowrap;
+    }
+    input[type="range"]{
+      width:180px;
+      accent-color: var(--yellow);
+    }
+
+    /* Map area */
+    .main{
+      height: calc(100vh - 74px);
+      padding: 8px 12px 14px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
     }
 
     .panel{
-      background: var(--card);
-      border:1px solid var(--bd);
+      flex:1;
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.14);
       border-radius:18px;
       box-shadow: var(--shadow);
       overflow:hidden;
       position:relative;
-    }
-
-    /* Map */
-    .mapPanel{ display:flex; flex-direction:column; }
-    .mapHead{
-      padding:10px 12px;
-      font-size:16px;
-      color:var(--muted);
-      border-bottom:1px solid rgba(255,255,255,.10);
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:10px;
-    }
-    .badge{
-      padding:6px 10px;
-      border-radius:999px;
-      background: rgba(0,0,0,.18);
-      border:1px solid rgba(255,255,255,.14);
-      color:#fff;
-      font-size:13px;
-      direction:ltr;
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      letter-spacing:.4px;
-      white-space:nowrap;
-    }
-    .mapBody{
-      flex:1;
-      padding:10px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-    svg{ display:block; width:100%; height:100%; }
-
-    .cell{ stroke: rgba(255,255,255,.22); stroke-width: 2; }
-    .s0{ fill: var(--cell0); }
-    .s1{ fill: var(--cell1); }
-    .s2{ fill: var(--cell2); }
-    .s3{ fill: var(--cell3); }
-
-    /* Side */
-    .side{
       display:flex;
       flex-direction:column;
-      gap:12px;
-      height:100%;
     }
 
-    .firstBar{
-      padding:14px 14px;
-      border-radius:18px;
-      background: rgba(255,255,255,.10);
-      border:1px solid rgba(255,255,255,.14);
-      text-align:center;
-      font-size:22px;
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:900;
-      line-height:1.2;
-      box-shadow: 0 16px 40px rgba(0,0,0,.25);
-    }
-
-    .timerPanel{
-      padding:14px 14px 16px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      flex-direction:column;
-      gap:8px;
-      min-height: 210px;
-    }
-    .timerLabel{
-      color:var(--muted);
-      font-size:14px;
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:800;
-    }
-    .timerNum{
-      width: 220px;
-      height: 220px;
-      border-radius: 999px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:72px;
-      font-weight:900;
-      color:#fff;
-      border:6px solid rgba(255,255,255,.25);
-      background: rgba(0,0,0,.18);
-      box-shadow: 0 22px 60px rgba(0,0,0,.35);
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-    }
-    .timerNum.last5{ color:#ff3b3b; animation: pop .5s ease-in-out; }
-    @keyframes pop{ 0%{transform:scale(.98)} 50%{transform:scale(1.02)} 100%{transform:scale(1)} }
-
-    .scoresPanel{
-      padding:14px;
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
-      align-items:stretch;
-      flex:1;
-      min-height: 220px;
-    }
-    .teamBox{
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(0,0,0,.18);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
-      box-shadow: 0 16px 42px rgba(0,0,0,.25);
-    }
-    .teamName{
-      font-size:16px;
-      color: rgba(255,255,255,.85);
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:900;
-    }
-    .teamScore{
-      font-size:64px;
-      font-weight:900;
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      line-height:1;
-    }
-    .teamBox.green .teamScore{ color: var(--green); }
-    .teamBox.orange .teamScore{ color: var(--orange); }
-
-    /* Footer status */
     .statusLine{
       position:absolute;
       right:12px;
       bottom:10px;
       font-size:12px;
-      color: rgba(255,255,255,.72);
+      color: rgba(255,255,255,.78);
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
       user-select:none;
+      text-shadow: 0 10px 18px rgba(0,0,0,.25);
     }
 
-    /* Setup overlay */
-    .backdrop{
+    .mapStage{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px;
+      overflow:hidden; /* ✅ الزوم ما يغطي التوب بار */
+    }
+
+    .mapWrap{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transform: scale(var(--zoom, 1));
+      transform-origin: center center;
+      will-change: transform;
+    }
+
+    svg{
+      width: min(1200px, 100%);
+      height: min(780px, 100%);
+      display:block;
+    }
+
+    .cell{ stroke: var(--cellStroke); stroke-width: 2.2; }
+    .s0{ fill: var(--cell0); }
+    .s1{ fill: var(--cell1); }
+    .s2{ fill: var(--cell2); }
+    .s3{ fill: var(--cell3); }
+
+    .letter{
+      font-family:"AA-GALAXY", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-size:34px;
+      font-weight:900;
+      fill:#111;
+      dominant-baseline: middle;
+      text-anchor: middle;
+      pointer-events:none;
+    }
+
+    /* Gate (no code / lock) */
+    .gate{
       position:fixed; inset:0;
       background: rgba(0,0,0,.55);
       display:flex;
@@ -270,35 +243,35 @@
       padding:16px;
       z-index:999;
     }
-    .modal{
+    .gateCard{
       width:min(560px, 96vw);
       background: rgba(20, 8, 25, .92);
       border:1px solid rgba(255,255,255,.16);
       border-radius:18px;
       padding:16px 14px 14px;
       box-shadow: 0 22px 70px rgba(0,0,0,.55);
+      text-align:center;
     }
-    .mTitle{
-      margin:4px 0 10px;
+    .gTitle{
+      margin:6px 0 8px;
       font-size:22px;
-      color:var(--accent);
-      text-align:center;
+      color:var(--yellow);
     }
-    .mHint{
-      text-align:center;
-      color:rgba(255,255,255,.78);
+    .gHint{
+      margin:0 0 12px;
+      color:rgba(255,255,255,.82);
       font-size:13px;
       line-height:1.7;
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      margin-bottom:12px;
     }
-    .row{
+    .gRow{
       display:flex;
       gap:10px;
-      flex-wrap:wrap;
       justify-content:center;
+      flex-wrap:wrap;
+      margin-top:8px;
     }
-    .in{
+    .gIn{
       width: min(360px, 90vw);
       height:54px;
       border-radius:16px;
@@ -310,42 +283,25 @@
       outline:none;
       text-align:center;
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:800;
+      font-weight:900;
       letter-spacing:2px;
       direction:ltr;
     }
-    .chip{
-      padding:10px 14px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.20);
-      background: rgba(255,255,255,.10);
-      color:#fff;
-      cursor:pointer;
-      font-size:14px;
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:900;
-      user-select:none;
-    }
-    .chip.on{
-      background: rgba(244,196,0,.95);
-      color:#111;
-      border-color: rgba(0,0,0,.12);
-    }
-    .btn{
+    .gBtn{
       width: min(360px, 90vw);
       height:56px;
       border:none;
       border-radius:16px;
-      background: var(--accent);
+      background: var(--yellow);
       color:#111;
       font-size:18px;
-      font-weight:900;
+      font-weight:1000;
       cursor:pointer;
-      margin-top:12px;
+      margin-top:10px;
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
       box-shadow: 0 18px 40px rgba(0,0,0,.35);
     }
-    .err{
+    .gErr{
       display:none;
       margin-top:10px;
       background:#fee2e2;
@@ -356,88 +312,86 @@
       font-size:14px;
       text-align:center;
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:800;
+      font-weight:900;
     }
 
-    /* Responsive */
-    @media (max-width: 980px){
-      .layout{ grid-template-columns: 1fr; }
+    /* Confetti canvas */
+    #fx{
+      position:fixed; inset:0;
+      pointer-events:none;
+      z-index:1000;
+    }
+
+    @media (max-width: 860px){
+      .topbar{ grid-template-columns: 70px 1fr auto; height:78px; }
+      input[type="range"]{ width:140px; }
+      .gameName{ font-size:28px; }
+      .scoreChip{ min-width:120px; padding:8px 10px; }
+      .scoreChip .num{ font-size:24px; }
     }
   </style>
 </head>
 
 <body>
-  <header>
-    <button class="gearBtn" id="openSetup" title="إعدادات العرض" aria-label="إعدادات العرض">⚙️</button>
+  <canvas id="fx"></canvas>
+
+  <div class="topbar">
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات" onerror="this.style.display='none'">
-    <h1 class="title">عرض التلفاز</h1>
-  </header>
+    <div class="gameName" id="gameName">—</div>
 
-  <div class="layout" id="layout" style="display:none">
-    <div class="panel mapPanel" id="mapPanel">
-      <div class="mapHead">
-        <div>الخريطة</div>
-        <div class="badge" id="roomBadge">ROOM: ------</div>
-      </div>
-      <div class="mapBody">
-        <svg id="mapSvg" viewBox="0 0 1000 700" aria-label="خريطة الخلايا"></svg>
-      </div>
-      <div class="statusLine" id="statusLine">جاري الاتصال...</div>
-    </div>
-
-    <div class="side" id="sideWrap">
-      <div class="firstBar" id="firstBar">اسم اللاعب الذي يضغط أولاً</div>
-
-      <div class="panel timerPanel" id="timerPanel">
-        <div class="timerLabel">المؤقت</div>
-        <div class="timerNum" id="timerNum">—</div>
+    <div class="rightBox">
+      <div class="zoomWrap">
+        <div class="zLabel">تكبير</div>
+        <input id="zoom" type="range" min="80" max="140" step="2" value="100" aria-label="تكبير الخريطة">
       </div>
 
-      <div class="panel scoresPanel" id="scoresPanel">
-        <div class="teamBox green">
-          <div class="teamName">الفريق الأخضر</div>
-          <div class="teamScore" id="scoreGreen">0</div>
+      <div class="scores">
+        <div class="scoreChip orange">
+          <div class="label">البرتقالي</div>
+          <div class="num" id="scoreOrange">0</div>
         </div>
-        <div class="teamBox orange">
-          <div class="teamName">الفريق البرتقالي</div>
-          <div class="teamScore" id="scoreOrange">0</div>
+        <div class="scoreChip green">
+          <div class="label">الأخضر</div>
+          <div class="num" id="scoreGreen">0</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Setup -->
-  <div class="backdrop" id="setupBackdrop" style="display:none">
-    <div class="modal">
-      <div class="mTitle">إعداد عرض التلفاز</div>
-      <div class="mHint">
-        افتح الرابط بهذا الشكل:<br>
-        <span style="direction:ltr;display:inline-block;opacity:.95">tv.html?code=123456</span><br>
-        أو اكتب رمز الغرفة هنا واختر العناصر التي تريد عرضها.
+  <div class="main">
+    <div class="panel">
+      <div class="mapStage">
+        <div class="mapWrap" id="mapWrap">
+          <svg id="mapSvg" viewBox="0 0 1000 700" aria-label="خريطة الخلايا"></svg>
+        </div>
+      </div>
+      <div class="statusLine" id="statusLine">جاري الاتصال...</div>
+    </div>
+  </div>
+
+  <!-- Gate -->
+  <div class="gate" id="gate" style="display:none">
+    <div class="gateCard">
+      <div class="gTitle" id="gTitle">عرض التلفاز</div>
+      <p class="gHint" id="gHint">افتح الرابط من زر "عرض التلفاز" عند المقدم (أو اكتب رمز الغرفة هنا).</p>
+
+      <div class="gRow">
+        <input class="gIn" id="codeInput" maxlength="6" inputmode="numeric" placeholder="رمز الغرفة (6 أرقام)">
       </div>
 
-      <div class="row" style="margin-bottom:10px">
-        <input class="in" id="codeInput" maxlength="6" inputmode="numeric" placeholder="رمز الغرفة (6 أرقام)">
-      </div>
-
-      <div class="row">
-        <div class="chip" id="chipMap">خريطة خلايا فقط</div>
-        <div class="chip" id="chipTimer">مؤقت</div>
-        <div class="chip" id="chipName">اسم اللاعب</div>
-        <div class="chip" id="chipScores">لوحة النتائج</div>
-      </div>
-
-      <button class="btn" id="startBtn">ابدأ العرض</button>
-
-      <div class="err" id="setupErr"></div>
+      <button class="gBtn" id="startBtn">ابدأ العرض</button>
+      <div class="gErr" id="gErr"></div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import {
+      getDatabase, ref,
+      onValue, onChildAdded, onChildChanged, onChildRemoved,
+      runTransaction, onDisconnect
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-    // نفس إعدادات مشروعك
     const firebaseConfig = {
       apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
       authDomain: "sabaq-alhorof.firebaseapp.com",
@@ -448,6 +402,7 @@
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
 
+    // ===== Helpers
     function normalizeDigits(s){
       const map = {
         "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
@@ -455,89 +410,113 @@
       };
       return String(s || "").replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
     }
-    function cleanCode(s){
-      return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
+    function cleanCode(s){ return normalizeDigits(s).replace(/\D/g, "").slice(0,6); }
+
+    function ensureTvDeviceId(){
+      const k = "sandooq_tv_device_id_v1";
+      let id = "";
+      try{ id = localStorage.getItem(k) || ""; }catch(e){}
+      if(!id){
+        try{ id = (crypto?.randomUUID ? crypto.randomUUID() : ("tv_" + Math.random().toString(16).slice(2) + Date.now().toString(16))); }catch(e){
+          id = "tv_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+        }
+        try{ localStorage.setItem(k, id); }catch(e){}
+      }
+      return id;
     }
 
-    const qs = new URLSearchParams(location.search);
-    const codeFromUrl = cleanCode(qs.get("code") || "");
-
-    // عناصر UI
-    const layout = document.getElementById("layout");
-    const mapPanel = document.getElementById("mapPanel");
-    const sideWrap = document.getElementById("sideWrap");
-
-    const firstBar = document.getElementById("firstBar");
-    const timerNum = document.getElementById("timerNum");
-    const timerPanel = document.getElementById("timerPanel");
-    const scoresPanel = document.getElementById("scoresPanel");
-    const scoreGreen = document.getElementById("scoreGreen");
-    const scoreOrange = document.getElementById("scoreOrange");
-    const roomBadge = document.getElementById("roomBadge");
+    // ===== UI refs
+    const gameNameEl = document.getElementById("gameName");
+    const scoreGreenEl = document.getElementById("scoreGreen");
+    const scoreOrangeEl = document.getElementById("scoreOrange");
     const statusLine = document.getElementById("statusLine");
 
-    const setupBackdrop = document.getElementById("setupBackdrop");
+    const zoomEl = document.getElementById("zoom");
+    const mapWrap = document.getElementById("mapWrap");
+
+    const gate = document.getElementById("gate");
     const codeInput = document.getElementById("codeInput");
-    const setupErr = document.getElementById("setupErr");
-
-    const chipMap = document.getElementById("chipMap");
-    const chipTimer = document.getElementById("chipTimer");
-    const chipName = document.getElementById("chipName");
-    const chipScores = document.getElementById("chipScores");
-
     const startBtn = document.getElementById("startBtn");
-    const openSetup = document.getElementById("openSetup");
+    const gErr = document.getElementById("gErr");
+    const gTitle = document.getElementById("gTitle");
+    const gHint = document.getElementById("gHint");
 
-    // إعدادات العرض (محلية — بدون أي كتابة في Firebase)
-    const DEFAULT_SETTINGS = { map:true, timer:true, name:true, scores:true };
-    let SETTINGS = { ...DEFAULT_SETTINGS };
+    function showGate(title, hint, err){
+      gTitle.textContent = title || "عرض التلفاز";
+      gHint.textContent = hint || "افتح الرابط من زر عرض التلفاز عند المقدم.";
+      if(err){
+        gErr.textContent = err;
+        gErr.style.display = "block";
+      }else{
+        gErr.textContent = "";
+        gErr.style.display = "none";
+      }
+      gate.style.display = "flex";
+    }
+    function hideGate(){ gate.style.display = "none"; }
 
-    // حالة البيانات
-    let CODE = "";
-    let db = null;
+    // ===== Zoom (محلي) — بدون Firebase
+    function loadZoom(code){
+      try{
+        const k = "sandooq_tv_zoom_v1_" + code;
+        const v = Number(localStorage.getItem(k));
+        if(Number.isFinite(v) && v>=80 && v<=140) return v;
+      }catch(e){}
+      return 100;
+    }
+    function saveZoom(code, v){
+      try{
+        const k = "sandooq_tv_zoom_v1_" + code;
+        localStorage.setItem(k, String(v));
+      }catch(e){}
+    }
+    function applyZoom(v){
+      const z = Math.max(80, Math.min(140, Number(v) || 100));
+      mapWrap.style.setProperty("--zoom", String(z/100));
+    }
 
-    let activeMap = 0;
-    let mapStates = {};
-    let buzzer = null;
-    let scores = { green:0, orange:0 };
-    let timer = { sel:10, dur:10, running:false, startTs:0, done:false };
-
-    // --- رسم الخلايا (Hex grid 5x5) ---
+    // ===== Map drawing (5x5 hex + حروف)
     const mapSvg = document.getElementById("mapSvg");
-    let CELLS = []; // polygons
+    const CELLS = new Map();      // key -> polygon
+    const LETTERS = new Map();    // key -> text
+    const LETTER_GRID = [
+      ["ش","أ","ث","د","هـ"],
+      ["ي","ح","ض","ن","ك"],
+      ["غ","ظ","ق","ر","ع"],
+      ["ص","ز","س","ط","و"],
+      ["ذ","ل","ب","م","ج"]
+    ];
 
     function hexPointsPointyTop(cx, cy, r){
-      // pointy-top
       const pts = [];
       for(let i=0;i<6;i++){
         const ang = (Math.PI/180) * (60*i - 30);
-        const x = cx + r * Math.cos(ang);
-        const y = cy + r * Math.sin(ang);
-        pts.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+        pts.push((cx + r*Math.cos(ang)).toFixed(2) + "," + (cy + r*Math.sin(ang)).toFixed(2));
       }
       return pts.join(" ");
     }
 
+    function cellKey(r,c){ return `${r}_${c}`; }
+
     function buildGrid(){
       mapSvg.innerHTML = "";
-      const W = 1000, H = 700;
+      CELLS.clear(); LETTERS.clear();
+
+      const W=1000, H=700;
       mapSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
-      const rows = 5, cols = 5;
+      const rows=5, cols=5;
+      const r = 74;                    // حجم الخلية
+      const dx = r * Math.sqrt(3);
+      const dy = r * 1.5;
 
-      // قياسات متناسقة
-      const r = 72;              // نصف قطر hex
-      const dx = r * Math.sqrt(3);  // عرض خطوة
-      const dy = r * 1.5;           // ارتفاع خطوة
+      const gridW = (cols-1)*dx + dx;
+      const gridH = (rows-1)*dy + (2*r);
 
-      const gridW = (cols - 1) * dx + dx;
-      const gridH = (rows - 1) * dy + (2*r);
+      const x0 = (W - gridW)/2 + (dx/2);
+      const y0 = (H - gridH)/2 + r;
 
-      const x0 = (W - gridW) / 2 + (dx/2);
-      const y0 = (H - gridH) / 2 + r;
-
-      const svgNS = "http://www.w3.org/2000/svg";
-      CELLS = [];
+      const svgNS="http://www.w3.org/2000/svg";
 
       for(let row=0; row<rows; row++){
         for(let col=0; col<cols; col++){
@@ -546,316 +525,323 @@
 
           const poly = document.createElementNS(svgNS, "polygon");
           poly.setAttribute("points", hexPointsPointyTop(cx, cy, r));
-          poly.classList.add("cell", "s0");
-          poly.setAttribute("data-r", String(row));
-          poly.setAttribute("data-c", String(col));
+          poly.classList.add("cell","s0");
+          const k = cellKey(row,col);
           mapSvg.appendChild(poly);
-          CELLS.push(poly);
+          CELLS.set(k, poly);
+
+          const t = document.createElementNS(svgNS, "text");
+          t.setAttribute("x", String(cx));
+          t.setAttribute("y", String(cy));
+          t.classList.add("letter");
+          t.textContent = (LETTER_GRID[row] && LETTER_GRID[row][col]) ? LETTER_GRID[row][col] : "—";
+          mapSvg.appendChild(t);
+          LETTERS.set(k, t);
         }
       }
     }
 
-    function readCellState(obj, r, c){
-      if(!obj) return 0;
-      const keys = [
-        `${r}_${c}`, `${r},${c}`, `${r}-${c}`, `${r}:${c}`, `${r}|${c}`,
-        `r${r}c${c}`
-      ];
-      for(const k of keys){
-        if(Object.prototype.hasOwnProperty.call(obj, k)) return Number(obj[k] ?? 0);
-      }
-      return 0;
-    }
+    function setCellVisual(k, st){
+      const el = CELLS.get(k);
+      const tt = LETTERS.get(k);
+      if(!el) return;
 
-    function applyMapStates(){
-      for(const el of CELLS){
-        const r = Number(el.getAttribute("data-r"));
-        const c = Number(el.getAttribute("data-c"));
-        const st = Math.max(0, Math.min(3, readCellState(mapStates, r, c)));
-        el.classList.remove("s0","s1","s2","s3");
-        el.classList.add("s" + st);
+      const s = Math.max(0, Math.min(3, Number(st) || 0));
+      el.classList.remove("s0","s1","s2","s3");
+      el.classList.add("s"+s);
+
+      // لون حرف مناسب
+      if(tt){
+        if(s === 2 || s === 3) tt.style.fill = "#fff";
+        else tt.style.fill = "#111";
       }
     }
 
-    // --- اسم أول لاعب ---
-    function teamColor(t){
-      return (t === "green") ? "var(--green)" : (t === "orange" ? "var(--orange)" : "rgba(255,255,255,.10)");
+    function clearAllCells(){
+      for(const k of CELLS.keys()) setCellVisual(k, 0);
     }
 
-    function applyBuzzer(){
-      if(!SETTINGS.name){
-        firstBar.style.display = "none";
-        return;
-      }
-      firstBar.style.display = "block";
-
-      if(buzzer && buzzer.name){
-        firstBar.textContent = buzzer.name;
-        firstBar.style.background = teamColor(buzzer.team);
-      }else{
-        firstBar.textContent = "اسم اللاعب الذي يضغط أولاً";
-        firstBar.style.background = "rgba(255,255,255,.10)";
-      }
+    function parseCellKey(key){
+      const s = String(key || "");
+      let m = s.match(/^(\d+)[_\-,|:](\d+)$/);
+      if(m) return { r:+m[1], c:+m[2], k: cellKey(+m[1], +m[2]) };
+      m = s.match(/r(\d+)c(\d+)/i);
+      if(m) return { r:+m[1], c:+m[2], k: cellKey(+m[1], +m[2]) };
+      return null;
     }
 
-    // --- النتائج ---
-    function applyScores(){
-      if(!SETTINGS.scores){
-        scoresPanel.style.display = "none";
-        return;
-      }
-      scoresPanel.style.display = "grid";
-      const g = Number(scores?.green ?? 0);
-      const o = Number(scores?.orange ?? 0);
-      scoreGreen.textContent = String(Number.isFinite(g) ? g : 0);
-      scoreOrange.textContent = String(Number.isFinite(o) ? o : 0);
+    // ===== Confetti + Sound (احتفالية)
+    const fx = document.getElementById("fx");
+    const ctx = fx.getContext("2d");
+    let fxW=0, fxH=0;
+    function resizeFx(){
+      fxW = fx.width = window.innerWidth;
+      fxH = fx.height = window.innerHeight;
     }
+    window.addEventListener("resize", resizeFx);
+    resizeFx();
 
-    // --- المؤقت (عرض فقط) ---
-    let TICK = null;
-    function computeRemaining(){
-      const t = timer || {};
-      const dur = Number(t.dur ?? t.sel ?? 10);
-      const startTs = Number(t.startTs || 0);
-      const running = !!t.running;
-
-      if(!Number.isFinite(dur) || dur <= 0) return 0;
-
-      if(!running){
-        // إذا مو شغال: اعرض dur (أو صفر لو done)
-        if(!!t.done) return 0;
-        return dur;
-      }
-
-      const diff = Math.max(0, Date.now() - startTs);
-      const sec = Math.floor(diff / 1000);
-      return Math.max(0, dur - sec);
-    }
-
-    function applyTimer(){
-      if(!SETTINGS.timer){
-        timerPanel.style.display = "none";
-        return;
-      }
-      timerPanel.style.display = "flex";
-
-      const rem = computeRemaining();
-      timerNum.textContent = String(rem);
-
-      timerNum.classList.remove("last5");
-      if(rem > 0 && rem <= 5) timerNum.classList.add("last5");
-    }
-
-    function ensureTick(){
-      if(TICK) return;
-      TICK = setInterval(() => {
-        try{ applyTimer(); }catch(e){}
-      }, 200);
-    }
-
-    // --- إعدادات العرض (محلياً) ---
-    function setChip(el, on){
-      el.classList.toggle("on", !!on);
-    }
-
-    function loadLocalSettings(code){
+    let lastCelebrateAt = 0;
+    function playWinSound(){
       try{
-        const k = "sandooq_tv_settings_v1_" + code;
-        const raw = localStorage.getItem(k);
-        if(!raw) return { ...DEFAULT_SETTINGS };
-        const obj = JSON.parse(raw);
-        return {
-          map: obj?.map !== false,
-          timer: obj?.timer !== false,
-          name: obj?.name !== false,
-          scores: obj?.scores !== false
-        };
-      }catch(e){
-        return { ...DEFAULT_SETTINGS };
-      }
-    }
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return;
+        const ac = new AC();
+        const now = ac.currentTime;
 
-    function saveLocalSettings(code, s){
-      try{
-        const k = "sandooq_tv_settings_v1_" + code;
-        localStorage.setItem(k, JSON.stringify(s));
+        const notes = [523.25, 659.25, 783.99]; // C5 E5 G5
+        notes.forEach((f, i) => {
+          const o = ac.createOscillator();
+          const g = ac.createGain();
+          o.type = "triangle";
+          o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, now);
+          g.gain.exponentialRampToValueAtTime(0.12, now + 0.02 + i*0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.30 + i*0.05);
+          o.connect(g).connect(ac.destination);
+          o.start(now + i*0.02);
+          o.stop(now + 0.40 + i*0.05);
+        });
+
+        setTimeout(()=>{ try{ ac.close(); }catch(e){} }, 900);
       }catch(e){}
     }
 
-    function applyVisibility(){
-      mapPanel.style.display = SETTINGS.map ? "flex" : "none";
-      sideWrap.style.display = (SETTINGS.timer || SETTINGS.name || SETTINGS.scores) ? "flex" : "none";
+    function celebrate(team){
+      const t = Date.now();
+      if(t - lastCelebrateAt < 900) return; // منع سبام
+      lastCelebrateAt = t;
 
-      applyBuzzer();
-      applyTimer();
-      applyScores();
-    }
+      playWinSound();
 
-    function openSetupModal(prefillCode){
-      setupErr.style.display = "none";
-      setupErr.textContent = "";
+      const color = (team === "green") ? "#16a34a" : (team === "orange" ? "#f28c00" : "#f4c400");
+      const pieces = [];
+      const N = 140;
 
-      const c = cleanCode(prefillCode || CODE || "");
-      codeInput.value = c || "";
+      for(let i=0;i<N;i++){
+        pieces.push({
+          x: fxW/2 + (Math.random()*160 - 80),
+          y: fxH*0.18 + (Math.random()*60),
+          vx: (Math.random()*6 - 3),
+          vy: (Math.random()*-7 - 2),
+          g: 0.18 + Math.random()*0.10,
+          r: 3 + Math.random()*4,
+          a: 0.9,
+          rot: Math.random()*Math.PI,
+          vr: (Math.random()*0.18 - 0.09),
+          c: (Math.random()<0.65) ? color : "#ffffff"
+        });
+      }
 
-      setChip(chipMap, SETTINGS.map);
-      setChip(chipTimer, SETTINGS.timer);
-      setChip(chipName, SETTINGS.name);
-      setChip(chipScores, SETTINGS.scores);
+      const start = performance.now();
+      const dur = 1600;
 
-      setupBackdrop.style.display = "flex";
-    }
+      function tick(now){
+        const dt = now - start;
+        ctx.clearRect(0,0,fxW,fxH);
 
-    function closeSetupModal(){
-      setupBackdrop.style.display = "none";
-    }
+        for(const p of pieces){
+          p.vy += p.g;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vr;
+          p.a = Math.max(0, 0.95 - dt/dur);
 
-    function setupToggle(which){
-      SETTINGS[which] = !SETTINGS[which];
-      setChip(which === "map" ? chipMap : which === "timer" ? chipTimer : which === "name" ? chipName : chipScores, SETTINGS[which]);
-    }
-
-    chipMap.addEventListener("click", () => setupToggle("map"));
-    chipTimer.addEventListener("click", () => setupToggle("timer"));
-    chipName.addEventListener("click", () => setupToggle("name"));
-    chipScores.addEventListener("click", () => setupToggle("scores"));
-
-    openSetup.addEventListener("click", () => openSetupModal(CODE));
-
-    setupBackdrop.addEventListener("click", (e) => {
-      if(e.target === setupBackdrop) closeSetupModal();
-    });
-
-    // --- Firebase listeners (قراءة فقط) ---
-    let unsubs = [];
-    function clearListeners(){
-      try{
-        unsubs.forEach(fn => { try{ fn && fn(); }catch(e){} });
-      }catch(e){}
-      unsubs = [];
-    }
-
-    function attachRoomListeners(code){
-      clearListeners();
-
-      const roomBase = `rooms/${code}`;
-
-      // status line
-      statusLine.textContent = "جاري الاتصال...";
-
-      // room exists check (خفيف)
-      const uStatus = onValue(ref(db, `${roomBase}/status`), (s) => {
-        const v = s.val();
-        if(v === null){
-          statusLine.textContent = "الغرفة غير موجودة";
-        }else{
-          statusLine.textContent = (v === "started") ? "اللعبة بدأت" : "في اللوبي";
+          ctx.save();
+          ctx.globalAlpha = p.a;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.c;
+          ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
+          ctx.restore();
         }
-      }, () => {
-        statusLine.textContent = "تعذر الاتصال";
-      });
-      unsubs.push(uStatus);
 
-      const uActiveMap = onValue(ref(db, `${roomBase}/activeMap`), (s) => {
-        activeMap = Number(s.val() || 0);
-        // اربط mapStates للـ activeMap الحالي
-        try{
-          const uMap = onValue(ref(db, `${roomBase}/mapStates/${String(activeMap)}`), (ms) => {
-            mapStates = ms.val() || {};
-            applyMapStates();
-          });
-          unsubs.push(uMap);
-        }catch(e){}
-      });
-      unsubs.push(uActiveMap);
-
-      const uBuzzer = onValue(ref(db, `${roomBase}/buzzer`), (s) => {
-        buzzer = s.val();
-        applyBuzzer();
-      });
-      unsubs.push(uBuzzer);
-
-      const uScores = onValue(ref(db, `${roomBase}/scores`), (s) => {
-        scores = s.val() || { green:0, orange:0 };
-        applyScores();
-      });
-      unsubs.push(uScores);
-
-      const uTimer = onValue(ref(db, `${roomBase}/timer`), (s) => {
-        timer = s.val() || { sel:10, dur:10, running:false, startTs:0, done:false };
-        applyTimer();
-      });
-      unsubs.push(uTimer);
+        if(dt < dur) requestAnimationFrame(tick);
+        else ctx.clearRect(0,0,fxW,fxH);
+      }
+      requestAnimationFrame(tick);
     }
 
-    function showError(msg){
-      setupErr.textContent = msg;
-      setupErr.style.display = "block";
+    // ===== Firebase (قراءة + قفل TV جهاز واحد)
+    let app=null, db=null;
+    let CODE="";
+    let roomBase="";
+    let activeMap=0;
+
+    let unsubMain = [];
+    let unsubMap = [];
+    function clearUnsubs(arr){
+      try{ arr.forEach(u=>{ try{ u && u(); }catch(e){} }); }catch(e){}
+      arr.length = 0;
     }
 
-    function startWithCode(code){
+    async function claimTvLock(code){
+      const deviceId = ensureTvDeviceId();
+      const lockRef = ref(db, `rooms/${code}/tvLock`);
+
+      // allow takeover only if ?force=1
+      const force = (new URLSearchParams(location.search).get("force") === "1");
+
+      const res = await runTransaction(lockRef, (cur) => {
+        if(cur == null) return { deviceId, claimedAt: Date.now() };
+
+        if(cur && cur.deviceId === deviceId) return cur;
+
+        if(force) return { deviceId, claimedAt: Date.now() };
+
+        return; // abort
+      }, { applyLocally:false });
+
+      if(!res.committed){
+        return { ok:false, reason:"locked" };
+      }
+
+      // ✅ يفك القفل تلقائي إذا انقطع الاتصال
+      try{ onDisconnect(lockRef).remove(); }catch(e){}
+      return { ok:true, deviceId };
+    }
+
+    let lastScores = { green:0, orange:0 };
+
+    function applyScores(v){
+      const g = Number(v?.green ?? 0);
+      const o = Number(v?.orange ?? 0);
+
+      const gg = Number.isFinite(g) ? g : 0;
+      const oo = Number.isFinite(o) ? o : 0;
+
+      scoreGreenEl.textContent = String(gg);
+      scoreOrangeEl.textContent = String(oo);
+
+      // ✅ احتفالية عند زيادة النقاط
+      if(gg > lastScores.green) celebrate("green");
+      if(oo > lastScores.orange) celebrate("orange");
+      lastScores = { green: gg, orange: oo };
+    }
+
+    function attachMapDeltaListeners(mapIndex){
+      clearUnsubs(unsubMap);
+      activeMap = Number(mapIndex || 0) || 0;
+
+      clearAllCells();
+
+      // ✅ أهم نقطة: تحديث خلية واحدة (onChildChanged) بدل قراءة كل الخريطة onValue
+      const msRef = ref(db, `${roomBase}/mapStates/${String(activeMap)}`);
+
+      unsubMap.push(onChildAdded(msRef, (snap) => {
+        const p = parseCellKey(snap.key);
+        if(!p) return;
+        setCellVisual(p.k, snap.val());
+      }));
+
+      unsubMap.push(onChildChanged(msRef, (snap) => {
+        const p = parseCellKey(snap.key);
+        if(!p) return;
+        setCellVisual(p.k, snap.val());
+      }));
+
+      unsubMap.push(onChildRemoved(msRef, (snap) => {
+        const p = parseCellKey(snap.key);
+        if(!p) return;
+        setCellVisual(p.k, 0);
+      }));
+    }
+
+    async function startTV(code){
       CODE = cleanCode(code);
       if(CODE.length !== 6){
-        showError("اكتب رمز غرفة صحيح (6 أرقام)");
+        showGate("عرض التلفاز", "اكتب رمز الغرفة الصحيح.", "رمز الغرفة لازم يكون 6 أرقام");
         return;
       }
 
-      // حفظ آخر كود
-      try{ localStorage.setItem("sandooq_tv_last_code", CODE); }catch(e){}
+      hideGate();
+      statusLine.textContent = "جاري الاتصال...";
 
-      // حفظ الإعدادات محلياً
-      saveLocalSettings(CODE, SETTINGS);
-
-      // اظهر الواجهة
-      roomBadge.textContent = "ROOM: " + CODE;
-      layout.style.display = "grid";
-      closeSetupModal();
-
-      // init firebase
       if(!db){
-        const app = initializeApp(firebaseConfig);
+        app = initializeApp(firebaseConfig);
         db = getDatabase(app);
       }
 
-      // build grid once
-      if(!CELLS.length) buildGrid();
+      roomBase = `rooms/${CODE}`;
 
-      applyVisibility();
-      ensureTick();
-      attachRoomListeners(CODE);
+      // ابني الخريطة مرة وحدة
+      if(CELLS.size === 0) buildGrid();
+
+      // Zoom load
+      const z = loadZoom(CODE);
+      zoomEl.value = String(z);
+      applyZoom(z);
+
+      // ✅ قفل TV (جهاز واحد فقط)
+      const lock = await claimTvLock(CODE);
+      if(!lock.ok){
+        showGate(
+          "عرض التلفاز مستخدم",
+          "فيه جهاز عرض ثاني شغال لنفس الغرفة. إذا تبي تستحوذ عليه: افتح الرابط مع ?force=1",
+          "غير مسموح بأكثر من جهاز عرض واحد لهذه الغرفة"
+        );
+        return;
+      }
+
+      // listeners
+      clearUnsubs(unsubMain);
+
+      unsubMain.push(onValue(ref(db, `${roomBase}/name`), (s) => {
+        const n = (s.val() || "").toString().trim();
+        gameNameEl.textContent = n ? n : "سباق الحروف";
+      }));
+
+      unsubMain.push(onValue(ref(db, `${roomBase}/scores`), (s) => {
+        applyScores(s.val() || {green:0, orange:0});
+      }));
+
+      unsubMain.push(onValue(ref(db, `${roomBase}/status`), (s) => {
+        const v = s.val();
+        if(v == null) statusLine.textContent = "الغرفة غير موجودة";
+        else statusLine.textContent = (v === "started") ? "اللعبة بدأت" : "في اللوبي";
+      }, () => {
+        statusLine.textContent = "تعذر الاتصال";
+      }));
+
+      unsubMain.push(onValue(ref(db, `${roomBase}/activeMap`), (s) => {
+        const m = Number(s.val() || 0) || 0;
+        attachMapDeltaListeners(m);
+      }));
+
+      // حفظ آخر كود
+      try{ localStorage.setItem("sandooq_tv_last_code", CODE); }catch(e){}
     }
 
-    // Start button
+    // Zoom interactions
+    zoomEl.addEventListener("input", () => {
+      const v = Number(zoomEl.value || 100);
+      applyZoom(v);
+      if(CODE) saveZoom(CODE, v);
+    });
+
+    // Gate start
     startBtn.addEventListener("click", () => {
-      const c = cleanCode(codeInput.value || "");
-      startWithCode(c);
+      startTV(codeInput.value || "");
     });
 
     // init
     (function init(){
-      // لو فيه كود بالرابط: ابدأ مباشرة
+      const qs = new URLSearchParams(location.search);
+      const codeFromUrl = cleanCode(qs.get("code") || "");
+
       if(codeFromUrl && codeFromUrl.length === 6){
-        // حمّل إعدادات محلية خاصة بهذا الروم (لو موجودة)
-        SETTINGS = loadLocalSettings(codeFromUrl);
-        startWithCode(codeFromUrl);
+        startTV(codeFromUrl);
         return;
       }
 
-      // غير كذا افتح الإعدادات
-      try{
-        const last = cleanCode(localStorage.getItem("sandooq_tv_last_code") || "");
-        if(last && last.length === 6){
-          SETTINGS = loadLocalSettings(last);
-          openSetupModal(last);
-        }else{
-          openSetupModal("");
-        }
-      }catch(e){
-        openSetupModal("");
-      }
+      // fallback: show gate
+      let last = "";
+      try{ last = cleanCode(localStorage.getItem("sandooq_tv_last_code") || ""); }catch(e){}
+      showGate("عرض التلفاز", "اكتب رمز الغرفة هنا أو افتح رابط العرض من المقدم.", "");
+      if(last && last.length === 6) codeInput.value = last;
     })();
   </script>
 
-  <!-- VERSION: tv.html — vTV-1 -->
+  <!-- VERSION: tv.html — vTV-MapOnly-DeltaLock-2 -->
 </body>
 </html>
