@@ -139,37 +139,30 @@
         location.replace(r);
       };
 
-      // ✅ تسجيل Service Worker بأسرع وقت (بدون انتظار load)
+      // ✅ تسجيل Service Worker بأسرع وقت (بدون ما نوقف التحويل)
       const canSW =
         ("serviceWorker" in navigator) &&
         (location.protocol === "https:" || location.hostname === "localhost");
 
-      if (!canSW) {
-        // بدون SW: تحويل سريع
-        setTimeout(go, 60);
-        return;
+      if (canSW) {
+        try{
+          // حاول نسجّل بسرعة بدون انتظار ready (عشان الصفحة ما تكون ملحوظة)
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        }catch(e){}
       }
 
-      // لو الصفحة أصلًا تحت تحكم SW، ما نحتاج ننتظر
-      if (navigator.serviceWorker.controller) {
-        setTimeout(go, 60);
-        return;
+      // ✅ تحويل فوري تقريباً (غير ملحوظ)
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(go);
+      } else {
+        setTimeout(go, 0);
       }
 
-      // نحاول نسجل بسرعة، ونخلي فيه fallback عشان ما نتأخر على المستخدم
-      const FALLBACK_MS = 350;
-
-      const p = navigator.serviceWorker.register("./sw.js")
-        .then(() => navigator.serviceWorker.ready)
-        .then(() => { dbg("sw ready"); })
-        .catch(() => { dbg("sw register failed"); });
-
-      // لما يخلص (نجاح أو فشل) نمشي مباشرة
-      p.finally(() => setTimeout(go, 30));
-
-      // fallback لو أخذ وقت زيادة
-      setTimeout(go, FALLBACK_MS);
+      // ✅ ضمان: لو أي سبب ما تحوّل
+      setTimeout(go, 120);
     })();
   </script>
+
+  <!-- VERSION: index.html — vFastOpen-2 -->
 </body>
 </html>
