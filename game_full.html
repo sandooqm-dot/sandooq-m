@@ -1597,11 +1597,17 @@ if(homeBtn && role !== "host"){
       }
 
       if(TIMER_UI.isHost){
-        if(view.running && view.remaining === 0 && !TIMER_UI.__doneSent){
-          TIMER_UI.__doneSent = true;
-          update(ref(db, `rooms/${code}/timer`), { running:false, done:true });
-        }
-      }
+  if(view.running && view.remaining === 0 && !TIMER_UI.__doneSent){
+    TIMER_UI.__doneSent = true;
+
+    // ✅ (تعديل) عند وصول المؤقت لـ 0: نوقفه + done + نصفر الجرس (ويرجع شريط الاسم افتراضي)
+    const updates = {};
+    updates[`rooms/${code}/timer/running`] = false;
+    updates[`rooms/${code}/timer/done`] = true;
+    updates[`rooms/${code}/buzzer`] = null;
+    update(ref(db), updates);
+  }
+}
     }
 
     function ensureTimerTicker(){
