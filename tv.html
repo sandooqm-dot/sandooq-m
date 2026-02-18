@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>عرض التلفاز - سباق الحروف</title>
+
+  <!-- ✅ تسريع تحميل Firebase -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="//www.gstatic.com">
+
+  <!-- ✅ (اختياري) تسجيل SW بدري مثل باقي الصفحات -->
+  <script>
+  (function(){
+    try{
+      if(!("serviceWorker" in navigator)) return;
+      if(!window.isSecureContext && location.hostname !== "localhost") return;
+      var ASSET_VERSION = "2026-02-18-1";
+      var vq = "?v=" + encodeURIComponent(ASSET_VERSION);
+      navigator.serviceWorker
+        .register("./sw.js" + vq, { scope: "./" })
+        .then(function(reg){ try{ reg && reg.update && reg.update(); }catch(e){} })
+        .catch(function(){});
+    }catch(e){}
+  })();
+  </script>
+
+  <style>
+    :root{
+      --bg1:#120617;
+      --bg2:#2b0e2b;
+      --accent:#f4c400;
+      --card: rgba(255,255,255,.08);
+      --bd: rgba(255,255,255,.16);
+      --txt:#ffffff;
+      --muted: rgba(255,255,255,.72);
+      --shadow: 0 18px 55px rgba(0,0,0,.45);
+      --green:#16a34a;
+      --orange:#f28c00;
+      --yellow:#f4c400;
+      --cell0: rgba(255,255,255,.12);
+      --cell1: rgba(244,196,0,.92);
+      --cell2: rgba(22,163,74,.95);
+      --cell3: rgba(242,140,0,.95);
+    }
+
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("AA-GALAXY.otf") format("opentype");
+      font-display:swap;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      min-height:100vh;
+      color:var(--txt);
+      font-family: "AA-GALAXY", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 700px at 20% 15%, rgba(255,255,255,.10), transparent 60%),
+        radial-gradient(900px 650px at 80% 70%, rgba(255,255,255,.07), transparent 55%),
+        linear-gradient(135deg, var(--bg2), var(--bg1));
+      overflow:hidden;
+    }
+
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:14px;
+      padding:14px 14px 6px;
+      position:relative;
+    }
+    .logo{
+      width:44px;height:44px;object-fit:contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
+      user-select:none; pointer-events:none;
+    }
+    .title{
+      font-size:30px;
+      color:var(--accent);
+      letter-spacing:.3px;
+      text-shadow:0 12px 22px rgba(0,0,0,.35);
+      margin:0;
+      line-height:1;
+    }
+
+    /* زر إعدادات (على نفس جهاز التلفاز فقط) */
+    .gearBtn{
+      position:absolute;
+      left:12px;
+      top:12px;
+      width:42px;height:42px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.18);
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      box-shadow: 0 12px 28px rgba(0,0,0,.25);
+      font-size:18px;
+    }
+
+    .layout{
+      height: calc(100vh - 62px);
+      padding:10px 12px 14px;
+      display:grid;
+      grid-template-columns: 1fr 380px;
+      gap:12px;
+      align-items:stretch;
+    }
+
+    .panel{
+      background: var(--card);
+      border:1px solid var(--bd);
+      border-radius:18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+
+    /* Map */
+    .mapPanel{ display:flex; flex-direction:column; }
+    .mapHead{
+      padding:10px 12px;
+      font-size:16px;
+      color:var(--muted);
+      border-bottom:1px solid rgba(255,255,255,.10);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+    .badge{
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.14);
+      color:#fff;
+      font-size:13px;
+      direction:ltr;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      letter-spacing:.4px;
+      white-space:nowrap;
+    }
+    .mapBody{
+      flex:1;
+      padding:10px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    svg{ display:block; width:100%; height:100%; }
+
+    .cell{ stroke: rgba(255,255,255,.22); stroke-width: 2; }
+    .s0{ fill: var(--cell0); }
+    .s1{ fill: var(--cell1); }
+    .s2{ fill: var(--cell2); }
+    .s3{ fill: var(--cell3); }
+
+    /* Side */
+    .side{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      height:100%;
+    }
+
+    .firstBar{
+      padding:14px 14px;
+      border-radius:18px;
+      background: rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
+      text-align:center;
+      font-size:22px;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+      line-height:1.2;
+      box-shadow: 0 16px 40px rgba(0,0,0,.25);
+    }
+
+    .timerPanel{
+      padding:14px 14px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      gap:8px;
+      min-height: 210px;
+    }
+    .timerLabel{
+      color:var(--muted);
+      font-size:14px;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:800;
+    }
+    .timerNum{
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:72px;
+      font-weight:900;
+      color:#fff;
+      border:6px solid rgba(255,255,255,.25);
+      background: rgba(0,0,0,.18);
+      box-shadow: 0 22px 60px rgba(0,0,0,.35);
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+    }
+    .timerNum.last5{ color:#ff3b3b; animation: pop .5s ease-in-out; }
+    @keyframes pop{ 0%{transform:scale(.98)} 50%{transform:scale(1.02)} 100%{transform:scale(1)} }
+
+    .scoresPanel{
+      padding:14px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      align-items:stretch;
+      flex:1;
+      min-height: 220px;
+    }
+    .teamBox{
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      box-shadow: 0 16px 42px rgba(0,0,0,.25);
+    }
+    .teamName{
+      font-size:16px;
+      color: rgba(255,255,255,.85);
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+    }
+    .teamScore{
+      font-size:64px;
+      font-weight:900;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      line-height:1;
+    }
+    .teamBox.green .teamScore{ color: var(--green); }
+    .teamBox.orange .teamScore{ color: var(--orange); }
+
+    /* Footer status */
+    .statusLine{
+      position:absolute;
+      right:12px;
+      bottom:10px;
+      font-size:12px;
+      color: rgba(255,255,255,.72);
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      user-select:none;
+    }
+
+    /* Setup overlay */
+    .backdrop{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:999;
+    }
+    .modal{
+      width:min(560px, 96vw);
+      background: rgba(20, 8, 25, .92);
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:18px;
+      padding:16px 14px 14px;
+      box-shadow: 0 22px 70px rgba(0,0,0,.55);
+    }
+    .mTitle{
+      margin:4px 0 10px;
+      font-size:22px;
+      color:var(--accent);
+      text-align:center;
+    }
+    .mHint{
+      text-align:center;
+      color:rgba(255,255,255,.78);
+      font-size:13px;
+      line-height:1.7;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      margin-bottom:12px;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+    .in{
+      width: min(360px, 90vw);
+      height:54px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.22);
+      background: rgba(255,255,255,.10);
+      color:#fff;
+      padding:0 14px;
+      font-size:18px;
+      outline:none;
+      text-align:center;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:800;
+      letter-spacing:2px;
+      direction:ltr;
+    }
+    .chip{
+      padding:10px 14px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.20);
+      background: rgba(255,255,255,.10);
+      color:#fff;
+      cursor:pointer;
+      font-size:14px;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+      user-select:none;
+    }
+    .chip.on{
+      background: rgba(244,196,0,.95);
+      color:#111;
+      border-color: rgba(0,0,0,.12);
+    }
+    .btn{
+      width: min(360px, 90vw);
+      height:56px;
+      border:none;
+      border-radius:16px;
+      background: var(--accent);
+      color:#111;
+      font-size:18px;
+      font-weight:900;
+      cursor:pointer;
+      margin-top:12px;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      box-shadow: 0 18px 40px rgba(0,0,0,.35);
+    }
+    .err{
+      display:none;
+      margin-top:10px;
+      background:#fee2e2;
+      border:1px solid #fecaca;
+      color:#7a1a1a;
+      padding:10px 12px;
+      border-radius:14px;
+      font-size:14px;
+      text-align:center;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:800;
+    }
+
+    /* Responsive */
+    @media (max-width: 980px){
+      .layout{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <button class="gearBtn" id="openSetup" title="إعدادات العرض" aria-label="إعدادات العرض">⚙️</button>
+    <img class="logo" src="logo.png" alt="شعار صندوق المسابقات" onerror="this.style.display='none'">
+    <h1 class="title">عرض التلفاز</h1>
+  </header>
+
+  <div class="layout" id="layout" style="display:none">
+    <div class="panel mapPanel" id="mapPanel">
+      <div class="mapHead">
+        <div>الخريطة</div>
+        <div class="badge" id="roomBadge">ROOM: ------</div>
+      </div>
+      <div class="mapBody">
+        <svg id="mapSvg" viewBox="0 0 1000 700" aria-label="خريطة الخلايا"></svg>
+      </div>
+      <div class="statusLine" id="statusLine">جاري الاتصال...</div>
+    </div>
+
+    <div class="side" id="sideWrap">
+      <div class="firstBar" id="firstBar">اسم اللاعب الذي يضغط أولاً</div>
+
+      <div class="panel timerPanel" id="timerPanel">
+        <div class="timerLabel">المؤقت</div>
+        <div class="timerNum" id="timerNum">—</div>
+      </div>
+
+      <div class="panel scoresPanel" id="scoresPanel">
+        <div class="teamBox green">
+          <div class="teamName">الفريق الأخضر</div>
+          <div class="teamScore" id="scoreGreen">0</div>
+        </div>
+        <div class="teamBox orange">
+          <div class="teamName">الفريق البرتقالي</div>
+          <div class="teamScore" id="scoreOrange">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Setup -->
+  <div class="backdrop" id="setupBackdrop" style="display:none">
+    <div class="modal">
+      <div class="mTitle">إعداد عرض التلفاز</div>
+      <div class="mHint">
+        افتح الرابط بهذا الشكل:<br>
+        <span style="direction:ltr;display:inline-block;opacity:.95">tv.html?code=123456</span><br>
+        أو اكتب رمز الغرفة هنا واختر العناصر التي تريد عرضها.
+      </div>
+
+      <div class="row" style="margin-bottom:10px">
+        <input class="in" id="codeInput" maxlength="6" inputmode="numeric" placeholder="رمز الغرفة (6 أرقام)">
+      </div>
+
+      <div class="row">
+        <div class="chip" id="chipMap">خريطة خلايا فقط</div>
+        <div class="chip" id="chipTimer">مؤقت</div>
+        <div class="chip" id="chipName">اسم اللاعب</div>
+        <div class="chip" id="chipScores">لوحة النتائج</div>
+      </div>
+
+      <button class="btn" id="startBtn">ابدأ العرض</button>
+
+      <div class="err" id="setupErr"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    // نفس إعدادات مشروعك
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
+      authDomain: "sabaq-alhorof.firebaseapp.com",
+      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "sabaq-alhorof",
+      storageBucket: "sabaq-alhorof.firebasestorage.app",
+      messagingSenderId: "1053646928152",
+      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
+    };
+
+    function normalizeDigits(s){
+      const map = {
+        "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+        "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+      };
+      return String(s || "").replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
+    }
+    function cleanCode(s){
+      return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
+    }
+
+    const qs = new URLSearchParams(location.search);
+    const codeFromUrl = cleanCode(qs.get("code") || "");
+
+    // عناصر UI
+    const layout = document.getElementById("layout");
+    const mapPanel = document.getElementById("mapPanel");
+    const sideWrap = document.getElementById("sideWrap");
+
+    const firstBar = document.getElementById("firstBar");
+    const timerNum = document.getElementById("timerNum");
+    const timerPanel = document.getElementById("timerPanel");
+    const scoresPanel = document.getElementById("scoresPanel");
+    const scoreGreen = document.getElementById("scoreGreen");
+    const scoreOrange = document.getElementById("scoreOrange");
+    const roomBadge = document.getElementById("roomBadge");
+    const statusLine = document.getElementById("statusLine");
+
+    const setupBackdrop = document.getElementById("setupBackdrop");
+    const codeInput = document.getElementById("codeInput");
+    const setupErr = document.getElementById("setupErr");
+
+    const chipMap = document.getElementById("chipMap");
+    const chipTimer = document.getElementById("chipTimer");
+    const chipName = document.getElementById("chipName");
+    const chipScores = document.getElementById("chipScores");
+
+    const startBtn = document.getElementById("startBtn");
+    const openSetup = document.getElementById("openSetup");
+
+    // إعدادات العرض (محلية — بدون أي كتابة في Firebase)
+    const DEFAULT_SETTINGS = { map:true, timer:true, name:true, scores:true };
+    let SETTINGS = { ...DEFAULT_SETTINGS };
+
+    // حالة البيانات
+    let CODE = "";
+    let db = null;
+
+    let activeMap = 0;
+    let mapStates = {};
+    let buzzer = null;
+    let scores = { green:0, orange:0 };
+    let timer = { sel:10, dur:10, running:false, startTs:0, done:false };
+
+    // --- رسم الخلايا (Hex grid 5x5) ---
+    const mapSvg = document.getElementById("mapSvg");
+    let CELLS = []; // polygons
+
+    function hexPointsPointyTop(cx, cy, r){
+      // pointy-top
+      const pts = [];
+      for(let i=0;i<6;i++){
+        const ang = (Math.PI/180) * (60*i - 30);
+        const x = cx + r * Math.cos(ang);
+        const y = cy + r * Math.sin(ang);
+        pts.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+      }
+      return pts.join(" ");
+    }
+
+    function buildGrid(){
+      mapSvg.innerHTML = "";
+      const W = 1000, H = 700;
+      mapSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+
+      const rows = 5, cols = 5;
+
+      // قياسات متناسقة
+      const r = 72;              // نصف قطر hex
+      const dx = r * Math.sqrt(3);  // عرض خطوة
+      const dy = r * 1.5;           // ارتفاع خطوة
+
+      const gridW = (cols - 1) * dx + dx;
+      const gridH = (rows - 1) * dy + (2*r);
+
+      const x0 = (W - gridW) / 2 + (dx/2);
+      const y0 = (H - gridH) / 2 + r;
+
+      const svgNS = "http://www.w3.org/2000/svg";
+      CELLS = [];
+
+      for(let row=0; row<rows; row++){
+        for(let col=0; col<cols; col++){
+          const cx = x0 + col*dx + ((row%2) ? (dx/2) : 0);
+          const cy = y0 + row*dy;
+
+          const poly = document.createElementNS(svgNS, "polygon");
+          poly.setAttribute("points", hexPointsPointyTop(cx, cy, r));
+          poly.classList.add("cell", "s0");
+          poly.setAttribute("data-r", String(row));
+          poly.setAttribute("data-c", String(col));
+          mapSvg.appendChild(poly);
+          CELLS.push(poly);
+        }
+      }
+    }
+
+    function readCellState(obj, r, c){
+      if(!obj) return 0;
+      const keys = [
+        `${r}_${c}`, `${r},${c}`, `${r}-${c}`, `${r}:${c}`, `${r}|${c}`,
+        `r${r}c${c}`
+      ];
+      for(const k of keys){
+        if(Object.prototype.hasOwnProperty.call(obj, k)) return Number(obj[k] ?? 0);
+      }
+      return 0;
+    }
+
+    function applyMapStates(){
+      for(const el of CELLS){
+        const r = Number(el.getAttribute("data-r"));
+        const c = Number(el.getAttribute("data-c"));
+        const st = Math.max(0, Math.min(3, readCellState(mapStates, r, c)));
+        el.classList.remove("s0","s1","s2","s3");
+        el.classList.add("s" + st);
+      }
+    }
+
+    // --- اسم أول لاعب ---
+    function teamColor(t){
+      return (t === "green") ? "var(--green)" : (t === "orange" ? "var(--orange)" : "rgba(255,255,255,.10)");
+    }
+
+    function applyBuzzer(){
+      if(!SETTINGS.name){
+        firstBar.style.display = "none";
+        return;
+      }
+      firstBar.style.display = "block";
+
+      if(buzzer && buzzer.name){
+        firstBar.textContent = buzzer.name;
+        firstBar.style.background = teamColor(buzzer.team);
+      }else{
+        firstBar.textContent = "اسم اللاعب الذي يضغط أولاً";
+        firstBar.style.background = "rgba(255,255,255,.10)";
+      }
+    }
+
+    // --- النتائج ---
+    function applyScores(){
+      if(!SETTINGS.scores){
+        scoresPanel.style.display = "none";
+        return;
+      }
+      scoresPanel.style.display = "grid";
+      const g = Number(scores?.green ?? 0);
+      const o = Number(scores?.orange ?? 0);
+      scoreGreen.textContent = String(Number.isFinite(g) ? g : 0);
+      scoreOrange.textContent = String(Number.isFinite(o) ? o : 0);
+    }
+
+    // --- المؤقت (عرض فقط) ---
+    let TICK = null;
+    function computeRemaining(){
+      const t = timer || {};
+      const dur = Number(t.dur ?? t.sel ?? 10);
+      const startTs = Number(t.startTs || 0);
+      const running = !!t.running;
+
+      if(!Number.isFinite(dur) || dur <= 0) return 0;
+
+      if(!running){
+        // إذا مو شغال: اعرض dur (أو صفر لو done)
+        if(!!t.done) return 0;
+        return dur;
+      }
+
+      const diff = Math.max(0, Date.now() - startTs);
+      const sec = Math.floor(diff / 1000);
+      return Math.max(0, dur - sec);
+    }
+
+    function applyTimer(){
+      if(!SETTINGS.timer){
+        timerPanel.style.display = "none";
+        return;
+      }
+      timerPanel.style.display = "flex";
+
+      const rem = computeRemaining();
+      timerNum.textContent = String(rem);
+
+      timerNum.classList.remove("last5");
+      if(rem > 0 && rem <= 5) timerNum.classList.add("last5");
+    }
+
+    function ensureTick(){
+      if(TICK) return;
+      TICK = setInterval(() => {
+        try{ applyTimer(); }catch(e){}
+      }, 200);
+    }
+
+    // --- إعدادات العرض (محلياً) ---
+    function setChip(el, on){
+      el.classList.toggle("on", !!on);
+    }
+
+    function loadLocalSettings(code){
+      try{
+        const k = "sandooq_tv_settings_v1_" + code;
+        const raw = localStorage.getItem(k);
+        if(!raw) return { ...DEFAULT_SETTINGS };
+        const obj = JSON.parse(raw);
+        return {
+          map: obj?.map !== false,
+          timer: obj?.timer !== false,
+          name: obj?.name !== false,
+          scores: obj?.scores !== false
+        };
+      }catch(e){
+        return { ...DEFAULT_SETTINGS };
+      }
+    }
+
+    function saveLocalSettings(code, s){
+      try{
+        const k = "sandooq_tv_settings_v1_" + code;
+        localStorage.setItem(k, JSON.stringify(s));
+      }catch(e){}
+    }
+
+    function applyVisibility(){
+      mapPanel.style.display = SETTINGS.map ? "flex" : "none";
+      sideWrap.style.display = (SETTINGS.timer || SETTINGS.name || SETTINGS.scores) ? "flex" : "none";
+
+      applyBuzzer();
+      applyTimer();
+      applyScores();
+    }
+
+    function openSetupModal(prefillCode){
+      setupErr.style.display = "none";
+      setupErr.textContent = "";
+
+      const c = cleanCode(prefillCode || CODE || "");
+      codeInput.value = c || "";
+
+      setChip(chipMap, SETTINGS.map);
+      setChip(chipTimer, SETTINGS.timer);
+      setChip(chipName, SETTINGS.name);
+      setChip(chipScores, SETTINGS.scores);
+
+      setupBackdrop.style.display = "flex";
+    }
+
+    function closeSetupModal(){
+      setupBackdrop.style.display = "none";
+    }
+
+    function setupToggle(which){
+      SETTINGS[which] = !SETTINGS[which];
+      setChip(which === "map" ? chipMap : which === "timer" ? chipTimer : which === "name" ? chipName : chipScores, SETTINGS[which]);
+    }
+
+    chipMap.addEventListener("click", () => setupToggle("map"));
+    chipTimer.addEventListener("click", () => setupToggle("timer"));
+    chipName.addEventListener("click", () => setupToggle("name"));
+    chipScores.addEventListener("click", () => setupToggle("scores"));
+
+    openSetup.addEventListener("click", () => openSetupModal(CODE));
+
+    setupBackdrop.addEventListener("click", (e) => {
+      if(e.target === setupBackdrop) closeSetupModal();
+    });
+
+    // --- Firebase listeners (قراءة فقط) ---
+    let unsubs = [];
+    function clearListeners(){
+      try{
+        unsubs.forEach(fn => { try{ fn && fn(); }catch(e){} });
+      }catch(e){}
+      unsubs = [];
+    }
+
+    function attachRoomListeners(code){
+      clearListeners();
+
+      const roomBase = `rooms/${code}`;
+
+      // status line
+      statusLine.textContent = "جاري الاتصال...";
+
+      // room exists check (خفيف)
+      const uStatus = onValue(ref(db, `${roomBase}/status`), (s) => {
+        const v = s.val();
+        if(v === null){
+          statusLine.textContent = "الغرفة غير موجودة";
+        }else{
+          statusLine.textContent = (v === "started") ? "اللعبة بدأت" : "في اللوبي";
+        }
+      }, () => {
+        statusLine.textContent = "تعذر الاتصال";
+      });
+      unsubs.push(uStatus);
+
+      const uActiveMap = onValue(ref(db, `${roomBase}/activeMap`), (s) => {
+        activeMap = Number(s.val() || 0);
+        // اربط mapStates للـ activeMap الحالي
+        try{
+          const uMap = onValue(ref(db, `${roomBase}/mapStates/${String(activeMap)}`), (ms) => {
+            mapStates = ms.val() || {};
+            applyMapStates();
+          });
+          unsubs.push(uMap);
+        }catch(e){}
+      });
+      unsubs.push(uActiveMap);
+
+      const uBuzzer = onValue(ref(db, `${roomBase}/buzzer`), (s) => {
+        buzzer = s.val();
+        applyBuzzer();
+      });
+      unsubs.push(uBuzzer);
+
+      const uScores = onValue(ref(db, `${roomBase}/scores`), (s) => {
+        scores = s.val() || { green:0, orange:0 };
+        applyScores();
+      });
+      unsubs.push(uScores);
+
+      const uTimer = onValue(ref(db, `${roomBase}/timer`), (s) => {
+        timer = s.val() || { sel:10, dur:10, running:false, startTs:0, done:false };
+        applyTimer();
+      });
+      unsubs.push(uTimer);
+    }
+
+    function showError(msg){
+      setupErr.textContent = msg;
+      setupErr.style.display = "block";
+    }
+
+    function startWithCode(code){
+      CODE = cleanCode(code);
+      if(CODE.length !== 6){
+        showError("اكتب رمز غرفة صحيح (6 أرقام)");
+        return;
+      }
+
+      // حفظ آخر كود
+      try{ localStorage.setItem("sandooq_tv_last_code", CODE); }catch(e){}
+
+      // حفظ الإعدادات محلياً
+      saveLocalSettings(CODE, SETTINGS);
+
+      // اظهر الواجهة
+      roomBadge.textContent = "ROOM: " + CODE;
+      layout.style.display = "grid";
+      closeSetupModal();
+
+      // init firebase
+      if(!db){
+        const app = initializeApp(firebaseConfig);
+        db = getDatabase(app);
+      }
+
+      // build grid once
+      if(!CELLS.length) buildGrid();
+
+      applyVisibility();
+      ensureTick();
+      attachRoomListeners(CODE);
+    }
+
+    // Start button
+    startBtn.addEventListener("click", () => {
+      const c = cleanCode(codeInput.value || "");
+      startWithCode(c);
+    });
+
+    // init
+    (function init(){
+      // لو فيه كود بالرابط: ابدأ مباشرة
+      if(codeFromUrl && codeFromUrl.length === 6){
+        // حمّل إعدادات محلية خاصة بهذا الروم (لو موجودة)
+        SETTINGS = loadLocalSettings(codeFromUrl);
+        startWithCode(codeFromUrl);
+        return;
+      }
+
+      // غير كذا افتح الإعدادات
+      try{
+        const last = cleanCode(localStorage.getItem("sandooq_tv_last_code") || "");
+        if(last && last.length === 6){
+          SETTINGS = loadLocalSettings(last);
+          openSetupModal(last);
+        }else{
+          openSetupModal("");
+        }
+      }catch(e){
+        openSetupModal("");
+      }
+    })();
+  </script>
+
+  <!-- VERSION: tv.html — vTV-1 -->
+</body>
+</html>
