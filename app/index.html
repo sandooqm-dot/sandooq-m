@@ -15,9 +15,7 @@
     }
 
     :root{
-      --bg1:#7b1f63;
-      --bg2:#5f214f;
-      --bg3:#3a1234;
+      --bgSolid:#7b1f63;  /* ✅ (تعديل 4) خلفية سادة مثل اللعبة */
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
@@ -28,10 +26,10 @@
       color:#fff;
       text-align:center;
       font-family:"AA-GALAXY", Arial, sans-serif;
-      background:
-        radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
-        radial-gradient(900px 650px at 80% 25%, rgba(255,255,255,.08), transparent 55%),
-        linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
+
+      /* ✅ (تعديل 4) سادة */
+      background: var(--bgSolid);
+
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
     }
@@ -71,9 +69,9 @@
   <div class="wrap">
     <div class="card">
       <input id="name" placeholder="ادخل اسم اللعبة">
-      <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 أو أكثر)">
+      <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 إلى 13)">
       <button id="btn">انشئ اللعبة</button>
-      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي</div>
+      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي (الحد الأقصى 13)</div>
     </div>
   </div>
 
@@ -110,11 +108,18 @@
     async function createRoom(){
       const name = document.getElementById("name").value.trim();
       const pRaw = document.getElementById("players").value;
-      const players = Number(normalizeDigits(pRaw));
+      let players = Number(normalizeDigits(pRaw));
 
       if(!name){ alert("اكتب اسم اللعبة"); return; }
+
       if(!Number.isFinite(players) || players < 1){
         alert("عدد اللاعبين لازم يكون 1 أو أكثر");
+        return;
+      }
+
+      // ✅ (تعديل 3) حد أقصى 13
+      if(players > 13){
+        alert("الحد الأقصى لعدد اللاعبين هو 13");
         return;
       }
 
@@ -160,9 +165,29 @@
       location.href = u.toString();
     }
 
+    // ✅ (تعديل 3) منع كتابة أكثر من 13 مباشرة داخل الحقل
+    (function(){
+      const inp = document.getElementById("players");
+      if(!inp) return;
+
+      inp.addEventListener("input", () => {
+        const raw = inp.value;
+        const digits = normalizeDigits(raw).replace(/\D/g, "");
+        if(digits === ""){
+          inp.value = "";
+          return;
+        }
+        let n = Number(digits);
+        if(!Number.isFinite(n)) n = 1;
+        if(n > 13) n = 13;
+        if(n < 1) n = 1;
+        inp.value = String(n);
+      });
+    })();
+
     document.getElementById("btn").addEventListener("click", createRoom);
   </script>
 </body>
 </html>
 
-<!-- app/index.html – إصدار 4 (رجوع مثل قبل بدون Firebase Auth) -->
+<!-- VERSION: app/index.html — vSolidBG-Max13-5 -->
