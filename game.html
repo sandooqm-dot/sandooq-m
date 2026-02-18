@@ -17,14 +17,26 @@
   <!-- ✅ (تسريع) تنزيل ملف اللعبة الكبيرة بدري -->
   <link rel="preload" href="./game_full.html" as="document">
 
-  <!-- ✅ (مهم) تسجيل Service Worker بدري (نفس فكرة index/join/game_full) -->
+  <!-- ✅ (إخفاء الصفحة تلقائياً): لا تظهر إلا إذا التحميل طول -->
+  <script>
+  (function(){
+    try{
+      var d = document.documentElement;
+      d.classList.add("js");              // مع JS نخفي الواجهة مبدئياً
+      window.__SANDOOQ_REVEAL_T = setTimeout(function(){
+        try{ d.classList.add("reveal"); }catch(e){}
+      }, 900); // 👈 إذا ما تحولت خلال 0.9 ثانية، نظهر الواجهة
+    }catch(e){}
+  })();
+  </script>
+
+  <!-- ✅ (مهم) تسجيل Service Worker بدري -->
   <script>
   (function(){
     try{
       if(!("serviceWorker" in navigator)) return;
       if(!window.isSecureContext && location.hostname !== "localhost") return;
 
-      // استخدم نفس رقم إصدار ملفاتك لكسر الكاش عند الحاجة
       var ASSET_VERSION = "2026-02-15-1";
       var vq = "?v=" + encodeURIComponent(ASSET_VERSION);
 
@@ -41,17 +53,13 @@
 
   <style>
     :root{
-      --bgA:#7b3459;   /* عنابي فاتح */
-      --bgB:#4b1f36;   /* عنابي غامق */
-      --white:#fff;
-      --shadow: rgba(0,0,0,.35);
+      --bgA:#7b3459;
+      --bgB:#4b1f36;
       --text:#ffffff;
       --muted: rgba(255,255,255,.78);
       --btnText:#111;
       --btnBg:#ffffff;
       --btnBorder:#1b1b1b;
-      --danger:#ffdddd;
-      --dangerText:#7a1a1a;
       --card:#ffffff;
       --cardText:#111;
       --blue:#1f4fa3;
@@ -59,15 +67,39 @@
     }
 
     *{box-sizing:border-box}
+
+    /* ✅ نخلي الخلفية على html عشان حتى لو أخفينا الواجهة ما تصير بيضاء */
+    html{
+      min-height:100%;
+      background:
+        radial-gradient(1200px 700px at 25% 10%, rgba(255,255,255,.12), transparent 60%),
+        linear-gradient(135deg, var(--bgA), var(--bgB));
+    }
+
     body{
       margin:0;
       min-height:100vh;
       font-family: Arial, sans-serif;
       color:var(--text);
-      background:
-        radial-gradient(1200px 700px at 25% 10%, rgba(255,255,255,.12), transparent 60%),
-        linear-gradient(135deg, var(--bgA), var(--bgB));
+      background: transparent;
       overflow-x:hidden;
+    }
+
+    /* ✅ الواجهة (كل محتوى الصفحة) */
+    .ui{ opacity:1; transition: opacity .14s ease; }
+
+    /* ✅ إذا JS شغال: نخفي الواجهة مبدئياً */
+    html.js .ui{
+      opacity:0;
+      pointer-events:none;
+      user-select:none;
+    }
+
+    /* ✅ بعد وقت بسيط (أو عند الخطأ): نظهر الواجهة */
+    html.js.reveal .ui{
+      opacity:1;
+      pointer-events:auto;
+      user-select:auto;
     }
 
     header{
@@ -110,7 +142,6 @@
       padding:18px 12px;
     }
 
-    /* دائرة تحميل بسيطة */
     .spinner{
       width:34px;height:34px;border-radius:50%;
       border:4px solid rgba(255,255,255,.22);
@@ -120,7 +151,6 @@
     }
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    /* مساعد صغير */
     .hint{
       margin-top:14px;
       font-size:13px;
@@ -134,7 +164,6 @@
       font-weight:800;
     }
 
-    /* زر الرئيسية مثل الصورة */
     .home-btn{
       position:fixed;
       left:16px;
@@ -161,7 +190,6 @@
       user-select:none;
     }
 
-    /* نافذة خطأ واضحة (تظهر فقط عند الحاجة) */
     .overlay{
       position:fixed; inset:0;
       background: rgba(0,0,0,.35);
@@ -229,45 +257,46 @@
 </head>
 
 <body>
-  <!-- بصمة عشان نكشف لو فيه Rewrite يرجع لنفس الصفحة -->
+  <!-- بصمة -->
   <!-- GATEWAY_V3_SANDOOQ -->
 
-  <header>
-    <img class="logo" src="/logo.png" alt="Sandooq" />
-    <div class="game-title">سباق الحروف</div>
-    <div class="loading-text">جاري التحميل...</div>
-  </header>
+  <div class="ui">
+    <header>
+      <img class="logo" src="/logo.png" alt="Sandooq" />
+      <div class="game-title">سباق الحروف</div>
+      <div class="loading-text">جاري التحميل...</div>
+    </header>
 
-  <div class="center">
-    <div style="width:100%; text-align:center">
-      <div class="spinner" aria-label="loading"></div>
+    <div class="center">
+      <div style="width:100%; text-align:center">
+        <div class="spinner" aria-label="loading"></div>
 
-      <div class="hint" id="hint">
-        إذا طول التحميل أكثر من 5 ثواني:
-        <br>
-        <a href="./game_full.html" id="manualOpen">افتح اللعبة يدويًا</a>
-        &nbsp;•&nbsp;
-        <a href="/activate" id="manualActivate">افتح صفحة التفعيل</a>
+        <div class="hint" id="hint">
+          إذا طول التحميل أكثر من 5 ثواني:
+          <br>
+          <a href="./game_full.html" id="manualOpen">افتح اللعبة يدويًا</a>
+          &nbsp;•&nbsp;
+          <a href="/activate" id="manualActivate">افتح صفحة التفعيل</a>
+        </div>
       </div>
     </div>
-  </div>
 
-  <button class="home-btn" id="homeBtn">الرئيسية</button>
-  <footer>© جميع الحقوق محفوظة لمتجر صندوق المسابقات</footer>
+    <button class="home-btn" id="homeBtn">الرئيسية</button>
+    <footer>© جميع الحقوق محفوظة لمتجر صندوق المسابقات</footer>
 
-  <!-- Overlay عند الخطأ -->
-  <div class="overlay" id="ov">
-    <div class="card">
-      <h3 id="ovTitle">تعذر فتح اللعبة</h3>
-      <p id="ovMsg">فيه مشكلة مؤقتة. جرّب إعادة المحاولة.</p>
+    <div class="overlay" id="ov">
+      <div class="card">
+        <h3 id="ovTitle">تعذر فتح اللعبة</h3>
+        <p id="ovMsg">فيه مشكلة مؤقتة. جرّب إعادة المحاولة.</p>
 
-      <div class="actions">
-        <button class="btn btn-blue" id="retryBtn">إعادة المحاولة</button>
-        <button class="btn btn-yellow" id="goActivateBtn">فتح صفحة التفعيل</button>
-        <button class="btn btn-white" id="openGameBtn">فتح اللعبة يدويًا</button>
+        <div class="actions">
+          <button class="btn btn-blue" id="retryBtn">إعادة المحاولة</button>
+          <button class="btn btn-yellow" id="goActivateBtn">فتح صفحة التفعيل</button>
+          <button class="btn btn-white" id="openGameBtn">فتح اللعبة يدويًا</button>
+        </div>
+
+        <div class="debug" id="dbg"></div>
       </div>
-
-      <div class="debug" id="dbg"></div>
     </div>
   </div>
 
@@ -282,10 +311,13 @@
   const openGameBtn = document.getElementById("openGameBtn");
   const homeBtn = document.getElementById("homeBtn");
 
-  const qs = new URLSearchParams(location.search);
-  const DBG = qs.get("dbg") === "1";
+  function forceReveal(){
+    try{ clearTimeout(window.__SANDOOQ_REVEAL_T); }catch(e){}
+    try{ document.documentElement.classList.add("reveal"); }catch(e){}
+  }
 
   function showOverlay(title, msg, debugText){
+    forceReveal();
     ovTitle.textContent = title || "تعذر فتح اللعبة";
     ovMsg.textContent = msg || "فيه مشكلة مؤقتة. جرّب إعادة المحاولة.";
     if(debugText){
@@ -331,76 +363,9 @@
     return "/activate?next=" + encodeURIComponent(here());
   }
 
-  function selfFingerprintInText(txt){
-    return (txt || "").includes("GATEWAY_V3_SANDOOQ");
-  }
-
-  function dbgLog(t){
-    if(!DBG) return;
-    try{
-      const el = document.getElementById("dbg");
-      if(el){
-        el.textContent = String(t || "");
-        el.classList.add("show");
-      }
-    }catch(e){}
-  }
-
-  async function probeHtml(url){
-    // ✅ (تسريع/تقليل تكلفة) نجيب جزء صغير فقط (Range) بدل تحميل الملف كله
-    const u = url + (url.includes("?") ? "&" : "?") + "__probe=" + Date.now();
-    const headers = { "Range": "bytes=0-4096" };
-    const res = await fetch(u, { cache:"no-store", credentials:"include", headers });
-    if(!res.ok) return { ok:false, status:res.status, url };
-
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-    const txt = await res.text();
-    const isHtml = ct.includes("text/html") || txt.includes("<!DOCTYPE html") || txt.includes("<html");
-    if(!isHtml) return { ok:false, status:200, url, reason:"not_html" };
-    if(selfFingerprintInText(txt)) return { ok:false, status:200, url, reason:"rewrite_to_gateway" };
-    return { ok:true, status:200, url };
-  }
-
-  async function quickHeadOk(url){
-    try{
-      const u = url + (url.includes("?") ? "&" : "?") + "__h=" + Date.now();
-      const res = await fetch(u, { method:"HEAD", cache:"no-store", credentials:"include" });
-      if(res && res.ok) return true;
-    }catch(e){}
-    return false;
-  }
-
-  async function findGameFullFast(){
-    // ✅ المسار الطبيعي: لا نلف — نجرب HEAD سريع على ./game_full.html
-    const primary = "./game_full.html";
-    const tried = [];
-
-    const headOk = await quickHeadOk(primary);
-    tried.push({ url: primary, headOk });
-
-    if(headOk){
-      return { found:true, url: primary, tried };
-    }
-
-    // fallback: نفس منطقك السابق لكن بـ probe (Range)
-    const candidates = [
-      "./game_full.html",
-      "/game_full.html",
-      "/app/game_full.html",
-      "./app/game_full.html"
-    ];
-
-    for(const c of candidates){
-      try{
-        const r = await probeHtml(c);
-        tried.push(r);
-        if(r.ok) return { found:true, url:c, tried };
-      }catch(e){
-        tried.push({ ok:false, url:c, error:String(e && e.message ? e.message : e) });
-      }
-    }
-
-    return { found:false, url: primary, tried };
+  function gameFullUrl(){
+    // لو أحد فتحها بالغلط من /app/ نخلي المسار صحيح
+    return location.pathname.includes("/app/") ? "../game_full.html" : "./game_full.html";
   }
 
   async function fetchMe(){
@@ -410,7 +375,6 @@
     const headers = { "X-Device-Id": deviceId };
     if(tkn) headers["Authorization"] = "Bearer " + tkn;
 
-    // جرّب GET أول، ثم POST لو 405
     let res = await fetch("/api2/me", {
       method:"GET",
       headers,
@@ -430,11 +394,10 @@
 
     let data = null;
     try{ data = await res.json(); }catch{}
-    return { res, data, deviceId, hasToken: !!tkn };
+    return { res, data };
   }
 
   async function openHomeSafely(){
-    // محاولة ذكية: لو المستخدم مفعّل نوديه الصفحة الرئيسية بدون لفّات
     try{
       const { res, data } = await fetchMe();
       if(res.ok && data && data.ok === true && data.activated){
@@ -448,26 +411,7 @@
   async function run(){
     hideOverlay();
 
-    // ✅ (تسريع) شغّل فحص game_full + فحص /me بالتوازي
-    const [gf, me] = await Promise.all([
-      findGameFullFast(),
-      fetchMe()
-    ]);
-
-    // 1) game_full موجود؟
-    if(!gf.found){
-      const debugText = JSON.stringify(gf.tried, null, 2);
-      showOverlay(
-        "ملف اللعبة الكبير غير موجود",
-        "ما قدرت ألقى game_full.html (أو فيه Rewrite يرجعنا لنفس البوابة). تأكد إن الملف مرفوع بنفس الاسم (حروف صغيرة) وفي نفس المستودع.",
-        debugText
-      );
-      openGameBtn.onclick = ()=> go("./game_full.html");
-      return;
-    }
-
-    // 2) تحقق من الدخول/التفعيل
-    const { res, data } = me;
+    const { res, data } = await fetchMe();
 
     if(!res.ok || !data || data.ok !== true){
       go(buildActivateNext());
@@ -479,8 +423,8 @@
       return;
     }
 
-    // 3) تمام: افتح اللعبة الكبيرة مع نفس query/hash
-    const target = gf.url + (location.search || "") + (location.hash || "");
+    // ✅ أسرع تحويل ممكن (بدون فحص مسارات إضافية)
+    const target = gameFullUrl() + (location.search || "") + (location.hash || "");
     go(target);
   }
 
@@ -503,10 +447,9 @@
 
   retryBtn.addEventListener("click", runWithRetry);
   goActivateBtn.addEventListener("click", ()=> go(buildActivateNext()));
-  openGameBtn.addEventListener("click", ()=> go("./game_full.html"));
+  openGameBtn.addEventListener("click", ()=> go(gameFullUrl()));
   homeBtn.addEventListener("click", openHomeSafely);
 
-  // ابدأ فورًا
   runWithRetry();
 })();
 </script>
@@ -514,4 +457,4 @@
 </body>
 </html>
 
-<!-- VERSION: game.html – vGatewayFastParallel-5 -->
+<!-- VERSION: game.html – vStealthLoader-HideUI-6 -->
