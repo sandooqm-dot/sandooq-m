@@ -1185,12 +1185,18 @@
 
     const params = new URLSearchParams(location.search);
     const role = params.get("role");
-    const code = params.get("code");
-    const hostKey = params.get("key");
-    const pid = params.get("pid");
+const code = params.get("code");
+const hostKey = params.get("key");
+const pid = params.get("pid");
 
-    const main = document.getElementById("main");
-    const gameNameEl = document.getElementById("gameName");
+const main = document.getElementById("main");
+const gameNameEl = document.getElementById("gameName");
+
+// ✅ (تعديل) زر الرئيسية للمقدم فقط
+const homeBtn = document.getElementById("homeBtn");
+if(homeBtn && role !== "host"){
+  homeBtn.style.display = "none";
+}
 
     const tipPopup = document.getElementById("tipPopup");
 
