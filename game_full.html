@@ -1597,14 +1597,30 @@ if(homeBtn && role !== "host"){
       }
 
       if(TIMER_UI.isHost){
+
+  // ✅ مهم: أول ما يرجع المؤقت يشتغل من جديد، نسمح بإرسال حدث النهاية مرة ثانية
+  if(view.running && view.remaining > 0){
+    TIMER_UI.__doneSent = false;
+  }
+
+  // ✅ عند وصول المؤقت لـ 0: نصفر الجرس + نصفر المؤقت بالكامل (بدون وميض أحمر/أبيض)
   if(view.running && view.remaining === 0 && !TIMER_UI.__doneSent){
     TIMER_UI.__doneSent = true;
 
-    // ✅ (تعديل) عند وصول المؤقت لـ 0: نوقفه + done + نصفر الجرس (ويرجع شريط الاسم افتراضي)
+    const t = normalizeTimer(TIMER_UI.latestTimer || {});
+    const sel = Number(t.sel || 10);
+
     const updates = {};
-    updates[`rooms/${code}/timer/running`] = false;
-    updates[`rooms/${code}/timer/done`] = true;
+    // (أمر واحد) تحديث متعدد المسارات لتقليل الرسائل
     updates[`rooms/${code}/buzzer`] = null;
+    updates[`rooms/${code}/timer`] = {
+      sel,
+      dur: sel,
+      running: false,
+      done: false,   // ✅ لا وميض
+      startTs: 0
+    };
+
     update(ref(db), updates);
   }
 }
