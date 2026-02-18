@@ -2979,13 +2979,31 @@ if(homeBtn && role !== "host"){
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
-      // ✅ (تعديل 1) تصفير/إخفاء اسم أول لاعب بضغطة على الشريط (للمقدم فقط) — يركب مرة
-      if(isHost && firstPressBar && !firstPressBar.__clearHooked){
-        firstPressBar.__clearHooked = true;
-        firstPressBar.addEventListener("click", async () => {
-          try{ await update(roomRef, { buzzer: null }); }catch(e){}
-        });
-      }
+      // ✅ (تعديل 1) تصفير/إخفاء اسم أول لاعب + تصفير المؤقت بضغطة على الشريط (للمقدم فقط)
+if(isHost && firstPressBar && !firstPressBar.__clearHooked){
+  firstPressBar.__clearHooked = true;
+  firstPressBar.addEventListener("click", async () => {
+    try{
+      const t = normalizeTimer(LIVE.room?.timer || TIMER_UI.latestTimer || {});
+      const sel = Number(t.sel || 10);
+
+      // مهم: نخلي done يشتغل طبيعي بالجولة الجاية
+      TIMER_UI.__doneSent = false;
+
+      const updates = {};
+      updates[`rooms/${code}/buzzer`] = null;
+
+      // تصفير المؤقت
+      updates[`rooms/${code}/timer/running`] = false;
+      updates[`rooms/${code}/timer/done`] = false;
+      updates[`rooms/${code}/timer/startTs`] = 0;
+      updates[`rooms/${code}/timer/sel`] = sel;
+      updates[`rooms/${code}/timer/dur`] = sel;
+
+      await update(ref(db), updates);
+    }catch(e){}
+  });
+}
 
       // Map image change (when activeMap changes)
       const activeMap = Number(room.activeMap || 0);
