@@ -5,43 +5,40 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>عرض التلفاز - سباق الحروف</title>
 
-  <!-- ✅ تسريع تحميل Firebase -->
+  <!-- ✅ تسريع Firebase -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="dns-prefetch" href="//www.gstatic.com">
 
-  <!-- ✅ (اختياري) تسجيل SW بدري مثل باقي الصفحات -->
+  <!-- ✅ (اختياري) SW -->
   <script>
   (function(){
     try{
       if(!("serviceWorker" in navigator)) return;
       if(!window.isSecureContext && location.hostname !== "localhost") return;
-      var ASSET_VERSION = "2026-02-18-2";
+      var ASSET_VERSION = "2026-02-18-tv-2";
       var vq = "?v=" + encodeURIComponent(ASSET_VERSION);
-      navigator.serviceWorker
-        .register("./sw.js" + vq, { scope: "./" })
-        .then(function(reg){ try{ reg && reg.update && reg.update(); }catch(e){} })
-        .catch(function(){});
+      navigator.serviceWorker.register("./sw.js" + vq, { scope:"./" }).catch(function(){});
     }catch(e){}
   })();
   </script>
 
   <style>
     :root{
-      --bg:#7b1f63;
-      --bg2:#5f214f;
-      --yellow:#f4c400;
-      --txt:#fff;
-      --muted:rgba(255,255,255,.78);
-      --shadow:0 18px 55px rgba(0,0,0,.35);
+      --bgA:#7b3459;
+      --bgB:#4b1f36;
 
+      --card: rgba(255,255,255,.10);
+      --bd: rgba(255,255,255,.16);
+      --shadow: 0 18px 55px rgba(0,0,0,.35);
+
+      --txt:#fff;
+      --muted: rgba(255,255,255,.75);
+
+      --yellow:#f4c400;
       --green:#16a34a;
       --orange:#f28c00;
 
-      --cell0:#ffffff;
-      --cell1:#f4c400;
-      --cell2:#16a34a;
-      --cell3:#f28c00;
-      --cellStroke: rgba(0,0,0,.28);
+      --zoom: 1.0;
     }
 
     @font-face{
@@ -54,224 +51,211 @@
     body{
       margin:0;
       min-height:100vh;
-      background:
-        radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.10), transparent 60%),
-        radial-gradient(900px 650px at 80% 70%, rgba(255,255,255,.07), transparent 55%),
-        linear-gradient(135deg, var(--bg), var(--bg2));
       color:var(--txt);
       font-family:"AA-GALAXY", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 700px at 25% 10%, rgba(255,255,255,.12), transparent 60%),
+        linear-gradient(135deg, var(--bgA), var(--bgB));
       overflow:hidden;
     }
 
     /* Top bar */
     .topbar{
-      height:74px;
+      height:78px;
+      padding:10px 14px 0;
       display:grid;
-      grid-template-columns: 120px 1fr auto;
+      grid-template-columns: 64px 1fr auto;
       align-items:center;
-      padding:10px 14px;
-      gap:10px;
+      gap:12px;
     }
-
     .logo{
-      width:56px;height:56px;object-fit:contain;
-      filter: drop-shadow(0 10px 18px rgba(0,0,0,.28));
+      width:54px;height:54px;object-fit:contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
       user-select:none; pointer-events:none;
       justify-self:start;
     }
-
     .gameName{
       text-align:center;
       font-size:34px;
       color:#fff;
-      text-shadow:0 12px 22px rgba(0,0,0,.28);
-      letter-spacing:.3px;
+      text-shadow: 0 10px 20px rgba(0,0,0,.35);
       line-height:1;
+      padding-top:2px;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      padding:0 6px;
     }
-
-    .rightBox{
-      display:flex;
-      align-items:center;
-      gap:10px;
+    .controls{
       justify-self:end;
-      flex-wrap:nowrap;
-    }
-
-    .scores{
-      display:flex;
-      gap:10px;
-      align-items:center;
-    }
-    .scoreChip{
       display:flex;
       align-items:center;
-      gap:10px;
-      padding:10px 12px;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.16);
-      background: rgba(0,0,0,.18);
-      box-shadow: 0 14px 32px rgba(0,0,0,.20);
-      min-width: 132px;
-      justify-content:center;
-    }
-    .scoreChip .label{
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:900;
-      font-size:14px;
-      color:rgba(255,255,255,.86);
-      white-space:nowrap;
-    }
-    .scoreChip .num{
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:1000;
-      font-size:28px;
-      line-height:1;
-      min-width: 22px;
-      text-align:center;
-    }
-    .scoreChip.green .num{ color: var(--green); }
-    .scoreChip.orange .num{ color: var(--orange); }
-
-    .zoomWrap{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:10px 12px;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.16);
-      background: rgba(0,0,0,.18);
-      box-shadow: 0 14px 32px rgba(0,0,0,.20);
-      user-select:none;
-    }
-    .zoomWrap .zLabel{
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-weight:900;
-      font-size:13px;
-      color:rgba(255,255,255,.86);
-      white-space:nowrap;
-    }
-    input[type="range"]{
-      width:180px;
-      accent-color: var(--yellow);
-    }
-
-    /* Map area */
-    .main{
-      height: calc(100vh - 74px);
-      padding: 8px 12px 14px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-
-    .panel{
-      flex:1;
-      background: rgba(255,255,255,.08);
+      gap:12px;
+      background: rgba(0,0,0,.12);
       border:1px solid rgba(255,255,255,.14);
-      border-radius:18px;
+      border-radius:16px;
+      padding:10px 12px;
+      box-shadow: 0 14px 30px rgba(0,0,0,.18);
+    }
+    .scorePill{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:8px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.10);
+      min-width:130px;
+      justify-content:space-between;
+    }
+    .scorePill .lbl{
+      font-size:14px;
+      color: rgba(255,255,255,.85);
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+    }
+    .scorePill .num{
+      font-size:22px;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+      line-height:1;
+    }
+    .scorePill.green .num{ color: var(--green); }
+    .scorePill.orange .num{ color: var(--orange); }
+
+    .zoomBox{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:8px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.10);
+    }
+    .zoomLbl{
+      font-size:14px;
+      color: rgba(255,255,255,.85);
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    input[type="range"]{ width:160px; }
+
+    /* Main */
+    .main{
+      height: calc(100vh - 78px);
+      padding:10px 12px 14px;
+    }
+    .panel{
+      height:100%;
+      background: var(--card);
+      border:1px solid var(--bd);
+      border-radius:22px;
       box-shadow: var(--shadow);
       overflow:hidden;
       position:relative;
+      padding:10px;
       display:flex;
       flex-direction:column;
+      gap:10px;
     }
 
-    .statusLine{
-      position:absolute;
-      right:12px;
-      bottom:10px;
-      font-size:12px;
-      color: rgba(255,255,255,.78);
-      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      user-select:none;
-      text-shadow: 0 10px 18px rgba(0,0,0,.25);
-    }
-
-    .mapStage{
+    /* Map viewport (never overlaps topbar because it’s inside panel) */
+    .mapViewport{
       flex:1;
+      border-radius:18px;
+      overflow:hidden;
+      position:relative;
+      background: rgba(0,0,0,.12);
+      border:1px solid rgba(255,255,255,.10);
+    }
+
+    /* Stage scaled by slider */
+    .mapStage{
+      position:absolute;
+      inset:0;
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:10px;
-      overflow:hidden; /* ✅ الزوم ما يغطي التوب بار */
+      transform: scale(var(--zoom));
+      transform-origin: top center;
+      pointer-events:none; /* ✅ عرض فقط */
     }
 
-    .mapWrap{
+    /* Keep consistent aspect ratio like the original maps */
+    .mapFrame{
+      width:min(1100px, 98vw);
+      aspect-ratio: 1000 / 700;
+      position:relative;
+    }
+
+    .mapImg{
+      position:absolute;
+      inset:0;
       width:100%;
       height:100%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      transform: scale(var(--zoom, 1));
-      transform-origin: center center;
-      will-change: transform;
+      object-fit:contain;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
     }
 
     svg{
-      width: min(1200px, 100%);
-      height: min(780px, 100%);
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
       display:block;
     }
 
-    .cell{ stroke: var(--cellStroke); stroke-width: 2.2; }
-    .s0{ fill: var(--cell0); }
-    .s1{ fill: var(--cell1); }
-    .s2{ fill: var(--cell2); }
-    .s3{ fill: var(--cell3); }
+    /* Overlay cells (transparent colors over the printed letters) */
+    .cell{
+      stroke: rgba(0,0,0,.10);
+      stroke-width: 1;
+      fill: rgba(0,0,0,0);
+    }
+    .s0{ fill: rgba(0,0,0,0); }
+    .s1{ fill: rgba(244,196,0,.80); }   /* أصفر */
+    .s2{ fill: rgba(22,163,74,.78); }   /* أخضر */
+    .s3{ fill: rgba(242,140,0,.78); }   /* برتقالي */
 
-    .letter{
-      font-family:"AA-GALAXY", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
-      font-size:34px;
-      font-weight:900;
-      fill:#111;
-      dominant-baseline: middle;
-      text-anchor: middle;
-      pointer-events:none;
+    .statusLine{
+      position:absolute;
+      right:14px;
+      bottom:10px;
+      font-size:12px;
+      color: rgba(255,255,255,.75);
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      user-select:none;
     }
 
-    /* Gate (no code / lock) */
-    .gate{
+    /* Simple modal if no code */
+    .backdrop{
       position:fixed; inset:0;
-      background: rgba(0,0,0,.55);
-      display:flex;
+      background: rgba(0,0,0,.60);
+      display:none;
       align-items:center;
       justify-content:center;
       padding:16px;
       z-index:999;
     }
-    .gateCard{
-      width:min(560px, 96vw);
-      background: rgba(20, 8, 25, .92);
+    .modal{
+      width:min(520px, 96vw);
+      background: rgba(20, 8, 25, .95);
       border:1px solid rgba(255,255,255,.16);
       border-radius:18px;
       padding:16px 14px 14px;
       box-shadow: 0 22px 70px rgba(0,0,0,.55);
       text-align:center;
     }
-    .gTitle{
-      margin:6px 0 8px;
-      font-size:22px;
-      color:var(--yellow);
-    }
-    .gHint{
-      margin:0 0 12px;
-      color:rgba(255,255,255,.82);
+    .mTitle{ margin:2px 0 10px; font-size:22px; color:var(--yellow); }
+    .mHint{
+      color:rgba(255,255,255,.78);
       font-size:13px;
       line-height:1.7;
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      margin-bottom:12px;
     }
-    .gRow{
-      display:flex;
-      gap:10px;
-      justify-content:center;
-      flex-wrap:wrap;
-      margin-top:8px;
-    }
-    .gIn{
+    .in{
       width: min(360px, 90vw);
       height:54px;
       border-radius:16px;
@@ -287,7 +271,7 @@
       letter-spacing:2px;
       direction:ltr;
     }
-    .gBtn{
+    .btn{
       width: min(360px, 90vw);
       height:56px;
       border:none;
@@ -295,13 +279,13 @@
       background: var(--yellow);
       color:#111;
       font-size:18px;
-      font-weight:1000;
+      font-weight:900;
       cursor:pointer;
-      margin-top:10px;
+      margin-top:12px;
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
       box-shadow: 0 18px 40px rgba(0,0,0,.35);
     }
-    .gErr{
+    .err{
       display:none;
       margin-top:10px;
       background:#fee2e2;
@@ -314,82 +298,65 @@
       font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
       font-weight:900;
     }
-
-    /* Confetti canvas */
-    #fx{
-      position:fixed; inset:0;
-      pointer-events:none;
-      z-index:1000;
-    }
-
-    @media (max-width: 860px){
-      .topbar{ grid-template-columns: 70px 1fr auto; height:78px; }
-      input[type="range"]{ width:140px; }
-      .gameName{ font-size:28px; }
-      .scoreChip{ min-width:120px; padding:8px 10px; }
-      .scoreChip .num{ font-size:24px; }
-    }
   </style>
 </head>
 
 <body>
-  <canvas id="fx"></canvas>
 
   <div class="topbar">
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات" onerror="this.style.display='none'">
     <div class="gameName" id="gameName">—</div>
 
-    <div class="rightBox">
-      <div class="zoomWrap">
-        <div class="zLabel">تكبير</div>
-        <input id="zoom" type="range" min="80" max="140" step="2" value="100" aria-label="تكبير الخريطة">
+    <div class="controls">
+      <div class="scorePill green">
+        <span class="lbl">الأخضر</span>
+        <span class="num" id="scoreGreen">0</span>
       </div>
 
-      <div class="scores">
-        <div class="scoreChip orange">
-          <div class="label">البرتقالي</div>
-          <div class="num" id="scoreOrange">0</div>
-        </div>
-        <div class="scoreChip green">
-          <div class="label">الأخضر</div>
-          <div class="num" id="scoreGreen">0</div>
-        </div>
+      <div class="scorePill orange">
+        <span class="lbl">البرتقالي</span>
+        <span class="num" id="scoreOrange">0</span>
+      </div>
+
+      <div class="zoomBox">
+        <span class="zoomLbl">تكبير</span>
+        <input id="zoomRange" type="range" min="0.90" max="1.35" step="0.01" value="1.00" />
       </div>
     </div>
   </div>
 
   <div class="main">
     <div class="panel">
-      <div class="mapStage">
-        <div class="mapWrap" id="mapWrap">
-          <svg id="mapSvg" viewBox="0 0 1000 700" aria-label="خريطة الخلايا"></svg>
+      <div class="mapViewport" id="mapViewport">
+        <div class="mapStage" id="mapStage">
+          <div class="mapFrame">
+            <img class="mapImg" id="mapImg" alt="خريطة سباق الحروف">
+            <svg id="overlaySvg" viewBox="0 0 1000 700" aria-label="طبقة تلوين الخلايا"></svg>
+          </div>
         </div>
+
+        <div class="statusLine" id="statusLine">جاري الاتصال...</div>
       </div>
-      <div class="statusLine" id="statusLine">جاري الاتصال...</div>
     </div>
   </div>
 
-  <!-- Gate -->
-  <div class="gate" id="gate" style="display:none">
-    <div class="gateCard">
-      <div class="gTitle" id="gTitle">عرض التلفاز</div>
-      <p class="gHint" id="gHint">افتح الرابط من زر "عرض التلفاز" عند المقدم (أو اكتب رمز الغرفة هنا).</p>
-
-      <div class="gRow">
-        <input class="gIn" id="codeInput" maxlength="6" inputmode="numeric" placeholder="رمز الغرفة (6 أرقام)">
-      </div>
-
-      <button class="gBtn" id="startBtn">ابدأ العرض</button>
-      <div class="gErr" id="gErr"></div>
+  <!-- Code modal -->
+  <div class="backdrop" id="backdrop">
+    <div class="modal">
+      <div class="mTitle">عرض التلفاز</div>
+      <div class="mHint">افتح الرابط هكذا: <span style="direction:ltr">tv.html?code=123456</span><br>أو اكتب رمز الغرفة هنا.</div>
+      <input class="in" id="codeInput" maxlength="6" inputmode="numeric" placeholder="رمز الغرفة (6 أرقام)">
+      <button class="btn" id="startBtn">ابدأ العرض</button>
+      <div class="err" id="errBox"></div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import {
-      getDatabase, ref,
-      onValue, onChildAdded, onChildChanged, onChildRemoved,
-      runTransaction, onDisconnect
+      getDatabase, ref, get, onValue,
+      onChildAdded, onChildChanged, onChildRemoved,
+      runTransaction, onDisconnect, update
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
     const firebaseConfig = {
@@ -402,7 +369,6 @@
       appId: "1:1053646928152:web:032d50148c3a4f1148066d"
     };
 
-    // ===== Helpers
     function normalizeDigits(s){
       const map = {
         "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
@@ -410,438 +376,352 @@
       };
       return String(s || "").replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
     }
-    function cleanCode(s){ return normalizeDigits(s).replace(/\D/g, "").slice(0,6); }
-
-    function ensureTvDeviceId(){
-      const k = "sandooq_tv_device_id_v1";
-      let id = "";
-      try{ id = localStorage.getItem(k) || ""; }catch(e){}
-      if(!id){
-        try{ id = (crypto?.randomUUID ? crypto.randomUUID() : ("tv_" + Math.random().toString(16).slice(2) + Date.now().toString(16))); }catch(e){
-          id = "tv_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
-        }
-        try{ localStorage.setItem(k, id); }catch(e){}
-      }
-      return id;
+    function cleanCode(s){
+      return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
     }
 
-    // ===== UI refs
+    // UI
     const gameNameEl = document.getElementById("gameName");
     const scoreGreenEl = document.getElementById("scoreGreen");
     const scoreOrangeEl = document.getElementById("scoreOrange");
     const statusLine = document.getElementById("statusLine");
+    const zoomRange = document.getElementById("zoomRange");
+    const mapImg = document.getElementById("mapImg");
+    const overlaySvg = document.getElementById("overlaySvg");
 
-    const zoomEl = document.getElementById("zoom");
-    const mapWrap = document.getElementById("mapWrap");
-
-    const gate = document.getElementById("gate");
+    const backdrop = document.getElementById("backdrop");
     const codeInput = document.getElementById("codeInput");
     const startBtn = document.getElementById("startBtn");
-    const gErr = document.getElementById("gErr");
-    const gTitle = document.getElementById("gTitle");
-    const gHint = document.getElementById("gHint");
+    const errBox = document.getElementById("errBox");
 
-    function showGate(title, hint, err){
-      gTitle.textContent = title || "عرض التلفاز";
-      gHint.textContent = hint || "افتح الرابط من زر عرض التلفاز عند المقدم.";
-      if(err){
-        gErr.textContent = err;
-        gErr.style.display = "block";
-      }else{
-        gErr.textContent = "";
-        gErr.style.display = "none";
+    zoomRange.addEventListener("input", () => {
+      document.documentElement.style.setProperty("--zoom", String(zoomRange.value));
+    });
+
+    // TV device id
+    function tvId(){
+      const k="sandooq_tv_id_v1";
+      let v = "";
+      try{ v = localStorage.getItem(k) || ""; }catch(e){}
+      if(!v){
+        v = (crypto?.randomUUID ? crypto.randomUUID() : ("tv_" + Math.random().toString(16).slice(2) + Date.now().toString(16)));
+        try{ localStorage.setItem(k, v); }catch(e){}
       }
-      gate.style.display = "flex";
-    }
-    function hideGate(){ gate.style.display = "none"; }
-
-    // ===== Zoom (محلي) — بدون Firebase
-    function loadZoom(code){
-      try{
-        const k = "sandooq_tv_zoom_v1_" + code;
-        const v = Number(localStorage.getItem(k));
-        if(Number.isFinite(v) && v>=80 && v<=140) return v;
-      }catch(e){}
-      return 100;
-    }
-    function saveZoom(code, v){
-      try{
-        const k = "sandooq_tv_zoom_v1_" + code;
-        localStorage.setItem(k, String(v));
-      }catch(e){}
-    }
-    function applyZoom(v){
-      const z = Math.max(80, Math.min(140, Number(v) || 100));
-      mapWrap.style.setProperty("--zoom", String(z/100));
+      return v;
     }
 
-    // ===== Map drawing (5x5 hex + حروف)
-    const mapSvg = document.getElementById("mapSvg");
-    const CELLS = new Map();      // key -> polygon
-    const LETTERS = new Map();    // key -> text
-    const LETTER_GRID = [
-      ["ش","أ","ث","د","هـ"],
-      ["ي","ح","ض","ن","ك"],
-      ["غ","ظ","ق","ر","ع"],
-      ["ص","ز","س","ط","و"],
-      ["ذ","ل","ب","م","ج"]
-    ];
+    // Build overlay grid (5x5) – bigger so it matches the printed map
+    const svgNS="http://www.w3.org/2000/svg";
+    const cellElByKey = new Map(); // "r_c" -> polygon
 
-    function hexPointsPointyTop(cx, cy, r){
-      const pts = [];
+    function hexPoints(cx, cy, r){
+      const pts=[];
       for(let i=0;i<6;i++){
         const ang = (Math.PI/180) * (60*i - 30);
-        pts.push((cx + r*Math.cos(ang)).toFixed(2) + "," + (cy + r*Math.sin(ang)).toFixed(2));
+        pts.push(`${(cx + r*Math.cos(ang)).toFixed(2)},${(cy + r*Math.sin(ang)).toFixed(2)}`);
       }
       return pts.join(" ");
     }
 
-    function cellKey(r,c){ return `${r}_${c}`; }
-
     function buildGrid(){
-      mapSvg.innerHTML = "";
-      CELLS.clear(); LETTERS.clear();
+      overlaySvg.innerHTML="";
+      cellElByKey.clear();
 
       const W=1000, H=700;
-      mapSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      overlaySvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
       const rows=5, cols=5;
-      const r = 74;                    // حجم الخلية
-      const dx = r * Math.sqrt(3);
-      const dy = r * 1.5;
+      const r=86; // ✅ أكبر من قبل عشان تطابق خريطة الصور
+      const dx=r*Math.sqrt(3);
+      const dy=r*1.5;
 
-      const gridW = (cols-1)*dx + dx;
+      const gridW = cols*dx;
       const gridH = (rows-1)*dy + (2*r);
 
-      const x0 = (W - gridW)/2 + (dx/2);
-      const y0 = (H - gridH)/2 + r;
-
-      const svgNS="http://www.w3.org/2000/svg";
+      const x0 = (W-gridW)/2 + (dx/2);
+      const y0 = (H-gridH)/2 + r;
 
       for(let row=0; row<rows; row++){
         for(let col=0; col<cols; col++){
-          const cx = x0 + col*dx + ((row%2) ? (dx/2) : 0);
+          const cx = x0 + col*dx + ((row%2)? (dx/2):0);
           const cy = y0 + row*dy;
 
-          const poly = document.createElementNS(svgNS, "polygon");
-          poly.setAttribute("points", hexPointsPointyTop(cx, cy, r));
+          const poly=document.createElementNS(svgNS,"polygon");
+          poly.setAttribute("points", hexPoints(cx,cy,r));
           poly.classList.add("cell","s0");
-          const k = cellKey(row,col);
-          mapSvg.appendChild(poly);
-          CELLS.set(k, poly);
-
-          const t = document.createElementNS(svgNS, "text");
-          t.setAttribute("x", String(cx));
-          t.setAttribute("y", String(cy));
-          t.classList.add("letter");
-          t.textContent = (LETTER_GRID[row] && LETTER_GRID[row][col]) ? LETTER_GRID[row][col] : "—";
-          mapSvg.appendChild(t);
-          LETTERS.set(k, t);
+          const k = row + "_" + col;
+          cellElByKey.set(k, poly);
+          overlaySvg.appendChild(poly);
         }
       }
     }
 
-    function setCellVisual(k, st){
-      const el = CELLS.get(k);
-      const tt = LETTERS.get(k);
+    function setCellStateByRC(r,c,st){
+      const k = r + "_" + c;
+      const el = cellElByKey.get(k);
       if(!el) return;
-
-      const s = Math.max(0, Math.min(3, Number(st) || 0));
+      const v = Math.max(0, Math.min(3, Number(st||0)));
       el.classList.remove("s0","s1","s2","s3");
-      el.classList.add("s"+s);
-
-      // لون حرف مناسب
-      if(tt){
-        if(s === 2 || s === 3) tt.style.fill = "#fff";
-        else tt.style.fill = "#111";
-      }
+      el.classList.add("s"+v);
     }
 
-    function clearAllCells(){
-      for(const k of CELLS.keys()) setCellVisual(k, 0);
-    }
-
-    function parseCellKey(key){
-      const s = String(key || "");
-      let m = s.match(/^(\d+)[_\-,|:](\d+)$/);
-      if(m) return { r:+m[1], c:+m[2], k: cellKey(+m[1], +m[2]) };
-      m = s.match(/r(\d+)c(\d+)/i);
-      if(m) return { r:+m[1], c:+m[2], k: cellKey(+m[1], +m[2]) };
+    function parseCellKey(k){
+      k = String(k||"").trim();
+      let m;
+      if((m = k.match(/^(\d+)[,_:\-|](\d+)$/))) return { r:+m[1], c:+m[2] };
+      if((m = k.match(/^r(\d+)c(\d+)$/i))) return { r:+m[1], c:+m[2] };
       return null;
     }
 
-    // ===== Confetti + Sound (احتفالية)
-    const fx = document.getElementById("fx");
-    const ctx = fx.getContext("2d");
-    let fxW=0, fxH=0;
-    function resizeFx(){
-      fxW = fx.width = window.innerWidth;
-      fxH = fx.height = window.innerHeight;
+    function resetAllCells(){
+      for(let r=0;r<5;r++){
+        for(let c=0;c<5;c++){
+          setCellStateByRC(r,c,0);
+        }
+      }
     }
-    window.addEventListener("resize", resizeFx);
-    resizeFx();
 
-    let lastCelebrateAt = 0;
-    function playWinSound(){
+    // Map images (root) – tries common names automatically
+    function candidatesForMapIndex(idx){
+      const i0 = Number(idx)||0;
+      const i1 = i0 + 1; // in case your files start from 1
+      const ext = ["png","webp","jpg","jpeg"];
+
+      const out = [];
+      for(const e of ext){
+        out.push(`map${i0}.${e}`, `map_${i0}.${e}`, `map-${i0}.${e}`);
+        out.push(`map${i1}.${e}`, `map_${i1}.${e}`, `map-${i1}.${e}`);
+      }
+      // also allow generic names
+      out.push("map.png","map.webp","map.jpg");
+      return [...new Set(out)];
+    }
+
+    function loadImageTry(src){
+      return new Promise((resolve) => {
+        const im = new Image();
+        const t = setTimeout(()=>resolve(false), 900);
+        im.onload = ()=>{ clearTimeout(t); resolve(true); };
+        im.onerror = ()=>{ clearTimeout(t); resolve(false); };
+        im.src = src + (src.includes("?")?"&":"?") + "_tv=" + Date.now();
+      });
+    }
+
+    async function setMapImage(activeMap){
+      const list = candidatesForMapIndex(activeMap);
+      for(const src of list){
+        try{
+          const ok = await loadImageTry("./" + src);
+          if(ok){
+            mapImg.src = "./" + src;
+            return true;
+          }
+        }catch(e){}
+      }
+      return false;
+    }
+
+    // Celebration (خفيف) على زيادة النقاط
+    let lastG = 0, lastO = 0;
+    function beep(){
       try{
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if(!AC) return;
-        const ac = new AC();
-        const now = ac.currentTime;
-
-        const notes = [523.25, 659.25, 783.99]; // C5 E5 G5
-        notes.forEach((f, i) => {
-          const o = ac.createOscillator();
-          const g = ac.createGain();
-          o.type = "triangle";
-          o.frequency.value = f;
-          g.gain.setValueAtTime(0.0001, now);
-          g.gain.exponentialRampToValueAtTime(0.12, now + 0.02 + i*0.01);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.30 + i*0.05);
-          o.connect(g).connect(ac.destination);
-          o.start(now + i*0.02);
-          o.stop(now + 0.40 + i*0.05);
-        });
-
-        setTimeout(()=>{ try{ ac.close(); }catch(e){} }, 900);
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type="triangle";
+        o.frequency.value = 520;
+        g.gain.value = 0.06;
+        o.connect(g); g.connect(ctx.destination);
+        o.start();
+        setTimeout(()=>{ o.stop(); ctx.close(); }, 160);
       }catch(e){}
     }
-
-    function celebrate(team){
-      const t = Date.now();
-      if(t - lastCelebrateAt < 900) return; // منع سبام
-      lastCelebrateAt = t;
-
-      playWinSound();
-
-      const color = (team === "green") ? "#16a34a" : (team === "orange" ? "#f28c00" : "#f4c400");
-      const pieces = [];
-      const N = 140;
-
-      for(let i=0;i<N;i++){
-        pieces.push({
-          x: fxW/2 + (Math.random()*160 - 80),
-          y: fxH*0.18 + (Math.random()*60),
-          vx: (Math.random()*6 - 3),
-          vy: (Math.random()*-7 - 2),
-          g: 0.18 + Math.random()*0.10,
-          r: 3 + Math.random()*4,
-          a: 0.9,
-          rot: Math.random()*Math.PI,
-          vr: (Math.random()*0.18 - 0.09),
-          c: (Math.random()<0.65) ? color : "#ffffff"
-        });
-      }
-
-      const start = performance.now();
-      const dur = 1600;
-
-      function tick(now){
-        const dt = now - start;
-        ctx.clearRect(0,0,fxW,fxH);
-
-        for(const p of pieces){
-          p.vy += p.g;
-          p.x += p.vx;
-          p.y += p.vy;
-          p.rot += p.vr;
-          p.a = Math.max(0, 0.95 - dt/dur);
-
-          ctx.save();
-          ctx.globalAlpha = p.a;
-          ctx.translate(p.x, p.y);
-          ctx.rotate(p.rot);
-          ctx.fillStyle = p.c;
-          ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
-          ctx.restore();
-        }
-
-        if(dt < dur) requestAnimationFrame(tick);
-        else ctx.clearRect(0,0,fxW,fxH);
-      }
-      requestAnimationFrame(tick);
+    function celebrate(){
+      beep();
+      // (بسيطة جداً) وميض خفيف في الشريط
+      document.body.animate([{filter:"brightness(1.0)"},{filter:"brightness(1.08)"},{filter:"brightness(1.0)"}], {duration:450});
     }
 
-    // ===== Firebase (قراءة + قفل TV جهاز واحد)
-    let app=null, db=null;
-    let CODE="";
-    let roomBase="";
-    let activeMap=0;
+    // Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-    let unsubMain = [];
-    let unsubMap = [];
-    function clearUnsubs(arr){
-      try{ arr.forEach(u=>{ try{ u && u(); }catch(e){} }); }catch(e){}
-      arr.length = 0;
+    let CODE = "";
+    let roomBase = "";
+    let unsubs = [];
+    let mapUnsubs = [];
+    let lockTimer = null;
+
+    function clearAll(){
+      try{ unsubs.forEach(fn=>fn&&fn()); }catch(e){}
+      try{ mapUnsubs.forEach(fn=>fn&&fn()); }catch(e){}
+      unsubs = [];
+      mapUnsubs = [];
+      if(lockTimer){ clearInterval(lockTimer); lockTimer=null; }
+    }
+
+    function showErr(msg){
+      errBox.textContent = msg;
+      errBox.style.display = "block";
+    }
+    function hideErr(){
+      errBox.textContent = "";
+      errBox.style.display = "none";
     }
 
     async function claimTvLock(code){
-      const deviceId = ensureTvDeviceId();
+      const id = tvId();
       const lockRef = ref(db, `rooms/${code}/tvLock`);
+      const now = Date.now();
+      const TTL = 60 * 1000; // 60s
 
-      // allow takeover only if ?force=1
-      const force = (new URLSearchParams(location.search).get("force") === "1");
+      const tx = await runTransaction(lockRef, (cur) => {
+        if(cur == null) return { id, lastSeen: now };
+        const curId = cur?.id;
+        const curSeen = Number(cur?.lastSeen || 0);
 
-      const res = await runTransaction(lockRef, (cur) => {
-        if(cur == null) return { deviceId, claimedAt: Date.now() };
-
-        if(cur && cur.deviceId === deviceId) return cur;
-
-        if(force) return { deviceId, claimedAt: Date.now() };
-
+        if(curId === id) return { id, lastSeen: now }; // refresh
+        if(!curSeen || (now - curSeen) > TTL) return { id, lastSeen: now }; // takeover if stale
         return; // abort
       }, { applyLocally:false });
 
-      if(!res.committed){
-        return { ok:false, reason:"locked" };
-      }
+      if(!tx.committed) return false;
 
-      // ✅ يفك القفل تلقائي إذا انقطع الاتصال
-      try{ onDisconnect(lockRef).remove(); }catch(e){}
-      return { ok:true, deviceId };
-    }
+      try{
+        const od = onDisconnect(lockRef);
+        od.remove();
+      }catch(e){}
 
-    let lastScores = { green:0, orange:0 };
+      // heartbeat
+      lockTimer = setInterval(() => {
+        update(lockRef, { lastSeen: Date.now() }).catch(()=>{});
+      }, 25000);
 
-    function applyScores(v){
-      const g = Number(v?.green ?? 0);
-      const o = Number(v?.orange ?? 0);
-
-      const gg = Number.isFinite(g) ? g : 0;
-      const oo = Number.isFinite(o) ? o : 0;
-
-      scoreGreenEl.textContent = String(gg);
-      scoreOrangeEl.textContent = String(oo);
-
-      // ✅ احتفالية عند زيادة النقاط
-      if(gg > lastScores.green) celebrate("green");
-      if(oo > lastScores.orange) celebrate("orange");
-      lastScores = { green: gg, orange: oo };
+      return true;
     }
 
     function attachMapDeltaListeners(mapIndex){
-      clearUnsubs(unsubMap);
-      activeMap = Number(mapIndex || 0) || 0;
+      // remove previous
+      try{ mapUnsubs.forEach(fn=>fn&&fn()); }catch(e){}
+      mapUnsubs = [];
 
-      clearAllCells();
+      const path = `${roomBase}/mapStates/${String(mapIndex)}`;
 
-      // ✅ أهم نقطة: تحديث خلية واحدة (onChildChanged) بدل قراءة كل الخريطة onValue
-      const msRef = ref(db, `${roomBase}/mapStates/${String(activeMap)}`);
+      // initial one-time snapshot (مرة وحدة)
+      resetAllCells();
+      get(ref(db, path)).then((snap)=>{
+        const obj = snap.val() || {};
+        for(const [k,v] of Object.entries(obj)){
+          const rc = parseCellKey(k);
+          if(rc) setCellStateByRC(rc.r, rc.c, v);
+        }
+      }).catch(()=>{});
 
-      unsubMap.push(onChildAdded(msRef, (snap) => {
-        const p = parseCellKey(snap.key);
-        if(!p) return;
-        setCellVisual(p.k, snap.val());
+      // delta updates (أقل تكلفة)
+      mapUnsubs.push(onChildAdded(ref(db, path), (s)=>{
+        const rc = parseCellKey(s.key);
+        if(rc) setCellStateByRC(rc.r, rc.c, s.val());
       }));
 
-      unsubMap.push(onChildChanged(msRef, (snap) => {
-        const p = parseCellKey(snap.key);
-        if(!p) return;
-        setCellVisual(p.k, snap.val());
+      mapUnsubs.push(onChildChanged(ref(db, path), (s)=>{
+        const rc = parseCellKey(s.key);
+        if(rc) setCellStateByRC(rc.r, rc.c, s.val());
       }));
 
-      unsubMap.push(onChildRemoved(msRef, (snap) => {
-        const p = parseCellKey(snap.key);
-        if(!p) return;
-        setCellVisual(p.k, 0);
+      mapUnsubs.push(onChildRemoved(ref(db, path), (s)=>{
+        const rc = parseCellKey(s.key);
+        if(rc) setCellStateByRC(rc.r, rc.c, 0);
       }));
     }
 
-    async function startTV(code){
+    async function start(code){
+      clearAll();
+      hideErr();
+
       CODE = cleanCode(code);
       if(CODE.length !== 6){
-        showGate("عرض التلفاز", "اكتب رمز الغرفة الصحيح.", "رمز الغرفة لازم يكون 6 أرقام");
+        showErr("اكتب رمز غرفة صحيح (6 أرقام)");
         return;
-      }
-
-      hideGate();
-      statusLine.textContent = "جاري الاتصال...";
-
-      if(!db){
-        app = initializeApp(firebaseConfig);
-        db = getDatabase(app);
       }
 
       roomBase = `rooms/${CODE}`;
+      statusLine.textContent = "جاري الاتصال...";
 
-      // ابني الخريطة مرة وحدة
-      if(CELLS.size === 0) buildGrid();
-
-      // Zoom load
-      const z = loadZoom(CODE);
-      zoomEl.value = String(z);
-      applyZoom(z);
-
-      // ✅ قفل TV (جهاز واحد فقط)
-      const lock = await claimTvLock(CODE);
-      if(!lock.ok){
-        showGate(
-          "عرض التلفاز مستخدم",
-          "فيه جهاز عرض ثاني شغال لنفس الغرفة. إذا تبي تستحوذ عليه: افتح الرابط مع ?force=1",
-          "غير مسموح بأكثر من جهاز عرض واحد لهذه الغرفة"
-        );
+      // ✅ قفل TV واحد فقط
+      const okLock = await claimTvLock(CODE);
+      if(!okLock){
+        showErr("يوجد جهاز عرض تلفاز آخر داخل هذه الغرفة بالفعل.");
         return;
       }
 
-      // listeners
-      clearUnsubs(unsubMain);
+      backdrop.style.display = "none";
 
-      unsubMain.push(onValue(ref(db, `${roomBase}/name`), (s) => {
-        const n = (s.val() || "").toString().trim();
-        gameNameEl.textContent = n ? n : "سباق الحروف";
+      // build overlay once
+      buildGrid();
+
+      // room name
+      unsubs.push(onValue(ref(db, `${roomBase}/name`), (s)=>{
+        const v = (s.val() || "").toString().trim();
+        gameNameEl.textContent = v ? v : "—";
       }));
 
-      unsubMain.push(onValue(ref(db, `${roomBase}/scores`), (s) => {
-        applyScores(s.val() || {green:0, orange:0});
+      // scores
+      unsubs.push(onValue(ref(db, `${roomBase}/scores`), (s)=>{
+        const sc = s.val() || { green:0, orange:0 };
+        const g = Number(sc.green||0);
+        const o = Number(sc.orange||0);
+        scoreGreenEl.textContent = String(Number.isFinite(g)?g:0);
+        scoreOrangeEl.textContent = String(Number.isFinite(o)?o:0);
+
+        // احتفالية خفيفة عند زيادة النقاط
+        if((g > lastG) || (o > lastO)) celebrate();
+        lastG = g; lastO = o;
       }));
 
-      unsubMain.push(onValue(ref(db, `${roomBase}/status`), (s) => {
+      // room status
+      unsubs.push(onValue(ref(db, `${roomBase}/status`), (s)=>{
         const v = s.val();
-        if(v == null) statusLine.textContent = "الغرفة غير موجودة";
+        if(v === null) statusLine.textContent = "الغرفة غير موجودة";
         else statusLine.textContent = (v === "started") ? "اللعبة بدأت" : "في اللوبي";
-      }, () => {
+      }, ()=>{
         statusLine.textContent = "تعذر الاتصال";
       }));
 
-      unsubMain.push(onValue(ref(db, `${roomBase}/activeMap`), (s) => {
-        const m = Number(s.val() || 0) || 0;
+      // active map -> set image + delta map states
+      unsubs.push(onValue(ref(db, `${roomBase}/activeMap`), async (s)=>{
+        const m = Number(s.val() || 0);
+        const ok = await setMapImage(m);
+        if(!ok){
+          statusLine.textContent = "لم يتم العثور على ملفات الخرائط في جذر المستودع";
+        }
         attachMapDeltaListeners(m);
       }));
 
-      // حفظ آخر كود
+      // store last code
       try{ localStorage.setItem("sandooq_tv_last_code", CODE); }catch(e){}
     }
 
-    // Zoom interactions
-    zoomEl.addEventListener("input", () => {
-      const v = Number(zoomEl.value || 100);
-      applyZoom(v);
-      if(CODE) saveZoom(CODE, v);
-    });
-
-    // Gate start
-    startBtn.addEventListener("click", () => {
-      startTV(codeInput.value || "");
-    });
-
     // init
-    (function init(){
+    (function(){
       const qs = new URLSearchParams(location.search);
       const codeFromUrl = cleanCode(qs.get("code") || "");
 
-      if(codeFromUrl && codeFromUrl.length === 6){
-        startTV(codeFromUrl);
+      if(codeFromUrl.length === 6){
+        start(codeFromUrl);
         return;
       }
 
-      // fallback: show gate
+      // fallback: last code or modal
       let last = "";
       try{ last = cleanCode(localStorage.getItem("sandooq_tv_last_code") || ""); }catch(e){}
-      showGate("عرض التلفاز", "اكتب رمز الغرفة هنا أو افتح رابط العرض من المقدم.", "");
-      if(last && last.length === 6) codeInput.value = last;
+      codeInput.value = (last && last.length===6) ? last : "";
+      backdrop.style.display = "flex";
     })();
+
+    startBtn.addEventListener("click", ()=> start(codeInput.value));
+    codeInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter") start(codeInput.value); });
   </script>
 
-  <!-- VERSION: tv.html — vTV-MapOnly-DeltaLock-2 -->
+  <!-- VERSION: tv.html — vTV-MapOnly-2 -->
 </body>
 </html>
