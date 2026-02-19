@@ -12,6 +12,12 @@
       --text:#111;
       --muted:#666;
       --yellow:#f4c400;
+
+      /* (TV) */
+      --hexBorder: rgba(0,0,0,.80);
+      --hexPale: rgba(255, 231, 140, .65);
+      --hexGreen: rgba(26,163,74,.88);
+      --hexOrange: rgba(242,140,0,.88);
     }
     body{
       margin:0;
@@ -99,103 +105,274 @@
       text-align:center;
       display:none;
     }
+
+    /* =========================
+       ✅ (TV) جهاز عرض الشاشة
+       ========================= */
+    body.displayMode{
+      padding:0;
+      align-items:stretch;
+      justify-content:stretch;
+    }
+    body.displayMode .wrap{ display:none; }
+
+    .tvRoot{
+      position:fixed;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .tvTop{
+      position:sticky;
+      top:0;
+      z-index:50;
+      padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+      background: rgba(0,0,0,.22);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,.18);
+    }
+
+    .tvTopRow{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    /* يمين: اللوجو + السلايدر */
+    .tvRight{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex:0 0 auto;
+      min-width: 280px;
+      justify-content:flex-start;
+    }
+    .tvLogo{
+      width:54px;
+      height:54px;
+      object-fit:contain;
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
+      user-select:none;
+      pointer-events:none;
+    }
+
+    .tvZoomWrap{
+      flex:1 1 auto;
+      min-width: 160px;
+      max-width: 320px;
+      display:flex;
+      align-items:center;
+    }
+
+    /* سلايدر (نفس الإحساس) */
+    input[type="range"]{
+      width:100%;
+      -webkit-appearance:none;
+      appearance:none;
+      height:10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.80);
+      border:3px solid rgba(0,0,0,.70);
+      box-shadow:0 10px 18px rgba(0,0,0,.20);
+      outline:none;
+    }
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      appearance:none;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background: var(--yellow);
+      border:3px solid rgba(0,0,0,.85);
+      box-shadow:0 8px 14px rgba(0,0,0,.18);
+      cursor:pointer;
+    }
+    input[type="range"]::-moz-range-thumb{
+      width:22px;height:22px;border-radius:50%;
+      background: var(--yellow);
+      border:3px solid rgba(0,0,0,.85);
+      box-shadow:0 8px 14px rgba(0,0,0,.18);
+      cursor:pointer;
+    }
+
+    /* وسط: اسم اللعبة الذي كتبه المقدم */
+    .tvCenter{
+      flex:1 1 auto;
+      text-align:center;
+      font-weight:900;
+      font-size:22px;
+      line-height:1.2;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      padding:0 6px;
+    }
+
+    /* يسار: لوحة النتائج (غير قابلة للضغط) */
+    .tvLeft{
+      flex:0 0 auto;
+      min-width: 300px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:10px;
+      pointer-events:none; /* ✅ لا يمكن التحكم فيها */
+      user-select:none;
+    }
+    .tvTeamPill{
+      height:44px;
+      padding:0 14px;
+      border-radius:999px;
+      border:3px solid rgba(0,0,0,.85);
+      color:#fff;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 10px 18px rgba(0,0,0,.20);
+      white-space:nowrap;
+      font-size:16px;
+    }
+    .tvTeamPill.green{ background: rgba(26,163,74,.95); }
+    .tvTeamPill.orange{ background: rgba(242,140,0,.95); }
+
+    .tvScoreBox{
+      width:56px;
+      height:44px;
+      border-radius:14px;
+      border:3px solid rgba(0,0,0,.85);
+      background:#fff;
+      color:#111;
+      font-size:22px;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 10px 18px rgba(0,0,0,.20);
+    }
+
+    /* الخريطة بالأسفل (غير قابلة للضغط) */
+    .tvBody{
+      flex:1 1 auto;
+      overflow:auto;
+      padding: 12px 12px calc(16px + env(safe-area-inset-bottom));
+      box-sizing:border-box;
+    }
+
+    .mapOuter{ width:100%; display:flex; justify-content:center; }
+    .mapScale{
+      width:min(94vw, 980px);
+      transform:scale(var(--zoom, 1));
+      transform-origin:center top;
+    }
+    .mapBox{
+      position:relative;
+      width:100%;
+      overflow:hidden;
+      border-radius:0;
+      background:transparent;
+      box-shadow:0 18px 34px rgba(0,0,0,.30);
+      border:6px solid rgba(0,0,0,.80);
+    }
+    .mapBox img{
+      width:100%;
+      height:auto;
+      display:block;
+      object-fit:unset;
+      user-select:none;
+      pointer-events:none;
+    }
+    .overlaySvg{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      pointer-events:none; /* ✅ لا يمكن الضغط على الخلايا */
+    }
+    .overlaySvg .cell{
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      stroke: var(--hexBorder);
+      stroke-width: 1;
+    }
+    .overlaySvg .state0{ fill: rgba(0,0,0,0.001); }
+    .overlaySvg .state1{ fill: var(--hexPale); }
+    .overlaySvg .state2{ fill: var(--hexGreen); }
+    .overlaySvg .state3{ fill: var(--hexOrange); }
+
+    @keyframes palePulse {
+      0%   { opacity: 1; }
+      50%  { opacity: .35; }
+      100% { opacity: 1; }
+    }
+    .overlaySvg .pulse{ animation: palePulse 1.1s ease-in-out infinite; }
+
+    .tvMsg{
+      text-align:center;
+      margin-top:14px;
+      opacity:.92;
+      font-weight:800;
+    }
   </style>
 </head>
 <body>
+  <!-- ✅ الوضع العادي (فتح سريع) -->
   <div class="wrap">
     <img class="logo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
     <div class="card">
       <div class="title"><span id="stateText">جاري فتح اللعبة</span><span class="spinner" id="sp"></span></div>
       <p class="sub" id="stateSub">لحظة.. جاري فتح اللعبة.</p>
 
-      <!-- ✅ زر جهاز عرض الشاشة (يظهر إذا ضغط المستخدم على الشاشة قبل التحويل التلقائي) -->
-      <div class="row hidden" id="actions">
-        <button class="btn-primary" id="btnGo">فتح اللعبة</button>
-        <button class="btn-secondary" id="btnTv">جهاز عرض الشاشة</button>
-      </div>
-
       <div class="dbg" id="dbg"></div>
     </div>
     <div class="small">© صندوق المسابقات</div>
+  </div>
+
+  <!-- ✅ جهاز عرض الشاشة (يظهر فقط عند display=1) -->
+  <div id="tvRoot" class="tvRoot hidden">
+    <div class="tvTop">
+      <div class="tvTopRow">
+        <div class="tvRight">
+          <img class="tvLogo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
+          <div class="tvZoomWrap">
+            <input id="tvZoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة">
+          </div>
+        </div>
+
+        <div id="tvGameName" class="tvCenter">—</div>
+
+        <div class="tvLeft" aria-label="لوحة النتائج">
+          <div class="tvTeamPill green">الفريق الأخضر</div>
+          <div id="tvScoreGreen" class="tvScoreBox">0</div>
+          <div id="tvScoreOrange" class="tvScoreBox">0</div>
+          <div class="tvTeamPill orange">الفريق البرتقالي</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tvBody">
+      <div class="mapOuter">
+        <div id="mapScale" class="mapScale" style="--zoom:1">
+          <div id="mapBox" class="mapBox">
+            <img id="mapImg" src="" alt="">
+            <svg id="overlay" class="overlaySvg"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div id="tvMsg" class="tvMsg"></div>
+    </div>
   </div>
 
   <script>
     (function(){
       const qs = new URLSearchParams(location.search);
 
-      // هدف اللعبة
-      let r = (qs.get("r") || "game_full.html").trim();
-      r = r.replace(/^\/+/, "");
-      if (r.startsWith("http://") || r.startsWith("https://")) {
-        try { r = new URL(r).pathname.replace(/^\/+/, ""); } catch(e){}
-      }
-
       const DBG = qs.get("dbg") === "1";
       const dbgEl = document.getElementById("dbg");
       if (DBG) dbgEl.style.display = "block";
       const dbg = (t)=>{ if(DBG){ dbgEl.textContent = t; } };
-
-      const stateTextEl = document.getElementById("stateText");
-      const stateSubEl  = document.getElementById("stateSub");
-      const spEl        = document.getElementById("sp");
-      const actionsEl   = document.getElementById("actions");
-      const btnGo       = document.getElementById("btnGo");
-      const btnTv       = document.getElementById("btnTv");
-
-      dbg("redirect -> " + r);
-
-      // ✅ Redirect مرة واحدة فقط
-      let didGo = false;
-      const go = (to) => {
-        if (didGo) return;
-        didGo = true;
-        location.replace(to || r);
-      };
-
-      // ✅ رابط نفس الصفحة لكن مع tv=1 داخل الهدف
-      const withTvParam = (path) => {
-        try{
-          const hashIdx = path.indexOf("#");
-          const base = hashIdx >= 0 ? path.slice(0, hashIdx) : path;
-          const hash = hashIdx >= 0 ? path.slice(hashIdx) : "";
-          const sep = base.includes("?") ? "&" : "?";
-          return base + sep + "tv=1" + hash;
-        }catch(e){
-          return path;
-        }
-      };
-
-      // ✅ إلغاء التحويل التلقائي إذا ضغط المستخدم (لإظهار الأزرار)
-      let autoCanceled = false;
-      let rafId = null;
-      let t0 = null;
-      let t1 = null;
-
-      const showActions = () => {
-        if (autoCanceled || didGo) return;
-        autoCanceled = true;
-
-        if (rafId !== null && typeof cancelAnimationFrame === "function") {
-          try{ cancelAnimationFrame(rafId); }catch(e){}
-        }
-        if (t0) { try{ clearTimeout(t0); }catch(e){} }
-        if (t1) { try{ clearTimeout(t1); }catch(e){} }
-
-        spEl.classList.add("hidden");
-        stateTextEl.textContent = "اختر الوضع";
-        stateSubEl.textContent = "فتح اللعبة أو جهاز عرض الشاشة.";
-        actionsEl.classList.remove("hidden");
-      };
-
-      // أول لمسة توقف التحويل وتظهر الأزرار
-      window.addEventListener("pointerdown", showActions, { once:true, passive:true });
-
-      // أزرار
-      btnGo.addEventListener("click", () => go(r));
-      btnTv.addEventListener("click", () => {
-        try{ sessionStorage.setItem("sandooq_tv_mode", "1"); }catch(e){}
-        go(withTvParam(r));
-      });
 
       // ✅ تسجيل Service Worker بأسرع وقت (بدون ما نوقف التحويل)
       const canSW =
@@ -208,20 +385,332 @@
         }catch(e){}
       }
 
-      // ✅ تحويل فوري تقريباً (غير ملحوظ) ما لم يتم إلغاؤه بلمسة
-      const autoGo = () => { if (!autoCanceled) go(r); };
+      // =========================
+      // ✅ وضع جهاز عرض الشاشة
+      // URL: index.html?display=1&code=ROOM_CODE
+      // =========================
+      const isDisplay = (qs.get("display") === "1");
+      if(isDisplay){
+        document.body.classList.add("displayMode");
+        document.getElementById("tvRoot").classList.remove("hidden");
 
+        const tvMsg = document.getElementById("tvMsg");
+        const tvGameName = document.getElementById("tvGameName");
+        const tvScoreGreen = document.getElementById("tvScoreGreen");
+        const tvScoreOrange = document.getElementById("tvScoreOrange");
+
+        const tvZoom = document.getElementById("tvZoom");
+        const mapScale = document.getElementById("mapScale");
+        const mapBox = document.getElementById("mapBox");
+        const mapImg = document.getElementById("mapImg");
+        const overlay = document.getElementById("overlay");
+
+        const code = (qs.get("code") || "").trim();
+        if(!code){
+          tvMsg.textContent = "رمز الغرفة غير موجود بالرابط.";
+          return;
+        }
+
+        // ✅ (نفس فكرة كسر الكاش للخرائط)
+        const ASSET_VERSION = (qs.get("v") || "2026-02-15-1");
+        const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
+
+        // ✅ إعداد SVG خلايا 5x5
+        overlay.innerHTML = "";
+        overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        const svgNS = "http://www.w3.org/2000/svg";
+        for(let row=0; row<5; row++){
+          for(let col=0; col<5; col++){
+            const poly = document.createElementNS(svgNS, "polygon");
+            poly.classList.add("cell", "state0");
+            poly.setAttribute("data-row", row);
+            poly.setAttribute("data-col", col);
+            overlay.appendChild(poly);
+          }
+        }
+        const CELLS = Array.from(overlay.querySelectorAll(".cell"));
+
+        function escapeHtml(s){
+          return String(s ?? "").replace(/[&<>"']/g, c => ({
+            "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+          }[c]));
+        }
+        function setGameName(raw){
+          const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
+          if(!s0){ tvGameName.textContent = "—"; return; }
+          const MAX_CHARS = 80;
+          let s = s0;
+          if(s.length > MAX_CHARS) s = s.slice(0, MAX_CHARS - 1).trim() + "…";
+          tvGameName.textContent = s;
+        }
+        function clamp(n,min,max){
+          n = Number(n);
+          if(!Number.isFinite(n)) n = min;
+          return Math.max(min, Math.min(max, n));
+        }
+
+        function cellKey(row,col){ return `${row}-${col}`; }
+
+        function setStateClass(el, st){
+          el.classList.remove("state0","state1","state2","state3","pulse");
+          el.classList.add(`state${st}`);
+          if(st === 1) el.classList.add("pulse");
+        }
+
+        function hexPointsPointyTop(x, y, w, h){
+          const pts = [
+            [x + w/2, y],
+            [x + w,   y + h*0.25],
+            [x + w,   y + h*0.75],
+            [x + w/2, y + h],
+            [x,       y + h*0.75],
+            [x,       y + h*0.25],
+          ];
+          return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
+        }
+
+        // ✅ اكتشاف مساحة شبكة السداسي داخل صورة الخريطة (نفس فكرة game_full)
+        const BBOX_CACHE = {};
+        function detectHexBBox(img){
+          const nw = img.naturalWidth, nh = img.naturalHeight;
+          const maxW = 700;
+          const scale = Math.min(1, maxW / nw);
+
+          const cw = Math.round(nw * scale);
+          const ch = Math.round(nh * scale);
+
+          const canvas = document.createElement("canvas");
+          canvas.width = cw; canvas.height = ch;
+          const ctx = canvas.getContext("2d", { willReadFrequently:true });
+          ctx.drawImage(img, 0, 0, cw, ch);
+
+          const data = ctx.getImageData(0,0,cw,ch).data;
+
+          let minX = cw, minY = ch, maxX = -1, maxY = -1;
+          let found = false;
+
+          const step = 2;
+          for(let y=0; y<ch; y+=step){
+            for(let x=0; x<cw; x+=step){
+              const i = (y*cw + x) * 4;
+              const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+              if(a < 10) continue;
+
+              // نلتقط البكسلات "غير الخلفية" بشكل عام
+              const bright = (r + g + b) / 3;
+              if(bright < 245){
+                found = true;
+                if(x < minX) minX = x;
+                if(y < minY) minY = y;
+                if(x > maxX) maxX = x;
+                if(y > maxY) maxY = y;
+              }
+            }
+          }
+
+          if(!found){
+            return { x0:0.12, y0:0.04, x1:0.90, y1:0.95 };
+          }
+
+          minX = Math.max(0, minX - 2);
+          minY = Math.max(0, minY - 2);
+          maxX = Math.min(cw - 1, maxX + 2);
+          maxY = Math.min(ch - 1, maxY + 2);
+
+          return {
+            x0: minX / cw,
+            y0: minY / ch,
+            x1: (maxX + 1) / cw,
+            y1: (maxY + 1) / ch,
+          };
+        }
+
+        function applyZoomFix(){
+          const z = clamp(tvZoom.value || 1, 0.8, 1.35);
+          mapScale.style.setProperty("--zoom", z);
+
+          // ✅ حتى ما "يتغطى" المحتوى: نضيف مساحة أسفل عند التكبير
+          const baseH = mapBox.offsetHeight || 0;
+          const extra = Math.max(0, baseH * (z - 1));
+          mapScale.parentElement.style.marginBottom = `${extra}px`;
+        }
+
+        const ZOOM_KEY = `sabaq_tv_zoom_${code}`;
+        const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
+        if(Number.isFinite(savedZoom) && savedZoom >= 0.8 && savedZoom <= 1.35){
+          tvZoom.value = String(savedZoom);
+        }
+        tvZoom.addEventListener("input", () => {
+          try{
+            localStorage.setItem(ZOOM_KEY, String(tvZoom.value || "1"));
+          }catch(e){}
+          applyZoomFix();
+        });
+
+        function placeHexes(srcKey){
+          const W = mapImg.clientWidth;
+          const H = mapImg.clientHeight;
+          if(!W || !H) return;
+
+          overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
+          overlay.setAttribute("preserveAspectRatio", "none");
+
+          const bbox = BBOX_CACHE[srcKey];
+          if(!bbox) return;
+
+          const x0 = bbox.x0 * W;
+          const y0 = bbox.y0 * H;
+          const x1 = bbox.x1 * W;
+          const y1 = bbox.y1 * H;
+
+          const gridW = x1 - x0;
+          const gridH = y1 - y0;
+
+          const w = gridW / 5.5;
+          const h = gridH / 4.0;
+          const stepY = h * 0.75;
+
+          let i = 0;
+          for(let row=0; row<5; row++){
+            for(let col=0; col<5; col++){
+              const left = x0 + col*w + (row%2)*(w/2);
+              const top  = y0 + row*stepY;
+              CELLS[i++].setAttribute("points", hexPointsPointyTop(left, top, w, h));
+            }
+          }
+
+          applyZoomFix();
+        }
+
+        function setMapSrc(activeMap){
+          const srcBase = ([
+            "maps/map1.jpeg",
+            "maps/map2.jpeg",
+            "maps/map3.jpeg"
+          ][activeMap] || "maps/map1.jpeg");
+
+          const key = srcBase;
+          mapImg.src = srcBase + vq;
+
+          const onReady = () => {
+            try{
+              if(!BBOX_CACHE[key]) BBOX_CACHE[key] = detectHexBBox(mapImg);
+              requestAnimationFrame(()=> placeHexes(key));
+            }catch(e){}
+          };
+          if(mapImg.complete) onReady();
+          else mapImg.addEventListener("load", onReady, { once:true });
+
+          window.addEventListener("resize", () => {
+            try{ placeHexes(key); applyZoomFix(); }catch(e){}
+          }, { passive:true });
+
+          return key;
+        }
+
+        // ✅ Firebase (قراءة فقط)
+        (async () => {
+          try{
+            tvMsg.textContent = "جاري الاتصال بالغرفة…";
+
+            const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+            const { getDatabase, ref, onValue } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js");
+
+            const firebaseConfig = {
+              apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
+              authDomain: "sabaq-alhorof.firebaseapp.com",
+              databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
+              projectId: "sabaq-alhorof",
+              storageBucket: "sabaq-alhorof.firebasestorage.app",
+              messagingSenderId: "1053646928152",
+              appId: "1:1053646928152:web:032d50148c3a4f1148066d"
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const db = getDatabase(app);
+
+            const roomRef = ref(db, `rooms/${code}`);
+
+            let lastMapKey = null;
+            let lastActiveMap = null;
+
+            onValue(roomRef, (snap) => {
+              const room = snap.val();
+              if(!room){
+                tvMsg.textContent = "الغرفة غير موجودة أو لم يتم إنشاؤها بعد.";
+                return;
+              }
+
+              setGameName(room.name);
+
+              const scores = room.scores || { green:0, orange:0 };
+              tvScoreGreen.textContent = String(Number(scores.green ?? 0));
+              tvScoreOrange.textContent = String(Number(scores.orange ?? 0));
+
+              const activeMap = Number(room.activeMap || 0);
+              if(lastActiveMap !== activeMap){
+                lastActiveMap = activeMap;
+                lastMapKey = setMapSrc(activeMap);
+              }
+
+              const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
+              for(const cell of CELLS){
+                const r = Number(cell.getAttribute("data-row"));
+                const c = Number(cell.getAttribute("data-col"));
+                const k = cellKey(r,c);
+                const st = Number(mapStates?.[k] ?? 0);
+                setStateClass(cell, st);
+              }
+
+              tvMsg.textContent = ""; // ✅ جاهز
+              dbg("DISPLAY room ok: " + code + " map=" + activeMap);
+            }, (err) => {
+              tvMsg.textContent = "تعذر قراءة بيانات الغرفة.";
+              dbg("onValue error: " + (err?.message || err));
+            });
+
+          }catch(e){
+            tvMsg.textContent = "حدث خطأ أثناء تشغيل جهاز العرض.";
+            dbg("init error: " + (e?.message || e));
+          }
+        })();
+
+        return; // ✅ لا نكمل تحويل فتح اللعبة
+      }
+
+      // =========================
+      // ✅ الوضع العادي: فتح اللعبة بسرعة (كما هو)
+      // =========================
+
+      // هدف اللعبة
+      let r = (qs.get("r") || "game_full.html").trim();
+      r = r.replace(/^\/+/, "");
+      if (r.startsWith("http://") || r.startsWith("https://")) {
+        try { r = new URL(r).pathname.replace(/^\/+/, ""); } catch(e){}
+      }
+
+      dbg("redirect -> " + r);
+
+      // ✅ Redirect مرة واحدة فقط
+      let didGo = false;
+      const go = () => {
+        if (didGo) return;
+        didGo = true;
+        location.replace(r);
+      };
+
+      // ✅ تحويل فوري تقريباً (غير ملحوظ)
       if (typeof requestAnimationFrame === "function") {
-        rafId = requestAnimationFrame(autoGo);
+        requestAnimationFrame(go);
       } else {
-        t0 = setTimeout(autoGo, 0);
+        setTimeout(go, 0);
       }
 
       // ✅ ضمان: لو أي سبب ما تحوّل
-      t1 = setTimeout(autoGo, 120);
+      setTimeout(go, 120);
     })();
   </script>
 
-  <!-- VERSION: index.html — vFastOpen-3 -->
+  <!-- VERSION: index.html — vFastOpen-3 + DisplayMode -->
 </body>
 </html>
