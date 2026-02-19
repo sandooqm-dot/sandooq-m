@@ -1045,21 +1045,30 @@
     }
 
     
-    /* ✅ (TV) جهاز عرض الشاشة */
-    body.tvMode header{display:none;}
-    body.tvMode .footerBtn{display:none;}
-    body.tvMode .rights{display:none;}
-    body.tvMode .wrap{padding-top:92px;}
-    body.tvMode #main.card{background:transparent;border:none;box-shadow:none;padding:0;}
+        /* ✅ (TV) جهاز عرض الشاشة */
+    body.tvMode header{ display:none !important; }
+    body.tvMode .footerBtn{ display:none !important; }
+    body.tvMode .rights{ display:none !important; }
+
+    body.tvMode .wrap{ padding-top:92px; }
+    body.tvMode #main.card{
+      background:transparent;
+      border:none;
+      box-shadow:none;
+      padding:0;
+    }
+
     .tvTopBar{
-      position:fixed;top:0;left:0;right:0;z-index:24000;
-      /* ✅ TV Mode Top Bar (LTR layout to match المطلوب) */
-      direction:ltr;
+      position:fixed;
+      top:0; left:0; right:0;
+      z-index:24000;
+      direction:ltr; /* ترتيب: لوجو-سلايدر-اسم اللعبة-النتائج */
       background:rgba(0,0,0,.22);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      border-bottom:4px solid rgba(255,255,255,.22);
+      border-bottom:1px solid rgba(255,255,255,.18);
       padding:10px 12px;
+      color:#fff;
     }
     .tvBarRow{
       display:flex;
@@ -1067,9 +1076,9 @@
       justify-content:space-between;
       gap:10px;
       flex-wrap:nowrap;
-      direction:ltr;
+      width:100%;
     }
-    .tvRight{
+    .tvLeft{
       display:flex;
       align-items:center;
       gap:10px;
@@ -1077,83 +1086,81 @@
       min-width:0;
     }
     .tvLogo{
-      width:54px;height:54px;object-fit:contain;
-      filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
+      width:52px;
+      height:52px;
+      object-fit:contain;
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,.22));
       user-select:none;
-      flex:0 0 auto;
+      pointer-events:none;
     }
     .tvZoom{
-      width:160px;
-      max-width:28vw;
-      flex:0 0 auto;
+      width:150px;
+      max-width:32vw;
+      accent-color: var(--yellow);
     }
     .tvGameName{
       flex:1 1 auto;
       min-width:0;
       text-align:center;
-      direction:rtl; /* اسم اللعبة عربي */
       font-weight:900;
-      font-size:26px;
-      color:#fff;
-      text-shadow:0 10px 22px rgba(0,0,0,.35);
+      font-size:20px;
+      line-height:1.1;
+      direction:rtl;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      padding:0 10px;
+      padding:0 6px;
     }
-    .tvScoreBoard{
-      display:flex;
-      align-items:center;
-      gap:8px;
+    .tvScoreWrap{
       flex:0 0 auto;
       min-width:0;
-      pointer-events:none;
+      pointer-events:none; /* النتائج غير قابلة للتفاعل */
     }
-    .tvScoreCol{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      background:rgba(255,255,255,.90);
-      border:3px solid rgba(0,0,0,.80);
-      border-radius:14px;
-      padding:7px 9px;
-      box-shadow:0 10px 22px rgba(0,0,0,.20);
-      flex:0 0 auto;
-      white-space:nowrap;
-    }
-    .tvTeamName{
-      font-weight:900;
-      font-size:14px;
-      color:#111;
-      opacity:.85;
-    }
-    .tvScoreNum{
-      font-weight:900;
-      font-size:26px;
-      color:#111;
-      min-width:30px;
-      text-align:center;
-    }
-    .tvContent{padding:0 0 12px;}
-    body.tvMode .mapBox{pointer-events:none;}
-    body.tvMode .overlaySvg{pointer-events:none;}
 
-    /* ✅ موبايل: نخلي كل شيء أصغر حتى ما يغطي السلايدر */
+    /* ✅ نفس لوحة النتائج القديمة لكن مصغّرة لتناسب الشريط */
+    body.tvMode .tvTopBar .scoreBoard{
+      direction:rtl;
+      width:auto;
+      margin:0;
+      gap:8px;
+      justify-content:flex-end;
+      flex-wrap:nowrap;
+    }
+    body.tvMode .tvTopBar .teamPill{
+      flex:0 0 auto;
+      height:42px;
+      font-size:14px;
+      border-width:3px;
+      padding:0 12px;
+    }
+    body.tvMode .tvTopBar .scoreBox{
+      width:46px;
+      height:42px;
+      font-size:20px;
+      border-width:3px;
+      border-radius:12px;
+    }
+
+    .tvContent{
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+      padding-top:0;
+    }
+    body.tvMode .mapToolsRow{ display:none !important; } /* لا أدوات تحت الخريطة في TV */
+    body.tvMode .landLeft{ display:none !important; }   /* لا مؤقت/أزرار/سؤال */
+    body.tvMode .overlaySvg{ pointer-events:none !important; } /* الخريطة غير قابلة للنقر */
+
     @media (max-width:520px){
+      body.tvMode .wrap{ padding-top:86px; }
       .tvLogo{width:46px;height:46px;}
       .tvZoom{width:120px;max-width:34vw;}
-      .tvGameName{font-size:20px;}
-      .tvTeamName{display:none;}
-      .tvScoreCol{padding:6px 7px;gap:6px;border-width:3px;}
-      .tvScoreNum{font-size:22px;}
+      .tvGameName{font-size:18px;}
+      body.tvMode .tvTopBar .teamPill{height:38px;font-size:12px;padding:0 10px;}
+      body.tvMode .tvTopBar .scoreBox{width:42px;height:38px;font-size:18px;}
     }
 
-      .tvGameName{font-size:22px;}
-      .tvScoreCol{padding:6px 8px;}
-      .tvScoreNum{font-size:24px;}
-    }
-
-/* موبايل صغير */
+    /* موبايل صغير */
     @media (max-width:420px){
       h1{ font-size:46px; }
       .gameName{ min-height:52px; }
@@ -2645,7 +2652,7 @@ if(homeBtn && role !== "host"){
       main.classList.add("inGame");
       setGameName(room?.name);
       if(GAME_UI.els?.tvGameName){
-        const nm = String(room?.name || "").trim();
+        const nm = String((room?.name ?? room?.gameName ?? room?.title ?? "") || "").trim();
         GAME_UI.els.tvGameName.textContent = nm || "";
       }
 
@@ -3128,24 +3135,21 @@ if(homeBtn && role !== "host"){
       const sg = Number(room?.scores?.green ?? 0);
       const so = Number(room?.scores?.orange ?? 0);
 
-      main.innerHTML = `
-        <div class="tvTopBar">
+      main.innerHTML = `        <div class="tvTopBar">
           <div class="tvBarRow">
-            <div class="tvRight">
-              <img class="tvLogo" src="logo.png?v=2026-02-15-1" alt="صندوق المسابقات" draggable="false" onerror="this.style.display='none'">
-              <input id="zoom" class="tvZoom" type="range" min="0.8" max="1.35" step="0.01" value="${initialZoom}">
+            <div class="tvLeft">
+              <img class="tvLogo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
+              <input id="zoom" class="tvZoom" type="range" min="0.8" max="1.35" step="0.01" value="${initialZoom}" aria-label="تكبير تصغير الخريطة"/>
             </div>
 
             <div id="tvGameName" class="tvGameName"></div>
 
-            <div class="tvScoreBoard" aria-hidden="true">
-              <div class="tvScoreCol green">
-                <div class="tvTeamName">الأخضر</div>
-                <div id="scoreGreen" class="tvScoreNum">${Number.isFinite(sg)?sg:0}</div>
-              </div>
-              <div class="tvScoreCol orange">
-                <div class="tvTeamName">البرتقالي</div>
-                <div id="scoreOrange" class="tvScoreNum">${Number.isFinite(so)?so:0}</div>
+            <div class="tvScoreWrap" aria-hidden="true">
+              <div class="scoreBoard">
+                <div class="teamPill green">الفريق الأخضر</div>
+                <div id="scoreGreen" class="scoreBox">${Number.isFinite(sg) ? sg : 0}</div>
+                <div id="scoreOrange" class="scoreBox">${Number.isFinite(so) ? so : 0}</div>
+                <div class="teamPill orange">الفريق البرتقالي</div>
               </div>
             </div>
           </div>
@@ -3153,15 +3157,14 @@ if(homeBtn && role !== "host"){
 
         <div class="tvContent">
           <div class="mapOuter">
-            <div id="mapScale" class="mapScale" style="--zoom:${initialZoom}">
+            <div id="mapScale" class="mapScale" style="--zoom:${initialZoom};transform:scale(${initialZoom});transform-origin:center top;">
               <div id="mapBox" class="mapBox">
-                <img id="mapImg" src="${src}" alt="الخريطة" draggable="false" />
+                <img id="mapImg" src="" alt="" decoding="async">
                 <svg id="overlay" class="overlaySvg"></svg>
               </div>
             </div>
           </div>
-        </div>
-      `;
+        </div>`;
 
       const mapOuter = main.querySelector(".mapOuter");
       const mapScale = document.getElementById("mapScale");
@@ -3216,6 +3219,9 @@ if(homeBtn && role !== "host"){
       function applyZoomFix(){
         const z = Number(zoom.value || 1);
         mapScale.style.setProperty("--zoom", String(z));
+        // ✅ دعم مباشر للـ transform (عشان الـ iOS ما يصير السلايدر منظر)
+        mapScale.style.transform = `scale(${z})`;
+        mapScale.style.transformOrigin = "center top";
         localStorage.setItem(ZOOM_KEY, String(z));
 
         // اضبط المساحة أسفل الخريطة حتى لا تنقص عند التكبير
@@ -3250,7 +3256,7 @@ if(homeBtn && role !== "host"){
       }
 
       // تعبئة اسم اللعبة في الشريط العلوي
-      const nm = String(room?.name || "").trim();
+      const nm = String((room?.name ?? room?.gameName ?? room?.title ?? "") || "").trim();
       if(GAME_UI.els.tvGameName) GAME_UI.els.tvGameName.textContent = nm || "";
     }
 
@@ -3264,7 +3270,7 @@ if(homeBtn && role !== "host"){
 
       setGameName(room?.name);
       if(GAME_UI.els?.tvGameName){
-        const nm = String(room?.name || "").trim();
+        const nm = String((room?.name ?? room?.gameName ?? room?.title ?? "") || "").trim();
         GAME_UI.els.tvGameName.textContent = nm || "";
       }
 
