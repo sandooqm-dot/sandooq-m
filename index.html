@@ -108,6 +108,12 @@
       <div class="title"><span id="stateText">جاري فتح اللعبة</span><span class="spinner" id="sp"></span></div>
       <p class="sub" id="stateSub">لحظة.. جاري فتح اللعبة.</p>
 
+      <!-- ✅ زر جهاز عرض الشاشة (يظهر إذا ضغط المستخدم على الشاشة قبل التحويل التلقائي) -->
+      <div class="row hidden" id="actions">
+        <button class="btn-primary" id="btnGo">فتح اللعبة</button>
+        <button class="btn-secondary" id="btnTv">جهاز عرض الشاشة</button>
+      </div>
+
       <div class="dbg" id="dbg"></div>
     </div>
     <div class="small">© صندوق المسابقات</div>
@@ -129,15 +135,67 @@
       if (DBG) dbgEl.style.display = "block";
       const dbg = (t)=>{ if(DBG){ dbgEl.textContent = t; } };
 
+      const stateTextEl = document.getElementById("stateText");
+      const stateSubEl  = document.getElementById("stateSub");
+      const spEl        = document.getElementById("sp");
+      const actionsEl   = document.getElementById("actions");
+      const btnGo       = document.getElementById("btnGo");
+      const btnTv       = document.getElementById("btnTv");
+
       dbg("redirect -> " + r);
 
       // ✅ Redirect مرة واحدة فقط
       let didGo = false;
-      const go = () => {
+      const go = (to) => {
         if (didGo) return;
         didGo = true;
-        location.replace(r);
+        location.replace(to || r);
       };
+
+      // ✅ رابط نفس الصفحة لكن مع tv=1 داخل الهدف
+      const withTvParam = (path) => {
+        try{
+          const hashIdx = path.indexOf("#");
+          const base = hashIdx >= 0 ? path.slice(0, hashIdx) : path;
+          const hash = hashIdx >= 0 ? path.slice(hashIdx) : "";
+          const sep = base.includes("?") ? "&" : "?";
+          return base + sep + "tv=1" + hash;
+        }catch(e){
+          return path;
+        }
+      };
+
+      // ✅ إلغاء التحويل التلقائي إذا ضغط المستخدم (لإظهار الأزرار)
+      let autoCanceled = false;
+      let rafId = null;
+      let t0 = null;
+      let t1 = null;
+
+      const showActions = () => {
+        if (autoCanceled || didGo) return;
+        autoCanceled = true;
+
+        if (rafId !== null && typeof cancelAnimationFrame === "function") {
+          try{ cancelAnimationFrame(rafId); }catch(e){}
+        }
+        if (t0) { try{ clearTimeout(t0); }catch(e){} }
+        if (t1) { try{ clearTimeout(t1); }catch(e){} }
+
+        spEl.classList.add("hidden");
+        stateTextEl.textContent = "اختر الوضع";
+        stateSubEl.textContent = "فتح اللعبة أو جهاز عرض الشاشة.";
+        actionsEl.classList.remove("hidden");
+      };
+
+      // أول لمسة توقف التحويل وتظهر الأزرار
+      window.addEventListener("pointerdown", showActions, { once:true, passive:true });
+
+      // أزرار
+      btnGo.addEventListener("click", () => go(r));
+      btnTv.addEventListener("click", () => {
+        try{ sessionStorage.setItem("sandooq_tv_mode", "1"); }catch(e){}
+        go(withTvParam(r));
+      });
 
       // ✅ تسجيل Service Worker بأسرع وقت (بدون ما نوقف التحويل)
       const canSW =
@@ -146,23 +204,24 @@
 
       if (canSW) {
         try{
-          // حاول نسجّل بسرعة بدون انتظار ready (عشان الصفحة ما تكون ملحوظة)
           navigator.serviceWorker.register("./sw.js").catch(() => {});
         }catch(e){}
       }
 
-      // ✅ تحويل فوري تقريباً (غير ملحوظ)
+      // ✅ تحويل فوري تقريباً (غير ملحوظ) ما لم يتم إلغاؤه بلمسة
+      const autoGo = () => { if (!autoCanceled) go(r); };
+
       if (typeof requestAnimationFrame === "function") {
-        requestAnimationFrame(go);
+        rafId = requestAnimationFrame(autoGo);
       } else {
-        setTimeout(go, 0);
+        t0 = setTimeout(autoGo, 0);
       }
 
       // ✅ ضمان: لو أي سبب ما تحوّل
-      setTimeout(go, 120);
+      t1 = setTimeout(autoGo, 120);
     })();
   </script>
 
-  <!-- VERSION: index.html — vFastOpen-2 -->
+  <!-- VERSION: index.html — vFastOpen-3 -->
 </body>
 </html>
