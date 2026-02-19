@@ -1048,6 +1048,114 @@
       .pillBtn{ height:72px; font-size:26px; }
       .qText{ font-size:30px; }
     }
+  
+    /* ✅ TV: اختيار جهاز العرض (داخل اللوبي) */
+    .tvSelect{
+      width:100%;
+      margin-top:10px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:3px solid rgba(0,0,0,.25);
+      font-size:18px;
+      font-weight:800;
+      outline:none;
+      background:#fff;
+    }
+
+    /* ✅ TV Mode (جهاز العرض) */
+    body.tvMode header,
+    body.tvMode #homeBtn,
+    body.tvMode .rights{
+      display:none !important;
+    }
+    body.tvMode .wrap{ padding-top:0; }
+
+    .tvBar{
+      position:fixed;
+      inset:0 0 auto 0;
+      height:68px;
+      z-index:50;
+      display:grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      box-sizing:border-box;
+      background: rgba(80, 20, 70, .92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,.18);
+    }
+    .tvRight{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      justify-content:flex-start;
+    }
+    .tvLogo{
+      width:44px;height:44px;
+      object-fit:contain;
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,.25));
+      user-select:none;
+      pointer-events:none;
+    }
+    .tvZoom{
+      flex:1;
+      min-width:110px;
+      max-width:260px;
+    }
+    .tvZoom input[type="range"]{ width:100%; }
+
+    .tvTitle{
+      text-align:center;
+      color:#fff;
+      font-weight:1000;
+      font-size:18px;
+      letter-spacing:.2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      padding:0 8px;
+    }
+    .tvLeft{
+      display:flex;
+      justify-content:flex-end;
+    }
+    .tvScore{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      transform: scale(.92);
+      transform-origin: left center;
+    }
+
+    body.tvMode #main.card{
+      width:min(980px, 96vw);
+      margin:0 auto;
+      padding:0;
+      background: transparent;
+      border:none;
+      box-shadow:none;
+    }
+    .tvBody{
+      padding-top:78px;
+    }
+    body.tvMode .mapOuter{
+      margin-top:0;
+    }
+    body.tvMode .mapBox,
+    body.tvMode .overlaySvg{
+      pointer-events:none !important;
+      touch-action:none !important;
+    }
+
+    body.tvMode .gameLayout{ padding-top:78px; }
+    body.tvMode .landLeft{ display:none !important; }
+    body.tvMode .mapToolsRow{ display:none !important; }
+    body.tvMode .scoreBoard{ display:none !important; }
+    body.tvMode .landRight{ width:100% !important; flex:1 !important; }
+    body.tvMode .mapOuter{ margin-top:0 !important; }
+
   </style>
 </head>
 
@@ -1395,7 +1503,8 @@ if(homeBtn && role !== "host"){
         timer: { sel:10, dur:10, running:false, startTs:0, done:false },
         questionMode: "default",
         customQuestions: {},
-        customQuestionsUpdatedAt: 0
+        customQuestionsUpdatedAt: 0,
+        displayPid: null
       },
       me: null
     };
@@ -2323,6 +2432,7 @@ if(homeBtn && role !== "host"){
           <div class="row">
             <button id="shareBtn" class="btn btnYellow">مشاركة اللعبة للاعبين</button>
             <button id="startBtn" class="btn btnGreen">ابدأ اللعبة</button>
+            <button id="tvBtn" class="btn btnOrange">عرض الشاشة</button>
           </div>
 
           <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
@@ -2360,6 +2470,21 @@ if(homeBtn && role !== "host"){
                 </div>
               </div>
             </div>
+          <div id="tvBackdrop" class="shareBackdrop">
+            <div class="shareModal">
+              <button id="tvClose" class="shareClose" aria-label="إغلاق">×</button>
+              <div class="shareTitle">جهاز عرض الشاشة</div>
+              <div class="shareSmall">اختر لاعبًا ليكون جهاز العرض (خريطة + نتائج فقط)</div>
+
+              <select id="tvSelect" class="tvSelect" aria-label="اختيار لاعب"></select>
+
+              <div class="row" style="justify-content:center;margin-top:12px">
+                <button id="tvApply" class="btn btnGreen">تأكيد</button>
+                <button id="tvClear" class="btn btnYellow">إلغاء</button>
+              </div>
+            </div>
+          </div>
+
           </div>
         </div>
       `;
@@ -2465,6 +2590,66 @@ if(homeBtn && role !== "host"){
       }
     }
 
+
+      // ✅ TV: اختيار لاعب كجهاز عرض
+      const tvBackdrop = document.getElementById("tvBackdrop");
+      const tvBtn = document.getElementById("tvBtn");
+      const tvClose = document.getElementById("tvClose");
+      const tvSelect = document.getElementById("tvSelect");
+      const tvApply = document.getElementById("tvApply");
+      const tvClear = document.getElementById("tvClear");
+
+      const fillTv = () => {
+        if(!tvSelect) return;
+        const entries = Object.entries(players || {})
+          .map(([id,p]) => ({id, name: p?.name || "", team: p?.team || ""}))
+          .filter(x => x.name && x.name.trim().length);
+        tvSelect.innerHTML = entries.map(x => {
+          const teamTxt = (x.team === "green") ? " (أخضر)" : (x.team === "orange") ? " (برتقالي)" : "";
+          const sel = (LIVE.room.displayPid && LIVE.room.displayPid === x.id) ? "selected" : "";
+          return `<option value="${escapeHtml(x.id)}" ${sel}>${escapeHtml(x.name)}${teamTxt}</option>`;
+        }).join("") || `<option value="">لا يوجد لاعبين</option>`;
+      };
+
+      const openTv = () => {
+        fillTv();
+        tvBackdrop.style.display = "flex";
+      };
+      const closeTv = () => {
+        tvBackdrop.style.display = "none";
+      };
+
+      if(tvBtn){
+        tvBtn.addEventListener("click", openTv);
+        // لو ما فيه لاعبين نخليه يفتح لكن يظهر "لا يوجد"
+      }
+      if(tvClose) tvClose.addEventListener("click", closeTv);
+      if(tvBackdrop){
+        tvBackdrop.addEventListener("click", (e) => {
+          if(e.target === tvBackdrop) closeTv();
+        });
+      }
+
+      if(tvApply){
+        tvApply.addEventListener("click", async () => {
+          const val = (tvSelect?.value || "").trim();
+          if(!val){
+            closeTv();
+            return;
+          }
+          await update(roomRef, { displayPid: val });
+          closeTv();
+        });
+      }
+
+      if(tvClear){
+        tvClear.addEventListener("click", async () => {
+          await update(roomRef, { displayPid: null });
+          closeTv();
+        });
+      }
+
+
     function renderWaiting(msg){
       main.classList.remove("inGame");
       main.innerHTML = `
@@ -2480,11 +2665,103 @@ if(homeBtn && role !== "host"){
     const ANSWER_UI = { revealed:false, sig:"" };
 
     // ✅✅✅ (جديد) رسم واجهة اللعب مرة واحدة فقط (بدون رمشة)
-    function renderGame(room, me){
+    
+
+    function renderDisplay(room, me){
+      // نبني نفس واجهة اللاعب (حتى نحافظ على نفس الخريطة/التحديثات)، ثم نخفي الأزرار ونظهر شريط TV
+      renderGame(room, me);
+
+      // تفعيل وضع TV + شريط علوي ثابت
+      document.body.classList.add("tvMode");
+
+      // إزالة أي شريط قديم ثم إعادة بنائه (لضمان تزامن البيانات)
+      const old = document.getElementById("tvBar");
+      if(old) old.remove();
+
+      const scores = room.scores || { green:0, orange:0 };
+      const sg = Number(scores.green ?? 0);
+      const so = Number(scores.orange ?? 0);
+
+      const rawName = String(room?.name ?? "").replace(/\s+/g, " ").trim();
+      const MAX_CHARS = 80;
+      let showName = rawName;
+      if(showName.length > MAX_CHARS){
+        showName = showName.slice(0, MAX_CHARS - 1).trim() + "…";
+      }
+
+      const bar = document.createElement("div");
+      bar.className = "tvBar";
+      bar.id = "tvBar";
+      bar.innerHTML = `
+        <div class="tvRight">
+          <img class="tvLogo" src="logo.png?v=2026-02-15-1" alt="صندوق المسابقات" onerror="this.style.display='none'">
+          <div class="tvZoom">
+            <input id="tvZoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
+          </div>
+        </div>
+
+        <div id="tvGameTitle" class="tvTitle">${escapeHtml(showName || "")}</div>
+
+        <div class="tvLeft">
+          <div class="tvScore">
+            <div class="teamPill green">الأخضر</div>
+            <div id="tvScoreGreen" class="scoreBox">${Number.isFinite(sg) ? sg : 0}</div>
+            <div id="tvScoreOrange" class="scoreBox">${Number.isFinite(so) ? so : 0}</div>
+            <div class="teamPill orange">البرتقالي</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(bar);
+
+      // ربط الزوم: نخلي tvZoom يتحكم في الزوم الحقيقي داخل الخريطة
+      const tvZoom = document.getElementById("tvZoom");
+      if(tvZoom){
+        // مزامنة قيمة الزوم من السلايدر الأصلي (لو موجود)
+        if(GAME_UI.els.zoom){
+          tvZoom.value = String(GAME_UI.els.zoom.value || 1);
+        }
+        if(!tvZoom.dataset.bound){
+          tvZoom.dataset.bound = "1";
+          tvZoom.addEventListener("input", () => {
+            const v = String(tvZoom.value || "1");
+            if(GAME_UI.els.zoom){
+              GAME_UI.els.zoom.value = v;
+              GAME_UI.els.zoom.dispatchEvent(new Event("input"));
+            }else if(GAME_UI.els.mapScale){
+              GAME_UI.els.mapScale.style.setProperty("--zoom", v);
+            }
+          });
+        }
+      }
+
+      // حفظ مراجع شريط TV لتحديثها في updateGameUI
+      GAME_UI.els.tvZoom = tvZoom;
+      GAME_UI.els.tvScoreGreen = document.getElementById("tvScoreGreen");
+      GAME_UI.els.tvScoreOrange = document.getElementById("tvScoreOrange");
+      GAME_UI.els.tvGameTitle = document.getElementById("tvGameTitle");
+    }
+
+function renderGame(room, me){
       GAME_UI.mounted = true;
+
+      // خروج من وضع جهاز العرض لو كان مفعل
+      document.body.classList.remove("tvMode");
+      const oldTvBar = document.getElementById("tvBar");
+      if(oldTvBar) oldTvBar.remove();
 
       main.classList.add("inGame");
       setGameName(room?.name);
+
+      // TV title (جهاز العرض)
+      if(GAME_UI.els.tvGameTitle){
+        const s0 = String(room?.name ?? "").replace(/\s+/g, " ").trim();
+        const MAX_CHARS = 80;
+        let s = s0;
+        if(s.length > MAX_CHARS){
+          s = s.slice(0, MAX_CHARS - 1).trim() + "…";
+        }
+        GAME_UI.els.tvGameTitle.textContent = s;
+      }
 
       const isHost = role === "host";
       const started = room.status === "started";
@@ -2969,6 +3246,8 @@ if(homeBtn && role !== "host"){
       const so = Number(room?.scores?.orange ?? 0);
       if(GAME_UI.els.scoreGreen) GAME_UI.els.scoreGreen.textContent = String(Number.isFinite(sg) ? sg : 0);
       if(GAME_UI.els.scoreOrange) GAME_UI.els.scoreOrange.textContent = String(Number.isFinite(so) ? so : 0);
+      if(GAME_UI.els.tvScoreGreen) GAME_UI.els.tvScoreGreen.textContent = String(Number.isFinite(sg) ? sg : 0);
+      if(GAME_UI.els.tvScoreOrange) GAME_UI.els.tvScoreOrange.textContent = String(Number.isFinite(so) ? so : 0);
 
       // Freeze UI
       if(isHost && GAME_UI.els.freezeBtn){
@@ -3277,7 +3556,20 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       if(stored && players[stored]) return players[stored];
 
       return null;
+    
+    function getMyPid(players){
+      if(!players) return null;
+
+      if(pid && players[pid]) return pid;
+
+      const k = `sabaq_pid_${code}`;
+      const stored = localStorage.getItem(k);
+      if(stored && players[stored]) return stored;
+
+      return null;
     }
+
+}
 
     function scheduleRender(){
       if(VIEW.scheduled) return;
@@ -3370,6 +3662,20 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         return;
       }
 
+      // ✅ TV device (لاعب تم تعيينه كجهاز عرض)
+      const myPidNow = getMyPid(players);
+      const isDisplay = !!(room.displayPid && myPidNow && room.displayPid === myPidNow);
+
+      if(isDisplay){
+        if(VIEW.type !== "display_game"){
+          renderDisplay(room, LIVE.me);
+          VIEW.type = "display_game";
+        }
+        updateGameUI();
+        afterRender(room);
+        return;
+      }
+
       if(!LIVE.me && playerCount >= MAX_PLAYERS){
         if(VIEW.type !== "wait" || VIEW.waitingMsg !== "الغرفة ممتلئة"){
           VIEW.waitingMsg = "الغرفة ممتلئة";
@@ -3409,6 +3715,13 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         LIVE.room.name = s.val();
         scheduleRender();
       });
+
+      // displayPid (TV)
+      onValue(ref(db, `rooms/${code}/displayPid`), (s) => {
+        LIVE.room.displayPid = s.val();
+        scheduleRender();
+      });
+
 
       // players
       onValue(ref(db, `rooms/${code}/players`), (s) => {
