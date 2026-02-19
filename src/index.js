@@ -58,9 +58,9 @@ export default {
   },
 };
 
-export class RoomDO extends DurableObject {
+// ✅ التعديل هنا فقط: بدون extends DurableObject وبدون super()
+export class RoomDO {
   constructor(state, env) {
-    super(state, env);
     this.state = state;
     this.env = env;
   }
