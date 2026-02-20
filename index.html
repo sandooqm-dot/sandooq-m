@@ -411,6 +411,9 @@
           return;
         }
 
+        // ✅ Cloudflare Worker/DO base (يمكن تغييره من الرابط عبر sync=)
+        const SYNC_BASE = (qs.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
+
         // ✅ (نفس فكرة كسر الكاش للخرائط)
         const ASSET_VERSION = (qs.get("v") || "2026-02-15-1");
         const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
@@ -430,11 +433,6 @@
         }
         const CELLS = Array.from(overlay.querySelectorAll(".cell"));
 
-        function escapeHtml(s){
-          return String(s ?? "").replace(/[&<>"']/g, c => ({
-            "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-          }[c]));
-        }
         function setGameName(raw){
           const s0 = String(raw ?? "").replace(/\s+/g, " ").trim();
           if(!s0){ tvGameName.textContent = "—"; return; }
@@ -469,7 +467,7 @@
           return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
         }
 
-        // ✅ اكتشاف مساحة شبكة السداسي داخل صورة الخريطة (نفس فكرة game_full)
+        // ✅ اكتشاف مساحة شبكة السداسي داخل صورة الخريطة
         const BBOX_CACHE = {};
         function detectHexBBox(img){
           const nw = img.naturalWidth, nh = img.naturalHeight;
@@ -496,7 +494,6 @@
               const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
               if(a < 10) continue;
 
-              // نلتقط البكسلات "غير الخلفية" بشكل عام
               const bright = (r + g + b) / 3;
               if(bright < 245){
                 found = true;
@@ -529,7 +526,6 @@
           const z = clamp(tvZoom.value || 1, 0.8, 1.35);
           mapScale.style.setProperty("--zoom", z);
 
-          // ✅ حتى ما "يتغطى" المحتوى: نضيف مساحة أسفل عند التكبير
           const baseH = mapBox.offsetHeight || 0;
           const extra = Math.max(0, baseH * (z - 1));
           mapScale.parentElement.style.marginBottom = `${extra}px`;
@@ -608,72 +604,78 @@
           return key;
         }
 
-        // ✅ Firebase (قراءة فقط)
-        (async () => {
+        // ✅ (NEW) قراءة الغرفة من Durable Object بدل Firebase
+        let lastActiveMap = null;
+        let lastMapKey = null;
+        let alive = true;
+
+        async function fetchRoom(){
+          const url = `${SYNC_BASE}/state?room=${encodeURIComponent(code)}`;
+          const r = await fetch(url, { cache:"no-store" });
+          const j = await r.json().catch(()=>null);
+          if(!j || !j.ok) throw new Error("STATE_FAIL");
+          return (j.state && typeof j.state === "object") ? j.state : {};
+        }
+
+        function readMapStates(room, activeMap){
+          const ms = room.mapStates;
+          if(!ms || typeof ms !== "object") return {};
+          // يدعم مفاتيح رقمية أو نصية
+          return ms[String(activeMap)] || ms[activeMap] || {};
+        }
+
+        async function tick(){
+          if(!alive) return;
           try{
-            tvMsg.textContent = "جاري الاتصال بالغرفة…";
+            const room = await fetchRoom();
 
-            const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
-            const { getDatabase, ref, onValue } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js");
+            // إذا الغرفة لسه ما انعملت
+            if(!room || Object.keys(room).length === 0){
+              tvMsg.textContent = "الغرفة غير موجودة أو لم يتم إنشاؤها بعد.";
+              return;
+            }
 
-            const firebaseConfig = {
-              apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
-              authDomain: "sabaq-alhorof.firebaseapp.com",
-              databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
-              projectId: "sabaq-alhorof",
-              storageBucket: "sabaq-alhorof.firebasestorage.app",
-              messagingSenderId: "1053646928152",
-              appId: "1:1053646928152:web:032d50148c3a4f1148066d"
-            };
+            setGameName(room.name);
 
-            const app = initializeApp(firebaseConfig);
-            const db = getDatabase(app);
+            const scores = room.scores || { green:0, orange:0 };
+            tvScoreGreen.textContent = String(Number(scores.green ?? 0));
+            tvScoreOrange.textContent = String(Number(scores.orange ?? 0));
 
-            const roomRef = ref(db, `rooms/${code}`);
+            const activeMap = Number(room.activeMap || 0);
+            if(lastActiveMap !== activeMap){
+              lastActiveMap = activeMap;
+              lastMapKey = setMapSrc(activeMap);
+            }
 
-            let lastMapKey = null;
-            let lastActiveMap = null;
+            const mapStates = readMapStates(room, activeMap);
+            for(const cell of CELLS){
+              const r = Number(cell.getAttribute("data-row"));
+              const c = Number(cell.getAttribute("data-col"));
+              const k = cellKey(r,c);
+              const st = Number(mapStates?.[k] ?? 0);
+              setStateClass(cell, st);
+            }
 
-            onValue(roomRef, (snap) => {
-              const room = snap.val();
-              if(!room){
-                tvMsg.textContent = "الغرفة غير موجودة أو لم يتم إنشاؤها بعد.";
-                return;
-              }
-
-              setGameName(room.name);
-
-              const scores = room.scores || { green:0, orange:0 };
-              tvScoreGreen.textContent = String(Number(scores.green ?? 0));
-              tvScoreOrange.textContent = String(Number(scores.orange ?? 0));
-
-              const activeMap = Number(room.activeMap || 0);
-              if(lastActiveMap !== activeMap){
-                lastActiveMap = activeMap;
-                lastMapKey = setMapSrc(activeMap);
-              }
-
-              const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
-              for(const cell of CELLS){
-                const r = Number(cell.getAttribute("data-row"));
-                const c = Number(cell.getAttribute("data-col"));
-                const k = cellKey(r,c);
-                const st = Number(mapStates?.[k] ?? 0);
-                setStateClass(cell, st);
-              }
-
-              tvMsg.textContent = ""; // ✅ جاهز
-              dbg("DISPLAY room ok: " + code + " map=" + activeMap);
-            }, (err) => {
-              tvMsg.textContent = "تعذر قراءة بيانات الغرفة.";
-              dbg("onValue error: " + (err?.message || err));
-            });
+            tvMsg.textContent = "";
+            dbg("DISPLAY(DO) room ok: " + code + " map=" + activeMap);
 
           }catch(e){
-            tvMsg.textContent = "حدث خطأ أثناء تشغيل جهاز العرض.";
-            dbg("init error: " + (e?.message || e));
+            tvMsg.textContent = "تعذر قراءة بيانات الغرفة.";
+            dbg("DO error: " + (e?.message || e));
           }
-        })();
+        }
+
+        function loop(){
+          if(!alive) return;
+          tick();
+          const slow = document.hidden ? 1800 : 900;
+          setTimeout(loop, slow);
+        }
+
+        tvMsg.textContent = "جاري الاتصال بالغرفة…";
+        loop();
+
+        window.addEventListener("beforeunload", ()=>{ alive = false; });
 
         return; // ✅ لا نكمل تحويل فتح اللعبة
       }
@@ -711,6 +713,6 @@
     })();
   </script>
 
-  <!-- VERSION: index.html — vFastOpen-3 + DisplayMode -->
+  <!-- VERSION: index.html — vFastOpen-3 + DisplayMode-DO-1 -->
 </body>
 </html>
