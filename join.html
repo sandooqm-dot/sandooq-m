@@ -5,14 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>الدخول إلى لعبة</title>
 
-  <!-- ✅ تسريع تحميل Firebase + فتح اللعبة -->
+  <!-- ✅ تسريع فتح اللعبة -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="dns-prefetch" href="//www.gstatic.com">
   <link rel="preload" href="game_full.html" as="document">
-
-  <!-- ✅ (1) تسريع إضافي: تحميل موديولات Firebase قبل الضغط -->
-  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js">
-  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js">
 
   <!-- ✅ (2) خط واجهة اللاعبين -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -168,24 +164,12 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
-      authDomain: "sabaq-alhorof.firebaseapp.com",
-      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "sabaq-alhorof",
-      storageBucket: "sabaq-alhorof.firebasestorage.app",
-      messagingSenderId: "1053646928152",
-      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
     const params = new URLSearchParams(location.search);
+
+    // ✅ Sync base (Cloudflare Worker + Durable Objects)
+    const SYNC_BASE = params.get("sync") || "https://horof-sync.sandooq-m.workers.dev";
     const codeFromLink = params.get("code") || "";
+    const syncFromLink = params.get("sync") || "";
 
     const nameEl = document.getElementById("playerName");
     const btn = document.getElementById("joinBtn");
@@ -261,6 +245,54 @@
       }catch(e){}
     }
 
+    function baseUrl(){
+      return String(SYNC_BASE || "").replace(/\/$/,"");
+    }
+
+    async function fetchState(){
+      const url = `${baseUrl()}/state?room=${encodeURIComponent(roomCode)}`;
+      const r = await fetch(url, { cache:"no-store" });
+      const j = await r.json().catch(()=>null);
+      if(!j || !j.ok) throw new Error("STATE_FAIL");
+      return (j.state && typeof j.state === "object") ? j.state : {};
+    }
+
+    async function postAction(patch){
+      const url = `${baseUrl()}/action?room=${encodeURIComponent(roomCode)}`;
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "content-type":"application/json" },
+        body: JSON.stringify(patch || {})
+      });
+      const j = await r.json().catch(()=>null);
+      if(!j || !j.ok) throw new Error("ACTION_FAIL");
+      return (j.state && typeof j.state === "object") ? j.state : null;
+    }
+
+    function countTeams(players){
+      let g=0,o=0;
+      for(const id of Object.keys(players || {})){
+        if(players[id]?.team === "orange") o++;
+        else if(players[id]?.team === "green") g++;
+      }
+      return { g, o };
+    }
+
+    function enforceLimit(players, max=13){
+      const list = Object.entries(players || {}).map(([id, p]) => ({
+        id,
+        joinedAt: Number(p?.joinedAt || 0),
+        p
+      }));
+      list.sort((a,b) => a.joinedAt - b.joinedAt);
+      const keep = list.slice(0, max);
+      const out = {};
+      for(const it of keep){
+        out[it.id] = it.p;
+      }
+      return out;
+    }
+
     async function join(){
       clearError();
 
@@ -277,52 +309,82 @@
       btn.classList.add("loading");
       btn.textContent = "جاري الدخول...";
 
+      const MAX_PLAYERS = 13;
+      const pid = genPid();
+
       try{
-        // ✅ (1) بدل قراءة الغرفة كاملة: نقرأ status فقط (أسرع + أقل تكلفة)
-        const statusSnap = await get(ref(db, `rooms/${roomCode}/status`));
-        if(!statusSnap.exists()){
-          showError("الرابط غير صحيح أو الغرفة غير موجودة");
-          return;
-        }
-        const status = String(statusSnap.val() || "");
-
-        if(status !== "lobby" && status !== "started"){
-          showError("الغرفة غير جاهزة حالياً");
-          return;
-        }
-
-        const pid = genPid();
         localStorage.setItem("sandooq_last_player_name", name);
 
-        // ✅ حد أقصى: 13 لاعب
-        const playersRef = ref(db, `rooms/${roomCode}/players`);
-        const tx = await runTransaction(playersRef, (players) => {
-          players = players || {};
-          const ids = Object.keys(players);
-          if(ids.length >= 13){
-            return; // abort
+        let finalRoom = null;
+
+        // ✅ Retry + Union لتقليل تعارض دخول أكثر من لاعب بنفس اللحظة
+        for(let attempt=0; attempt<4; attempt++){
+          const room = await fetchState();
+          const statusRaw = (room && room.status != null) ? String(room.status) : "";
+          const status = (statusRaw === "started" || statusRaw === "lobby") ? statusRaw : (statusRaw ? statusRaw : "lobby");
+
+          // لو حالة غريبة غير lobby/started
+          if(statusRaw && status !== "lobby" && status !== "started"){
+            showError("الغرفة غير جاهزة حالياً");
+            return;
           }
 
-          // اختيار فريق (الأقل عددًا)
-          let g = 0, o = 0;
-          for(const id of ids){
-            if(players[id]?.team === "orange") o++;
-            else if(players[id]?.team === "green") g++;
+          const players0 = (room.players && typeof room.players === "object") ? room.players : {};
+          const players = { ...players0 };
+
+          // إذا هو موجود أصلاً (نادر)
+          if(players[pid]){
+            finalRoom = room;
+            break;
           }
+
+          // حد أقصى (قبل الإرسال)
+          const ids0 = Object.keys(players);
+          if(ids0.length >= MAX_PLAYERS){
+            showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
+            return;
+          }
+
+          const { g, o } = countTeams(players);
           const team = (g <= o) ? "green" : "orange";
 
-          players[pid] = {
-            name,
-            team,
-            joinedAt: Date.now()
-          };
+          players[pid] = { name, team, joinedAt: Date.now() };
 
-          return players;
-        }, { applyLocally:false });
+          // إرسال تحديث
+          await postAction({ status, players });
 
-        if(!tx.committed){
-          showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
+          // تحقق (pull)
+          const room2 = await fetchState();
+          const p2 = (room2.players && typeof room2.players === "object") ? room2.players : {};
+          if(p2 && p2[pid]){
+            finalRoom = room2;
+            break;
+          }
+
+          // إذا انمسح بسبب تعارض، نعيد المحاولة ونضمّه مع أحدث قائمة
+          await new Promise(r => setTimeout(r, 120 + attempt*80));
+        }
+
+        if(!finalRoom){
+          showError("صار خطأ أثناء الانضمام، حاول مرة ثانية");
           return;
+        }
+
+        // ✅ تطبيق حد 13 بشكل حاسم (keep earliest 13)
+        const pFinal = (finalRoom.players && typeof finalRoom.players === "object") ? finalRoom.players : {};
+        const idsF = Object.keys(pFinal);
+
+        if(idsF.length > MAX_PLAYERS){
+          const trimmed = enforceLimit(pFinal, MAX_PLAYERS);
+          const kept = !!trimmed[pid];
+
+          // نكتب القائمة المقصوصة (حتى ما يزيد العدد)
+          await postAction({ players: trimmed });
+
+          if(!kept){
+            showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
+            return;
+          }
         }
 
         // ✅ علّم الجهاز أنه لاعب
@@ -336,6 +398,7 @@
         u.searchParams.set("guest", "1");
         u.searchParams.set("player", "1");
         u.searchParams.set("view", "player");
+        if(syncFromLink) u.searchParams.set("sync", syncFromLink);
         location.href = u.toString();
 
       }catch(e){
@@ -350,6 +413,6 @@
     nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vPlayerUI-NoCodeBox-FastJoin-4 -->
+  <!-- VERSION: join.html — vDO-Join-1 -->
 </body>
 </html>
