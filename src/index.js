@@ -23,9 +23,6 @@ function json(data, status = 200) {
   });
 }
 
-/* =========================
-   Crypto helpers (HMAC + MD5)
-   ========================= */
 const te = new TextEncoder();
 
 function toHex(buf) {
@@ -47,9 +44,19 @@ async function hmacSha256Hex(secret, message) {
   return toHex(sig);
 }
 
-// Minimal MD5 (for Pusher REST signing)
-function md5Hex(str) {
-  // based on standard MD5 implementation (no deps)
+// ✅ MD5 "مضمون" على Cloudflare (لو مدعوم)، وإلا fallback للـ md5 القديمة
+async function md5HexSafe(str) {
+  try {
+    // Cloudflare Workers تدعم MD5 في أغلب البيئات
+    const dig = await crypto.subtle.digest("MD5", te.encode(str));
+    return toHex(dig);
+  } catch (e) {
+    return md5HexFallback(str);
+  }
+}
+
+// Fallback MD5 (لو لم يُدعم MD5)
+function md5HexFallback(str) {
   function cmn(q, a, b, x, s, t) {
     a = (a + q + x + t) | 0;
     return (((a << s) | (a >>> (32 - s))) + b) | 0;
@@ -187,15 +194,11 @@ function md5Hex(str) {
   return rhex(out[0]) + rhex(out[1]) + rhex(out[2]) + rhex(out[3]);
 }
 
-/* =========================
-   Pusher helpers
-   ========================= */
 function needPusher(env) {
   return env.PUSHER_APP_ID && env.PUSHER_KEY && env.PUSHER_SECRET && env.PUSHER_CLUSTER;
 }
 
 function channelForRoom(room) {
-  // private channel
   return `private-room-${room}`;
 }
 
@@ -206,7 +209,9 @@ async function pusherAuth(env, socketId, channelName) {
 }
 
 async function pusherTrigger(env, room, payloadObj) {
-  if (!needPusher(env)) return;
+  if (!needPusher(env)) {
+    return { ok: false, status: 0, text: "PUSHER_NOT_CONFIGURED" };
+  }
 
   const appId = String(env.PUSHER_APP_ID);
   const key = String(env.PUSHER_KEY);
@@ -214,13 +219,14 @@ async function pusherTrigger(env, room, payloadObj) {
   const cluster = String(env.PUSHER_CLUSTER);
 
   const channel = channelForRoom(room);
+
   const bodyObj = {
     name: "room-update",
     channels: [channel],
     data: JSON.stringify(payloadObj || {}),
   };
   const bodyStr = JSON.stringify(bodyObj);
-  const bodyMd5 = md5Hex(bodyStr);
+  const bodyMd5 = await md5HexSafe(bodyStr);
 
   const ts = Math.floor(Date.now() / 1000);
   const params = {
@@ -241,11 +247,14 @@ async function pusherTrigger(env, room, payloadObj) {
 
   const url = `https://api-${cluster}.pusher.com${path}?${query}&auth_signature=${signature}`;
 
-  await fetch(url, {
+  const resp = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: bodyStr,
   });
+
+  const text = await resp.text().catch(() => "");
+  return { ok: resp.ok, status: resp.status, text };
 }
 
 export default {
@@ -257,13 +266,17 @@ export default {
     const url = new URL(request.url);
     const room = url.searchParams.get("room") || "default";
 
-    // ping
     if (url.pathname === "/health") {
       return withCors(request, json({ ok: true, room }));
     }
 
-    // ✅ Pusher auth for private channels
-    // Pusher will send: socket_id, channel_name (usually form-urlencoded)
+    // ✅ اختبار مباشر: يرجّع لنا نتيجة Pusher (بدون ما نعتمد على Debug Console)
+    if (url.pathname === "/pusher/ping" && request.method === "GET") {
+      const payload = { ping: Date.now(), room };
+      const out = await pusherTrigger(env, room, payload);
+      return withCors(request, json({ ok: true, sent: out.ok, pusher: out }));
+    }
+
     if (url.pathname === "/pusher/auth" && request.method === "POST") {
       try {
         const ct = (request.headers.get("content-type") || "").toLowerCase();
@@ -284,12 +297,9 @@ export default {
         if (!socketId || !channelName) {
           return withCors(request, json({ ok: false, error: "MISSING_FIELDS" }, 400));
         }
-
-        // allow only our room private channels
         if (!channelName.startsWith("private-room-")) {
           return withCors(request, json({ ok: false, error: "BAD_CHANNEL" }, 403));
         }
-
         if (!needPusher(env)) {
           return withCors(request, json({ ok: false, error: "PUSHER_NOT_CONFIGURED" }, 500));
         }
@@ -318,22 +328,24 @@ export default {
         body: bodyText,
       });
 
-      // ✅ fire Pusher event (non-blocking)
+      // ✅ إرسال Pusher (خلفية)
       if (needPusher(env)) {
         let patch = null;
         try { patch = JSON.parse(bodyText); } catch { patch = { raw: bodyText }; }
 
-        const payload = {
-          room,
-          t: Date.now(),
-          patch,
-        };
+        const payload = { room, t: Date.now(), patch };
 
-        try {
-          ctx.waitUntil(pusherTrigger(env, room, payload));
-        } catch (e) {
-          // ignore
+        // إذا debug=1 نخليه ينتظر ويرجع لنا النتيجة داخل header
+        if (url.searchParams.get("debug") === "1") {
+          const out = await pusherTrigger(env, room, payload);
+          const rr = new Response(r.body, r);
+          rr.headers.set("x-pusher-ok", String(out.ok));
+          rr.headers.set("x-pusher-status", String(out.status));
+          rr.headers.set("x-pusher-text", (out.text || "").slice(0, 200));
+          return withCors(request, rr);
         }
+
+        try { ctx.waitUntil(pusherTrigger(env, room, payload)); } catch {}
       }
 
       return withCors(request, r);
@@ -360,9 +372,7 @@ export class RoomDO {
 
     if (url.pathname === "/action") {
       let body = {};
-      try {
-        body = await request.json();
-      } catch {}
+      try { body = await request.json(); } catch {}
 
       const current = (await this.state.storage.get("state")) || {};
       const next = (body && typeof body === "object") ? { ...current, ...body } : current;
@@ -375,4 +385,4 @@ export class RoomDO {
   }
 }
 
-/* VERSION: src/index.js — vPusher-1 */
+/* VERSION: src/index.js — vPusher-2-debug */
