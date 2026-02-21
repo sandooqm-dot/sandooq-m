@@ -186,7 +186,7 @@
     const pid  = (params.get("pid") || "").trim();
 
     // ✅ Sync base (Cloudflare Worker + DO)
-    const SYNC_BASE = (params.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
+    const SYNC_BASE = (params.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
 
     // نخزنها (مخفية) للاحتياط بدون ما نعرضها
     try{
