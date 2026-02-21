@@ -10,10 +10,6 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <!-- ✅ تسريع تحميل Firebase -->
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="dns-prefetch" href="//www.gstatic.com">
-
   <style>
     :root{
       --bg:#7b1f63;
@@ -177,7 +173,7 @@
       transform-origin: top center;
     }
 
-    /* صورة الخريطة (من جذر المستودع) */
+    /* صورة الخريطة */
     .mapBg{
       position:absolute;
       inset:0;
@@ -372,14 +368,8 @@
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import {
-      getDatabase, ref, onValue, onChildAdded, onChildChanged, onChildRemoved,
-      runTransaction, onDisconnect, get
-    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-
-    const ASSET_VERSION = "2026-02-18-2";
+  <script>
+    const ASSET_VERSION = "2026-02-20-1";
 
     // ✅ كسر كاش رابط tv تلقائيًا (مرة وحدة)
     (function ensureV(){
@@ -391,16 +381,6 @@
         }
       }catch(e){}
     })();
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
-      authDomain: "sabaq-alhorof.firebaseapp.com",
-      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "sabaq-alhorof",
-      storageBucket: "sabaq-alhorof.firebasestorage.app",
-      messagingSenderId: "1053646928152",
-      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
-    };
 
     function normalizeDigits(s){
       const map = {
@@ -426,6 +406,67 @@
         try{ localStorage.setItem(key, id); }catch(e){}
       }
       return id;
+    }
+
+    // ✅ Sync base (Cloudflare Worker + Durable Objects)
+    const qs0 = new URLSearchParams(location.search);
+    const SYNC_BASE = (qs0.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
+
+    async function fetchJSON(url, opts){
+      const r = await fetch(url, opts);
+      const j = await r.json().catch(()=>null);
+      return { ok: r.ok, status: r.status, json: j };
+    }
+    async function fetchRoom(code){
+      const url = `${SYNC_BASE}/state?room=${encodeURIComponent(code)}`;
+      const { json } = await fetchJSON(url, { cache:"no-store" });
+      if(!json || !json.ok) throw new Error("STATE_FAIL");
+      return (json.state && typeof json.state === "object") ? json.state : {};
+    }
+    async function postAction(code, patch){
+      const url = `${SYNC_BASE}/action?room=${encodeURIComponent(code)}`;
+      const { json } = await fetchJSON(url, {
+        method:"POST",
+        headers:{ "content-type":"application/json" },
+        body: JSON.stringify(patch || {})
+      });
+      if(!json || !json.ok) throw new Error("ACTION_FAIL");
+      return (json.state && typeof json.state === "object") ? json.state : {};
+    }
+
+    async function claimTvLockDO(code){
+      const deviceId = ensureDeviceId();
+      const room = await fetchRoom(code);
+
+      // لو الغرفة فاضية/غير موجودة
+      if(!room || Object.keys(room).length === 0) return { ok:false, reason:"ROOM_MISSING" };
+
+      const cur = room.tvLock || null;
+      const curDev = cur && cur.deviceId ? String(cur.deviceId) : "";
+      const ts = cur && cur.ts ? Number(cur.ts) : 0;
+
+      const EXPIRE_MS = 30 * 60 * 1000;
+
+      const allowed =
+        (!curDev) ||
+        (curDev === deviceId) ||
+        (ts && (Date.now() - ts) > EXPIRE_MS);
+
+      if(!allowed){
+        return { ok:false, reason:"LOCKED", by: curDev };
+      }
+
+      // حاول نكتب القفل ثم نتحقق
+      await postAction(code, { tvLock: { deviceId, ts: Date.now() } });
+      const room2 = await fetchRoom(code);
+      const cur2 = room2.tvLock || null;
+      const dev2 = cur2 && cur2.deviceId ? String(cur2.deviceId) : "";
+
+      if(dev2 !== deviceId){
+        return { ok:false, reason:"LOCKED", by: dev2 };
+      }
+
+      return { ok:true };
     }
 
     // UI
@@ -464,6 +505,7 @@
 
     // Cells refs
     const CELL_POLY = Array.from({length:5}, ()=>Array.from({length:5}, ()=>null));
+    const CELL_STATE_CACHE = {}; // key -> st
 
     function hexPointsPointyTop(cx, cy, r){
       const pts = [];
@@ -516,6 +558,7 @@
           mapSvg.appendChild(txt);
 
           CELL_POLY[row][col] = poly;
+          CELL_STATE_CACHE[`${row}-${col}`] = 0;
         }
       }
     }
@@ -547,109 +590,6 @@
       el.classList.add("s"+s);
     }
 
-    function resetAllCells(){
-      for(let r=0;r<5;r++){
-        for(let c=0;c<5;c++){
-          setCellState(r,c,0);
-        }
-      }
-    }
-
-    // حاول تلقائيًا أسماء خرائط شائعة (0-based و 1-based) من جذر المستودع
-    function mapCandidates(activeMap){
-      const n0 = Number(activeMap)||0;
-      const n1 = n0 + 1;
-      const exts = ["png","webp","jpg","jpeg"];
-
-      const out = [];
-      for(const ext of exts){
-        out.push(`map${n0}.${ext}`);
-        out.push(`map${n1}.${ext}`);
-      }
-      // احتياطيات
-      for(const ext of exts){
-        out.push(`Map${n0}.${ext}`);
-        out.push(`Map${n1}.${ext}`);
-      }
-      // كسر كاش
-      return out.map(x => x + `?v=${encodeURIComponent(ASSET_VERSION)}`);
-    }
-
-    function loadMapImage(activeMap){
-      const cands = mapCandidates(activeMap);
-      let i = 0;
-
-      const tryNext = () => {
-        if(i >= cands.length){
-          // ما لقينا ملف
-          mapBg.removeAttribute("src");
-          statusLine.textContent = "لم أجد ملفات الخريطة في الجذر (تأكد من رفع الخرائط الثلاث).";
-          return;
-        }
-        const src = cands[i++];
-        const img = new Image();
-        img.onload = () => {
-          mapBg.src = src;
-          statusLine.textContent = "متصل";
-        };
-        img.onerror = () => tryNext();
-        img.src = src;
-      };
-
-      tryNext();
-    }
-
-    // ===== Firebase =====
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    let CODE = "";
-    let activeMap = 0;
-
-    // listeners cleanup
-    let unsubRoom = [];
-    let unsubMap = [];
-
-    function clearUnsubs(list){
-      try{ list.forEach(fn => { try{ fn && fn(); }catch(e){} }); }catch(e){}
-      list.length = 0;
-    }
-
-    async function claimTvLock(code){
-      const deviceId = ensureDeviceId();
-      const lockRef = ref(db, `rooms/${code}/tvLock`);
-
-      const res = await runTransaction(lockRef, (cur) => {
-        // cur = { deviceId, ts }
-        if(!cur) return { deviceId, ts: Date.now() };
-
-        const curDev = cur?.deviceId || "";
-        const ts = Number(cur?.ts || 0);
-
-        // نفس الجهاز؟ يسمح
-        if(curDev && curDev === deviceId){
-          return { deviceId, ts: Date.now() };
-        }
-
-        // لو قديم جدًا (مثلاً 30 دقيقة) اعتبره منتهي
-        if(ts && (Date.now() - ts) > (30 * 60 * 1000)){
-          return { deviceId, ts: Date.now() };
-        }
-
-        // غير كذا: ارفض
-        return;
-      }, { applyLocally:false });
-
-      if(!res.committed){
-        return { ok:false };
-      }
-
-      try{
-        onDisconnect(lockRef).remove();
-      }catch(e){}
-      return { ok:true };
-    }
-
     function applyScores(s){
       const g = Number(s?.green ?? 0);
       const o = Number(s?.orange ?? 0);
@@ -662,65 +602,59 @@
       gameNameEl.textContent = t;
     }
 
-    function attachMapStates(code, mapIndex){
-      clearUnsubs(unsubMap);
-      resetAllCells();
+    // ✅ الخرائط (نجرب maps/ أولاً ثم الجذر كاحتياط)
+    function mapCandidates(activeMap){
+      const n0 = Number(activeMap)||0;
+      const n1 = n0 + 1;
+      const out = [];
 
-      loadMapImage(mapIndex);
+      // المسار الصحيح الحالي بالمستودع
+      out.push(`maps/map${n1}.jpeg`);
+      out.push(`maps/map${n1}.jpg`);
+      out.push(`maps/map${n1}.png`);
+      out.push(`maps/map${n1}.webp`);
 
-      const base = `rooms/${code}/mapStates/${String(mapIndex)}`;
-      const baseRef = ref(db, base);
+      // احتياطيات قديمة بالجذر
+      const exts = ["png","webp","jpg","jpeg"];
+      for(const ext of exts){
+        out.push(`map${n0}.${ext}`);
+        out.push(`map${n1}.${ext}`);
+        out.push(`Map${n0}.${ext}`);
+        out.push(`Map${n1}.${ext}`);
+      }
 
-      // onChildAdded يجي لكل خلية موجودة + أي تحديث جديد
-      const uAdd = onChildAdded(baseRef, (snap) => {
-        const rc = parseCellKey(snap.key);
-        if(!rc) return;
-        setCellState(rc.r, rc.c, snap.val());
-      });
-      const uChg = onChildChanged(baseRef, (snap) => {
-        const rc = parseCellKey(snap.key);
-        if(!rc) return;
-        setCellState(rc.r, rc.c, snap.val());
-      });
-      const uRem = onChildRemoved(baseRef, (snap) => {
-        const rc = parseCellKey(snap.key);
-        if(!rc) return;
-        setCellState(rc.r, rc.c, 0);
-      });
-
-      unsubMap.push(uAdd, uChg, uRem);
+      return out.map(x => x + `?v=${encodeURIComponent(ASSET_VERSION)}`);
     }
 
-    function attachRoom(code){
-      clearUnsubs(unsubRoom);
-      statusLine.textContent = "جاري الاتصال...";
+    function loadMapImage(activeMap){
+      const cands = mapCandidates(activeMap);
+      let i = 0;
 
-      // تحقق سريع من وجود الغرفة
-      (async ()=>{
-        try{
-          const roomSnap = await get(ref(db, `rooms/${code}`));
-          if(!roomSnap.exists()){
-            statusLine.textContent = "الغرفة غير موجودة";
-          }
-        }catch(e){}
-      })();
+      const tryNext = () => {
+        if(i >= cands.length){
+          mapBg.removeAttribute("src");
+          statusLine.textContent = "لم أجد ملفات الخريطة (تأكد من maps/map1.jpeg..map3.jpeg).";
+          return;
+        }
+        const src = cands[i++];
+        const img = new Image();
+        img.onload = () => {
+          mapBg.src = src;
+        };
+        img.onerror = () => tryNext();
+        img.src = src;
+      };
 
-      const uName = onValue(ref(db, `rooms/${code}/name`), (s) => {
-        setGameName(s.val());
-      }, ()=>{});
-
-      const uScores = onValue(ref(db, `rooms/${code}/scores`), (s) => {
-        applyScores(s.val() || {green:0,orange:0});
-      }, ()=>{});
-
-      const uActiveMap = onValue(ref(db, `rooms/${code}/activeMap`), (s) => {
-        activeMap = Number(s.val() || 0);
-        attachMapStates(code, activeMap);
-      }, ()=>{});
-
-      unsubRoom.push(uName, uScores, uActiveMap);
+      tryNext();
     }
 
+    function readMapStates(room, activeMap){
+      const ms = room.mapStates;
+      if(!ms || typeof ms !== "object") return {};
+      return ms[String(activeMap)] || ms[activeMap] || {};
+    }
+
+    // ===== Overlays =====
     function showSetup(msg){
       setupErr.style.display = msg ? "block" : "none";
       setupErr.textContent = msg || "";
@@ -738,6 +672,96 @@
       document.getElementById("blockedMsg").textContent = msg || "عرض التلفاز مفتوح على جهاز آخر لنفس الغرفة.";
     }
 
+    // ===== Main Loop (DO polling) =====
+    let CODE = "";
+    let activeMap = 0;
+    let lastActiveMap = null;
+    let alive = true;
+
+    function applyRoom(room){
+      setGameName(room.name);
+      applyScores(room.scores || {green:0, orange:0});
+
+      const am = Number(room.activeMap || 0);
+      if(lastActiveMap !== am){
+        lastActiveMap = am;
+        activeMap = am;
+        loadMapImage(activeMap);
+        // reset cache
+        for(let r=0;r<5;r++) for(let c=0;c<5;c++){
+          const k = `${r}-${c}`;
+          CELL_STATE_CACHE[k] = 0;
+          setCellState(r,c,0);
+        }
+      }
+
+      const mapStates = readMapStates(room, activeMap);
+
+      // تحديث 25 خلية فقط (بدون reset كامل كل مرة)
+      for(let r=0;r<5;r++){
+        for(let c=0;c<5;c++){
+          const key = `${r}-${c}`;
+          let st = 0;
+
+          // يدعم مفاتيح "r2c3" أو "2-3" أو "2_3" أو "2:3"
+          if(mapStates && typeof mapStates === "object"){
+            if(mapStates[key] != null) st = Number(mapStates[key] || 0);
+            else{
+              // بحث بديل في المفاتيح الموجودة
+              // (في حال كانت مفاتيح بصيغة مختلفة)
+              // نمر عليها مرة واحدة فقط لو احتجنا
+            }
+          }
+
+          st = Math.max(0, Math.min(3, Number(st)||0));
+          if(CELL_STATE_CACHE[key] !== st){
+            CELL_STATE_CACHE[key] = st;
+            setCellState(r,c,st);
+          }
+        }
+      }
+
+      // إذا فيه مفاتيح بصيغ ثانية (r2c3 مثلاً) نطبقها هنا:
+      if(mapStates && typeof mapStates === "object"){
+        for(const [k,v] of Object.entries(mapStates)){
+          const rc = parseCellKey(k);
+          if(!rc) continue;
+          const kk = `${rc.r}-${rc.c}`;
+          const st = Math.max(0, Math.min(3, Number(v)||0));
+          if(CELL_STATE_CACHE[kk] !== st){
+            CELL_STATE_CACHE[kk] = st;
+            setCellState(rc.r, rc.c, st);
+          }
+        }
+      }
+    }
+
+    async function tick(){
+      if(!alive) return;
+      try{
+        const room = await fetchRoom(CODE);
+
+        if(!room || Object.keys(room).length === 0){
+          statusLine.textContent = "الغرفة غير موجودة";
+          return;
+        }
+
+        applyRoom(room);
+        statusLine.textContent = "متصل";
+
+      }catch(e){
+        statusLine.textContent = "تعذر الاتصال";
+      }
+    }
+
+    function loop(){
+      if(!alive) return;
+      tick();
+      const delay = document.hidden ? 1800 : 900;
+      setTimeout(loop, delay);
+    }
+
+    // ===== Start =====
     async function start(code){
       const c = cleanCode(code);
       if(c.length !== 6){
@@ -749,22 +773,40 @@
       hideSetup();
 
       if(!CELL_POLY[0][0]) buildGrid();
+      statusLine.textContent = "جاري الاتصال...";
 
-      // قفل جهاز واحد
-      const lock = await claimTvLock(CODE);
-      if(!lock.ok){
-        showBlocked("عرض التلفاز مفتوح على جهاز آخر لهذه الغرفة.");
+      // قفل جهاز واحد (Best-effort عبر DO state)
+      try{
+        const lock = await claimTvLockDO(CODE);
+        if(!lock.ok){
+          if(lock.reason === "ROOM_MISSING"){
+            showSetup("الغرفة غير موجودة أو لم يتم إنشاؤها بعد.");
+            return;
+          }
+          showBlocked("عرض التلفاز مفتوح على جهاز آخر لهذه الغرفة.");
+          return;
+        }
+      }catch(e){
+        showSetup("تعذر الاتصال بالسيرفر. حاول مرة ثانية.");
         return;
       }
 
-      attachRoom(CODE);
-      statusLine.textContent = "متصل";
+      // تحديث القفل كل دقيقة (عشان ما يطول ويُعتبر منتهي)
+      const deviceId = ensureDeviceId();
+      setInterval(() => {
+        if(!alive || !CODE) return;
+        postAction(CODE, { tvLock: { deviceId, ts: Date.now() } }).catch(()=>{});
+      }, 60 * 1000);
+
+      loop();
     }
 
     // Buttons
     startBtn.addEventListener("click", () => start(codeInput.value || ""));
     codeInput.addEventListener("keydown", (e) => { if(e.key === "Enter") start(codeInput.value || ""); });
     reloadBtn.addEventListener("click", () => location.reload());
+
+    window.addEventListener("beforeunload", ()=>{ alive = false; });
 
     // init
     (function init(){
@@ -778,6 +820,6 @@
     })();
   </script>
 
-  <!-- VERSION: tv.html — vTV-2-PlayerStyle-MapOnly -->
+  <!-- VERSION: tv.html — vTV-DO-NoFirebase-1 -->
 </body>
 </html>
