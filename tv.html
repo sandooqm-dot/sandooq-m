@@ -410,7 +410,7 @@
 
     // ✅ Sync base (Cloudflare Worker + Durable Objects)
     const qs0 = new URLSearchParams(location.search);
-    const SYNC_BASE = (qs0.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
+    const SYNC_BASE = (qs0.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
 
     async function fetchJSON(url, opts){
       const r = await fetch(url, opts);
