@@ -2312,6 +2312,115 @@ if(homeBtn && role !== "host"){
     });
 
     const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
+    // =========================================================
+    // ✅ (NEW) أسئلة خاصة محفوظة بالحساب (email) — للمقدم فقط
+    // عبر API: /api2/custom-questions (D1)
+    // =========================================================
+    const CQ_API = "/api2/custom-questions";
+    const CQ_ACCOUNT = { loaded:false, loading:false, data:{}, updatedAt:0, lastLoadAt:0 };
+
+    function cqGetDeviceId(){
+      const k = "sandooq_device_id_v1";
+      try{
+        let v = localStorage.getItem(k) || "";
+        if(!v){
+          v = (crypto?.randomUUID ? crypto.randomUUID() :
+            ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16)));
+          localStorage.setItem(k, v);
+        }
+        return v;
+      }catch(e){
+        return ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16));
+      }
+    }
+
+    function cqGetSessionToken(){
+      try{ return localStorage.getItem("sandooq_token_v1") || ""; }catch(e){ return ""; }
+    }
+
+    async function cqFetch(url, opts){
+      const headers = new Headers((opts && opts.headers) || {});
+      if(!headers.has("X-Device-Id")) headers.set("X-Device-Id", cqGetDeviceId());
+
+      const tok = cqGetSessionToken();
+      if(tok && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + tok);
+
+      const res = await fetch(url, Object.assign({}, opts, {
+        headers,
+        credentials: "include",
+        cache: "no-store"
+      }));
+      const json = await res.json().catch(() => null);
+      return { res, json };
+    }
+
+    async function loadAccountCustomQuestions(force=false){
+      if(role !== "host") return;
+
+      const now = Date.now();
+      if(!force && CQ_ACCOUNT.loaded && (now - (CQ_ACCOUNT.lastLoadAt||0) < 15000)) return;
+      if(CQ_ACCOUNT.loading) return;
+
+      CQ_ACCOUNT.loading = true;
+      try{
+        const { res, json } = await cqFetch(CQ_API, { method:"GET" });
+        if(res.ok && json && json.ok){
+          const data =
+            (json.customQuestions && typeof json.customQuestions === "object") ? json.customQuestions :
+            (json.questions && typeof json.questions === "object") ? json.questions :
+            (json.data && typeof json.data === "object") ? json.data : {};
+
+          CQ_ACCOUNT.data = (data && typeof data === "object") ? data : {};
+          CQ_ACCOUNT.updatedAt = Number(json.updatedAt || json.updated_at || Date.now());
+          CQ_ACCOUNT.loaded = true;
+
+          // ✅ نخزنها محلياً في LIVE (بدون ما نكتبها داخل الغرفة)
+          LIVE.room.customQuestions = CQ_ACCOUNT.data || {};
+          LIVE.room.customQuestionsUpdatedAt = CQ_ACCOUNT.updatedAt || Date.now();
+
+          scheduleRender();
+        }else{
+          // لو المستخدم مو مسجّل/مو مفعل، ما نكسر اللعبة
+          // console.warn("custom-questions GET failed", json);
+        }
+      }catch(e){
+        // console.warn("custom-questions GET error", e);
+      }finally{
+        CQ_ACCOUNT.lastLoadAt = now;
+        CQ_ACCOUNT.loading = false;
+      }
+    }
+
+    async function saveAccountCustomQuestions(letter, items){
+      if(role !== "host") throw new Error("NOT_HOST");
+
+      const L = String(letter || "").trim();
+      const arr = Array.isArray(items) ? items : [];
+      const payload = { letter: L, items: arr, questions: arr };
+
+      const { res, json } = await cqFetch(CQ_API, {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if(!res.ok || !json || !json.ok){
+        const err = (json && (json.message || json.error)) ? String(json.message || json.error) : "SAVE_FAILED";
+        throw new Error(err);
+      }
+
+      CQ_ACCOUNT.loaded = true;
+      CQ_ACCOUNT.updatedAt = Number(json.updatedAt || json.updated_at || Date.now());
+      CQ_ACCOUNT.data = (CQ_ACCOUNT.data && typeof CQ_ACCOUNT.data === "object") ? CQ_ACCOUNT.data : {};
+      CQ_ACCOUNT.data[L] = arr;
+
+      LIVE.room.customQuestions = CQ_ACCOUNT.data;
+      LIVE.room.customQuestionsUpdatedAt = CQ_ACCOUNT.updatedAt;
+
+      scheduleRender();
+      return true;
+    }
+
 
     function autosizeTA(ta){
       if(!ta) return;
@@ -2420,13 +2529,23 @@ if(homeBtn && role !== "host"){
           return;
         }
 
-        await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
-        await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
+        // ✅ حفظ بالحساب (D1) بدل الغرفة — المقدم فقط
+        saveBtn.disabled = true;
+        const oldText = saveBtn.textContent;
+        saveBtn.textContent = "جاري الحفظ...";
 
-        savedMsg.textContent = "تم الحفظ ✅";
-        setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
-
-        refreshAddState();
+        try{
+          await saveAccountCustomQuestions(letter, out);
+          savedMsg.textContent = "تم الحفظ ✅";
+        }catch(e){
+          savedMsg.textContent = "فشل الحفظ — تأكد أنك مسجّل دخول ومُفعّل";
+          console.warn("customQuestions save error", e);
+        }finally{
+          saveBtn.disabled = false;
+          saveBtn.textContent = oldText || "حفظ";
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+          refreshAddState();
+        }
       });
     }
 
@@ -2479,9 +2598,16 @@ if(homeBtn && role !== "host"){
       CUSTOM_Q_UI.els = { backdrop, cqList };
     }
 
-    function openCustomQuestionsModal(room){
+    async function openCustomQuestionsModal(room){
       ensureCustomQuestionsModal();
       CUSTOM_Q_UI.roomLatest = room || {};
+
+      // ✅ حمّل أسئلتك المحفوظة بالحساب قبل ما تفتح (عشان تظهر مباشرة)
+      try{ await loadAccountCustomQuestions(true); }catch(e){}
+
+      // نخلي أحدث نسخة في الواجهة
+      CUSTOM_Q_UI.roomLatest = LIVE.room || (room || {});
+
       const { backdrop, cqList } = CUSTOM_Q_UI.els;
       cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
       backdrop.style.display = "flex";
@@ -2576,10 +2702,10 @@ if(homeBtn && role !== "host"){
         openStoreUrl();
       });
 
-      bd.querySelector("#sAddQ").addEventListener("click", () => {
+      bd.querySelector("#sAddQ").addEventListener("click", async () => {
         const room = SETTINGS_UI.roomLatest || {};
         closeSettings();
-        openCustomQuestionsModal(room);
+        await openCustomQuestionsModal(room);
       });
 
       bd.querySelector("#sTimer").addEventListener("click", () => {
@@ -4103,12 +4229,15 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       // customQuestions
       onValue(ref(db, `rooms/${code}/customQuestions`), (s) => {
+        // ✅ الأسئلة الخاصة للمقدم تُقرأ من الحساب (D1) وليس من الغرفة
+        if(role === "host") return;
         LIVE.room.customQuestions = s.val() || {};
         scheduleRender();
       });
 
       // customQuestionsUpdatedAt
       onValue(ref(db, `rooms/${code}/customQuestionsUpdatedAt`), (s) => {
+        if(role === "host") return;
         LIVE.room.customQuestionsUpdatedAt = Number(s.val() || 0);
         scheduleRender();
       });
@@ -4125,6 +4254,12 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
     startRoomListeners();
     scheduleRender();
+
+    // ✅ (NEW) حمّل أسئلة المقدم المحفوظة بالحساب مباشرةً
+    if(role === "host"){
+      loadAccountCustomQuestions(true);
+    }
+
 
   </script>
 
