@@ -1293,7 +1293,7 @@ const hostKey = params.get("key");
 const pid = params.get("pid");
 // ✅ Sync (Firebase removed): Cloudflare Worker + Durable Objects
 // Worker base (change only if you deploy a different worker)
-const SYNC_BASE = params.get("sync") || "https://horof-sync.sandooq-m.workers.dev";
+const SYNC_BASE = params.get("sync") || "https://sync.horof.sandooq-games.com";
 
 // Local cache of room state (Durable Object stores ONE JSON state per room)
 const SYNC = {
