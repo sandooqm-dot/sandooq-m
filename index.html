@@ -412,7 +412,7 @@
         }
 
         // ✅ Cloudflare Worker/DO base (يمكن تغييره من الرابط عبر sync=)
-        const SYNC_BASE = (qs.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
+        const SYNC_BASE = (qs.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
 
         // ✅ (نفس فكرة كسر الكاش للخرائط)
         const ASSET_VERSION = (qs.get("v") || "2026-02-15-1");
