@@ -78,7 +78,7 @@
   <script>
     // ✅ Durable Objects (Firebase removed نهائياً)
     const params = new URLSearchParams(location.search);
-    const SYNC_BASE = (params.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
+    const SYNC_BASE = (params.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
 
     function normalizeDigits(str){
       const map = {
