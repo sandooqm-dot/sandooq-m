@@ -152,24 +152,9 @@
   <!-- الحقوق أسفل الصفحة بالمنتصف -->
   <div class="footer">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-
+  <script>
+    // ✅ Firebase removed نهائياً: الاعتماد على Durable Objects (/state)
     const BUY_URL = "https://sandooq-m.com";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
-      authDomain: "sabaq-alhorof.firebaseapp.com",
-      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "sabaq-alhorof",
-      storageBucket: "sabaq-alhorof.firebasestorage.app",
-      messagingSenderId: "1053646928152",
-      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
 
     const msg = document.getElementById("msg");
     const errBox = document.getElementById("errBox");
@@ -196,40 +181,86 @@
       errBox.style.display = "block";
     }
 
-    // نجيب بيانات الغرفة من الرابط (بدون عرضها للاعب)
     const params = new URLSearchParams(location.search);
     const code = cleanCode(params.get("code") || "");
     const pid  = (params.get("pid") || "").trim();
 
+    // ✅ Sync base (Cloudflare Worker + DO)
+    const SYNC_BASE = (params.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
+
     // نخزنها (مخفية) للاحتياط بدون ما نعرضها
-    if(code) sessionStorage.setItem("room_code", code);
-    if(pid)  sessionStorage.setItem("player_pid", pid);
+    try{
+      if(code) sessionStorage.setItem("room_code", code);
+      if(pid)  sessionStorage.setItem("player_pid", pid);
+    }catch(e){}
+
+    function buildGameUrl(){
+      const u = new URL("game.html", location.href);
+      u.searchParams.set("role", "player");
+      if(code) u.searchParams.set("code", code);
+      if(pid) u.searchParams.set("pid", pid);
+      // مهم: نمرر sync عشان game.html يمرره لـ game_full.html
+      if(params.get("sync")) u.searchParams.set("sync", params.get("sync"));
+      return u.toString();
+    }
+
+    async function fetchRoomState(){
+      const url = `${SYNC_BASE}/state?room=${encodeURIComponent(code)}`;
+      const r = await fetch(url, { cache:"no-store" });
+      const j = await r.json().catch(()=>null);
+      if(!j || !j.ok) throw new Error("STATE_FAIL");
+      const st = (j.state && typeof j.state === "object") ? j.state : {};
+      return st;
+    }
+
+    let alive = true;
+
+    async function tick(){
+      if(!alive) return;
+      try{
+        const room = await fetchRoomState();
+
+        // لو الغرفة غير موجودة/فاضية
+        if(!room || Object.keys(room).length === 0){
+          msg.textContent = "افتح الرابط من المقدم";
+          showErr("الغرفة غير موجودة أو لم يتم إنشاؤها بعد.");
+          return;
+        }
+
+        const st = String(room.status || "");
+        if(st === "started"){
+          msg.textContent = "جاري فتح اللعبة...";
+          location.replace(buildGameUrl());
+          return;
+        }
+
+        // باقي في اللوبي
+        msg.textContent = "بانتظار المقدم يبدأ اللعبة...";
+
+      }catch(e){
+        // ما نوقف الصفحة، نخليه يحاول
+        msg.textContent = "بانتظار المقدم يبدأ اللعبة...";
+      }
+    }
+
+    function loop(){
+      if(!alive) return;
+      tick();
+      const delay = document.hidden ? 1800 : 900;
+      setTimeout(loop, delay);
+    }
 
     if(code.length !== 6){
       msg.textContent = "افتح الرابط من المقدم";
       showErr("رمز الغرفة غير موجود في الرابط.");
     }else{
       msg.textContent = "بانتظار المقدم يبدأ اللعبة...";
-      const statusRef = ref(db, `rooms/${code}/status`);
-
-      onValue(statusRef, (snap) => {
-        const st = snap.val();
-
-        // عند بدء اللعبة: ننقل اللاعب لصفحة اللعب (وليس play.html)
-        if(st === "started"){
-          msg.textContent = "جاري فتح اللعبة...";
-          const u = new URL("game.html", location.href);
-          u.searchParams.set("role", "player");
-          u.searchParams.set("code", code);
-          if(pid) u.searchParams.set("pid", pid);
-          location.replace(u.toString());
-        }
-      }, (err) => {
-        showErr("صار خطأ في الاتصال. حاول تحدّث الصفحة.");
-      });
+      loop();
     }
+
+    window.addEventListener("beforeunload", ()=>{ alive = false; });
   </script>
 
-  <!-- VERSION: play.html — v2 (Style match + no room code shown + redirect to game.html on started) -->
+  <!-- VERSION: play.html — vDO-Wait-NoFirebase-1 -->
 </body>
 </html>
