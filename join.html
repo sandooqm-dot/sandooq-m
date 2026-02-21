@@ -6,19 +6,16 @@
   <title>الدخول إلى لعبة</title>
 
   <!-- ✅ تسريع فتح اللعبة -->
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="dns-prefetch" href="//www.gstatic.com">
   <link rel="preload" href="game_full.html" as="document">
 
-  <!-- ✅ (2) خط واجهة اللاعبين -->
+  <!-- ✅ خط واجهة اللاعبين -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@600;700;800&display=swap" rel="stylesheet">
 
   <style>
     :root{
-      /* ✅ تغيير لون وخط صفحة اللاعبين + إزالة مربع الرمز */
-      --bg:#7b1f63;        /* نفس ثيم اللعبة */
+      --bg:#7b1f63;
       --yellow:#f4c400;
       --text:#ffffff;
       --muted:rgba(255,255,255,.78);
@@ -35,7 +32,7 @@
 
     body{
       margin:0;
-      font-family: "Baloo Bhaijaan 2", Arial, sans-serif; /* ✅ (2) خط الواجهة */
+      font-family: "Baloo Bhaijaan 2", Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       text-align:center;
@@ -45,9 +42,8 @@
       justify-content:flex-start;
     }
 
-    header{
-      padding:22px 14px 0;
-    }
+    header{ padding:22px 14px 0; }
+
     .logo{
       width:86px;
       height:86px;
@@ -57,6 +53,7 @@
       pointer-events:none;
       filter: drop-shadow(0 10px 18px rgba(0,0,0,.22));
     }
+
     h1{
       margin:6px 0 0;
       color: var(--yellow);
@@ -74,7 +71,6 @@
       box-sizing:border-box;
     }
 
-    /* ✅ إزالة “المربع الأبيض” والاكتفاء بتخطيط أنيق */
     .panel{
       background: rgba(0,0,0,.08);
       border:1px solid rgba(255,255,255,.16);
@@ -84,7 +80,6 @@
       box-sizing:border-box;
     }
 
-    /* ✅ (التعديل المطلوب) تصغير مربع الاسم وزر الدخول من الأطراف يمين/يسار */
     .input{
       width:min(84vw, 560px);
       max-width:560px;
@@ -147,7 +142,6 @@
 </head>
 <body>
   <header>
-    <!-- ✅ اللوجو أعلى الصفحة في المنتصف -->
     <img class="logo" src="logo.png" alt="شعار صندوق المسابقات">
     <h1>الدخول إلى لعبة</h1>
   </header>
@@ -155,7 +149,6 @@
   <div class="wrap">
     <div class="panel">
       <input id="playerName" class="input" type="text" placeholder="اكتب اسمك هنا.." autocomplete="name" />
-      <!-- ✅ تم إزالة مربع كتابة رمز الغرفة للاعبين -->
       <button id="joinBtn" class="btn">دخول</button>
 
       <div id="err" class="error"></div>
@@ -287,9 +280,7 @@
       list.sort((a,b) => a.joinedAt - b.joinedAt);
       const keep = list.slice(0, max);
       const out = {};
-      for(const it of keep){
-        out[it.id] = it.p;
-      }
+      for(const it of keep) out[it.id] = it.p;
       return out;
     }
 
@@ -317,13 +308,11 @@
 
         let finalRoom = null;
 
-        // ✅ Retry + Union لتقليل تعارض دخول أكثر من لاعب بنفس اللحظة
         for(let attempt=0; attempt<4; attempt++){
           const room = await fetchState();
           const statusRaw = (room && room.status != null) ? String(room.status) : "";
           const status = (statusRaw === "started" || statusRaw === "lobby") ? statusRaw : (statusRaw ? statusRaw : "lobby");
 
-          // لو حالة غريبة غير lobby/started
           if(statusRaw && status !== "lobby" && status !== "started"){
             showError("الغرفة غير جاهزة حالياً");
             return;
@@ -332,13 +321,11 @@
           const players0 = (room.players && typeof room.players === "object") ? room.players : {};
           const players = { ...players0 };
 
-          // إذا هو موجود أصلاً (نادر)
           if(players[pid]){
             finalRoom = room;
             break;
           }
 
-          // حد أقصى (قبل الإرسال)
           const ids0 = Object.keys(players);
           if(ids0.length >= MAX_PLAYERS){
             showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
@@ -350,10 +337,8 @@
 
           players[pid] = { name, team, joinedAt: Date.now() };
 
-          // إرسال تحديث
           await postAction({ status, players });
 
-          // تحقق (pull)
           const room2 = await fetchState();
           const p2 = (room2.players && typeof room2.players === "object") ? room2.players : {};
           if(p2 && p2[pid]){
@@ -361,7 +346,6 @@
             break;
           }
 
-          // إذا انمسح بسبب تعارض، نعيد المحاولة ونضمّه مع أحدث قائمة
           await new Promise(r => setTimeout(r, 120 + attempt*80));
         }
 
@@ -370,7 +354,6 @@
           return;
         }
 
-        // ✅ تطبيق حد 13 بشكل حاسم (keep earliest 13)
         const pFinal = (finalRoom.players && typeof finalRoom.players === "object") ? finalRoom.players : {};
         const idsF = Object.keys(pFinal);
 
@@ -378,7 +361,6 @@
           const trimmed = enforceLimit(pFinal, MAX_PLAYERS);
           const kept = !!trimmed[pid];
 
-          // نكتب القائمة المقصوصة (حتى ما يزيد العدد)
           await postAction({ players: trimmed });
 
           if(!kept){
@@ -387,10 +369,8 @@
           }
         }
 
-        // ✅ علّم الجهاز أنه لاعب
         markAsGuestPlayer(roomCode, pid);
 
-        // دخول مباشر لـ game_full بوضعيّة لاعب
         const u = new URL("game_full.html", location.href);
         u.searchParams.set("role", "player");
         u.searchParams.set("code", roomCode);
@@ -413,6 +393,6 @@
     nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vDO-Join-1 -->
+  <!-- VERSION: join.html — vDO-Join-2-NoFirebase -->
 </body>
 </html>
