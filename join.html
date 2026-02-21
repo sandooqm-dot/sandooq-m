@@ -160,7 +160,7 @@
     const params = new URLSearchParams(location.search);
 
     // ✅ Sync base (Cloudflare Worker + Durable Objects)
-    const SYNC_BASE = params.get("sync") || "https://horof-sync.sandooq-m.workers.dev";
+    const SYNC_BASE = params.get("sync") || "https://sync.horof.sandooq-games.com";
     const codeFromLink = params.get("code") || "";
     const syncFromLink = params.get("sync") || "";
 
