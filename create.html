@@ -59,7 +59,7 @@
 
     // ✅ Sync (Firebase removed نهائياً): Cloudflare Worker + Durable Objects (+ Pusher broadcast من السيرفر)
     const qs = new URLSearchParams(location.search);
-    const SYNC_BASE = qs.get("sync") || "https://horof-sync.sandooq-m.workers.dev";
+    const SYNC_BASE = qs.get("sync") || "https://sync.horof.sandooq-games.com";
 
     function normalizeDigits(str){
       const map = {
