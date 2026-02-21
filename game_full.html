@@ -1229,7 +1229,9 @@
   </script>
 
   <script type="module">
-    // ✅ Firebase removed — Sync via Cloudflare Durable Objects (and later Pusher)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getDatabase, ref, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
     // ✅ رقم إصدار للكاش + كسر كاش (غيّره فقط عند تحديث ملفات محلية: خرائط/لوجو/خط/بنك أسئلة)
     const ASSET_VERSION = "2026-02-15-1";
     const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
@@ -1240,6 +1242,17 @@
     }catch(e){
       console.warn("questions_bank.js load failed (will use fallback questions).", e);
     }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
+      authDomain: "sabaq-alhorof.firebaseapp.com",
+      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "sabaq-alhorof",
+      storageBucket: "sabaq-alhorof.firebasestorage.app",
+      messagingSenderId: "1053646928152",
+      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
+    };
+
     // ✅ (2) حد أقصى للغرفة: 13 لاعب + المقدم = 14
     const MAX_PLAYERS = 13;
 
@@ -1285,234 +1298,15 @@
     const QUESTIONS = (window.QUESTIONS && Object.keys(window.QUESTIONS).length)
       ? window.QUESTIONS
       : DEFAULT_QUESTIONS;
-    const db = {}; // ✅ placeholder (Firebase removed)
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
     const params = new URLSearchParams(location.search);
     const role = params.get("role");
 const code = params.get("code");
 const hostKey = params.get("key");
 const pid = params.get("pid");
-// ✅ Sync (Firebase removed): Cloudflare Worker + Durable Objects
-// Worker base (change only if you deploy a different worker)
-const SYNC_BASE = params.get("sync") || "https://sync.horof.sandooq-games.com";
-
-// Local cache of room state (Durable Object stores ONE JSON state per room)
-const SYNC = {
-  state: {},           // room root object (equivalent to rooms/{code} in Firebase)
-  lastPullAt: 0,
-  pulling: false,
-  pollMs: 900
-};
-
-function _stripRoomPrefix(path){
-  // Firebase paths in this file look like: rooms/${code}/...
-  if(!path) return "";
-  path = String(path).replace(/^\/+/, "");
-  const p1 = `rooms/${code}`;
-  if(path === p1) return "";
-  if(path.startsWith(p1 + "/")) return path.slice((p1 + "/").length);
-  // if caller already sent relative path
-  if(path.startsWith("rooms/")) return path.replace(/^rooms\//,""); // fallback
-  return path;
-}
-
-function _split(path){
-  path = _stripRoomPrefix(path);
-  if(!path) return [];
-  return path.split("/").filter(Boolean).map(seg => seg);
-}
-
-function _get(obj, path){
-  const parts = _split(path);
-  let cur = obj;
-  for(const seg of parts){
-    if(cur == null) return undefined;
-    cur = cur[seg];
-  }
-  return cur;
-}
-
-function _ensureChild(cur, seg, nextSeg){
-  if(cur[seg] == null || typeof cur[seg] !== "object"){
-    // decide array vs object? keep object; your state uses objects not arrays for keys
-    cur[seg] = {};
-  }
-  return cur[seg];
-}
-
-function _set(obj, path, value){
-  const parts = _split(path);
-  if(parts.length === 0){
-    // set root
-    SYNC.state = value && typeof value === "object" ? value : {};
-    return;
-  }
-  let cur = obj;
-  for(let i=0;i<parts.length-1;i++){
-    const seg = parts[i];
-    cur = _ensureChild(cur, seg, parts[i+1]);
-  }
-  cur[parts[parts.length-1]] = value;
-}
-
-function _mergeAtPath(obj, path, patch){
-  const rel = _stripRoomPrefix(path);
-  if(!rel){
-    // merge into root
-    if(patch && typeof patch === "object" && !Array.isArray(patch)){
-      SYNC.state = SYNC.state && typeof SYNC.state === "object" ? SYNC.state : {};
-      Object.assign(SYNC.state, patch);
-    }else{
-      SYNC.state = patch;
-    }
-    return;
-  }
-  const existing = _get(obj, rel);
-  if(existing && typeof existing === "object" && !Array.isArray(existing) && patch && typeof patch === "object" && !Array.isArray(patch)){
-    _set(obj, rel, Object.assign({}, existing, patch));
-  }else{
-    _set(obj, rel, patch);
-  }
-}
-
-function _topKey(relPath){
-  relPath = _stripRoomPrefix(relPath);
-  if(!relPath) return ""; // root
-  return relPath.split("/")[0];
-}
-
-function _snapshot(v){
-  return {
-    val: () => v,
-    exists: () => v !== undefined && v !== null
-  };
-}
-
-const _watchers = new Map();      // path -> Set(callback)
-const _lastStr = new Map();       // path -> JSON string of last value
-
-function ref(_db, path=""){
-  return { path: String(path || "") };
-}
-
-async function _pullOnce(force=false){
-  if(SYNC.pulling) return;
-  const now = Date.now();
-  if(!force && now - SYNC.lastPullAt < Math.max(250, SYNC.pollMs - 50)) return;
-  SYNC.pulling = true;
-  try{
-    const url = `${SYNC_BASE.replace(/\/$/,"")}/state?room=${encodeURIComponent(code)}`;
-    const r = await fetch(url, { cache: "no-store" });
-    const j = await r.json().catch(()=>null);
-    if(j && j.ok){
-      SYNC.state = (j.state && typeof j.state === "object") ? j.state : {};
-      SYNC.lastPullAt = now;
-      // notify watchers
-      for(const [path, set] of _watchers.entries()){
-        const v = _get(SYNC.state, path);
-        let s;
-        try{ s = JSON.stringify(v); }catch(e){ s = String(v); }
-        if(_lastStr.get(path) !== s){
-          _lastStr.set(path, s);
-          set.forEach(cb => { try{ cb(_snapshot(v)); }catch(e){} });
-        }
-      }
-    }
-  }catch(e){
-    // ignore transient network errors
-  }finally{
-    SYNC.pulling = false;
-  }
-}
-
-function onValue(r, cb){
-  const p = _stripRoomPrefix(r?.path || "");
-  if(!_watchers.has(p)) _watchers.set(p, new Set());
-  _watchers.get(p).add(cb);
-  // call once immediately with current cached value (may be undefined until first pull)
-  try{ cb(_snapshot(_get(SYNC.state, p))); }catch(e){}
-  // ensure we start polling
-  _pullOnce(true);
-  return () => { try{ _watchers.get(p)?.delete(cb); }catch(e){} };
-}
-
-async function _action(patch){
-  const url = `${SYNC_BASE.replace(/\/$/,"")}/action?room=${encodeURIComponent(code)}`;
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "content-type":"application/json" },
-    body: JSON.stringify(patch || {})
-  });
-  // update local state from response if present
-  const j = await r.json().catch(()=>null);
-  if(j && j.ok && j.state && typeof j.state === "object"){
-    SYNC.state = j.state;
-  }else{
-    // fallback: pull
-    await _pullOnce(true);
-  }
-  // notify watchers immediately after action
-  for(const [path, set] of _watchers.entries()){
-    const v = _get(SYNC.state, path);
-    let s;
-    try{ s = JSON.stringify(v); }catch(e){ s = String(v); }
-    if(_lastStr.get(path) !== s){
-      _lastStr.set(path, s);
-      set.forEach(cb => { try{ cb(_snapshot(v)); }catch(e){} });
-    }
-  }
-  return j;
-}
-
-async function update(r, value){
-  // Firebase: update(ref(db, "path"), {a:1}) OR update(ref(db), {"rooms/x/a":1, ...})
-  const rawPath = String(r?.path || "");
-  if(!rawPath){
-    // multi path update
-    const updates = value || {};
-    const topPatch = {};
-    for(const [k, v] of Object.entries(updates)){
-      _mergeAtPath(SYNC.state, k, v);
-      const tk = _topKey(k);
-      if(!tk){
-        // root path update: merge all top-level keys from SYNC.state
-        Object.assign(topPatch, (v && typeof v === "object" && !Array.isArray(v)) ? v : {});
-      }else{
-        topPatch[tk] = SYNC.state[tk];
-      }
-    }
-    return _action(topPatch);
-  }else{
-    // single node update
-    _mergeAtPath(SYNC.state, rawPath, value);
-    const rel = _stripRoomPrefix(rawPath);
-    const tk = _topKey(rel);
-    const patch = {};
-    if(!tk){
-      // root update: send only provided keys (merge semantics)
-      if(value && typeof value === "object" && !Array.isArray(value)) Object.assign(patch, value);
-      else patch._root = value; // unlikely
-    }else{
-      patch[tk] = SYNC.state[tk];
-    }
-    return _action(patch);
-  }
-}
-
-async function runTransaction(r, fn){
-  // Best-effort transaction (not fully atomic yet). We'll harden later in Worker.
-  await _pullOnce(true);
-  const p = String(r?.path || "");
-  const cur = _get(SYNC.state, p);
-  const next = fn(cur);
-  if(next === undefined){
-    return { committed: false, snapshot: _snapshot(cur) };
-  }
-  await update(r, next);
-  return { committed: true, snapshot: _snapshot(next) };
-}
-
-// Start polling loop (lightweight)
-setInterval(() => { _pullOnce(false); }, SYNC.pollMs);
 
 const main = document.getElementById("main");
 const gameNameEl = document.getElementById("gameName");
@@ -1697,6 +1491,11 @@ if(homeBtn && role !== "host"){
     if(!role || !code){
       main.textContent = "بيانات الدخول غير مكتملة.";
       throw new Error("Missing params");
+    }
+
+    // ✅ (NEW) تحميل أسئلة المقدم المحفوظة بالحساب (مرة واحدة عند الدخول)
+    if(role === "host"){
+      try{ loadAccountCustomQuestions(false); }catch(e){}
     }
 
     const roomRef = ref(db, `rooms/${code}`);
@@ -2311,7 +2110,156 @@ if(homeBtn && role !== "host"){
       WIN_HIDE_T = null;
     });
 
+
     const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
+
+    // ✅ (NEW) الأسئلة الخاصة تُحفظ دائمًا في الحساب (email) عبر API /api2/custom-questions
+    const CUSTOM_STORE = { loaded:false, loading:false, updatedAt:0, data:{}, lastErr:"" };
+
+    function getDeviceId(){
+      const k="sandooq_device_id_v1";
+      let v="";
+      try{ v = localStorage.getItem(k) || ""; }catch(e){}
+      if(!v){
+        try{
+          v = (crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(16).slice(2)+Date.now().toString(16)));
+        }catch(e){
+          v = (Math.random().toString(16).slice(2)+Date.now().toString(16));
+        }
+        try{ localStorage.setItem(k, v); }catch(e){}
+      }
+      return v;
+    }
+
+    function getSessionToken(){
+      try{ return localStorage.getItem("sandooq_token_v1") || ""; }catch(e){ return ""; }
+    }
+
+    function apiHeaders(){
+      const h = { "X-Device-Id": getDeviceId() };
+      const t = getSessionToken();
+      if(t) h["Authorization"] = "Bearer " + t;
+      return h;
+    }
+
+    function normalizeCustomItems(items){
+      const out = [];
+      (Array.isArray(items) ? items : []).forEach(it => {
+        if(!it || typeof it !== "object") return;
+        const q = String(it.q || "").trim();
+        const a = String(it.a || "").trim();
+        if(q || a) out.push({ q, a });
+      });
+      return out.slice(0, MAX_CUSTOM_PER_LETTER);
+    }
+
+    function normalizeCustomMap(obj){
+      const m = {};
+      if(!obj || typeof obj !== "object") return m;
+      for(const [k,v] of Object.entries(obj)){
+        const L = String(k || "").trim();
+        if(!L) continue;
+        const items = normalizeCustomItems(v);
+        if(items.length) m[L] = items;
+      }
+      return m;
+    }
+
+    function pickCustomMap(resp){
+      if(!resp || typeof resp !== "object") return {};
+      if(resp.questions && typeof resp.questions === "object") return resp.questions;
+      if(resp.customQuestions && typeof resp.customQuestions === "object") return resp.customQuestions;
+      if(resp.data && typeof resp.data === "object") return resp.data;
+      if(resp.state && typeof resp.state === "object") return resp.state;
+      return {};
+    }
+
+    async function loadAccountCustomQuestions(force=false){
+      if(role !== "host") return;
+      if(CUSTOM_STORE.loading) return;
+      if(CUSTOM_STORE.loaded && !force) return;
+
+      CUSTOM_STORE.loading = true;
+      CUSTOM_STORE.lastErr = "";
+
+      try{
+        const url = "/api2/custom-questions";
+
+        let res = await fetch(url, {
+          method:"GET",
+          headers: apiHeaders(),
+          credentials:"include",
+          cache:"no-store"
+        });
+
+        // احتياط لو السيرفر ما يقبل GET
+        if(res.status === 405){
+          res = await fetch(url, {
+            method:"POST",
+            headers: Object.assign({ "Content-Type":"application/json" }, apiHeaders()),
+            credentials:"include",
+            cache:"no-store",
+            body:"{}"
+          });
+        }
+
+        const j = await res.json().catch(()=>null);
+
+        if(!res.ok || !j || j.ok !== true){
+          CUSTOM_STORE.data = {};
+          CUSTOM_STORE.updatedAt = 0;
+          CUSTOM_STORE.loaded = true;
+          CUSTOM_STORE.lastErr = (j && (j.message || j.error)) ? String(j.message || j.error) : "LOAD_FAIL";
+          return;
+        }
+
+        const rawMap = pickCustomMap(j);
+        CUSTOM_STORE.data = normalizeCustomMap(rawMap);
+        CUSTOM_STORE.updatedAt = Number(j.updatedAt || j.updated_at || j.ts || Date.now());
+        CUSTOM_STORE.loaded = true;
+
+      }catch(e){
+        CUSTOM_STORE.lastErr = String(e?.message || e);
+        CUSTOM_STORE.data = {};
+        CUSTOM_STORE.updatedAt = 0;
+        CUSTOM_STORE.loaded = true;
+      }finally{
+        CUSTOM_STORE.loading = false;
+      }
+    }
+
+    async function saveAccountCustomQuestions(letter, items){
+      if(role !== "host") return { ok:false, error:"NOT_HOST" };
+
+      const L = String(letter || "").trim();
+      const safe = normalizeCustomItems(items || []);
+
+      try{
+        const url = "/api2/custom-questions";
+        const res = await fetch(url, {
+          method:"POST",
+          headers: Object.assign({ "Content-Type":"application/json" }, apiHeaders()),
+          credentials:"include",
+          cache:"no-store",
+          body: JSON.stringify({ letter: L, questions: safe, items: safe })
+        });
+
+        const j = await res.json().catch(()=>null);
+        if(!res.ok || !j || j.ok !== true){
+          return { ok:false, error:(j && (j.error || j.message)) ? String(j.error || j.message) : "SAVE_FAIL" };
+        }
+
+        CUSTOM_STORE.data = CUSTOM_STORE.data || {};
+        CUSTOM_STORE.data[L] = safe;
+        CUSTOM_STORE.updatedAt = Number(j.updatedAt || j.updated_at || Date.now());
+        CUSTOM_STORE.loaded = true;
+
+        return { ok:true };
+      }catch(e){
+        return { ok:false, error:String(e?.message || e) };
+      }
+    }
+
 
     function autosizeTA(ta){
       if(!ta) return;
@@ -2320,10 +2268,18 @@ if(homeBtn && role !== "host"){
     }
 
     function getCustomList(room, letter){
+      const L = String(letter || "").trim();
+
+      // ✅ المصدر الأساسي: أسئلة الحساب (Persistent)
+      const acc = CUSTOM_STORE?.data?.[L];
+      if(Array.isArray(acc)) return acc.filter(x => x && (x.q || x.a)).slice(0, MAX_CUSTOM_PER_LETTER);
+
+      // ✅ احتياط لنسخ قديمة كانت تخزن داخل الغرفة
       const cq = room?.customQuestions || {};
-      const v = cq?.[letter];
-      if(Array.isArray(v)) return v.filter(x => x && (x.q || x.a));
-      if(v && typeof v === "object") return [v].filter(x => x && (x.q || x.a));
+      const v = cq?.[L];
+      if(Array.isArray(v)) return v.filter(x => x && (x.q || x.a)).slice(0, MAX_CUSTOM_PER_LETTER);
+      if(v && typeof v === "object") return [v].filter(x => x && (x.q || x.a)).slice(0, MAX_CUSTOM_PER_LETTER);
+
       return [];
     }
 
@@ -2420,8 +2376,12 @@ if(homeBtn && role !== "host"){
           return;
         }
 
-        await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
-        await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
+        const r = await saveAccountCustomQuestions(letter, out);
+        if(!r || !r.ok){
+          savedMsg.textContent = "تعذر الحفظ. تأكد من تسجيل الدخول.";
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1600);
+          return;
+        }
 
         savedMsg.textContent = "تم الحفظ ✅";
         setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
@@ -2440,7 +2400,7 @@ if(homeBtn && role !== "host"){
         <div class="cqModal" role="dialog" aria-modal="true" aria-label="أسئلة المقدم">
           <button id="cqClose" class="cqCloseRed" aria-label="إغلاق">X</button>
           <div class="cqTitle">أسئلة خاصة للمقدم</div>
-          <div class="cqHint">اضغط على الحرف لفتح صفحة أسئلته. يمكنك إضافة أكثر من سؤال وجواب لنفس الحرف.</div>
+          <div class="cqHint" id="cqHint">اضغط على الحرف لفتح صفحة أسئلته. (الأسئلة تُحفظ في حسابك تلقائياً)</div>
           <div id="cqList"></div>
         </div>
       `;
@@ -2479,12 +2439,25 @@ if(homeBtn && role !== "host"){
       CUSTOM_Q_UI.els = { backdrop, cqList };
     }
 
-    function openCustomQuestionsModal(room){
+    async function openCustomQuestionsModal(room){
       ensureCustomQuestionsModal();
       CUSTOM_Q_UI.roomLatest = room || {};
       const { backdrop, cqList } = CUSTOM_Q_UI.els;
+
       cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
       backdrop.style.display = "flex";
+
+      // ✅ تحميل أحدث أسئلة من الحساب قبل العرض
+      const hint = backdrop.querySelector("#cqHint");
+      if(hint) hint.textContent = "جاري تحميل الأسئلة الخاصة...";
+      try{
+        await loadAccountCustomQuestions(true);
+      }catch(e){}
+      if(hint){
+        hint.textContent = CUSTOM_STORE.lastErr
+          ? "تعذر تحميل الأسئلة الخاصة الآن. تأكد أنك مسجل دخول."
+          : "اضغط على الحرف لفتح صفحة أسئلته. (الأسئلة تُحفظ في حسابك تلقائياً)";
+      }
     }
 
     function getQuestionMode(room){
@@ -3662,7 +3635,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
         if(qText) qText.textContent = curQ;
 
-        const sig = `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number(room.customQuestionsUpdatedAt||0)}`;
+        const sig = `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number((CUSTOM_STORE && CUSTOM_STORE.updatedAt) || room.customQuestionsUpdatedAt || 0)}`;
         if(ANSWER_UI.sig !== sig){
           ANSWER_UI.sig = sig;
           ANSWER_UI.revealed = false;
@@ -4036,18 +4009,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         scheduleRender();
       });
 
-      // customQuestions
-      onValue(ref(db, `rooms/${code}/customQuestions`), (s) => {
-        LIVE.room.customQuestions = s.val() || {};
-        scheduleRender();
-      });
-
-      // customQuestionsUpdatedAt
-      onValue(ref(db, `rooms/${code}/customQuestionsUpdatedAt`), (s) => {
-        LIVE.room.customQuestionsUpdatedAt = Number(s.val() || 0);
-        scheduleRender();
-      });
-
       // winEvent
       onValue(ref(db, `rooms/${code}/winEvent`), (s) => {
         LIVE.room.winEvent = s.val();
@@ -4063,6 +4024,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-02-20-1 (Firebase→DO) -->
+  <!-- VERSION: game_full.html — v2026-02-17-1 -->
 </body>
 </html>
