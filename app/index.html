@@ -75,26 +75,17 @@
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDy2FEg8Xj0pA05syDawTh37rI1NEbQTjQ",
-      authDomain: "sabaq-alhorof.firebaseapp.com",
-      databaseURL: "https://sabaq-alhorof-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "sabaq-alhorof",
-      storageBucket: "sabaq-alhorof.firebasestorage.app",
-      messagingSenderId: "1053646928152",
-      appId: "1:1053646928152:web:032d50148c3a4f1148066d"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+  <script>
+    // ✅ Durable Objects (Firebase removed نهائياً)
+    const params = new URLSearchParams(location.search);
+    const SYNC_BASE = (params.get("sync") || "https://horof-sync.sandooq-m.workers.dev").replace(/\/$/,"");
 
     function normalizeDigits(str){
-      const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
-      return String(str ?? "").trim().replace(/[٠-٩]/g, d => map[d]);
+      const map = {
+        "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+        "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+      };
+      return String(str ?? "").trim().replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
     }
 
     function random6(){
@@ -102,13 +93,29 @@
     }
 
     function randomKey(){
-      return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      try{
+        if (crypto?.randomUUID) return crypto.randomUUID();
+      }catch(e){}
+      return (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Date.now().toString(36));
+    }
+
+    async function fetchJSON(url, opts){
+      const r = await fetch(url, opts);
+      const j = await r.json().catch(()=>null);
+      return { ok: r.ok, status: r.status, json: j };
+    }
+
+    async function roomExists(code){
+      const url = `${SYNC_BASE}/state?room=${encodeURIComponent(code)}`;
+      const { json } = await fetchJSON(url, { cache:"no-store" });
+      const st = (json && json.ok && json.state && typeof json.state === "object") ? json.state : {};
+      return !!(st.createdAt || st.status || st.hostKey || st.presenterKey);
     }
 
     async function createRoom(){
       const name = document.getElementById("name").value.trim();
       const pRaw = document.getElementById("players").value;
-      let players = Number(normalizeDigits(pRaw));
+      let players = Number(normalizeDigits(pRaw).replace(/\D/g,""));
 
       if(!name){ alert("اكتب اسم اللعبة"); return; }
 
@@ -117,7 +124,7 @@
         return;
       }
 
-      // ✅ (تعديل 3) حد أقصى 13
+      // ✅ حد أقصى 13
       if(players > 13){
         alert("الحد الأقصى لعدد اللاعبين هو 13");
         return;
@@ -126,11 +133,14 @@
       const btn = document.getElementById("btn");
       btn.disabled = true;
 
+      // ✅ توليد كود 6 أرقام غير مستخدم
       let code = "";
-      for(let i=0;i<10;i++){
+      for(let i=0;i<12;i++){
         const c = random6();
-        const exists = (await get(ref(db, `rooms/${c}`))).exists();
-        if(!exists){ code = c; break; }
+        try{
+          const exists = await roomExists(c);
+          if(!exists){ code = c; break; }
+        }catch(e){}
       }
 
       if(!code){
@@ -139,33 +149,68 @@
         return;
       }
 
-      const presenterKey = randomKey();
+      const hostKey = randomKey();
 
+      // ✅ نفس شكل الحالة اللي تتوقعه اللعبة
       const room = {
         code,
         name,
         maxPlayers: players,
-        presenterKey,
+        hostKey,
         status: "lobby",
         createdAt: Date.now(),
+
+        displayPid: null,
         activeMap: 0,
         freeze: false,
         buzzer: null,
+
+        scores: { green: 0, orange: 0 },
+
         current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
+        timer: { sel: 10, dur: 10, running: false, startTs: 0, done: false },
+
+        questionMode: "default",
+        customQuestions: {},
+        customQuestionsUpdatedAt: 0,
+
+        winEvent: null,
+        winState: {},
+        mapStates: {},
         players: {},
-        scores: { orange: 0, green: 0 }
+        tvLock: null
       };
 
-      await set(ref(db, `rooms/${code}`), room);
+      try{
+        const url = `${SYNC_BASE}/action?room=${encodeURIComponent(code)}`;
+        const { json } = await fetchJSON(url, {
+          method:"POST",
+          headers:{ "content-type":"application/json" },
+          body: JSON.stringify(room)
+        });
 
-      const u = new URL("../game.html", location.href);
-      u.searchParams.set("role", "host");
-      u.searchParams.set("code", code);
-      u.searchParams.set("key", presenterKey);
-      location.href = u.toString();
+        if(!json || !json.ok){
+          btn.disabled = false;
+          alert("صار خطأ أثناء إنشاء الغرفة، حاول مرة ثانية");
+          return;
+        }
+
+        const u = new URL("../game.html", location.href);
+        u.searchParams.set("role", "host");
+        u.searchParams.set("code", code);
+        u.searchParams.set("key", hostKey);
+        // اختياري: تثبيت السيرفر من الرابط
+        // u.searchParams.set("sync", SYNC_BASE);
+
+        location.href = u.toString();
+
+      }catch(e){
+        btn.disabled = false;
+        alert("صار خطأ، حاول مرة ثانية");
+      }
     }
 
-    // ✅ (تعديل 3) منع كتابة أكثر من 13 مباشرة داخل الحقل
+    // ✅ منع كتابة أكثر من 13 مباشرة داخل الحقل
     (function(){
       const inp = document.getElementById("players");
       if(!inp) return;
@@ -190,4 +235,4 @@
 </body>
 </html>
 
-<!-- VERSION: app/index.html — vSolidBG-Max13-5 -->
+<!-- VERSION: app/index.html — vSolidBG-Max13-DO-1 -->
