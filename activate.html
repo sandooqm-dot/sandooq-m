@@ -6,6 +6,15 @@
   <title>تفعيل اللعبة - صندوق المسابقات</title>
 
   <style>
+    /* ✅ (4) تطبيق خط AA-GALAXY على كامل الصفحة */
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("AA-GALAXY.otf") format("opentype");
+      font-weight:400;
+      font-style:normal;
+      font-display:swap;
+    }
+
     :root{
       --bg1:#7b1f63;
       --bg2:#5f214f;
@@ -28,7 +37,7 @@
     body{
       margin:0;
       min-height:100vh;
-      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      font-family: "AA-GALAXY", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; /* ✅ */
       color:var(--text);
       background:
         radial-gradient(1100px 700px at 20% 10%, rgba(255,255,255,.12), transparent 60%),
@@ -39,6 +48,9 @@
       justify-content:center;
       padding:28px 14px;
     }
+
+    /* ✅ ضمان تطبيق الخط على الحقول والأزرار */
+    button, input, a{ font-family: inherit; }
 
     body:before{
       content:"";
@@ -69,9 +81,11 @@
       margin-top:2px;
       margin-bottom:8px;
     }
+
+    /* ✅ (1) تكبير اللوقو بنفس المكان */
     .brand img{
-      width:52px; height:52px; object-fit:contain;
-      filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
+      width:88px; height:88px; object-fit:contain;           /* 👈 أكبر */
+      filter: drop-shadow(0 10px 20px rgba(0,0,0,.22));
     }
 
     .title{
@@ -166,6 +180,9 @@
       display:flex; align-items:center; justify-content:center;
       gap:10px;
       box-shadow:0 14px 30px rgba(0,0,0,.14);
+
+      /* ✅ (2) نقل أيقونة Google للجهة المقابلة */
+      flex-direction: row-reverse;
     }
     .google img{width:20px; height:20px}
 
@@ -405,7 +422,8 @@
         <div id="resetMsg" class="msg"></div>
       </div>
 
-      <div class="foot">© صندوق المسابقات</div>
+      <!-- ✅ (3) تعديل الحقوق -->
+      <div class="foot">جميع الحقوق محفوظة لصندوق المسابقات © 2026</div>
     </div>
   </div>
 
@@ -803,7 +821,6 @@
           show("view-activate");
           return;
         } else {
-          // لو التوكن قديم/غير صالح نمسحه عشان ما نعلق
           clearToken();
         }
       }
@@ -884,4 +901,4 @@
 </body>
 </html>
 
-<!-- VERSION: activate.html — v11 (Fix Google click hard + /me GET fallback + token cookie backup + no-store) -->
+<!-- VERSION: activate.html — v12 (Bigger logo + Google icon opposite + full footer + AA-GALAXY everywhere) -->
