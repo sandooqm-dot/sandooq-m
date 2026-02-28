@@ -1460,6 +1460,7 @@ async function _action(patch){
       set.forEach(cb => { try{ cb(_snapshot(v)); }catch(e){} });
     }
   }
+  try{ if(j && (j.room || j.state)) _applyRoomAndNotify(j); }catch(_){ }
   return j;
 }
 
@@ -1511,8 +1512,156 @@ async function runTransaction(r, fn){
   return { committed: true, snapshot: _snapshot(next) };
 }
 
-// Start polling loop (lightweight)
-setInterval(() => { _pullOnce(false); }, SYNC.pollMs);
+// Realtime (Pusher optional) + adaptive resync/polling
+// الفكرة: /state يكون فقط للـ initial + resync خفيف، والتحديثات اللحظية تجينا من Pusher (إذا مُفعّل).
+function _applyRoomAndNotify(roomLike){
+  const room = (roomLike && (roomLike.room || roomLike.state)) ? (roomLike.room || roomLike.state) : roomLike;
+  if(!room || typeof room !== 'object') return;
+
+  const next = { ...(room || {}) };
+  if(!next.maps) next.maps = {};
+  if(!next.mapStates) next.mapStates = {};
+  SYNC.state = next;
+
+  for(const [path, set] of _watchers.entries()){
+    const v = _get(SYNC.state, path);
+    let s = "";
+    try{ s = JSON.stringify(v); }catch(_){ s = String(v); }
+    if(_lastStr.get(path) !== s){
+      _lastStr.set(path, s);
+      for(const cb of set){
+        try{ cb(_snapshot(v)); }catch(_){}
+      }
+    }
+  }
+}
+
+async function _loadPusherLib(){
+  if(window.Pusher) return true;
+  return await new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://js.pusher.com/8.2.0/pusher.min.js';
+    s.async = true;
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
+async function _getPusherConfig(){
+  const q = new URLSearchParams(location.search);
+
+  // 1) من Querystring (للاختبار السريع): ?pk=APP_KEY&pc=CLUSTER
+  const pk = q.get('pk') || q.get('pkey') || '';
+  const pc = q.get('pc') || q.get('pcluster') || '';
+  if(pk && pc) return { key: pk, cluster: pc };
+
+  // 2) من LocalStorage (إذا حبيت تحفظها مرة واحدة)
+  const lpk = localStorage.getItem('horof_pusher_key') || '';
+  const lpc = localStorage.getItem('horof_pusher_cluster') || '';
+  if(lpk && lpc) return { key: lpk, cluster: lpc };
+
+  // 3) من الـ Worker (أفضل وأأمن): /pusher-config  => { key, cluster, channelPrefix? }
+  try{
+    const r = await fetch(`${SYNC.base.replace(/\/$/, '')}/pusher-config`, { cache: 'no-store' });
+    if(r.ok){
+      const j = await r.json();
+      if(j?.key && j?.cluster) return j;
+    }
+  }catch(_){}
+
+  return null;
+}
+
+async function _tryPusher(){
+  if(SYNC.pusherTried) return;
+  SYNC.pusherTried = true;
+
+  const conf = await _getPusherConfig();
+  if(!conf?.key || !conf?.cluster) return;
+
+  const ok = await _loadPusherLib();
+  if(!ok || !window.Pusher) return;
+
+  const q = new URLSearchParams(location.search);
+  const channelPrefix = conf.channelPrefix || q.get('pfx') || 'horof-room-';
+  const channelName = q.get('pchan') || `${channelPrefix}${code}`;
+
+  const p = new window.Pusher(conf.key, {
+    cluster: conf.cluster,
+    forceTLS: true,
+    enabledTransports: ['ws','wss'],
+    disabledTransports: ['xhr_streaming','xhr_polling']
+  });
+
+  SYNC.pusher = p;
+  const ch = p.subscribe(channelName);
+
+  const onMsg = (data) => _applyRoomAndNotify(data);
+  ch.bind('state', onMsg);
+  ch.bind('update', onMsg);
+  ch.bind('delta', onMsg);
+
+  p.connection.bind('connected', () => {
+    SYNC.pusherActive = true;
+    // resync بسيط للتأكد من التطابق
+    _pullOnce(false);
+  });
+
+  p.connection.bind('disconnected', () => {
+    SYNC.pusherActive = false;
+  });
+
+  p.connection.bind('error', () => {
+    SYNC.pusherActive = false;
+  });
+}
+
+// Adaptive polling: يقلّل الطلبات على Durable Objects بشكل كبير
+let _pollTimer = null;
+let _pollBackoff = 0;
+
+function _desiredDelayMs(){
+  const base = SYNC.pusherActive ? (SYNC.resyncMs || 60000) : (SYNC.pollMs || 15000);
+  const hidden = SYNC.hiddenMs || Math.max(60000, base * 4);
+  const d = document.hidden ? hidden : base;
+  return Math.max(2000, d + (_pollBackoff || 0));
+}
+
+function _scheduleNextPoll(){
+  clearTimeout(_pollTimer);
+  _pollTimer = setTimeout(async () => {
+    try{
+      await _pullOnce(false);
+      _pollBackoff = 0;
+    }catch(_){
+      // backoff تدريجي (حتى دقيقتين)
+      _pollBackoff = Math.min((_pollBackoff || 1000) * 2, 120000);
+    }
+    _scheduleNextPoll();
+  }, _desiredDelayMs());
+}
+
+let _rtStarted = false;
+function _ensureRealtime(){
+  if(_rtStarted) return;
+  _rtStarted = true;
+
+  // جرّب Pusher أولاً (إذا متوفر إعداداته)
+  _tryPusher();
+
+  // ابدأ جدول polling/resync
+  _scheduleNextPoll();
+
+  document.addEventListener('visibilitychange', () => {
+    // يعيد جدولة التأخير مباشرة حسب حالة التبويب
+    _scheduleNextPoll();
+  });
+}
+
+// تشغيل realtime مباشرة
+_ensureRealtime();
+
 
 const main = document.getElementById("main");
 const gameNameEl = document.getElementById("gameName");
