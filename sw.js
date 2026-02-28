@@ -1,11 +1,11 @@
 /* Service Worker — Sabaq Alhorof
    - Precaches core files (maps/questions/font/logo)
    - Fast offline + safer updates (iOS-friendly)
-   - ✅ NEW: Force Network on ?v / ?fresh / ?nocache so cache-buster links REALLY work
+   - ✅ NEW: Fix versioned assets (?v=...) so updates actually arrive (SWR + canonical key)
 */
 
 const CACHE_PREFIX  = "sabaq-alhorof";
-const CACHE_VERSION = "2026-02-28-1"; // ✅ غيّرناه عشان يضمن تحديث SW عند العملاء
+const CACHE_VERSION = "2026-02-15-3"; // ✅ حدّثناه لأننا عدّلنا sw.js
 const PRECACHE_NAME = `${CACHE_PREFIX}-precache-${CACHE_VERSION}`;
 const RUNTIME_NAME  = `${CACHE_PREFIX}-runtime-${CACHE_VERSION}`;
 
@@ -120,23 +120,10 @@ function withTimeout(promise, ms){
   });
 }
 
-function hasCacheBuster(url){
-  try{
-    return url.searchParams.has("v") || url.searchParams.has("fresh") || url.searchParams.has("nocache");
-  }catch(e){
-    return false;
-  }
-}
-
 // HTML: Network-first لكن لو الشبكة تأخرت يرجع الكاش بسرعة
 async function navigateStrategy(event){
   const req = event.request;
-  const url = new URL(req.url);
-
-  // ✅ إذا فيه cache-buster نخليها Network 100% (عشان يحل مشاكل “بعض الأجهزة”)
-  const forceFresh = hasCacheBuster(url);
-
-  const cached = forceFresh ? null : await matchKeyFirstRuntime(req, true);
+  const cached = await matchKeyFirstRuntime(req, true);
 
   const networkPromise = (async () => {
     try{
@@ -147,23 +134,11 @@ async function navigateStrategy(event){
       }
     }catch(e){}
 
-    const res = await fetch(req, { cache: "no-store" });
+    const res = await fetch(req);
     await cachePut(RUNTIME_NAME, req, res.clone());
     return res;
   })();
 
-  // ✅ Force fresh: لا نرجّع كاش إلا إذا الشبكة فشلت تماماً
-  if(forceFresh){
-    try{
-      return await networkPromise;
-    }catch(e){
-      return (await matchKeyFirstRuntime(req, true)) ||
-             (await matchKeyFirstRuntime(OFFLINE_FALLBACK_PAGE, true)) ||
-             new Response("Offline", { status: 503 });
-    }
-  }
-
-  // سلوكنا القديم
   if(!cached){
     try{
       return await networkPromise;
@@ -250,6 +225,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // ✅ ملفات نبيها تتحدث حتى لو كانت Cache موجودة (maps/logo/font/questions)
+  // (تشتغل مع ?v=ASSET_VERSION بشكل صحيح الآن)
   const canonKey = toCanonicalKey(url);
   const isHeavy =
     canonKey === "questions_bank.js" ||
