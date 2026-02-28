@@ -1228,7 +1228,10 @@
     })();
   </script>
 
-  <script type="module">
+    <!-- ✅ Pusher (optional) realtime transport -->
+  <script defer src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+
+<script type="module">
     // ✅ Firebase removed — Sync via Cloudflare Durable Objects (and later Pusher)
     // ✅ رقم إصدار للكاش + كسر كاش (غيّره فقط عند تحديث ملفات محلية: خرائط/لوجو/خط/بنك أسئلة)
     const ASSET_VERSION = "2026-02-15-1";
@@ -1460,7 +1463,6 @@ async function _action(patch){
       set.forEach(cb => { try{ cb(_snapshot(v)); }catch(e){} });
     }
   }
-  try{ if(j && (j.room || j.state)) _applyRoomAndNotify(j); }catch(_){ }
   return j;
 }
 
@@ -1512,156 +1514,187 @@ async function runTransaction(r, fn){
   return { committed: true, snapshot: _snapshot(next) };
 }
 
-// Realtime (Pusher optional) + adaptive resync/polling
-// الفكرة: /state يكون فقط للـ initial + resync خفيف، والتحديثات اللحظية تجينا من Pusher (إذا مُفعّل).
-function _applyRoomAndNotify(roomLike){
-  const room = (roomLike && (roomLike.room || roomLike.state)) ? (roomLike.room || roomLike.state) : roomLike;
-  if(!room || typeof room !== 'object') return;
-
-  const next = { ...(room || {}) };
-  if(!next.maps) next.maps = {};
-  if(!next.mapStates) next.mapStates = {};
-  SYNC.state = next;
-
+// ✅ تطبيق تحديثات من البث (Pusher) أو من /state مع نفس منطق إشعار onValue
+function _notifyWatchersNow(){
   for(const [path, set] of _watchers.entries()){
     const v = _get(SYNC.state, path);
-    let s = "";
-    try{ s = JSON.stringify(v); }catch(_){ s = String(v); }
+    let s;
+    try{ s = JSON.stringify(v); }catch(e){ s = String(v); }
     if(_lastStr.get(path) !== s){
       _lastStr.set(path, s);
-      for(const cb of set){
-        try{ cb(_snapshot(v)); }catch(_){}
-      }
+      set.forEach(cb => { try{ cb(_snapshot(v)); }catch(e){} });
     }
   }
 }
-
-async function _loadPusherLib(){
-  if(window.Pusher) return true;
-  return await new Promise((resolve) => {
-    const s = document.createElement('script');
-    s.src = 'https://js.pusher.com/8.2.0/pusher.min.js';
-    s.async = true;
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.head.appendChild(s);
-  });
+function _applyFullState(nextState){
+  SYNC.state = (nextState && typeof nextState === "object") ? nextState : {};
+  SYNC.lastPullAt = Date.now();
+  _notifyWatchersNow();
+}
+function _applyTopPatch(topPatch){
+  if(!SYNC.state || typeof SYNC.state !== "object") SYNC.state = {};
+  if(topPatch && typeof topPatch === "object"){
+    for(const [k, v] of Object.entries(topPatch)){
+      if(k === "_root"){
+        SYNC.state = (v && typeof v === "object") ? v : {};
+      }else{
+        SYNC.state[k] = v; // patch عبارة عن Top-level keys فقط
+      }
+    }
+  }
+  _notifyWatchersNow();
 }
 
-async function _getPusherConfig(){
-  const q = new URLSearchParams(location.search);
+// ✅ Polling manager (عند تفعيل Pusher نقلل السحب من /state)
+let __POLL_T = null;
+const __ORIG_POLL_MS = Number(SYNC.pollMs || 900);
 
-  // 1) من Querystring (للاختبار السريع): ?pk=APP_KEY&pc=CLUSTER
-  const pk = q.get('pk') || q.get('pkey') || '';
-  const pc = q.get('pc') || q.get('pcluster') || '';
-  if(pk && pc) return { key: pk, cluster: pc };
+function _startPolling(){
+  try{ if(__POLL_T) clearInterval(__POLL_T); }catch(e){}
+  __POLL_T = setInterval(() => { _pullOnce(false); }, Math.max(250, Number(SYNC.pollMs)||900));
+}
+function _setPollMs(ms){
+  const n = Math.max(250, Number(ms)||0);
+  if(!n) return;
+  if(Number(SYNC.pollMs) === n && __POLL_T) return;
+  SYNC.pollMs = n;
+  _startPolling();
+}
 
-  // 2) من LocalStorage (إذا حبيت تحفظها مرة واحدة)
-  const lpk = localStorage.getItem('horof_pusher_key') || '';
-  const lpc = localStorage.getItem('horof_pusher_cluster') || '';
-  if(lpk && lpc) return { key: lpk, cluster: lpc };
+// ✅ Pusher (اختياري): إذا توفر pk + pc في الرابط، يصير الحمل اللحظي على Pusher بدل كثرة Pull
+const __DEBUG_SYNC = (params.get("debug") === "1");
+const __PUSHER_KEY = (params.get("pk") || "").trim();
+const __PUSHER_CLUSTER = (params.get("pc") || "").trim();
+const __PUSHER_CHANNEL = (params.get("pchan") || `private-horof-${code}`).trim();
+const __PUSHER_AUTH = (params.get("pa") || `${SYNC_BASE.replace(/\/$/,"")}/pusher/auth?room=${encodeURIComponent(code)}`).trim();
 
-  // 3) من الـ Worker (أفضل وأأمن): /pusher-config  => { key, cluster, channelPrefix? }
+let __pusher = null;
+let __pusherCh = null;
+let __pusherReady = false;
+
+function _initPusherIfConfigured(){
+  if(!__PUSHER_KEY || !__PUSHER_CLUSTER) return false;
+  if(!window.Pusher) return false;
+
+  try{ window.Pusher.logToConsole = false; }catch(e){}
+
   try{
-    const r = await fetch(`${SYNC.base.replace(/\/$/, '')}/pusher-config`, { cache: 'no-store' });
-    if(r.ok){
-      const j = await r.json();
-      if(j?.key && j?.cluster) return j;
+    __pusher = new window.Pusher(__PUSHER_KEY, {
+      cluster: __PUSHER_CLUSTER,
+      forceTLS: true,
+      authEndpoint: __PUSHER_AUTH,
+      enabledTransports: ["ws","wss"],
+      disabledTransports: ["sockjs"]
+    });
+
+    __pusher.connection.bind("connected", () => {
+      __pusherReady = true;
+      // نقلل Pull من DO (يبقى فقط Resync كل فترة)
+      _setPollMs(15000);
+      if(__DEBUG_SYNC) console.log("[SYNC] Pusher connected ✅ | Poll -> 15000ms", { ch: __PUSHER_CHANNEL });
+      _dbgRender();
+      _pullOnce(true); // sync once
+      _dbgRender();
+    });
+
+    __pusher.connection.bind("disconnected", () => {
+      __pusherReady = false;
+      _setPollMs(__ORIG_POLL_MS);
+      if(__DEBUG_SYNC) console.log("[SYNC] Pusher disconnected ⚠️ | Poll ->", __ORIG_POLL_MS);
+      _dbgRender();
+    });
+
+    __pusher.connection.bind("error", (err) => {
+      if(__DEBUG_SYNC) console.log("[SYNC] Pusher error", err);
+    });
+
+    __pusherCh = __pusher.subscribe(__PUSHER_CHANNEL);
+
+    const onIncoming = (payload) => {
+      // نتوقع أحد الشكلين:
+      // 1) { state: {...} }  أو 2) { patch: {...} }  (Top-level keys)
+      if(payload && payload.state && typeof payload.state === "object"){
+        _applyFullState(payload.state);
+        return;
+      }
+      if(payload && payload.patch && typeof payload.patch === "object"){
+        _applyTopPatch(payload.patch);
+        return;
+      }
+      // fallback (لو السيرفر أرسل حدث بدون بيانات)
+      _pullOnce(true);
+    };
+
+    __pusherCh.bind("state", onIncoming);
+    __pusherCh.bind("patch", onIncoming);
+
+    // نافذة تشخيص
+    window.__SYNC_DIAG = window.__SYNC_DIAG || {};
+    window.__SYNC_DIAG.mode = "pusher+do";
+    window.__SYNC_DIAG.pusher = { cluster: __PUSHER_CLUSTER, channel: __PUSHER_CHANNEL, auth: __PUSHER_AUTH, connected: () => __pusherReady };
+
+    if(__DEBUG_SYNC) console.log("[SYNC] mode = pusher+do ✅", window.__SYNC_DIAG.pusher);
+
+    return true;
+  }catch(e){
+    if(__DEBUG_SYNC) console.log("[SYNC] Pusher init failed", e);
+    return false;
+  }
+}
+
+const __PUSHER_ENABLED = _initPusherIfConfigured();
+if(!__PUSHER_ENABLED){
+  window.__SYNC_DIAG = window.__SYNC_DIAG || {};
+  window.__SYNC_DIAG.mode = "do-poll";
+  if(__DEBUG_SYNC) console.log("[SYNC] mode = do-poll (لا يوجد pk/pc أو مكتبة Pusher) ⚠️");
+  _dbgRender();
+}
+
+// ✅ Debug badge (يظهر فقط عند ?debug=1) — ما يغيّر أي شيء للمستخدمين العاديين
+let __dbgEl = null;
+function _dbgEnsure(){
+  if(__dbgEl) return __dbgEl;
+  __dbgEl = document.createElement("div");
+  __dbgEl.style.cssText = "position:fixed;left:10px;bottom:10px;z-index:99999;background:rgba(0,0,0,.55);color:#fff;padding:6px 10px;border-radius:10px;font:12px/1.4 Arial, sans-serif;direction:ltr;max-width:90vw;white-space:pre;";
+  document.body.appendChild(__dbgEl);
+  return __dbgEl;
+}
+function _dbgRender(){
+  if(!__DEBUG_SYNC) return;
+  const el = _dbgEnsure();
+  const mode = (window.__SYNC_DIAG && window.__SYNC_DIAG.mode) ? window.__SYNC_DIAG.mode : "—";
+  const st = (window.__SYNC_DIAG && window.__SYNC_DIAG.stats) ? window.__SYNC_DIAG.stats : null;
+  // نخليها مرنة لأن شكل /stats يختلف حسب ما تبنيه بالسيرفر
+  const conn = st?.pusher?.connections_now ?? st?.connections_now ?? st?.concurrent_connections ?? "—";
+  const msg  = st?.pusher?.messages_today ?? st?.messages_today ?? st?.messages_per_day ?? "—";
+  const ok   = (__pusherReady ? "✅" : "⚪️");
+  el.textContent = `SYNC ${ok}\nmode: ${mode}\nconn: ${conn}\nmsg/day: ${msg}`;
+}
+
+// ✅ (اختياري) إحصائيات: تحتاج Endpoint من السيرفر (لا يمكن جلبها من Pusher بدون Secret)
+async function _fetchSyncStats(){
+  if(!__DEBUG_SYNC) return;
+  const url = `${SYNC_BASE.replace(/\/$/,"")}/stats?room=${encodeURIComponent(code)}`;
+  try{
+    const r = await fetch(url, { cache:"no-store" });
+    const j = await r.json().catch(()=>null);
+    if(j){
+      window.__SYNC_DIAG = window.__SYNC_DIAG || {};
+      window.__SYNC_DIAG.stats = j;
+      console.log("[SYNC] stats", j);
+      _dbgRender();
     }
-  }catch(_){}
-
-  return null;
+  }catch(e){
+    // إذا ما عندك /stats الآن، تجاهل
+  }
+}
+if(__DEBUG_SYNC){
+  _fetchSyncStats();
+  setInterval(_fetchSyncStats, 20000);
 }
 
-async function _tryPusher(){
-  if(SYNC.pusherTried) return;
-  SYNC.pusherTried = true;
-
-  const conf = await _getPusherConfig();
-  if(!conf?.key || !conf?.cluster) return;
-
-  const ok = await _loadPusherLib();
-  if(!ok || !window.Pusher) return;
-
-  const q = new URLSearchParams(location.search);
-  const channelPrefix = conf.channelPrefix || q.get('pfx') || 'horof-room-';
-  const channelName = q.get('pchan') || `${channelPrefix}${code}`;
-
-  const p = new window.Pusher(conf.key, {
-    cluster: conf.cluster,
-    forceTLS: true,
-    enabledTransports: ['ws','wss'],
-    disabledTransports: ['xhr_streaming','xhr_polling']
-  });
-
-  SYNC.pusher = p;
-  const ch = p.subscribe(channelName);
-
-  const onMsg = (data) => _applyRoomAndNotify(data);
-  ch.bind('state', onMsg);
-  ch.bind('update', onMsg);
-  ch.bind('delta', onMsg);
-
-  p.connection.bind('connected', () => {
-    SYNC.pusherActive = true;
-    // resync بسيط للتأكد من التطابق
-    _pullOnce(false);
-  });
-
-  p.connection.bind('disconnected', () => {
-    SYNC.pusherActive = false;
-  });
-
-  p.connection.bind('error', () => {
-    SYNC.pusherActive = false;
-  });
-}
-
-// Adaptive polling: يقلّل الطلبات على Durable Objects بشكل كبير
-let _pollTimer = null;
-let _pollBackoff = 0;
-
-function _desiredDelayMs(){
-  const base = SYNC.pusherActive ? (SYNC.resyncMs || 60000) : (SYNC.pollMs || 15000);
-  const hidden = SYNC.hiddenMs || Math.max(60000, base * 4);
-  const d = document.hidden ? hidden : base;
-  return Math.max(2000, d + (_pollBackoff || 0));
-}
-
-function _scheduleNextPoll(){
-  clearTimeout(_pollTimer);
-  _pollTimer = setTimeout(async () => {
-    try{
-      await _pullOnce(false);
-      _pollBackoff = 0;
-    }catch(_){
-      // backoff تدريجي (حتى دقيقتين)
-      _pollBackoff = Math.min((_pollBackoff || 1000) * 2, 120000);
-    }
-    _scheduleNextPoll();
-  }, _desiredDelayMs());
-}
-
-let _rtStarted = false;
-function _ensureRealtime(){
-  if(_rtStarted) return;
-  _rtStarted = true;
-
-  // جرّب Pusher أولاً (إذا متوفر إعداداته)
-  _tryPusher();
-
-  // ابدأ جدول polling/resync
-  _scheduleNextPoll();
-
-  document.addEventListener('visibilitychange', () => {
-    // يعيد جدولة التأخير مباشرة حسب حالة التبويب
-    _scheduleNextPoll();
-  });
-}
-
-// تشغيل realtime مباشرة
-_ensureRealtime();
-
+// Start polling loop (lightweight)
+_startPolling();
 
 const main = document.getElementById("main");
 const gameNameEl = document.getElementById("gameName");
@@ -2461,115 +2494,6 @@ if(homeBtn && role !== "host"){
     });
 
     const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
-    // =========================================================
-    // ✅ (NEW) أسئلة خاصة محفوظة بالحساب (email) — للمقدم فقط
-    // عبر API: /api2/custom-questions (D1)
-    // =========================================================
-    const CQ_API = "/api2/custom-questions";
-    const CQ_ACCOUNT = { loaded:false, loading:false, data:{}, updatedAt:0, lastLoadAt:0 };
-
-    function cqGetDeviceId(){
-      const k = "sandooq_device_id_v1";
-      try{
-        let v = localStorage.getItem(k) || "";
-        if(!v){
-          v = (crypto?.randomUUID ? crypto.randomUUID() :
-            ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16)));
-          localStorage.setItem(k, v);
-        }
-        return v;
-      }catch(e){
-        return ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16));
-      }
-    }
-
-    function cqGetSessionToken(){
-      try{ return localStorage.getItem("sandooq_token_v1") || ""; }catch(e){ return ""; }
-    }
-
-    async function cqFetch(url, opts){
-      const headers = new Headers((opts && opts.headers) || {});
-      if(!headers.has("X-Device-Id")) headers.set("X-Device-Id", cqGetDeviceId());
-
-      const tok = cqGetSessionToken();
-      if(tok && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + tok);
-
-      const res = await fetch(url, Object.assign({}, opts, {
-        headers,
-        credentials: "include",
-        cache: "no-store"
-      }));
-      const json = await res.json().catch(() => null);
-      return { res, json };
-    }
-
-    async function loadAccountCustomQuestions(force=false){
-      if(role !== "host") return;
-
-      const now = Date.now();
-      if(!force && CQ_ACCOUNT.loaded && (now - (CQ_ACCOUNT.lastLoadAt||0) < 15000)) return;
-      if(CQ_ACCOUNT.loading) return;
-
-      CQ_ACCOUNT.loading = true;
-      try{
-        const { res, json } = await cqFetch(CQ_API, { method:"GET" });
-        if(res.ok && json && json.ok){
-          const data =
-            (json.customQuestions && typeof json.customQuestions === "object") ? json.customQuestions :
-            (json.questions && typeof json.questions === "object") ? json.questions :
-            (json.data && typeof json.data === "object") ? json.data : {};
-
-          CQ_ACCOUNT.data = (data && typeof data === "object") ? data : {};
-          CQ_ACCOUNT.updatedAt = Number(json.updatedAt || json.updated_at || Date.now());
-          CQ_ACCOUNT.loaded = true;
-
-          // ✅ نخزنها محلياً في LIVE (بدون ما نكتبها داخل الغرفة)
-          LIVE.room.customQuestions = CQ_ACCOUNT.data || {};
-          LIVE.room.customQuestionsUpdatedAt = CQ_ACCOUNT.updatedAt || Date.now();
-
-          scheduleRender();
-        }else{
-          // لو المستخدم مو مسجّل/مو مفعل، ما نكسر اللعبة
-          // console.warn("custom-questions GET failed", json);
-        }
-      }catch(e){
-        // console.warn("custom-questions GET error", e);
-      }finally{
-        CQ_ACCOUNT.lastLoadAt = now;
-        CQ_ACCOUNT.loading = false;
-      }
-    }
-
-    async function saveAccountCustomQuestions(letter, items){
-      if(role !== "host") throw new Error("NOT_HOST");
-
-      const L = String(letter || "").trim();
-      const arr = Array.isArray(items) ? items : [];
-      const payload = { letter: L, items: arr, questions: arr };
-
-      const { res, json } = await cqFetch(CQ_API, {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if(!res.ok || !json || !json.ok){
-        const err = (json && (json.message || json.error)) ? String(json.message || json.error) : "SAVE_FAILED";
-        throw new Error(err);
-      }
-
-      CQ_ACCOUNT.loaded = true;
-      CQ_ACCOUNT.updatedAt = Number(json.updatedAt || json.updated_at || Date.now());
-      CQ_ACCOUNT.data = (CQ_ACCOUNT.data && typeof CQ_ACCOUNT.data === "object") ? CQ_ACCOUNT.data : {};
-      CQ_ACCOUNT.data[L] = arr;
-
-      LIVE.room.customQuestions = CQ_ACCOUNT.data;
-      LIVE.room.customQuestionsUpdatedAt = CQ_ACCOUNT.updatedAt;
-
-      scheduleRender();
-      return true;
-    }
-
 
     function autosizeTA(ta){
       if(!ta) return;
@@ -2678,23 +2602,13 @@ if(homeBtn && role !== "host"){
           return;
         }
 
-        // ✅ حفظ بالحساب (D1) بدل الغرفة — المقدم فقط
-        saveBtn.disabled = true;
-        const oldText = saveBtn.textContent;
-        saveBtn.textContent = "جاري الحفظ...";
+        await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
+        await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
 
-        try{
-          await saveAccountCustomQuestions(letter, out);
-          savedMsg.textContent = "تم الحفظ ✅";
-        }catch(e){
-          savedMsg.textContent = "فشل الحفظ — تأكد أنك مسجّل دخول ومُفعّل";
-          console.warn("customQuestions save error", e);
-        }finally{
-          saveBtn.disabled = false;
-          saveBtn.textContent = oldText || "حفظ";
-          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
-          refreshAddState();
-        }
+        savedMsg.textContent = "تم الحفظ ✅";
+        setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+
+        refreshAddState();
       });
     }
 
@@ -2747,16 +2661,9 @@ if(homeBtn && role !== "host"){
       CUSTOM_Q_UI.els = { backdrop, cqList };
     }
 
-    async function openCustomQuestionsModal(room){
+    function openCustomQuestionsModal(room){
       ensureCustomQuestionsModal();
       CUSTOM_Q_UI.roomLatest = room || {};
-
-      // ✅ حمّل أسئلتك المحفوظة بالحساب قبل ما تفتح (عشان تظهر مباشرة)
-      try{ await loadAccountCustomQuestions(true); }catch(e){}
-
-      // نخلي أحدث نسخة في الواجهة
-      CUSTOM_Q_UI.roomLatest = LIVE.room || (room || {});
-
       const { backdrop, cqList } = CUSTOM_Q_UI.els;
       cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
       backdrop.style.display = "flex";
@@ -2851,10 +2758,10 @@ if(homeBtn && role !== "host"){
         openStoreUrl();
       });
 
-      bd.querySelector("#sAddQ").addEventListener("click", async () => {
+      bd.querySelector("#sAddQ").addEventListener("click", () => {
         const room = SETTINGS_UI.roomLatest || {};
         closeSettings();
-        await openCustomQuestionsModal(room);
+        openCustomQuestionsModal(room);
       });
 
       bd.querySelector("#sTimer").addEventListener("click", () => {
@@ -4378,15 +4285,12 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       // customQuestions
       onValue(ref(db, `rooms/${code}/customQuestions`), (s) => {
-        // ✅ الأسئلة الخاصة للمقدم تُقرأ من الحساب (D1) وليس من الغرفة
-        if(role === "host") return;
         LIVE.room.customQuestions = s.val() || {};
         scheduleRender();
       });
 
       // customQuestionsUpdatedAt
       onValue(ref(db, `rooms/${code}/customQuestionsUpdatedAt`), (s) => {
-        if(role === "host") return;
         LIVE.room.customQuestionsUpdatedAt = Number(s.val() || 0);
         scheduleRender();
       });
@@ -4403,12 +4307,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
     startRoomListeners();
     scheduleRender();
-
-    // ✅ (NEW) حمّل أسئلة المقدم المحفوظة بالحساب مباشرةً
-    if(role === "host"){
-      loadAccountCustomQuestions(true);
-    }
-
 
   </script>
 
