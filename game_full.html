@@ -1293,10 +1293,24 @@
     const role = params.get("role");
 const code = params.get("code");
 const hostKey = params.get("key");
-const pid = params.get("pid");
+const pid = (function(){
+  const u = params.get("pid");
+  if(u) return u;
+  try{
+    const k = "horof_pid_v1";
+    let v = localStorage.getItem(k);
+    if(!v){
+      v = "p_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+      localStorage.setItem(k, v);
+    }
+    return v;
+  }catch(e){
+    return "p_" + Math.random().toString(36).slice(2,10);
+  }
+})();
 // ✅ Sync (Firebase removed): Cloudflare Worker + Durable Objects
 // Worker base (change only if you deploy a different worker)
-const SYNC_BASE = params.get("sync") || "https://horof-sync.sandooq-m.workers.dev";
+const SYNC_BASE = params.get("sync") || "https://sync.horof.sandooq-games.com";
 
 // Local cache of room state (Durable Object stores ONE JSON state per room)
 const SYNC = {
@@ -1403,7 +1417,7 @@ async function _pullOnce(force=false){
   if(!force && now - SYNC.lastPullAt < Math.max(250, SYNC.pollMs - 50)) return;
   SYNC.pulling = true;
   try{
-    const url = `${SYNC_BASE.replace(/\/$/,"")}/state?room=${encodeURIComponent(code)}`;
+    const url = `${SYNC_BASE.replace(/\/$/,"")}/state?room=${encodeURIComponent(code)}&pid=${encodeURIComponent(pid)}`;
     const r = await fetch(url, { cache: "no-store" });
     const j = await r.json().catch(()=>null);
     if(j && j.ok){
@@ -1439,7 +1453,7 @@ function onValue(r, cb){
 }
 
 async function _action(patch){
-  const url = `${SYNC_BASE.replace(/\/$/,"")}/action?room=${encodeURIComponent(code)}`;
+  const url = `${SYNC_BASE.replace(/\/$/,"")}/action?room=${encodeURIComponent(code)}&pid=${encodeURIComponent(pid)}`;
   const r = await fetch(url, {
     method: "POST",
     headers: { "content-type":"application/json" },
@@ -1565,7 +1579,8 @@ function _setPollMs(ms){
 const __DEBUG_SYNC = (params.get("debug") === "1");
 const __PUSHER_KEY = (params.get("pk") || "").trim();
 const __PUSHER_CLUSTER = (params.get("pc") || "").trim();
-const __PUSHER_CHANNEL = (params.get("pchan") || `private-horof-${code}`).trim();
+const __PUSHER_CHANNEL = (params.get("pchan") || `private-room-${code}`).trim();
+const __PUSHER_CHANNEL_FALLBACK = `private-horof-${code}`;
 const __PUSHER_AUTH = (params.get("pa") || `${SYNC_BASE.replace(/\/$/,"")}/pusher/auth?room=${encodeURIComponent(code)}`).trim();
 
 let __pusher = null;
@@ -1627,6 +1642,22 @@ function _initPusherIfConfigured(){
 
     __pusherCh.bind("state", onIncoming);
     __pusherCh.bind("patch", onIncoming);
+
+    // لو فشل الاشتراك (اختلاف اسم القناة)، جرّب fallback مرة واحدة
+    let __triedFallback = false;
+    __pusherCh.bind("pusher:subscription_error", (status) => {
+      if(__triedFallback) return;
+      __triedFallback = true;
+      if(__DEBUG_SYNC) console.log("[SYNC] subscription_error", status, "-> trying fallback", __PUSHER_CHANNEL_FALLBACK);
+      try{ __pusher.unsubscribe(__PUSHER_CHANNEL); }catch(e){}
+      try{
+        __pusherCh = __pusher.subscribe(__PUSHER_CHANNEL_FALLBACK);
+        __pusherCh.bind("state", onIncoming);
+        __pusherCh.bind("patch", onIncoming);
+        _dbgRender();
+      }catch(e){}
+    });
+
 
     // نافذة تشخيص
     window.__SYNC_DIAG = window.__SYNC_DIAG || {};
