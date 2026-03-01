@@ -307,7 +307,7 @@ const DEFAULT_IDLE_MS = 2 * 60 * 60 * 1000; // ساعتين
 const SEEN_TTL_MS = 90 * 1000; // آخر 90 ثانية نحسبها "متصل"
 const SEEN_GC_MAX = 200; // حماية من التضخم
 
-export class Room {
+export class RoomDO {
   constructor(state, env) {
     this.state = state;
     this.env = env;
