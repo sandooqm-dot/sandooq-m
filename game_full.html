@@ -1645,11 +1645,9 @@ function _initPusherIfConfigured(){
     });
 
     __pusher.connection.bind("connected", () => {
-      __pusherReady = true;
-      // نقلل Pull من DO (يبقى فقط Resync كل فترة)
-      _setPollMs(15000);
-      if(__DEBUG_SYNC) console.log("[SYNC] Pusher connected ✅ | Poll -> 15000ms", { ch: __PUSHER_CHANNEL });
-      _dbgRender();
+      // مهم: لا نبطئ polling هنا، لأن الاتصال بالسوكت وحده لا يعني أن الاشتراك بالقناة نجح.
+      // نبقي polling سريعًا إلى أن نحصل على subscription_succeeded أو أول patch فعلي.
+      if(__DEBUG_SYNC) console.log("[SYNC] Pusher socket connected ⏳ waiting for channel subscription", { ch: __PUSHER_CHANNEL });
       _pullOnce(true); // sync once
       _dbgRender();
     });
@@ -1681,20 +1679,53 @@ function _initPusherIfConfigured(){
       _pullOnce(true);
     };
 
-    __pusherCh.bind("state", onIncoming);
-    __pusherCh.bind("patch", onIncoming);
+    __pusherCh.bind("pusher:subscription_succeeded", () => {
+      __pusherReady = true;
+      _setPollMs(15000);
+      if(__DEBUG_SYNC) console.log("[SYNC] subscription_succeeded ✅ | Poll -> 15000ms", { ch: __PUSHER_CHANNEL });
+      _dbgRender();
+      _pullOnce(true);
+    });
+
+    __pusherCh.bind("state", (payload) => {
+      __pusherReady = true;
+      _setPollMs(15000);
+      onIncoming(payload);
+    });
+    __pusherCh.bind("patch", (payload) => {
+      __pusherReady = true;
+      _setPollMs(15000);
+      onIncoming(payload);
+    });
 
     // لو فشل الاشتراك (اختلاف اسم القناة)، جرّب fallback مرة واحدة
     let __triedFallback = false;
     __pusherCh.bind("pusher:subscription_error", (status) => {
+      __pusherReady = false;
+      _setPollMs(__ORIG_POLL_MS);
       if(__triedFallback) return;
       __triedFallback = true;
       if(__DEBUG_SYNC) console.log("[SYNC] subscription_error", status, "-> trying fallback", __PUSHER_CHANNEL_FALLBACK);
       try{ __pusher.unsubscribe(__PUSHER_CHANNEL); }catch(e){}
       try{
         __pusherCh = __pusher.subscribe(__PUSHER_CHANNEL_FALLBACK);
-        __pusherCh.bind("state", onIncoming);
-        __pusherCh.bind("patch", onIncoming);
+        __pusherCh.bind("pusher:subscription_succeeded", () => {
+          __pusherReady = true;
+          _setPollMs(15000);
+          if(__DEBUG_SYNC) console.log("[SYNC] fallback subscription_succeeded ✅ | Poll -> 15000ms", { ch: __PUSHER_CHANNEL_FALLBACK });
+          _dbgRender();
+          _pullOnce(true);
+        });
+        __pusherCh.bind("state", (payload) => {
+          __pusherReady = true;
+          _setPollMs(15000);
+          onIncoming(payload);
+        });
+        __pusherCh.bind("patch", (payload) => {
+          __pusherReady = true;
+          _setPollMs(15000);
+          onIncoming(payload);
+        });
         _dbgRender();
       }catch(e){}
     });
