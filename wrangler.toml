@@ -2,6 +2,9 @@ name = "horof-sync"
 main = "src/index.js"
 compatibility_date = "2026-02-19"
 
+[vars]
+ALLOWED_ORIGINS = "https://horof.sandooq-games.com"
+
 [[durable_objects.bindings]]
 name = "ROOMS"
 class_name = "RoomDO"
