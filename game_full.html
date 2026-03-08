@@ -1317,7 +1317,7 @@ const SYNC = {
   state: {},           // room root object (equivalent to rooms/{code} in Firebase)
   lastPullAt: 0,
   pulling: false,
-  pollMs: 900
+  pollMs: 350
 };
 
 function _stripRoomPrefix(path){
@@ -1516,8 +1516,8 @@ async function update(r, value){
 }
 
 async function runTransaction(r, fn){
-  // Best-effort transaction (not fully atomic yet). We'll harden later in Worker.
-  await _pullOnce(true);
+  // Emergency fast-path: do NOT block on an extra /state pull before the write.
+  // The previous await _pullOnce(true) added visible delay to buzzer / players / cell updates.
   const p = String(r?.path || "");
   const cur = _get(SYNC.state, p);
   const next = fn(cur);
@@ -1525,7 +1525,8 @@ async function runTransaction(r, fn){
     return { committed: false, snapshot: _snapshot(cur) };
   }
   await update(r, next);
-  return { committed: true, snapshot: _snapshot(next) };
+  const latest = _get(SYNC.state, p);
+  return { committed: true, snapshot: _snapshot(latest) };
 }
 
 // ✅ تطبيق تحديثات من البث (Pusher) أو من /state مع نفس منطق إشعار onValue
@@ -1681,20 +1682,20 @@ function _initPusherIfConfigured(){
 
     __pusherCh.bind("pusher:subscription_succeeded", () => {
       __pusherReady = true;
-      _setPollMs(15000);
-      if(__DEBUG_SYNC) console.log("[SYNC] subscription_succeeded ✅ | Poll -> 15000ms", { ch: __PUSHER_CHANNEL });
+      _setPollMs(1200);
+      if(__DEBUG_SYNC) console.log("[SYNC] subscription_succeeded ✅ | Poll -> 1200ms", { ch: __PUSHER_CHANNEL });
       _dbgRender();
       _pullOnce(true);
     });
 
     __pusherCh.bind("state", (payload) => {
       __pusherReady = true;
-      _setPollMs(15000);
+      _setPollMs(1200);
       onIncoming(payload);
     });
     __pusherCh.bind("patch", (payload) => {
       __pusherReady = true;
-      _setPollMs(15000);
+      _setPollMs(1200);
       onIncoming(payload);
     });
 
@@ -1711,19 +1712,19 @@ function _initPusherIfConfigured(){
         __pusherCh = __pusher.subscribe(__PUSHER_CHANNEL_FALLBACK);
         __pusherCh.bind("pusher:subscription_succeeded", () => {
           __pusherReady = true;
-          _setPollMs(15000);
-          if(__DEBUG_SYNC) console.log("[SYNC] fallback subscription_succeeded ✅ | Poll -> 15000ms", { ch: __PUSHER_CHANNEL_FALLBACK });
+          _setPollMs(1200);
+          if(__DEBUG_SYNC) console.log("[SYNC] fallback subscription_succeeded ✅ | Poll -> 1200ms", { ch: __PUSHER_CHANNEL_FALLBACK });
           _dbgRender();
           _pullOnce(true);
         });
         __pusherCh.bind("state", (payload) => {
           __pusherReady = true;
-          _setPollMs(15000);
+          _setPollMs(1200);
           onIncoming(payload);
         });
         __pusherCh.bind("patch", (payload) => {
           __pusherReady = true;
-          _setPollMs(15000);
+          _setPollMs(1200);
           onIncoming(payload);
         });
         _dbgRender();
@@ -4133,29 +4134,34 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       }catch(e){}
     }
 
-    // ✅✅✅ (مهم) بدل onValue على الغرفة كاملة: نستمع على مسارات صغيرة فقط (تقليل صرفية + يمنع الرمشة)
-    let UN_SUB_MAP = null;
-    let UN_SUB_WIN = null;
+    // ✅ Root listener only: أسرع وأكثر ثباتًا مع Pusher patches من المستمعات المجزأة القديمة
+    function attachMapListeners(_mapId){
+      // no-op
+    }
 
-    function attachMapListeners(mapId){
-      try{
-        if(typeof UN_SUB_MAP === "function") UN_SUB_MAP();
-        if(typeof UN_SUB_WIN === "function") UN_SUB_WIN();
-      }catch(e){}
-
-      const mKey = String(mapId);
-
-      UN_SUB_MAP = onValue(ref(db, `rooms/${code}/mapStates/${mKey}`), (snap) => {
-        LIVE.room.mapStates = LIVE.room.mapStates || {};
-        LIVE.room.mapStates[mKey] = snap.val() || {};
-        scheduleRender();
-      });
-
-      UN_SUB_WIN = onValue(ref(db, `rooms/${code}/winState/${mKey}`), (snap) => {
-        LIVE.room.winState = LIVE.room.winState || {};
-        LIVE.room.winState[mKey] = snap.val() || null;
-        scheduleRender();
-      });
+    function normalizeLiveRoom(room){
+      room = (room && typeof room === "object") ? room : {};
+      const activeMap = Number(room.activeMap || 0);
+      return {
+        code,
+        status: room.status ?? null,
+        hostKey: room.hostKey ?? null,
+        name: room.name ?? null,
+        players: (room.players && typeof room.players === "object") ? room.players : {},
+        displayPid: room.displayPid ?? null,
+        activeMap,
+        freeze: !!room.freeze,
+        buzzer: room.buzzer ?? null,
+        scores: (room.scores && typeof room.scores === "object") ? room.scores : { green:0, orange:0 },
+        winEvent: room.winEvent ?? null,
+        winState: (room.winState && typeof room.winState === "object") ? room.winState : {},
+        mapStates: (room.mapStates && typeof room.mapStates === "object") ? room.mapStates : {},
+        current: (room.current && typeof room.current === "object") ? room.current : { letter:null, qIndex:0, row:null, col:null, map: activeMap },
+        timer: (room.timer && typeof room.timer === "object") ? room.timer : { sel:10, dur:10, running:false, startTs:0, done:false },
+        questionMode: String(room.questionMode || "default"),
+        customQuestions: (room.customQuestions && typeof room.customQuestions === "object") ? room.customQuestions : {},
+        customQuestionsUpdatedAt: Number(room.customQuestionsUpdatedAt || 0)
+      };
     }
 
     function getMeFromPlayers(players){
@@ -4318,104 +4324,12 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       afterRender(room);
     }
 
-    // ✅ تشغيل listeners مجزأة (أقل تحميل)
+    // ✅ Root room listener only
     function startRoomListeners(){
-      // status
-      onValue(ref(db, `rooms/${code}/status`), (s) => {
-        LIVE.room.status = s.val();
-        scheduleRender();
-      }, () => {
-        main.textContent = "تعذر الاتصال بالغرفة.";
-      });
-
-      // hostKey
-      onValue(ref(db, `rooms/${code}/hostKey`), (s) => {
-        LIVE.room.hostKey = s.val();
+      onValue(ref(db, `rooms/${code}`), (s) => {
+        LIVE.room = normalizeLiveRoom(s.val() || {});
         scheduleRender();
       });
-
-      // name
-      onValue(ref(db, `rooms/${code}/name`), (s) => {
-        LIVE.room.name = s.val();
-        scheduleRender();
-      });
-
-      // players
-      onValue(ref(db, `rooms/${code}/players`), (s) => {
-        LIVE.room.players = s.val() || {};
-        scheduleRender();
-      });
-
-      // displayPid (جهاز عرض الشاشة)
-      onValue(ref(db, `rooms/${code}/displayPid`), (s) => {
-        LIVE.room.displayPid = s.val();
-        scheduleRender();
-      });
-
-      // activeMap (مع إعادة ربط mapStates / winState)
-      onValue(ref(db, `rooms/${code}/activeMap`), (s) => {
-        const v = Number(s.val() || 0);
-        LIVE.room.activeMap = v;
-        attachMapListeners(v);
-        scheduleRender();
-      });
-
-      // freeze
-      onValue(ref(db, `rooms/${code}/freeze`), (s) => {
-        LIVE.room.freeze = !!s.val();
-        scheduleRender();
-      });
-
-      // scores
-      onValue(ref(db, `rooms/${code}/scores`), (s) => {
-        LIVE.room.scores = s.val() || { green:0, orange:0 };
-        scheduleRender();
-      });
-
-      // buzzer
-      onValue(ref(db, `rooms/${code}/buzzer`), (s) => {
-        LIVE.room.buzzer = s.val();
-        scheduleRender();
-      });
-
-      // current
-      onValue(ref(db, `rooms/${code}/current`), (s) => {
-        LIVE.room.current = s.val() || { letter:null, qIndex:0, row:null, col:null, map: Number(LIVE.room.activeMap||0) };
-        scheduleRender();
-      });
-
-      // timer
-      onValue(ref(db, `rooms/${code}/timer`), (s) => {
-        LIVE.room.timer = s.val() || { sel:10, dur:10, running:false, startTs:0, done:false };
-        scheduleRender();
-      });
-
-      // questionMode
-      onValue(ref(db, `rooms/${code}/questionMode`), (s) => {
-        LIVE.room.questionMode = String(s.val() || "default");
-        scheduleRender();
-      });
-
-      // customQuestions
-      onValue(ref(db, `rooms/${code}/customQuestions`), (s) => {
-        LIVE.room.customQuestions = s.val() || {};
-        scheduleRender();
-      });
-
-      // customQuestionsUpdatedAt
-      onValue(ref(db, `rooms/${code}/customQuestionsUpdatedAt`), (s) => {
-        LIVE.room.customQuestionsUpdatedAt = Number(s.val() || 0);
-        scheduleRender();
-      });
-
-      // winEvent
-      onValue(ref(db, `rooms/${code}/winEvent`), (s) => {
-        LIVE.room.winEvent = s.val();
-        scheduleRender();
-      });
-
-      // attach initial map listeners
-      attachMapListeners(Number(LIVE.room.activeMap || 0));
     }
 
     startRoomListeners();
@@ -4423,6 +4337,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-08-1 (Pusher config boot) -->
+  <!-- VERSION: game_full.html — v2026-03-08-2 (root-listener + fast-transaction emergency fix) -->
 </body>
 </html>
