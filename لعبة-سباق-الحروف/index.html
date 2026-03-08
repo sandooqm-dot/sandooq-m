@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>لعبة سباق الحروف لمحبي برنامج حروف مع عزيز... لعبة تفاعلية تضيف الحماس لكل جمعة</title>
-  <meta name="description" content="استمتعوا بتجربة أونلاين حماسية، يشارك فيها كل لاعب من جهازه، مع إمكانية إضافة أسئلتكم الخاصة ووجود جرس تفاعلي يزيد التنافس في كل جولة. أكثر من 3000 سؤال ولعبة مثالية للعائلة والأصدقاء." />
+  <meta name="description" content="استمتعوا بتجربة أونلاين حماسية، يشارك فيها كل لاعب من جهازه، مع إمكانية إضافة أسئلتكم الخاصة ووجود جرس تفاعلي يزيد التنافس في كل جولة." />
   <meta name="robots" content="index, follow" />
-  <meta name="theme-color" content="#1f4fa3" />
+  <meta name="theme-color" content="#7f2d73" />
   <meta name="author" content="صندوق المسابقات" />
   <meta name="language" content="ar" />
 
@@ -27,407 +27,327 @@
   <meta name="twitter:image" content="https://horof.sandooq-games.com/logo.png" />
 
   <style>
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("../AA-GALAXY.otf") format("opentype");
+      font-display:swap;
+    }
+
     :root{
-      --bg:#1f4fa3;
-      --bg2:#173f84;
-      --yellow:#f4c400;
-      --yellow-dark:#d7ab00;
-      --card:#ffffff;
-      --text:#111827;
-      --muted:#4b5563;
-      --line:rgba(255,255,255,.16);
-      --shadow:0 14px 40px rgba(0,0,0,.18);
-      --radius:22px;
-      --max:1180px;
+      --bg1:#8a3a78;
+      --bg2:#6b235d;
+      --bg3:#4f1449;
+      --card:rgba(137, 86, 126, 0.48);
+      --card-border:rgba(255,255,255,0.13);
+      --white:#ffffff;
+      --soft:#f4e8f2;
+      --muted:rgba(255,255,255,0.82);
+      --line:rgba(255,255,255,0.10);
+      --input:rgba(76, 34, 67, 0.58);
+      --pink:#ff4fae;
+      --purple:#6f5bff;
+      --yellow:#f5c400;
+      --shadow:0 18px 60px rgba(0,0,0,.22);
+      --radius:28px;
+      --radius-sm:18px;
+      --max:760px;
     }
 
     *{box-sizing:border-box}
+
     html{scroll-behavior:smooth}
+
     body{
       margin:0;
-      font-family:Arial,sans-serif;
+      min-height:100vh;
+      font-family:Arial, sans-serif;
+      color:var(--white);
       background:
-        radial-gradient(circle at top right, rgba(255,255,255,.08), transparent 22%),
-        radial-gradient(circle at bottom left, rgba(255,255,255,.06), transparent 18%),
-        linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
-      color:#fff;
-      line-height:1.8;
+        radial-gradient(circle at 20% 10%, rgba(255,255,255,.09), transparent 25%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,.07), transparent 22%),
+        linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 48%, var(--bg3) 100%);
     }
 
-    a{text-decoration:none}
-    img{max-width:100%;display:block}
+    a{text-decoration:none;color:inherit}
+    img{display:block;max-width:100%}
 
-    .wrap{
+    .page{
       width:min(var(--max), calc(100% - 28px));
-      margin:auto;
+      margin:0 auto;
+      padding:30px 0 38px;
     }
 
-    .topbar{
-      padding:20px 0 10px;
+    .hero{
+      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      border:1px solid var(--card-border);
+      border-radius:34px;
+      box-shadow:var(--shadow);
+      padding:28px 18px 22px;
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
     }
 
-    .topbar-inner{
+    .logo-wrap{
+      display:flex;
+      justify-content:center;
+      margin-bottom:16px;
+    }
+
+    .logo-wrap img{
+      width:140px;
+      max-width:44vw;
+      height:auto;
+      filter:drop-shadow(0 10px 25px rgba(0,0,0,.18));
+    }
+
+    .title{
+      margin:0;
+      text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      font-size:clamp(34px, 7vw, 58px);
+      line-height:1.22;
+      letter-spacing:.2px;
+      text-shadow:0 3px 12px rgba(0,0,0,.18);
+    }
+
+    .subtitle{
+      margin:18px auto 0;
+      max-width:620px;
+      text-align:center;
+      font-size:clamp(18px, 3.5vw, 24px);
+      line-height:1.9;
+      color:var(--soft);
+    }
+
+    .cta-row{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:14px;
+      margin-top:24px;
+    }
+
+    .btn{
+      min-height:60px;
+      border:none;
+      border-radius:20px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      font-size:clamp(22px, 4vw, 32px);
+      padding:10px 18px;
+      transition:transform .18s ease, opacity .18s ease;
+      box-shadow:0 10px 24px rgba(0,0,0,.14);
+    }
+
+    .btn:hover{transform:translateY(-1px)}
+
+    .btn-login{
+      background:linear-gradient(90deg, var(--pink) 0%, #cc52d2 45%, var(--purple) 100%);
+      color:#fff;
+    }
+
+    .btn-buy{
+      background:#ffffff;
+      color:#1d1d1d;
+    }
+
+    .mini-tags{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:10px;
+      margin-top:16px;
+    }
+
+    .mini-tag{
+      background:rgba(255,255,255,.09);
+      border:1px solid rgba(255,255,255,.10);
+      color:#fff3fb;
+      padding:9px 14px;
+      border-radius:999px;
+      font-size:14px;
+      line-height:1;
+      white-space:nowrap;
+    }
+
+    .sections{
+      margin-top:18px;
+      display:grid;
+      gap:14px;
+    }
+
+    details.panel{
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+      border:1px solid var(--card-border);
+      border-radius:26px;
+      overflow:hidden;
+      box-shadow:var(--shadow);
+    }
+
+    details.panel[open]{
+      background:linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.06));
+    }
+
+    summary{
+      list-style:none;
+      cursor:pointer;
+      padding:20px 18px;
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:16px;
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:12px 16px;
-      background:rgba(255,255,255,.06);
-      backdrop-filter:blur(8px);
+      gap:12px;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      font-size:clamp(24px, 4vw, 34px);
+      line-height:1.25;
     }
 
-    .brand{
+    summary::-webkit-details-marker{display:none}
+
+    .summary-left{
       display:flex;
       align-items:center;
       gap:12px;
       min-width:0;
     }
 
-    .brand img{
-      width:58px;
-      height:58px;
-      object-fit:contain;
-      background:#fff;
-      border-radius:14px;
-      padding:6px;
-      box-shadow:0 8px 18px rgba(0,0,0,.14);
-      flex:0 0 auto;
-    }
-
-    .brand-text{
-      min-width:0;
-    }
-
-    .brand-text strong{
-      display:block;
-      font-size:18px;
-      color:#fff;
-    }
-
-    .brand-text span{
-      display:block;
-      font-size:13px;
-      color:rgba(255,255,255,.82);
-    }
-
-    .top-actions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      justify-content:flex-end;
-    }
-
-    .hero{
-      padding:28px 0 26px;
-    }
-
-    .hero-box{
-      position:relative;
-      overflow:hidden;
-      border-radius:30px;
-      padding:34px 26px;
-      border:1px solid var(--line);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
-      box-shadow:var(--shadow);
-    }
-
-    .badge{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      background:rgba(244,196,0,.15);
-      color:#fff7c2;
-      border:1px solid rgba(244,196,0,.30);
-      padding:8px 14px;
-      border-radius:999px;
-      font-size:14px;
-      font-weight:700;
-      margin-bottom:14px;
-    }
-
-    h1{
-      margin:0 0 14px;
-      font-size:clamp(30px, 5vw, 54px);
-      line-height:1.25;
-      letter-spacing:-.4px;
-    }
-
-    .hero p{
-      margin:0;
-      font-size:clamp(17px,2.2vw,21px);
-      color:rgba(255,255,255,.95);
-      max-width:920px;
-    }
-
-    .cta-row{
-      display:flex;
-      gap:14px;
-      flex-wrap:wrap;
-      margin-top:24px;
-    }
-
-    .btn{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      min-height:52px;
-      padding:0 22px;
+    .summary-icon{
+      width:50px;
+      height:50px;
       border-radius:16px;
-      font-size:16px;
-      font-weight:700;
-      transition:.2s ease;
-      border:2px solid transparent;
-      cursor:pointer;
-    }
-
-    .btn-primary{
-      background:var(--yellow);
-      color:#111;
-      box-shadow:0 10px 24px rgba(244,196,0,.25);
-    }
-
-    .btn-primary:hover{
-      transform:translateY(-1px);
-      background:#ffd531;
-    }
-
-    .btn-secondary{
-      background:#fff;
-      color:#111;
-    }
-
-    .btn-secondary:hover{
-      transform:translateY(-1px);
-      background:#f3f4f6;
-    }
-
-    .section{
-      padding:18px 0 26px;
-    }
-
-    .section-title{
-      font-size:clamp(24px, 3.4vw, 38px);
-      margin:0 0 10px;
-      line-height:1.35;
-    }
-
-    .section-sub{
-      margin:0 0 24px;
-      color:rgba(255,255,255,.88);
-      font-size:17px;
-      max-width:860px;
-    }
-
-    .cards{
-      display:grid;
-      grid-template-columns:repeat(5, minmax(0,1fr));
-      gap:16px;
-    }
-
-    .card{
-      background:var(--card);
-      color:var(--text);
-      border-radius:var(--radius);
-      padding:20px 18px;
-      box-shadow:var(--shadow);
-    }
-
-    .card .icon{
-      width:52px;
-      height:52px;
-      border-radius:14px;
-      background:#eef4ff;
-      color:#1f4fa3;
+      background:rgba(255,255,255,.12);
       display:flex;
       align-items:center;
       justify-content:center;
       font-size:24px;
-      margin-bottom:12px;
-      font-weight:700;
+      flex:0 0 auto;
     }
 
-    .card h3{
-      margin:0 0 8px;
-      font-size:19px;
-      line-height:1.4;
-    }
-
-    .card p{
-      margin:0;
-      color:var(--muted);
-      font-size:15px;
-      line-height:1.9;
-    }
-
-    .steps{
-      display:grid;
-      grid-template-columns:repeat(3, minmax(0,1fr));
-      gap:16px;
-    }
-
-    .step{
-      border:1px solid var(--line);
-      border-radius:24px;
-      padding:22px 18px;
-      background:rgba(255,255,255,.07);
-      backdrop-filter:blur(8px);
-    }
-
-    .step-num{
-      width:42px;
-      height:42px;
+    .summary-arrow{
+      width:38px;
+      height:38px;
       border-radius:50%;
-      background:var(--yellow);
-      color:#111;
+      background:rgba(255,255,255,.10);
       display:flex;
       align-items:center;
       justify-content:center;
-      font-weight:800;
-      margin-bottom:12px;
-    }
-
-    .step h3{
-      margin:0 0 8px;
       font-size:20px;
+      transition:transform .2s ease;
+      flex:0 0 auto;
     }
 
-    .step p{
-      margin:0;
-      color:rgba(255,255,255,.9);
-      font-size:15px;
+    details[open] .summary-arrow{
+      transform:rotate(180deg);
     }
 
-    .audience{
+    .panel-body{
+      border-top:1px solid var(--line);
+      padding:16px 16px 18px;
+    }
+
+    .body-intro{
+      margin:0 0 14px;
+      color:var(--soft);
+      font-size:18px;
+      line-height:1.9;
+    }
+
+    .feature-list,
+    .steps-list{
       display:grid;
-      grid-template-columns:1.2fr .8fr;
-      gap:18px;
-      align-items:stretch;
+      gap:12px;
     }
 
-    .audience-box,
-    .cta-box{
-      border-radius:28px;
-      overflow:hidden;
-      box-shadow:var(--shadow);
+    .feature-item,
+    .step-item{
+      background:rgba(67, 28, 59, 0.42);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:20px;
+      padding:16px 14px;
     }
 
-    .audience-box{
-      background:#fff;
-      color:var(--text);
-      padding:28px 24px;
+    .feature-item h3,
+    .step-item h3{
+      margin:0 0 6px;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      font-size:24px;
+      line-height:1.3;
     }
 
-    .audience-box h3{
-      margin:0 0 12px;
-      font-size:28px;
-    }
-
-    .audience-box p{
+    .feature-item p,
+    .step-item p,
+    .plain-text{
       margin:0;
-      color:var(--muted);
-      font-size:16px;
-      line-height:2;
+      color:var(--soft);
+      font-size:17px;
+      line-height:1.95;
     }
 
-    .mini-list{
-      margin-top:18px;
-      display:grid;
+    .chips{
+      display:flex;
+      flex-wrap:wrap;
       gap:10px;
+      margin-top:14px;
     }
 
-    .mini-item{
-      background:#f7f9fc;
-      border:1px solid #e5e7eb;
-      border-radius:14px;
-      padding:12px 14px;
+    .chip{
+      background:#ffffff;
+      color:#291827;
+      padding:10px 14px;
+      border-radius:999px;
       font-size:15px;
-      color:#111827;
       font-weight:700;
     }
 
-    .cta-box{
-      background:linear-gradient(180deg, #ffd94c 0%, var(--yellow) 100%);
-      color:#111;
-      padding:28px 24px;
-    }
-
-    .cta-box h3{
-      margin:0 0 12px;
-      font-size:30px;
-      line-height:1.35;
-    }
-
-    .cta-box p{
-      margin:0 0 18px;
-      font-size:16px;
-      line-height:1.9;
-      color:#3b2f00;
-    }
-
-    .cta-box .cta-row{
-      margin-top:0;
-    }
-
-    .cta-box .btn-primary{
-      background:#111;
-      color:#fff;
-      box-shadow:none;
-    }
-
-    .cta-box .btn-primary:hover{
-      background:#000;
-    }
-
-    .cta-box .btn-secondary{
-      background:rgba(255,255,255,.75);
-      color:#111;
-    }
-
-    footer{
-      padding:26px 0 34px;
-      color:rgba(255,255,255,.78);
-      font-size:14px;
+    .footer{
       text-align:center;
+      margin-top:18px;
+      color:rgba(255,255,255,.72);
+      font-size:14px;
+      line-height:1.8;
     }
 
-    @media (max-width: 1100px){
-      .cards{grid-template-columns:repeat(2, minmax(0,1fr))}
-      .audience{grid-template-columns:1fr}
+    @media (min-width:700px){
+      .cta-row{
+        grid-template-columns:1fr 1fr;
+      }
+
+      .feature-list{
+        grid-template-columns:1fr 1fr;
+      }
     }
 
-    @media (max-width: 760px){
-      .topbar-inner{
-        flex-direction:column;
-        align-items:stretch;
+    @media (max-width:560px){
+      .page{
+        width:min(var(--max), calc(100% - 18px));
+        padding-top:18px;
       }
 
-      .top-actions{
-        justify-content:stretch;
+      .hero{
+        padding:22px 14px 18px;
+        border-radius:26px;
       }
 
-      .top-actions .btn{
-        width:100%;
+      .logo-wrap img{
+        width:120px;
       }
 
-      .hero-box{
-        padding:26px 18px;
-        border-radius:24px;
+      .subtitle{
+        font-size:18px;
       }
 
-      .cards,
-      .steps{
-        grid-template-columns:1fr;
+      summary{
+        padding:16px 14px;
       }
 
-      .cta-row .btn{
-        width:100%;
+      .panel-body{
+        padding:14px;
       }
 
-      .section{
-        padding:14px 0 20px;
+      .feature-item h3,
+      .step-item h3{
+        font-size:22px;
       }
     }
   </style>
@@ -452,144 +372,140 @@
   </script>
 </head>
 <body>
+  <main class="page">
 
-  <div class="wrap">
-    <header class="topbar">
-      <div class="topbar-inner">
-        <div class="brand">
-          <img src="../logo.png" alt="شعار صندوق المسابقات">
-          <div class="brand-text">
-            <strong>صندوق المسابقات</strong>
-            <span>ألعاب تفاعلية ممتعة للعائلة والأصدقاء</span>
-          </div>
-        </div>
-
-        <div class="top-actions">
-          <a class="btn btn-secondary" href="/activate">دخول اللعبة</a>
-          <a class="btn btn-primary" href="https://sandooq-m.com" target="_blank" rel="noopener">شراء اللعبة</a>
-        </div>
+    <section class="hero">
+      <div class="logo-wrap">
+        <img src="../logo.png" alt="شعار صندوق المسابقات">
       </div>
-    </header>
 
-    <main>
-      <section class="hero">
-        <div class="hero-box">
-          <div class="badge">أونلاين • تفاعلية • مناسبة للجمعات</div>
+      <h1 class="title">لعبة سباق الحروف لمحبي برنامج حروف مع عزيز... لعبة تفاعلية تضيف الحماس لكل جمعة</h1>
 
-          <h1>لعبة سباق الحروف لمحبي برنامج حروف مع عزيز... لعبة تفاعلية تضيف الحماس لكل جمعة</h1>
+      <p class="subtitle">
+        استمتعوا بتجربة أونلاين حماسية، يشارك فيها كل لاعب من جهازه، مع إمكانية إضافة أسئلتكم الخاصة ووجود جرس تفاعلي يزيد التنافس في كل جولة.
+      </p>
 
-          <p>
-            استمتعوا بتجربة أونلاين حماسية، يشارك فيها كل لاعب من جهازه، مع إمكانية إضافة أسئلتكم الخاصة ووجود جرس تفاعلي يزيد التنافس في كل جولة.
+      <div class="cta-row">
+        <a class="btn btn-login" href="/activate">دخول اللعبة</a>
+        <a class="btn btn-buy" href="https://sandooq-m.com" target="_blank" rel="noopener">شراء اللعبة</a>
+      </div>
+
+      <div class="mini-tags">
+        <span class="mini-tag">أونلاين</span>
+        <span class="mini-tag">أسئلة خاصة</span>
+        <span class="mini-tag">جرس تفاعلي</span>
+        <span class="mini-tag">أكثر من 3000 سؤال</span>
+      </div>
+    </section>
+
+    <section class="sections">
+
+      <details class="panel" open>
+        <summary>
+          <span class="summary-left">
+            <span class="summary-icon">✨</span>
+            <span>مميزات اللعبة</span>
+          </span>
+          <span class="summary-arrow">⌄</span>
+        </summary>
+
+        <div class="panel-body">
+          <p class="body-intro">
+            صُممت اللعبة لتكون سهلة، حماسية، ومناسبة للجمعات، مع مزايا ترفع التفاعل وتخلي كل جولة أجمل من اللي قبلها.
           </p>
 
-          <div class="cta-row">
-            <a class="btn btn-primary" href="/activate">دخول اللعبة</a>
-            <a class="btn btn-secondary" href="https://sandooq-m.com" target="_blank" rel="noopener">شراء اللعبة</a>
+          <div class="feature-list">
+            <article class="feature-item">
+              <h3>اللعب أونلاين</h3>
+              <p>كل لاعب يدخل من جهازه ويشارك مباشرة، وهذا يعطي مرونة أكبر ومتعة أكثر وتفاعلًا أجمل بين الجميع.</p>
+            </article>
+
+            <article class="feature-item">
+              <h3>إضافة أسئلة خاصة</h3>
+              <p>تقدر تضيف أسئلتك الخاصة لأي حرف، وتبدّل بينها وبين أسئلة اللعبة الأصلية بضغطة زر وقت ما تبغى.</p>
+            </article>
+
+            <article class="feature-item">
+              <h3>جرس تفاعلي</h3>
+              <p>إذا ضغط أحد اللاعبين الجرس يظهر اسمه عند الجميع فورًا، ويبدأ المؤقت تلقائيًا ليزيد الحماس والتنافس.</p>
+            </article>
+
+            <article class="feature-item">
+              <h3>أكثر من 3000 سؤال</h3>
+              <p>عدد كبير من الأسئلة يضيف تنوّعًا أكبر ويقلل التكرار ويجعل اللعب ممتعًا في كل جلسة.</p>
+            </article>
           </div>
         </div>
-      </section>
+      </details>
 
-      <section class="section">
-        <h2 class="section-title">ليش لعبة سباق الحروف مميزة؟</h2>
-        <p class="section-sub">
-          صُممت اللعبة لتكون سهلة، حماسية، ومناسبة للجلسات العائلية ولمّة الأصدقاء، مع مزايا ترفع التفاعل وتجعل كل جولة أجمل من اللي قبلها.
-        </p>
+      <details class="panel">
+        <summary>
+          <span class="summary-left">
+            <span class="summary-icon">🎮</span>
+            <span>شرح اللعبة</span>
+          </span>
+          <span class="summary-arrow">⌄</span>
+        </summary>
 
-        <div class="cards">
-          <article class="card">
-            <div class="icon">📱</div>
-            <h3>اللعب أونلاين</h3>
-            <p>كل لاعب يشارك من جهازه بسهولة، وهذا يجعل التجربة أكثر مرونة ومتعة وتفاعلًا بين الجميع.</p>
-          </article>
+        <div class="panel-body">
+          <p class="body-intro">
+            طريقة اللعب بسيطة وسريعة، وكل الفكرة قائمة على السرعة والانتباه والتنافس بين اللاعبين.
+          </p>
 
-          <article class="card">
-            <div class="icon">✍️</div>
-            <h3>إضافة أسئلة خاصة</h3>
-            <p>أضفوا أسئلتكم الخاصة لأي حرف، وبدّلوا بينها وبين أسئلة اللعبة بضغطة زر بكل سهولة.</p>
-          </article>
+          <div class="steps-list">
+            <article class="step-item">
+              <h3>1) دخول اللاعبين</h3>
+              <p>المقدم يجهز الجلسة، وكل لاعب يدخل من جهازه ويشارك أونلاين بكل سهولة.</p>
+            </article>
 
-          <article class="card">
-            <div class="icon">🔔</div>
-            <h3>جرس تفاعلي</h3>
-            <p>إذا ضغط أحد اللاعبين الجرس يظهر اسمه عند الجميع ويبدأ المؤقت تلقائيًا، فيزيد الحماس والتنافس.</p>
-          </article>
+            <article class="step-item">
+              <h3>2) اختيار الحرف</h3>
+              <p>تبدأ الجولة باختيار حرف من الخريطة، ومن هنا يبدأ التحدي الحقيقي بين اللاعبين.</p>
+            </article>
 
-          <article class="card">
-            <div class="icon">❓</div>
-            <h3>أكثر من 3000 سؤال</h3>
-            <p>محتوى كبير ومتنوّع يعطيكم جلسات أكثر حيوية ويقلل التكرار ويزيد الاستمتاع في كل مرة.</p>
-          </article>
+            <article class="step-item">
+              <h3>3) السباق على الجرس</h3>
+              <p>أول لاعب يضغط الجرس يظهر اسمه عند الجميع، ويبدأ المؤقت تلقائيًا ليجاوب قبل انتهاء الوقت.</p>
+            </article>
 
-          <article class="card">
-            <div class="icon">🎉</div>
-            <h3>مناسبة للعائلة والأصدقاء</h3>
-            <p>أجواء خفيفة وحماسية تجعلها خيارًا مثاليًا للجمعات، الجُمعات، واللقاءات الممتعة.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2 class="section-title">كيف تبدأ اللعب؟</h2>
-        <p class="section-sub">
-          خطوات بسيطة وسريعة، وبعدها تبدأ أجواء الحماس مباشرة.
-        </p>
-
-        <div class="steps">
-          <article class="step">
-            <div class="step-num">1</div>
-            <h3>ادخل اللعبة</h3>
-            <p>ابدأ بالدخول إلى اللعبة من الرابط الرسمي، ثم جهّز الجلسة خلال لحظات.</p>
-          </article>
-
-          <article class="step">
-            <div class="step-num">2</div>
-            <h3>أضف اللاعبين</h3>
-            <p>كل لاعب يشارك من جهازه، لتكون التجربة أونلاين أكثر تفاعلية وسهولة.</p>
-          </article>
-
-          <article class="step">
-            <div class="step-num">3</div>
-            <h3>ابدأ التحدي</h3>
-            <p>عند بدء الجولة يتنافس الجميع على الجرس، ويظهر اسم أول لاعب ضغط ليبدأ المؤقت فورًا.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="audience">
-          <div class="audience-box">
-            <h3>مناسبة لـ</h3>
-            <p>
-              مناسبة للجمعات العائلية، جلسات الأصدقاء، الأمسيات الترفيهية، واللقاءات التي تحتاج لعبة سريعة، واضحة، وسهلة تضيف الحماس من أول جولة.
-            </p>
-
-            <div class="mini-list">
-              <div class="mini-item">الجمعات العائلية</div>
-              <div class="mini-item">جلسات الأصدقاء</div>
-              <div class="mini-item">أجواء الجمعة والويكند</div>
-              <div class="mini-item">المناسبات الخفيفة والتحديات الممتعة</div>
-            </div>
-          </div>
-
-          <div class="cta-box">
-            <h3>جاهزين تبدأون التحدي؟</h3>
-            <p>
-              ابدأوا اللعب الآن أو اطلبوا اللعبة من المتجر، واستمتعوا بتجربة مليئة بالحماس، السرعة، والتفاعل بين العائلة والأصدقاء.
-            </p>
-
-            <div class="cta-row">
-              <a class="btn btn-primary" href="/activate">دخول اللعبة</a>
-              <a class="btn btn-secondary" href="https://sandooq-m.com" target="_blank" rel="noopener">شراء اللعبة</a>
-            </div>
+            <article class="step-item">
+              <h3>4) التبديل بين الأسئلة</h3>
+              <p>تقدرون تلعبون بأسئلة اللعبة الأساسية أو تنتقلون فورًا إلى الأسئلة الخاصة التي أضفتوها أنتم.</p>
+            </article>
           </div>
         </div>
-      </section>
-    </main>
+      </details>
 
-    <footer>
+      <details class="panel">
+        <summary>
+          <span class="summary-left">
+            <span class="summary-icon">👨‍👩‍👧‍👦</span>
+            <span>مناسبة لمن؟</span>
+          </span>
+          <span class="summary-arrow">⌄</span>
+        </summary>
+
+        <div class="panel-body">
+          <p class="plain-text">
+            مناسبة للعائلة، الأصدقاء، أجواء الجمعة، والجلسات التي تحتاج لعبة تفاعلية سريعة تضيف الحماس من أول جولة.
+          </p>
+
+          <div class="chips">
+            <span class="chip">الجمعات العائلية</span>
+            <span class="chip">جلسات الأصدقاء</span>
+            <span class="chip">الويكند</span>
+            <span class="chip">التحديات الخفيفة</span>
+            <span class="chip">الأجواء التنافسية</span>
+          </div>
+        </div>
+      </details>
+
+    </section>
+
+    <div class="footer">
       جميع الحقوق محفوظة © صندوق المسابقات
-    </footer>
-  </div>
+    </div>
 
+  </main>
 </body>
 </html>
