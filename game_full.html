@@ -1229,7 +1229,7 @@
   </script>
 
     <!-- ✅ Pusher (optional) realtime transport -->
-  <script defer src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+  <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
 
 <script type="module">
     // ✅ Firebase removed — Sync via Cloudflare Durable Objects (and later Pusher)
@@ -1637,7 +1637,9 @@ function _initPusherIfConfigured(){
     __pusher = new window.Pusher(__PUSHER_KEY, {
       cluster: __PUSHER_CLUSTER,
       forceTLS: true,
-      authEndpoint: __PUSHER_AUTH,
+      channelAuthorization: {
+        endpoint: __PUSHER_AUTH
+      },
       enabledTransports: ["ws","wss"],
       disabledTransports: ["sockjs"]
     });
