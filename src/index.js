@@ -21,7 +21,7 @@ function parseAllowedOrigins(env) {
 
 function isOriginAllowed(req, env) {
   const origin = (req.headers.get("Origin") || "").trim();
-  if (!origin) return true; // same-origin / server-to-server
+  if (!origin) return true;
   const allowed = parseAllowedOrigins(env);
   return allowed.includes("*") || allowed.includes(origin);
 }
@@ -32,8 +32,6 @@ function resolveAllowOrigin(req, env) {
 
   if (allowed.includes("*")) return origin || "*";
   if (origin && allowed.includes(origin)) return origin;
-
-  // fallback for same-origin requests with no Origin header
   return allowed[0] || "*";
 }
 
@@ -67,12 +65,21 @@ function json(data, status = 200, extraHeaders = {}) {
 }
 
 function utcDayKey(ts = Date.now()) {
-  return new Date(ts).toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+  return new Date(ts).toISOString().slice(0, 10);
 }
 
 function clampMin(n, min) {
   n = Number(n);
   return Number.isFinite(n) ? Math.max(min, n) : min;
+}
+
+function normalizeRoom(v) {
+  const s = String(v || "").trim();
+  return (s || "default").slice(0, 120);
+}
+
+function normalizePid(v) {
+  return String(v || "").trim().slice(0, 80);
 }
 
 /* eslint-disable */
@@ -289,7 +296,7 @@ async function parseBodyAsObject(request) {
 
 // ---------- Worker (router) ----------
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") {
       return withCors(request, new Response(null, { status: 204 }), env);
     }
@@ -299,8 +306,8 @@ export default {
     }
 
     const url = new URL(request.url);
-    const room = url.searchParams.get("room") || "default";
-    const pid = url.searchParams.get("pid") || "";
+    const room = normalizeRoom(url.searchParams.get("room") || "default");
+    const pid = normalizePid(url.searchParams.get("pid") || "");
     const id = env.ROOMS.idFromName(room);
     const stub = env.ROOMS.get(id);
 
@@ -328,12 +335,44 @@ export default {
     }
 
     if (url.pathname === "/action" && request.method === "POST") {
-      const r = await stub.fetch("https://do/action", {
+      const raw = await request.text();
+
+      const doRes = await stub.fetch("https://do/action", {
         method: "POST",
         headers: { "content-type": "application/json", "x-room-name": room },
-        body: await request.text(),
+        body: raw,
       });
-      return withCors(request, r, env);
+
+      const doStatus = doRes.status || 200;
+      const payload = await doRes.json().catch(() => null);
+
+      if (!payload || typeof payload !== "object") {
+        return withCors(request, json({ ok: false, msg: "ACTION_BAD_RESPONSE" }, 502), env);
+      }
+
+      if (payload.ok && pusherEnabled(env)) {
+        const evt = {
+          patch: (payload.patch && typeof payload.patch === "object") ? payload.patch : {},
+          ts: Number(payload.ts || Date.now()),
+          rev: Number(payload.rev || 0),
+        };
+
+        ctx.waitUntil((async () => {
+          try {
+            const trig = await pusherTrigger(env, roomChannel(room), "patch", evt);
+            if (trig?.ok) {
+              await stub.fetch("https://do/mark-pusher-sent", {
+                method: "POST",
+                headers: { "x-room-name": room },
+              });
+            }
+          } catch (e) {
+            console.log("pusher_trigger_bg_failed", String(e?.message || e));
+          }
+        })());
+      }
+
+      return withCors(request, json(payload, doStatus), env);
     }
 
     if (url.pathname === "/stats" && request.method === "GET") {
@@ -435,12 +474,12 @@ export class RoomDO {
       const s = (await this.state.storage.get("state")) || {};
       const rev = Number((await this.state.storage.get("rev")) || 0);
 
-      const pid = url.searchParams.get("pid") || "";
+      const pid = normalizePid(url.searchParams.get("pid") || "");
       if (pid) {
         const now = Date.now();
         const m = await this._loadMetrics(now);
         m.seen = this._gcSeen(m.seen, now);
-        m.seen[String(pid).slice(0, 80)] = now;
+        m.seen[pid] = now;
         const clientsNow = this._clientsNow(m.seen, now);
         m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
         await this.state.storage.put("metrics", m);
@@ -474,6 +513,14 @@ export class RoomDO {
       });
     }
 
+    if (url.pathname === "/mark-pusher-sent" && request.method === "POST") {
+      const now = Date.now();
+      const m = await this._loadMetrics(now);
+      m.pusherMsgsToday = Number(m.pusherMsgsToday || 0) + 1;
+      await this.state.storage.put("metrics", m);
+      return json({ ok: true });
+    }
+
     if (url.pathname === "/action") {
       let body = {};
       try { body = await request.json(); } catch {}
@@ -501,19 +548,15 @@ export class RoomDO {
       m.seen = this._gcSeen(m.seen, now);
       const clientsNow = this._clientsNow(m.seen, now);
       m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
-
-      if (pusherEnabled(this.env) && this.roomName) {
-        const trig = await pusherTrigger(this.env, roomChannel(this.roomName), "patch", {
-          patch,
-          ts: now,
-          rev: nextRev,
-        });
-        if (trig?.ok) m.pusherMsgsToday = Number(m.pusherMsgsToday || 0) + 1;
-      }
-
       await this.state.storage.put("metrics", m);
 
-      return json({ ok: true, state: next, rev: nextRev });
+      return json({
+        ok: true,
+        state: next,
+        rev: nextRev,
+        patch,
+        ts: now
+      });
     }
 
     return json({ ok: false, msg: "DO Not found" }, 404);
