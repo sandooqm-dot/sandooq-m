@@ -20,6 +20,11 @@
 /app/*
   Cache-Control: no-store
 
+# ✅ ملف السايت ماب
+/sitemap.xml
+  Content-Type: application/xml; charset=UTF-8
+  Cache-Control: public, max-age=300
+
 # ✅ خزّن الملفات الثقيلة سنة كاملة (أسرع + تحمل أعلى)
 #/maps/ ملفات الخرائط
 /maps/*
