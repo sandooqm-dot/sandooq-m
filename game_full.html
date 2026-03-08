@@ -1575,17 +1575,57 @@ function _setPollMs(ms){
   _startPolling();
 }
 
-// ✅ Pusher (اختياري): إذا توفر pk + pc في الرابط، يصير الحمل اللحظي على Pusher بدل كثرة Pull
+// ✅ Pusher: الإعداد يؤخذ من الـ Worker أولاً، مع بقاء دعم بارامترات الرابط كـ fallback
 const __DEBUG_SYNC = (params.get("debug") === "1");
-const __PUSHER_KEY = (params.get("pk") || "").trim();
-const __PUSHER_CLUSTER = (params.get("pc") || "").trim();
-const __PUSHER_CHANNEL = (params.get("pchan") || `private-room-${code}`).trim();
+const __MANUAL_PUSHER_KEY = (params.get("pk") || "").trim();
+const __MANUAL_PUSHER_CLUSTER = (params.get("pc") || "").trim();
+const __MANUAL_PUSHER_CHANNEL = (params.get("pchan") || "").trim();
+const __MANUAL_PUSHER_AUTH = (params.get("pa") || "").trim();
 const __PUSHER_CHANNEL_FALLBACK = `private-horof-${code}`;
-const __PUSHER_AUTH = (params.get("pa") || `${SYNC_BASE.replace(/\/$/,"")}/pusher/auth?room=${encodeURIComponent(code)}`).trim();
+
+let __PUSHER_KEY = "";
+let __PUSHER_CLUSTER = "";
+let __PUSHER_CHANNEL = `private-room-${code}`;
+let __PUSHER_AUTH = `${SYNC_BASE.replace(/\/$/,"")}/pusher/auth?room=${encodeURIComponent(code)}`;
 
 let __pusher = null;
 let __pusherCh = null;
 let __pusherReady = false;
+let __PUSHER_ENABLED = false;
+
+async function _loadRealtimeConfig(){
+  // 1) بارامترات الرابط لها أولوية إذا كانت موجودة (للاختبار السريع)
+  if(__MANUAL_PUSHER_KEY && __MANUAL_PUSHER_CLUSTER){
+    __PUSHER_KEY = __MANUAL_PUSHER_KEY;
+    __PUSHER_CLUSTER = __MANUAL_PUSHER_CLUSTER;
+    __PUSHER_CHANNEL = __MANUAL_PUSHER_CHANNEL || `private-room-${code}`;
+    __PUSHER_AUTH = __MANUAL_PUSHER_AUTH || `${SYNC_BASE.replace(/\/$/,"")}/pusher/auth?room=${encodeURIComponent(code)}`;
+    return { enabled:true, source:"query" };
+  }
+
+  // 2) الإعداد الرسمي من الـ Worker
+  try{
+    const url = `${SYNC_BASE.replace(/\/$/,"")}/pusher/config?room=${encodeURIComponent(code)}`;
+    const r = await fetch(url, { cache:"no-store" });
+    const j = await r.json().catch(()=>null);
+
+    if(j && j.ok && j.pusher && j.pusher.enabled && j.pusher.key && j.pusher.cluster){
+      __PUSHER_KEY = String(j.pusher.key || "").trim();
+      __PUSHER_CLUSTER = String(j.pusher.cluster || "").trim();
+      __PUSHER_CHANNEL = String(j.pusher.channel || `private-room-${code}`).trim();
+      __PUSHER_AUTH = String(j.pusher.authEndpoint || `${SYNC_BASE.replace(/\/$/,"")}/pusher/auth?room=${encodeURIComponent(code)}`).trim();
+
+      if(__PUSHER_AUTH.startsWith("/")){
+        __PUSHER_AUTH = `${SYNC_BASE.replace(/\/$/,"")}${__PUSHER_AUTH}`;
+      }
+      return { enabled:true, source:"worker" };
+    }
+  }catch(e){
+    if(__DEBUG_SYNC) console.log("[SYNC] pusher/config fetch failed", e);
+  }
+
+  return { enabled:false, source:"none" };
+}
 
 function _initPusherIfConfigured(){
   if(!__PUSHER_KEY || !__PUSHER_CLUSTER) return false;
@@ -1626,8 +1666,7 @@ function _initPusherIfConfigured(){
     __pusherCh = __pusher.subscribe(__PUSHER_CHANNEL);
 
     const onIncoming = (payload) => {
-      // نتوقع أحد الشكلين:
-      // 1) { state: {...} }  أو 2) { patch: {...} }  (Top-level keys)
+      // نتوقع { patch:{...}, rev, ts } أو { state:{...} }
       if(payload && payload.state && typeof payload.state === "object"){
         _applyFullState(payload.state);
         return;
@@ -1636,7 +1675,7 @@ function _initPusherIfConfigured(){
         _applyTopPatch(payload.patch);
         return;
       }
-      // fallback (لو السيرفر أرسل حدث بدون بيانات)
+      // fallback
       _pullOnce(true);
     };
 
@@ -1658,11 +1697,15 @@ function _initPusherIfConfigured(){
       }catch(e){}
     });
 
-
     // نافذة تشخيص
     window.__SYNC_DIAG = window.__SYNC_DIAG || {};
     window.__SYNC_DIAG.mode = "pusher+do";
-    window.__SYNC_DIAG.pusher = { cluster: __PUSHER_CLUSTER, channel: __PUSHER_CHANNEL, auth: __PUSHER_AUTH, connected: () => __pusherReady };
+    window.__SYNC_DIAG.pusher = {
+      cluster: __PUSHER_CLUSTER,
+      channel: __PUSHER_CHANNEL,
+      auth: __PUSHER_AUTH,
+      connected: () => __pusherReady
+    };
 
     if(__DEBUG_SYNC) console.log("[SYNC] mode = pusher+do ✅", window.__SYNC_DIAG.pusher);
 
@@ -1673,13 +1716,19 @@ function _initPusherIfConfigured(){
   }
 }
 
-const __PUSHER_ENABLED = _initPusherIfConfigured();
-if(!__PUSHER_ENABLED){
-  window.__SYNC_DIAG = window.__SYNC_DIAG || {};
-  window.__SYNC_DIAG.mode = "do-poll";
-  if(__DEBUG_SYNC) console.log("[SYNC] mode = do-poll (لا يوجد pk/pc أو مكتبة Pusher) ⚠️");
-  _dbgRender();
-}
+(async function _bootRealtime(){
+  const cfg = await _loadRealtimeConfig();
+  __PUSHER_ENABLED = !!cfg.enabled && _initPusherIfConfigured();
+
+  if(!__PUSHER_ENABLED){
+    window.__SYNC_DIAG = window.__SYNC_DIAG || {};
+    window.__SYNC_DIAG.mode = "do-poll";
+    if(__DEBUG_SYNC) console.log("[SYNC] mode = do-poll (Pusher not enabled) ⚠️", cfg);
+    _dbgRender();
+  }else if(__DEBUG_SYNC){
+    console.log("[SYNC] realtime source =", cfg.source);
+  }
+})();
 
 // ✅ Debug badge (يظهر فقط عند ?debug=1) — ما يغيّر أي شيء للمستخدمين العاديين
 let __dbgEl = null;
@@ -4341,6 +4390,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-02-21-1 (DO Host room-not-found fix) -->
+  <!-- VERSION: game_full.html — v2026-03-08-1 (Pusher config boot) -->
 </body>
 </html>
