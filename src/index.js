@@ -1,5 +1,5 @@
 // src/index.js
-// Horof Sync Worker (Durable Objects) + Pusher fan-out + /stats + /pusher/auth
+// Horof Sync Worker (Durable Objects) + Pusher fan-out + /stats + /pusher/auth + /realtime-config
 //
 // ✅ Backward compatible: clients that still poll /state will keep working.
 // ✅ To enable Pusher, set these environment variables (Secrets) in Cloudflare:
@@ -7,15 +7,42 @@
 //
 // Endpoints (same origin as the worker):
 //   GET  /health?room=ROOM
+//   GET  /realtime-config?room=ROOM
 //   GET  /state?room=ROOM&pid=PID
 //   POST /action?room=ROOM           (JSON patch/object)
 //   GET  /stats?room=ROOM
 //   POST /pusher/auth?room=ROOM      (Pusher private-channel auth)
 
-function corsHeaders(req) {
-  const origin = req.headers.get("Origin") || "*";
+function getAllowedOrigins(env) {
+  const raw = String(env?.ALLOWED_ORIGINS || "").trim();
+  if (!raw) return [];
+  return raw.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function isAllowedOrigin(origin, env) {
+  if (!origin) return true; // same-origin / curl / server-side
+  const allowed = getAllowedOrigins(env);
+  if (!allowed.length) return true;
+  return allowed.includes(origin);
+}
+
+function pickAllowOrigin(req, env) {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = getAllowedOrigins(env);
+
+  if (!origin) {
+    return allowed[0] || "*";
+  }
+  if (!allowed.length) {
+    return origin;
+  }
+  return allowed.includes(origin) ? origin : "null";
+}
+
+function corsHeaders(req, env) {
+  const allowOrigin = pickAllowOrigin(req, env);
   return {
-    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Origin": allowOrigin,
     "Vary": "Origin",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Device-Id",
@@ -23,9 +50,9 @@ function corsHeaders(req) {
   };
 }
 
-function withCors(req, res) {
+function withCors(req, res, env) {
   const h = new Headers(res.headers);
-  const ch = corsHeaders(req);
+  const ch = corsHeaders(req, env);
   for (const [k, v] of Object.entries(ch)) h.set(k, v);
   return new Response(res.body, { status: res.status, headers: h });
 }
@@ -47,6 +74,15 @@ function utcDayKey(ts = Date.now()) {
 function clampMin(n, min) {
   n = Number(n);
   return Number.isFinite(n) ? Math.max(min, n) : min;
+}
+
+function normalizeRoom(v) {
+  const s = String(v || "").trim();
+  return (s || "default").slice(0, 120);
+}
+
+function normalizePid(v) {
+  return String(v || "").trim().slice(0, 80);
 }
 
 // ---------- MD5 (small, pure JS) ----------
@@ -241,12 +277,19 @@ async function parseBodyAsObject(request) {
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
-      return withCors(request, new Response(null, { status: 204 }));
+      if (!isAllowedOrigin(request.headers.get("Origin"), env)) {
+        return withCors(request, new Response(null, { status: 403 }), env);
+      }
+      return withCors(request, new Response(null, { status: 204 }), env);
+    }
+
+    if (!isAllowedOrigin(request.headers.get("Origin"), env)) {
+      return withCors(request, json({ ok: false, msg: "Origin not allowed" }, 403), env);
     }
 
     const url = new URL(request.url);
-    const room = url.searchParams.get("room") || "default";
-    const pid = url.searchParams.get("pid") || ""; // optional
+    const room = normalizeRoom(url.searchParams.get("room") || "default");
+    const pid = normalizePid(url.searchParams.get("pid") || "");
     const id = env.ROOMS.idFromName(room);
     const stub = env.ROOMS.get(id);
 
@@ -255,50 +298,65 @@ export default {
         ok: true,
         room,
         pusher: pusherEnabled(env) ? "enabled" : "disabled",
-      }));
+      }), env);
+    }
+
+    if (url.pathname === "/realtime-config" && request.method === "GET") {
+      return withCors(request, json({
+        ok: true,
+        room,
+        enabled: pusherEnabled(env),
+        key: String(env.PUSHER_KEY || ""),
+        cluster: String(env.PUSHER_CLUSTER || ""),
+        channel: `private-room-${room}`,
+        authEndpoint: `/pusher/auth?room=${encodeURIComponent(room)}`,
+      }), env);
     }
 
     if (url.pathname === "/state" && request.method === "GET") {
       const r = await stub.fetch(`https://do/state?pid=${encodeURIComponent(pid)}`, {
         headers: { "x-room-name": room },
       });
-      return withCors(request, r);
+      return withCors(request, r, env);
     }
 
     if (url.pathname === "/action" && request.method === "POST") {
+      const raw = await request.text();
       const r = await stub.fetch("https://do/action", {
         method: "POST",
         headers: { "content-type": "application/json", "x-room-name": room },
-        body: await request.text(),
+        body: raw,
       });
-      return withCors(request, r);
+      return withCors(request, r, env);
     }
 
     if (url.pathname === "/stats" && request.method === "GET") {
       const r = await stub.fetch("https://do/stats", { headers: { "x-room-name": room } });
-      return withCors(request, r);
+      return withCors(request, r, env);
     }
 
     if (url.pathname === "/pusher/auth" && request.method === "POST") {
       if (!pusherEnabled(env)) {
-        return withCors(request, json({ ok: false, msg: "Pusher not configured" }, 503));
+        return withCors(request, json({ ok: false, msg: "Pusher not configured" }, 503), env);
       }
+
       const body = await parseBodyAsObject(request);
       const socket_id = String(body.socket_id || "");
       const channel_name = String(body.channel_name || "");
-
       const expected = `private-room-${room}`;
+
       if (!socket_id || !channel_name || channel_name !== expected) {
-        return withCors(request, json({ ok: false, msg: "Forbidden" }, 403));
+        return withCors(request, json({ ok: false, msg: "Forbidden" }, 403), env);
       }
 
       const stringToSign = `${socket_id}:${channel_name}`;
       const signature = await hmacSHA256Hex(env.PUSHER_SECRET, stringToSign);
       const auth = `${env.PUSHER_KEY}:${signature}`;
-      return withCors(request, json({ auth }));
+
+      return withCors(request, json({ auth }), env);
     }
 
-    return withCors(request, json({ ok: false, msg: "Not found" }, 404));
+    return withCors(request, json({ ok: false, msg: "Not found" }, 404), env);
   },
 };
 
@@ -369,12 +427,12 @@ export class RoomDO {
     if (url.pathname === "/state") {
       const s = (await this.state.storage.get("state")) || {};
 
-      const pid = url.searchParams.get("pid") || "";
+      const pid = normalizePid(url.searchParams.get("pid") || "");
       if (pid) {
         const now = Date.now();
         const m = await this._loadMetrics(now);
         m.seen = this._gcSeen(m.seen, now);
-        m.seen[String(pid).slice(0, 80)] = now;
+        m.seen[pid] = now;
         const clientsNow = this._clientsNow(m.seen, now);
         m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
         await this.state.storage.put("metrics", m);
