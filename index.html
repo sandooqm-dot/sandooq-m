@@ -217,7 +217,7 @@
       align-items:center;
       justify-content:flex-end;
       gap:10px;
-      pointer-events:none; /* ✅ لا يمكن التحكم فيها */
+      pointer-events:none;
       user-select:none;
     }
     .tvTeamPill{
@@ -288,7 +288,7 @@
       inset:0;
       width:100%;
       height:100%;
-      pointer-events:none; /* ✅ لا يمكن الضغط على الخلايا */
+      pointer-events:none;
     }
     .overlaySvg .cell{
       -webkit-tap-highlight-color: transparent;
@@ -323,7 +323,6 @@
     <div class="card">
       <div class="title"><span id="stateText">جاري فتح اللعبة</span><span class="spinner" id="sp"></span></div>
       <p class="sub" id="stateSub">لحظة.. جاري فتح اللعبة.</p>
-
       <div class="dbg" id="dbg"></div>
     </div>
     <div class="small">© صندوق المسابقات</div>
@@ -374,7 +373,38 @@
       if (DBG) dbgEl.style.display = "block";
       const dbg = (t)=>{ if(DBG){ dbgEl.textContent = t; } };
 
-      // ✅ تسجيل Service Worker بأسرع وقت (بدون ما نوقف التحويل)
+      function cleanBase(v){
+        return String(v || "").trim().replace(/\/+$/, "");
+      }
+
+      function getStoredSyncBase(){
+        try{
+          return cleanBase(
+            localStorage.getItem("sandooq_sync_base") ||
+            sessionStorage.getItem("sandooq_sync_base") ||
+            ""
+          );
+        }catch(e){
+          return "";
+        }
+      }
+
+      const DEFAULT_SYNC_BASE = "https://sync.horof.sandooq-games.com";
+      const SYNC_BASE = cleanBase(qs.get("sync") || getStoredSyncBase() || DEFAULT_SYNC_BASE);
+
+      try{
+        localStorage.setItem("sandooq_sync_base", SYNC_BASE);
+        sessionStorage.setItem("sandooq_sync_base", SYNC_BASE);
+      }catch(e){}
+
+      function withSync(urlObj){
+        if (!urlObj.searchParams.get("sync")) {
+          urlObj.searchParams.set("sync", SYNC_BASE);
+        }
+        return urlObj;
+      }
+
+      // ✅ تسجيل Service Worker بأسرع وقت
       const canSW =
         ("serviceWorker" in navigator) &&
         (location.protocol === "https:" || location.hostname === "localhost");
@@ -383,6 +413,28 @@
         try{
           navigator.serviceWorker.register("./sw.js").catch(() => {});
         }catch(e){}
+      }
+
+      // ✅ تحميل مكتبة Pusher عند الحاجة فقط
+      function loadPusherScript(){
+        return new Promise((resolve, reject) => {
+          if (window.Pusher) return resolve(window.Pusher);
+
+          const existing = document.querySelector('script[data-pusher-loader="1"]');
+          if (existing) {
+            existing.addEventListener("load", () => resolve(window.Pusher), { once:true });
+            existing.addEventListener("error", reject, { once:true });
+            return;
+          }
+
+          const s = document.createElement("script");
+          s.src = "https://js.pusher.com/8.4.0/pusher.min.js";
+          s.async = true;
+          s.setAttribute("data-pusher-loader", "1");
+          s.onload = () => resolve(window.Pusher);
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
       }
 
       // =========================
@@ -411,10 +463,6 @@
           return;
         }
 
-        // ✅ Cloudflare Worker/DO base (يمكن تغييره من الرابط عبر sync=)
-        const SYNC_BASE = (qs.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
-
-        // ✅ (نفس فكرة كسر الكاش للخرائط)
         const ASSET_VERSION = (qs.get("v") || "2026-02-15-1");
         const vq = `?v=${encodeURIComponent(ASSET_VERSION)}`;
 
@@ -441,6 +489,7 @@
           if(s.length > MAX_CHARS) s = s.slice(0, MAX_CHARS - 1).trim() + "…";
           tvGameName.textContent = s;
         }
+
         function clamp(n,min,max){
           n = Number(n);
           if(!Number.isFinite(n)) n = min;
@@ -467,7 +516,6 @@
           return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
         }
 
-        // ✅ اكتشاف مساحة شبكة السداسي داخل صورة الخريطة
         const BBOX_CACHE = {};
         function detectHexBBox(img){
           const nw = img.naturalWidth, nh = img.naturalHeight;
@@ -604,87 +652,164 @@
           return key;
         }
 
-        // ✅ (NEW) قراءة الغرفة من Durable Object بدل Firebase
         let lastActiveMap = null;
-        let lastMapKey = null;
         let alive = true;
+        let roomCache = {};
+        let pusher = null;
+        let pusherChannel = null;
+
+        function renderRoom(room){
+          if(!room || typeof room !== "object") return;
+
+          roomCache = room;
+
+          if(!room || Object.keys(room).length === 0){
+            tvMsg.textContent = "الغرفة غير موجودة أو لم يتم إنشاؤها بعد.";
+            return;
+          }
+
+          setGameName(room.name);
+
+          const scores = room.scores || { green:0, orange:0 };
+          tvScoreGreen.textContent = String(Number(scores.green ?? 0));
+          tvScoreOrange.textContent = String(Number(scores.orange ?? 0));
+
+          const activeMap = Number(room.activeMap || 0);
+          if(lastActiveMap !== activeMap){
+            lastActiveMap = activeMap;
+            setMapSrc(activeMap);
+          }
+
+          const ms = room.mapStates;
+          const mapStates = (ms && typeof ms === "object")
+            ? (ms[String(activeMap)] || ms[activeMap] || {})
+            : {};
+
+          for(const cell of CELLS){
+            const r = Number(cell.getAttribute("data-row"));
+            const c = Number(cell.getAttribute("data-col"));
+            const k = cellKey(r,c);
+            const st = Number(mapStates?.[k] ?? 0);
+            setStateClass(cell, st);
+          }
+
+          tvMsg.textContent = "";
+          dbg("DISPLAY room ok: " + code + " map=" + activeMap);
+        }
 
         async function fetchRoom(){
           const url = `${SYNC_BASE}/state?room=${encodeURIComponent(code)}`;
           const r = await fetch(url, { cache:"no-store" });
           const j = await r.json().catch(()=>null);
           if(!j || !j.ok) throw new Error("STATE_FAIL");
-          return (j.state && typeof j.state === "object") ? j.state : {};
+          return {
+            state: (j.state && typeof j.state === "object") ? j.state : {},
+            rev: Number(j.rev || 0)
+          };
         }
 
-        function readMapStates(room, activeMap){
-          const ms = room.mapStates;
-          if(!ms || typeof ms !== "object") return {};
-          // يدعم مفاتيح رقمية أو نصية
-          return ms[String(activeMap)] || ms[activeMap] || {};
+        async function fetchPusherConfig(){
+          const url = `${SYNC_BASE}/pusher/config?room=${encodeURIComponent(code)}`;
+          const r = await fetch(url, { cache:"no-store" });
+          const j = await r.json().catch(()=>null);
+          if(!j || !j.ok) throw new Error("PUSHER_CONFIG_FAIL");
+          return j.pusher || {};
         }
 
-        async function tick(){
-          if(!alive) return;
+        async function resyncRoom(){
           try{
             const room = await fetchRoom();
-
-            // إذا الغرفة لسه ما انعملت
-            if(!room || Object.keys(room).length === 0){
-              tvMsg.textContent = "الغرفة غير موجودة أو لم يتم إنشاؤها بعد.";
-              return;
-            }
-
-            setGameName(room.name);
-
-            const scores = room.scores || { green:0, orange:0 };
-            tvScoreGreen.textContent = String(Number(scores.green ?? 0));
-            tvScoreOrange.textContent = String(Number(scores.orange ?? 0));
-
-            const activeMap = Number(room.activeMap || 0);
-            if(lastActiveMap !== activeMap){
-              lastActiveMap = activeMap;
-              lastMapKey = setMapSrc(activeMap);
-            }
-
-            const mapStates = readMapStates(room, activeMap);
-            for(const cell of CELLS){
-              const r = Number(cell.getAttribute("data-row"));
-              const c = Number(cell.getAttribute("data-col"));
-              const k = cellKey(r,c);
-              const st = Number(mapStates?.[k] ?? 0);
-              setStateClass(cell, st);
-            }
-
-            tvMsg.textContent = "";
-            dbg("DISPLAY(DO) room ok: " + code + " map=" + activeMap);
-
+            renderRoom(room.state);
           }catch(e){
             tvMsg.textContent = "تعذر قراءة بيانات الغرفة.";
             dbg("DO error: " + (e?.message || e));
           }
         }
 
-        function loop(){
-          if(!alive) return;
-          tick();
-          const slow = document.hidden ? 1800 : 900;
-          setTimeout(loop, slow);
+        async function initPusher(){
+          try{
+            const cfg = await fetchPusherConfig();
+            if(!cfg || !cfg.enabled || !cfg.key || !cfg.cluster || !cfg.channel){
+              dbg("Pusher disabled for TV");
+              return false;
+            }
+
+            await loadPusherScript();
+            if(!window.Pusher) return false;
+
+            try{
+              if(window.Pusher.logToConsole !== undefined) window.Pusher.logToConsole = false;
+            }catch(e){}
+
+            pusher = new window.Pusher(cfg.key, {
+              cluster: cfg.cluster,
+              channelAuthorization: {
+                endpoint: `${SYNC_BASE}${cfg.authEndpoint}`,
+                transport: "ajax"
+              }
+            });
+
+            pusher.connection.bind("connected", () => dbg("TV pusher connected"));
+            pusher.connection.bind("error", (err) => dbg("TV pusher error: " + (err?.error?.data?.message || err?.message || "unknown")));
+
+            pusherChannel = pusher.subscribe(cfg.channel);
+            pusherChannel.bind("patch", (payload) => {
+              try{
+                const patch = (payload && typeof payload.patch === "object") ? payload.patch : {};
+                roomCache = { ...(roomCache || {}), ...patch };
+                renderRoom(roomCache);
+              }catch(e){}
+            });
+
+            return true;
+          }catch(e){
+            dbg("initPusher failed: " + (e?.message || e));
+            return false;
+          }
         }
 
-        tvMsg.textContent = "جاري الاتصال بالغرفة…";
-        loop();
+        async function startDisplayMode(){
+          tvMsg.textContent = "جاري الاتصال بالغرفة…";
 
-        window.addEventListener("beforeunload", ()=>{ alive = false; });
+          await resyncRoom();
+          const pusherOk = await initPusher();
 
-        return; // ✅ لا نكمل تحويل فتح اللعبة
+          // ✅ fallback / resync هادئ
+          (function loop(){
+            if(!alive) return;
+            const delay = pusherOk
+              ? (document.hidden ? 20000 : 10000)
+              : (document.hidden ? 3000 : 1500);
+
+            setTimeout(async () => {
+              if(!alive) return;
+              await resyncRoom();
+              loop();
+            }, delay);
+          })();
+        }
+
+        startDisplayMode();
+
+        window.addEventListener("beforeunload", ()=>{
+          alive = false;
+          try{
+            if(pusherChannel){
+              pusherChannel.unbind_all();
+              pusher.unsubscribe(pusherChannel.name);
+            }
+            if(pusher){
+              pusher.disconnect();
+            }
+          }catch(e){}
+        });
+
+        return;
       }
 
       // =========================
-      // ✅ الوضع العادي: فتح اللعبة بسرعة (كما هو)
+      // ✅ الوضع العادي: فتح اللعبة بسرعة
       // =========================
-
-      // هدف اللعبة
       let r = (qs.get("r") || "game_full.html").trim();
       r = r.replace(/^\/+/, "");
       if (r.startsWith("http://") || r.startsWith("https://")) {
@@ -693,26 +818,41 @@
 
       dbg("redirect -> " + r);
 
-      // ✅ Redirect مرة واحدة فقط
       let didGo = false;
       const go = () => {
         if (didGo) return;
         didGo = true;
-        location.replace(r);
+
+        try{
+          const target = new URL(r, location.href);
+
+          // ✅ مرر بارامترات الرابط الحالية ما عدا r
+          for (const [k, v] of qs.entries()) {
+            if (k === "r") continue;
+            if (!target.searchParams.has(k)) target.searchParams.set(k, v);
+          }
+
+          // ✅ تأكد من تمرير sync
+          if (!target.searchParams.get("sync")) {
+            target.searchParams.set("sync", SYNC_BASE);
+          }
+
+          location.replace(target.toString());
+        }catch(e){
+          location.replace(r);
+        }
       };
 
-      // ✅ تحويل فوري تقريباً (غير ملحوظ)
       if (typeof requestAnimationFrame === "function") {
         requestAnimationFrame(go);
       } else {
         setTimeout(go, 0);
       }
 
-      // ✅ ضمان: لو أي سبب ما تحوّل
       setTimeout(go, 120);
     })();
   </script>
 
-  <!-- VERSION: index.html — vFastOpen-3 + DisplayMode-DO-1 -->
+  <!-- VERSION: index.html — vFastOpen-4 + DisplayMode-PusherFirst -->
 </body>
 </html>
