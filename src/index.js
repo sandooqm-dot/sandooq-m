@@ -1,46 +1,44 @@
 // src/index.js
-// Horof Sync Worker (Durable Objects) + Pusher fan-out + /stats + /pusher/auth + /realtime-config
+// Horof Sync Worker (Durable Objects) + Pusher fan-out + /stats + /pusher/auth + /pusher/config
 //
 // ✅ Backward compatible: clients that still poll /state will keep working.
-// ✅ To enable Pusher, set these environment variables (Secrets) in Cloudflare:
+// ✅ Pusher secrets stay in Cloudflare Worker Secrets:
 //    PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER
 //
-// Endpoints (same origin as the worker):
+// Endpoints:
 //   GET  /health?room=ROOM
-//   GET  /realtime-config?room=ROOM
 //   GET  /state?room=ROOM&pid=PID
-//   POST /action?room=ROOM           (JSON patch/object)
+//   POST /action?room=ROOM
 //   GET  /stats?room=ROOM
-//   POST /pusher/auth?room=ROOM      (Pusher private-channel auth)
+//   POST /pusher/auth?room=ROOM
+//   GET  /pusher/config?room=ROOM
 
-function getAllowedOrigins(env) {
-  const raw = String(env?.ALLOWED_ORIGINS || "").trim();
-  if (!raw) return [];
+function parseAllowedOrigins(env) {
+  const raw = String(env?.ALLOWED_ORIGINS || "*").trim();
+  if (!raw) return ["*"];
   return raw.split(",").map(s => s.trim()).filter(Boolean);
 }
 
-function isAllowedOrigin(origin, env) {
-  if (!origin) return true; // same-origin / curl / server-side
-  const allowed = getAllowedOrigins(env);
-  if (!allowed.length) return true;
-  return allowed.includes(origin);
+function isOriginAllowed(req, env) {
+  const origin = (req.headers.get("Origin") || "").trim();
+  if (!origin) return true; // same-origin / server-to-server
+  const allowed = parseAllowedOrigins(env);
+  return allowed.includes("*") || allowed.includes(origin);
 }
 
-function pickAllowOrigin(req, env) {
-  const origin = req.headers.get("Origin") || "";
-  const allowed = getAllowedOrigins(env);
+function resolveAllowOrigin(req, env) {
+  const origin = (req.headers.get("Origin") || "").trim();
+  const allowed = parseAllowedOrigins(env);
 
-  if (!origin) {
-    return allowed[0] || "*";
-  }
-  if (!allowed.length) {
-    return origin;
-  }
-  return allowed.includes(origin) ? origin : "null";
+  if (allowed.includes("*")) return origin || "*";
+  if (origin && allowed.includes(origin)) return origin;
+
+  // fallback for same-origin requests with no Origin header
+  return allowed[0] || "*";
 }
 
 function corsHeaders(req, env) {
-  const allowOrigin = pickAllowOrigin(req, env);
+  const allowOrigin = resolveAllowOrigin(req, env);
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Vary": "Origin",
@@ -62,6 +60,7 @@ function json(data, status = 200, extraHeaders = {}) {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
       ...extraHeaders,
     },
   });
@@ -76,17 +75,8 @@ function clampMin(n, min) {
   return Number.isFinite(n) ? Math.max(min, n) : min;
 }
 
-function normalizeRoom(v) {
-  const s = String(v || "").trim();
-  return (s || "default").slice(0, 120);
-}
-
-function normalizePid(v) {
-  return String(v || "").trim().slice(0, 80);
-}
-
-// ---------- MD5 (small, pure JS) ----------
 /* eslint-disable */
+// ---------- MD5 (small, pure JS) ----------
 function md5cycle(x, k) {
   let a = x[0], b = x[1], c = x[2], d = x[3];
 
@@ -234,6 +224,30 @@ function pusherEnabled(env) {
   return Boolean(env?.PUSHER_APP_ID && env?.PUSHER_KEY && env?.PUSHER_SECRET && env?.PUSHER_CLUSTER);
 }
 
+function roomChannel(room) {
+  return `private-room-${room}`;
+}
+
+function publicPusherConfig(env, room) {
+  if (!pusherEnabled(env)) {
+    return {
+      enabled: false,
+      key: null,
+      cluster: null,
+      channel: roomChannel(room),
+      authEndpoint: `/pusher/auth?room=${encodeURIComponent(room)}`,
+    };
+  }
+
+  return {
+    enabled: true,
+    key: env.PUSHER_KEY,
+    cluster: env.PUSHER_CLUSTER,
+    channel: roomChannel(room),
+    authEndpoint: `/pusher/auth?room=${encodeURIComponent(room)}`,
+  };
+}
+
 async function pusherTrigger(env, channel, event, payloadObj) {
   if (!pusherEnabled(env)) return { ok: false, skipped: true };
 
@@ -277,19 +291,16 @@ async function parseBodyAsObject(request) {
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
-      if (!isAllowedOrigin(request.headers.get("Origin"), env)) {
-        return withCors(request, new Response(null, { status: 403 }), env);
-      }
       return withCors(request, new Response(null, { status: 204 }), env);
     }
 
-    if (!isAllowedOrigin(request.headers.get("Origin"), env)) {
+    if (!isOriginAllowed(request, env)) {
       return withCors(request, json({ ok: false, msg: "Origin not allowed" }, 403), env);
     }
 
     const url = new URL(request.url);
-    const room = normalizeRoom(url.searchParams.get("room") || "default");
-    const pid = normalizePid(url.searchParams.get("pid") || "");
+    const room = url.searchParams.get("room") || "default";
+    const pid = url.searchParams.get("pid") || "";
     const id = env.ROOMS.idFromName(room);
     const stub = env.ROOMS.get(id);
 
@@ -297,19 +308,15 @@ export default {
       return withCors(request, json({
         ok: true,
         room,
-        pusher: pusherEnabled(env) ? "enabled" : "disabled",
+        pusher: publicPusherConfig(env, room),
       }), env);
     }
 
-    if (url.pathname === "/realtime-config" && request.method === "GET") {
+    if (url.pathname === "/pusher/config" && request.method === "GET") {
       return withCors(request, json({
         ok: true,
         room,
-        enabled: pusherEnabled(env),
-        key: String(env.PUSHER_KEY || ""),
-        cluster: String(env.PUSHER_CLUSTER || ""),
-        channel: `private-room-${room}`,
-        authEndpoint: `/pusher/auth?room=${encodeURIComponent(room)}`,
+        pusher: publicPusherConfig(env, room),
       }), env);
     }
 
@@ -321,17 +328,18 @@ export default {
     }
 
     if (url.pathname === "/action" && request.method === "POST") {
-      const raw = await request.text();
       const r = await stub.fetch("https://do/action", {
         method: "POST",
         headers: { "content-type": "application/json", "x-room-name": room },
-        body: raw,
+        body: await request.text(),
       });
       return withCors(request, r, env);
     }
 
     if (url.pathname === "/stats" && request.method === "GET") {
-      const r = await stub.fetch("https://do/stats", { headers: { "x-room-name": room } });
+      const r = await stub.fetch("https://do/stats", {
+        headers: { "x-room-name": room },
+      });
       return withCors(request, r, env);
     }
 
@@ -343,7 +351,7 @@ export default {
       const body = await parseBodyAsObject(request);
       const socket_id = String(body.socket_id || "");
       const channel_name = String(body.channel_name || "");
-      const expected = `private-room-${room}`;
+      const expected = roomChannel(room);
 
       if (!socket_id || !channel_name || channel_name !== expected) {
         return withCors(request, json({ ok: false, msg: "Forbidden" }, 403), env);
@@ -389,7 +397,7 @@ export class RoomDO {
       actionsToday: 0,
       pusherMsgsToday: 0,
       peakClientsToday: 0,
-      seen: {}, // pid -> lastSeenTs
+      seen: {},
     };
     if (m.day !== day) {
       return { day, actionsToday: 0, pusherMsgsToday: 0, peakClientsToday: 0, seen: {} };
@@ -421,24 +429,24 @@ export class RoomDO {
 
   async fetch(request) {
     this._setRoomFromReq(request);
-
     const url = new URL(request.url);
 
     if (url.pathname === "/state") {
       const s = (await this.state.storage.get("state")) || {};
+      const rev = Number((await this.state.storage.get("rev")) || 0);
 
-      const pid = normalizePid(url.searchParams.get("pid") || "");
+      const pid = url.searchParams.get("pid") || "";
       if (pid) {
         const now = Date.now();
         const m = await this._loadMetrics(now);
         m.seen = this._gcSeen(m.seen, now);
-        m.seen[pid] = now;
+        m.seen[String(pid).slice(0, 80)] = now;
         const clientsNow = this._clientsNow(m.seen, now);
         m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
         await this.state.storage.put("metrics", m);
       }
 
-      return json({ ok: true, state: s });
+      return json({ ok: true, state: s, rev });
     }
 
     if (url.pathname === "/stats") {
@@ -450,6 +458,7 @@ export class RoomDO {
       await this.state.storage.put("metrics", m);
 
       const lastActiveAt = Number((await this.state.storage.get("lastActiveAt")) || 0);
+      const rev = Number((await this.state.storage.get("rev")) || 0);
 
       return json({
         ok: true,
@@ -460,6 +469,7 @@ export class RoomDO {
         clientsNow,
         peakClientsToday: Number(m.peakClientsToday || 0),
         lastActiveAt,
+        rev,
         pusherConfigured: pusherEnabled(this.env),
       });
     }
@@ -473,8 +483,11 @@ export class RoomDO {
       const next = { ...current, ...patch };
 
       const now = Date.now();
+      const currentRev = Number((await this.state.storage.get("rev")) || 0);
+      const nextRev = currentRev + 1;
 
       await this.state.storage.put("state", next);
+      await this.state.storage.put("rev", nextRev);
       await this.state.storage.put("lastActiveAt", now);
 
       try {
@@ -490,14 +503,17 @@ export class RoomDO {
       m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
 
       if (pusherEnabled(this.env) && this.roomName) {
-        const ch = `private-room-${this.roomName}`;
-        const trig = await pusherTrigger(this.env, ch, "patch", { patch, ts: now });
+        const trig = await pusherTrigger(this.env, roomChannel(this.roomName), "patch", {
+          patch,
+          ts: now,
+          rev: nextRev,
+        });
         if (trig?.ok) m.pusherMsgsToday = Number(m.pusherMsgsToday || 0) + 1;
       }
 
       await this.state.storage.put("metrics", m);
 
-      return json({ ok: true, state: next });
+      return json({ ok: true, state: next, rev: nextRev });
     }
 
     return json({ ok: false, msg: "DO Not found" }, 404);
@@ -521,6 +537,7 @@ export class RoomDO {
         await this.state.storage.deleteAll();
       } else {
         await this.state.storage.delete("state");
+        await this.state.storage.delete("rev");
         await this.state.storage.delete("lastActiveAt");
         await this.state.storage.delete("metrics");
       }
