@@ -159,10 +159,10 @@
   <script type="module">
     const params = new URLSearchParams(location.search);
 
-    // ✅ Sync base (Cloudflare Worker + Durable Objects)
-    const SYNC_BASE = params.get("sync") || "https://sync.horof.sandooq-games.com";
+    // ✅ Sync base (Cloudflare Worker + Durable Objects + Pusher config)
+    const DEFAULT_SYNC_BASE = "https://sync.horof.sandooq-games.com";
+    const SYNC_BASE = String(params.get("sync") || DEFAULT_SYNC_BASE).replace(/\/+$/, "");
     const codeFromLink = params.get("code") || "";
-    const syncFromLink = params.get("sync") || "";
 
     const nameEl = document.getElementById("playerName");
     const btn = document.getElementById("joinBtn");
@@ -171,6 +171,11 @@
 
     const lastName = localStorage.getItem("sandooq_last_player_name");
     if(lastName && !nameEl.value) nameEl.value = lastName;
+
+    try{
+      localStorage.setItem("sandooq_sync_base", SYNC_BASE);
+      sessionStorage.setItem("sandooq_sync_base", SYNC_BASE);
+    }catch(e){}
 
     function showError(msg){
       err.textContent = msg;
@@ -239,12 +244,15 @@
     }
 
     function baseUrl(){
-      return String(SYNC_BASE || "").replace(/\/$/,"");
+      return SYNC_BASE;
     }
 
-    async function fetchState(){
-      const url = `${baseUrl()}/state?room=${encodeURIComponent(roomCode)}`;
-      const r = await fetch(url, { cache:"no-store" });
+    async function fetchState(pid = ""){
+      const u = new URL(`${baseUrl()}/state`);
+      u.searchParams.set("room", roomCode);
+      if (pid) u.searchParams.set("pid", pid);
+
+      const r = await fetch(u.toString(), { cache:"no-store" });
       const j = await r.json().catch(()=>null);
       if(!j || !j.ok) throw new Error("STATE_FAIL");
       return (j.state && typeof j.state === "object") ? j.state : {};
@@ -260,6 +268,17 @@
       const j = await r.json().catch(()=>null);
       if(!j || !j.ok) throw new Error("ACTION_FAIL");
       return (j.state && typeof j.state === "object") ? j.state : null;
+    }
+
+    async function warmPusherConfig(){
+      try{
+        const url = `${baseUrl()}/pusher/config?room=${encodeURIComponent(roomCode)}`;
+        const r = await fetch(url, { cache:"no-store" });
+        const j = await r.json().catch(()=>null);
+        if(j && j.ok){
+          sessionStorage.setItem(`horof_pusher_config_${roomCode}`, JSON.stringify(j.pusher || {}));
+        }
+      }catch(e){}
     }
 
     function countTeams(players){
@@ -309,7 +328,7 @@
         let finalRoom = null;
 
         for(let attempt=0; attempt<4; attempt++){
-          const room = await fetchState();
+          const room = await fetchState(pid);
           const statusRaw = (room && room.status != null) ? String(room.status) : "";
           const status = (statusRaw === "started" || statusRaw === "lobby") ? statusRaw : (statusRaw ? statusRaw : "lobby");
 
@@ -339,7 +358,7 @@
 
           await postAction({ status, players });
 
-          const room2 = await fetchState();
+          const room2 = await fetchState(pid);
           const p2 = (room2.players && typeof room2.players === "object") ? room2.players : {};
           if(p2 && p2[pid]){
             finalRoom = room2;
@@ -369,6 +388,7 @@
           }
         }
 
+        await warmPusherConfig();
         markAsGuestPlayer(roomCode, pid);
 
         const u = new URL("game_full.html", location.href);
@@ -378,7 +398,7 @@
         u.searchParams.set("guest", "1");
         u.searchParams.set("player", "1");
         u.searchParams.set("view", "player");
-        if(syncFromLink) u.searchParams.set("sync", syncFromLink);
+        u.searchParams.set("sync", SYNC_BASE);
         location.href = u.toString();
 
       }catch(e){
@@ -393,6 +413,6 @@
     nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vDO-Join-2-NoFirebase -->
+  <!-- VERSION: join.html — vDO-Join-3-PusherReady -->
 </body>
 </html>
