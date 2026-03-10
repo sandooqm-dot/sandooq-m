@@ -114,6 +114,8 @@ function roomMetricsPathKey(pathname) {
     case "/health": return "health";
     case "/pusher/auth": return "pusherAuth";
     case "/pusher/config": return "pusherConfig";
+    case "/monitor": return "monitorUI";
+    case "/monitor/summary": return "monitorSummary";
     default: return pathname.replace(/^\//, "") || "unknown";
   }
 }
@@ -335,6 +337,9 @@ const MONITOR_ROOM = "__monitor__";
 const MONITOR_ACTIVE_ROOM_MS = 2 * 60 * 1000;
 const MONITOR_ROOM_STALE_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_PUSHER_PLAN_MESSAGES = 4_000_000;
+const DEFAULT_CF_MONTHLY_REQUESTS = 10_000_000;
+const DEFAULT_CF_FREE_DAILY_REQUESTS = 100_000;
+const DEFAULT_CF_PLAN_NAME = "Workers Paid ($5)";
 
 function monitorStub(env) {
   const id = env.ROOMS.idFromName(MONITOR_ROOM);
@@ -504,15 +509,20 @@ function monitorPageHtml() {
       box-shadow:none; color:#fff; font-size:14px;
     }
     .helpBox{
-      display:none; position:absolute; top:40px; left:0; z-index:10;
-      width:min(330px, 82vw);
-      padding:12px 13px;
+      display:none;
+      position:fixed;
+      left:14px; right:14px; bottom:14px;
+      z-index:9999;
+      width:auto; max-width:620px; margin:0 auto;
+      padding:14px 15px;
       border-radius:18px;
       border:1px solid var(--line);
       background:#0a1120;
       color:#ecf4ff; font-size:13px; line-height:1.9;
-      box-shadow:0 18px 38px rgba(0,0,0,.38);
+      box-shadow:0 18px 38px rgba(0,0,0,.48);
       white-space:pre-line;
+      max-height:62vh;
+      overflow:auto;
     }
     .help.open .helpBox{display:block}
 
@@ -636,7 +646,7 @@ function monitorPageHtml() {
     <section class="hero">
       <div>
         <div class="heroTitle">لوحة مراقبة سباق الحروف</div>
-        <div class="heroSub">لوحة عربية واحدة تجمع لك Pusher و Cloudflare وحالة الغرف الحالية — قراءة فقط ولا ترسل أي أوامر أثناء اللعب.</div>
+        <div class="heroSub"></div>
         <div class="heroMeta">
           <div class="ghostTag">رابط واحد للمتابعة من الجوال</div>
           <div class="ghostTag">تحديث تلقائي كل 5 ثوانٍ</div>
@@ -733,31 +743,56 @@ function monitorPageHtml() {
           <div class="headSide">
             <div class="accent"></div>
             <div>
-              <div class="cardTitle">مؤشرات Cloudflare Worker
+              <div class="cardTitle">مؤشرات واستهلاك Cloudflare
                 <span class="help" data-help>
                   <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">هذه اللوحة تعرض أهم المؤشرات التشغيلية من نفس الـ Worker: عدد الطلبات، نسبة الأخطاء، متوسط زمن الاستجابة، وتوزيع الحالات.
+                  <div class="helpBox">هذه اللوحة تعرض مؤشرات Cloudflare التشغيلية + استهلاك الخطة الحالية بشكل واضح.
+
+المعروض هنا:
+- طلبات اليوم
+- نسبة الأخطاء
+- متوسط الاستجابة
+- استخدام الشهر الحالي من الخطة المدفوعة
+- مقارنة بالحد المجاني القديم 100,000 طلب يوميًا
+- تفصيل طلبات اللعب مقابل طلبات الحالة والمراقبة وPusher
 
 الحدود المقترحة:
 - نسبة الأخطاء: طبيعي أقل من 0.5% — متوسط حتى 2% — قلق فوق 2%
 - متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 800ms — قلق فوق 800ms</div>
                 </span>
               </div>
-              <div class="cardDesc">مهم لمعرفة هل الـ Worker مرتاح أو فيه بطء وأخطاء.</div>
+              <div class="cardDesc">يوضح الخطة الحالية، استهلاك الشهر، والفرق بين أنواع الطلبات داخل الـ Worker.</div>
             </div>
           </div>
           <div id="cfBadge" class="tag info">بانتظار البيانات</div>
         </div>
         <div class="metricGrid">
-          <div class="metric"><div class="metricLabel">طلبات اليوم</div><div id="cfRequests" class="metricValue">—</div></div>
-          <div class="metric"><div class="metricLabel">أخطاء اليوم</div><div id="cfErrors" class="metricValue">—</div></div>
-          <div class="metric"><div class="metricLabel">نسبة الأخطاء</div><div id="cfErrorRate" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">متوسط الاستجابة</div><div id="cfLatency" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">الخطة الحالية</div><div id="cfPlanName" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">استخدام الشهر الحالي</div><div id="cfMonthMain" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">المتبقي من الخطة</div><div id="cfMonthRemaining" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">الحد المجاني السابق</div><div id="cfFreeLimit" class="metricValue small">—</div></div>
+        </div>
+        <div class="metaRow">
+          <div id="cfMonthUsageTag" class="tag info">استهلاك الشهر: —</div>
+          <div id="cfRequests" class="tag info">طلبات اليوم: —</div>
+          <div id="cfErrors" class="tag warn">أخطاء اليوم: —</div>
+          <div id="cfLatency" class="tag info">متوسط الاستجابة: —</div>
+          <div id="cfErrorRate" class="tag info">نسبة الأخطاء: —</div>
         </div>
         <div class="metaRow">
           <div id="cf2xx" class="tag info">2xx: —</div>
           <div id="cf4xx" class="tag warn">4xx: —</div>
           <div id="cf5xx" class="tag bad">5xx: —</div>
+        </div>
+        <div class="sectionTitle">تفصيل طلبات الـ Worker</div>
+        <div class="metricGrid">
+          <div class="metric"><div class="metricLabel">طلبات اللعب /action</div><div id="cfReqAction" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">طلبات الحالة /state</div><div id="cfReqState" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">طلبات Pusher auth/config</div><div id="cfReqPusher" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">طلبات المراقبة</div><div id="cfReqMonitor" class="metricValue small">—</div></div>
+        </div>
+        <div class="metaRow">
+          <div id="cfReqOther" class="tag info">طلبات أخرى: —</div>
         </div>
       </section>
 
@@ -1018,16 +1053,29 @@ function monitorPageHtml() {
       setBadge($('liveBadge'), lvText, lvKind);
 
       const cf = summary.cloudflare || {};
-      $('cfRequests').textContent = fmt(cf.requestsToday);
-      $('cfErrors').textContent = fmt(cf.errorsToday);
-      $('cfErrorRate').textContent = pct(cf.errorRatePercent);
-      $('cfLatency').textContent = ms(cf.avgLatencyMs);
+      $('cfPlanName').textContent = String(cf.planName || '—');
+      $('cfMonthMain').textContent = fmt(cf.requestsMonth) + ' / ' + fmt(cf.planRequestsMonth);
+      $('cfMonthRemaining').textContent = fmt(cf.remainingRequestsMonth);
+      $('cfFreeLimit').textContent = fmt(cf.freeDailyRequests) + ' / يوم';
+      $('cfMonthUsageTag').textContent = 'استهلاك الشهر: ' + pct(cf.usagePercentMonth);
+      $('cfRequests').textContent = 'طلبات اليوم: ' + fmt(cf.requestsToday);
+      $('cfErrors').textContent = 'أخطاء اليوم: ' + fmt(cf.errorsToday);
+      $('cfErrorRate').textContent = 'نسبة الأخطاء: ' + pct(cf.errorRatePercent);
+      $('cfLatency').textContent = 'متوسط الاستجابة: ' + ms(cf.avgLatencyMs);
       $('cf2xx').textContent = '2xx: ' + fmt(cf.status2xx);
       $('cf4xx').textContent = '4xx: ' + fmt(cf.status4xx);
       $('cf5xx').textContent = '5xx: ' + fmt(cf.status5xx);
+      const wb = summary.requestBreakdown || {};
+      $('cfReqAction').textContent = fmt(wb.action);
+      $('cfReqState').textContent = fmt(wb.state);
+      $('cfReqPusher').textContent = fmt(wb.pusher);
+      $('cfReqMonitor').textContent = fmt(wb.monitor);
+      $('cfReqOther').textContent = 'طلبات أخرى: ' + fmt(wb.other);
       const er = errorLevel(cf.errorRatePercent);
       const lt = latencyLevel(cf.avgLatencyMs);
-      setBadge($('cfBadge'), er[1] === 'bad' || lt[1] === 'bad' ? 'قلق' : (er[1] === 'warn' || lt[1] === 'warn' ? 'متوسط' : 'طبيعي'), er[1] === 'bad' || lt[1] === 'bad' ? 'bad' : (er[1] === 'warn' || lt[1] === 'warn' ? 'warn' : 'ok'));
+      const cu = usageLevel(cf.usagePercentMonth);
+      const cfKind = (er[1] === 'bad' || lt[1] === 'bad' || cu[1] === 'bad') ? 'bad' : ((er[1] === 'warn' || lt[1] === 'warn' || cu[1] === 'warn') ? 'warn' : 'ok');
+      setBadge($('cfBadge'), cfKind === 'bad' ? 'قلق' : (cfKind === 'warn' ? 'متوسط' : 'طبيعي'), cfKind);
 
       renderAlerts(summary.alerts || []);
       renderRooms(summary.rooms || []);
@@ -1096,12 +1144,33 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/monitor" && request.method === "GET") {
-      return withCors(request, html(monitorPageHtml()), env);
+      const res = html(monitorPageHtml());
+      queueMonitorRequest(ctx, env, {
+        ts: Date.now(),
+        path: url.pathname,
+        pathKey: roomMetricsPathKey(url.pathname),
+        method: request.method,
+        status: 200,
+        room: MONITOR_ROOM,
+        pid: "",
+        ms: Date.now() - startedAt,
+      });
+      return withCors(request, res, env);
     }
 
     if (url.pathname === "/monitor/summary" && request.method === "GET") {
       const r = await monitorStub(env).fetch("https://do/monitor-summary", {
         headers: { "x-room-name": MONITOR_ROOM },
+      });
+      queueMonitorRequest(ctx, env, {
+        ts: Date.now(),
+        path: url.pathname,
+        pathKey: roomMetricsPathKey(url.pathname),
+        method: request.method,
+        status: r.status || 200,
+        room: MONITOR_ROOM,
+        pid: "",
+        ms: Date.now() - startedAt,
       });
       return withCors(request, r, env);
     }
@@ -1417,6 +1486,7 @@ export class RoomDO {
 
     if (prevMonth !== month) {
       m.pusherMsgsMonth = 0;
+      m.requestsMonth = 0;
     }
 
     m.day = day;
@@ -1430,6 +1500,7 @@ export class RoomDO {
     m.totalLatencyMsToday = toFiniteNumber(m.totalLatencyMsToday, 0);
     m.pusherMsgsToday = toFiniteNumber(m.pusherMsgsToday, 0);
     m.pusherMsgsMonth = toFiniteNumber(m.pusherMsgsMonth, 0);
+    m.requestsMonth = toFiniteNumber(m.requestsMonth, 0);
 
     m.rooms = this._gcMonitorRooms(m.rooms, now);
     return m;
@@ -1491,6 +1562,7 @@ export class RoomDO {
     const errorRate = Number(summary?.cloudflare?.errorRatePercent || 0);
     const avgLatencyMs = Number(summary?.cloudflare?.avgLatencyMs || 0);
     const activeRooms = Number(summary?.live?.roomsActiveNow || 0);
+    const cfUsage = Number(summary?.cloudflare?.usagePercentMonth || 0);
 
     if (usage >= 80) {
       alerts.push({
@@ -1517,6 +1589,20 @@ export class RoomDO {
         level: "warn",
         title: "نسبة الأخطاء تحتاج متابعة",
         text: `نسبة الأخطاء اليوم ${errorRate.toFixed(2)}% وهي أعلى من الطبيعي.`
+      });
+    }
+
+    if (cfUsage >= 85) {
+      alerts.push({
+        level: "bad",
+        title: "استهلاك Cloudflare الشهري اقترب من الحد",
+        text: `استهلاك الطلبات الشهري وصل إلى ${cfUsage.toFixed(1)}% من الخطة الحالية.`
+      });
+    } else if (cfUsage >= 60) {
+      alerts.push({
+        level: "warn",
+        title: "استهلاك Cloudflare الشهري يحتاج متابعة",
+        text: `استهلاك الطلبات الشهري الآن ${cfUsage.toFixed(1)}% من الخطة الحالية.`
       });
     }
 
@@ -1569,6 +1655,7 @@ export class RoomDO {
       const ts = toFiniteNumber(evt?.ts, now);
 
       m.requestsToday += 1;
+      m.requestsMonth += 1;
       m.totalLatencyMsToday += ms;
 
       if (status >= 500) m.status5xx += 1;
@@ -1709,11 +1796,24 @@ export class RoomDO {
       });
 
       const requestsToday = toFiniteNumber(m.requestsToday, 0);
+      const requestsMonth = toFiniteNumber(m.requestsMonth, 0);
       const errorsToday = toFiniteNumber(m.errorsToday, 0);
       const avgLatencyMs = requestsToday > 0 ? (toFiniteNumber(m.totalLatencyMsToday, 0) / requestsToday) : 0;
       const errorRatePercent = requestsToday > 0 ? (errorsToday / requestsToday) * 100 : 0;
       const messagesMonth = toFiniteNumber(m.pusherMsgsMonth, 0);
       const usagePercentMonth = Math.min(100, (messagesMonth / planMessages) * 100);
+      const cfPlanRequestsMonth = clampMin(Number(this.env?.CF_PLAN_REQUESTS_MONTH || DEFAULT_CF_MONTHLY_REQUESTS), 1);
+      const cfFreeDailyRequests = clampMin(Number(this.env?.CF_FREE_DAILY_REQUESTS || DEFAULT_CF_FREE_DAILY_REQUESTS), 1);
+      const cfPlanName = String(this.env?.CF_PLAN_NAME || DEFAULT_CF_PLAN_NAME);
+      const cfUsagePercentMonth = Math.min(100, (requestsMonth / cfPlanRequestsMonth) * 100);
+      const routes = m.routes || {};
+      const routeCount = (k) => toFiniteNumber((routes[k] && routes[k].count) || 0, 0);
+      const breakdownAction = routeCount("action");
+      const breakdownState = routeCount("state");
+      const breakdownPusher = routeCount("pusherAuth") + routeCount("pusherConfig") + routeCount("pusherTrigger");
+      const breakdownMonitor = routeCount("monitorUI") + routeCount("monitorSummary");
+      const knownBreakdown = breakdownAction + breakdownState + breakdownPusher + breakdownMonitor;
+      const breakdownOther = Math.max(0, requestsToday - knownBreakdown);
 
       const summary = {
         ok: true,
@@ -1738,12 +1838,25 @@ export class RoomDO {
         },
         cloudflare: {
           requestsToday,
+          requestsMonth,
           errorsToday,
           errorRatePercent,
           avgLatencyMs,
           status2xx: toFiniteNumber(m.status2xx, 0),
           status4xx: toFiniteNumber(m.status4xx, 0),
           status5xx: toFiniteNumber(m.status5xx, 0),
+          planName: cfPlanName,
+          planRequestsMonth: cfPlanRequestsMonth,
+          freeDailyRequests: cfFreeDailyRequests,
+          remainingRequestsMonth: Math.max(0, cfPlanRequestsMonth - requestsMonth),
+          usagePercentMonth: cfUsagePercentMonth,
+        },
+        requestBreakdown: {
+          action: breakdownAction,
+          state: breakdownState,
+          pusher: breakdownPusher,
+          monitor: breakdownMonitor,
+          other: breakdownOther,
         },
         rooms: rooms.slice(0, 100),
         lastErrors: Array.isArray(m.lastErrors) ? m.lastErrors.slice(0, 25) : [],
