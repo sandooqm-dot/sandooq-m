@@ -87,6 +87,22 @@ function utcMonthKey(ts = Date.now()) {
   return new Date(ts).toISOString().slice(0, 7);
 }
 
+function nextUtcDayResetTs(ts = Date.now()) {
+  const d = new Date(ts);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0);
+}
+
+function utcResetCountdown(ts = Date.now()) {
+  const resetAt = nextUtcDayResetTs(ts);
+  const remainingMs = Math.max(0, resetAt - ts);
+  return {
+    resetAt,
+    remainingMs,
+    hoursRemaining: Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000))),
+    minutesRemaining: Math.max(1, Math.ceil(remainingMs / (60 * 1000))),
+  };
+}
+
 function clampMin(n, min) {
   n = Number(n);
   return Number.isFinite(n) ? Math.max(min, n) : min;
@@ -628,6 +644,11 @@ function monitorPageHtml() {
       line-height:1.85;
     }
     .alert strong{display:block; margin-bottom:4px}
+
+    .rowEnded td{
+      background:rgba(255,93,115,.06);
+    }
+
     .empty{
       text-align:center; padding:18px;
       color:var(--muted);
@@ -678,6 +699,7 @@ function monitorPageHtml() {
           <div class="ghostTag">رابط واحد للمتابعة من الجوال</div>
           <div class="ghostTag">تحديث تلقائي كل 5 ثوانٍ</div>
           <div class="ghostTag">لا تؤثر على اللاعبين</div>
+          <div id="dailyResetChip" class="ghostTag">تصفير اليوم بعد: —</div>
         </div>
       </div>
       <div class="controls">
@@ -733,6 +755,7 @@ function monitorPageHtml() {
         <div class="metaRow">
           <div id="pusherTodayTag" class="tag info">اليوم: —</div>
           <div id="pusherRemainingTag" class="tag info">المتبقي: —</div>
+          <div id="pusherResetTag" class="tag info">يتصفّر بعد: —</div>
         </div>
       </section>
 
@@ -761,7 +784,7 @@ function monitorPageHtml() {
           <div class="metric"><div class="metricLabel">الاتصالات الحالية الآن</div><div id="liveConnections" class="metricValue">—</div></div>
           <div class="metric"><div class="metricLabel">الغرف النشطة الآن</div><div id="liveRooms" class="metricValue">—</div></div>
           <div class="metric"><div class="metricLabel">الغرف التي ظهرت اليوم</div><div id="liveRoomsToday" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">إجمالي الغرف المتتبعة</div><div id="liveRoomsTracked" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">غرف منتهية ظاهرة</div><div id="liveRoomsTracked" class="metricValue small">—</div></div>
         </div>
       </section>
 
@@ -806,6 +829,7 @@ function monitorPageHtml() {
           <div id="cfErrors" class="tag warn">أخطاء اللعبة اليوم: —</div>
           <div id="cfLatency" class="tag info">متوسط الاستجابة: —</div>
           <div id="cfErrorRate" class="tag info">نسبة الأخطاء المهمة: —</div>
+          <div id="cfResetTag" class="tag info">يتصفّر بعد: —</div>
         </div>
         <div class="metaRow">
           <div id="cf2xx" class="tag info">2xx: —</div>
@@ -851,8 +875,8 @@ function monitorPageHtml() {
           <div class="headSide">
             <div class="accent"></div>
             <div>
-              <div class="cardTitle">الغرف النشطة الآن</div>
-              <div class="cardDesc">جدول حي يوضح الغرف الحالية، عدد المتصلين فيها، وآخر نشاط.</div>
+              <div class="cardTitle">الغرف الحالية والمنتهية</div>
+              <div class="cardDesc">يعرض الغرف النشطة والهادئة، ويُظهر الغرف التي انتهت بالخمول باللون الأحمر بدون احتسابها ضمن الحالي.</div>
             </div>
           </div>
           <div id="roomsBadge" class="tag info">بانتظار البيانات</div>
@@ -909,7 +933,7 @@ function monitorPageHtml() {
         <div class="footerNote">
           ملاحظة: رقم رسائل Pusher هنا هو عداد داخلي مبني على الرسائل التي يرسلها هذا الـ Worker إلى Pusher، وهو ممتاز للمراقبة اليومية، لكنه ليس بديلًا رسميًا عن صفحة الفوترة داخل Pusher.
           <br>
-          أما مؤشرات Cloudflare هنا فهي مؤشرات تشغيلية من نفس الـ Worker، هدفها تعطيك نظرة عربية سريعة من رابط واحد بدون تنقل بين عدة لوحات.
+          أما مؤشرات Cloudflare هنا فهي مؤشرات تشغيلية داخلية من نفس الـ Worker، هدفها تعطيك نظرة عربية سريعة من رابط واحد بدون تنقل بين عدة لوحات.
         </div>
       </section>
     </div>
@@ -1010,11 +1034,14 @@ function monitorPageHtml() {
         setBadge($('roomsBadge'),'0 غرفة','info');
         return;
       }
-      setBadge($('roomsBadge'),'عدد الغرف: ' + rooms.length, 'info');
+      const endedCount = rooms.filter(r => r.isEnded).length;
+      const currentCount = rooms.filter(r => !r.isEnded).length;
+      setBadge($('roomsBadge'),'الحالية: ' + currentCount + ' | المنتهية: ' + endedCount, endedCount ? 'warn' : 'info');
       body.innerHTML = rooms.map(r => {
-        const statusText = r.isActive ? 'نشطة' : 'هادئة';
-        const cls = r.isActive ? 'ok' : 'info';
-        return '<tr>' +
+        const statusText = r.isEnded ? 'انتهت' : (r.isActive ? 'نشطة' : 'هادئة');
+        const cls = r.isEnded ? 'bad' : (r.isActive ? 'ok' : 'info');
+        const rowCls = r.isEnded ? ' class="rowEnded"' : '';
+        return '<tr' + rowCls + '>' +
           '<td>' + r.room + '</td>' +
           '<td><span class="tag ' + cls + '">' + statusText + '</span></td>' +
           '<td>' + fmt(r.clientsNow) + '</td>' +
@@ -1051,6 +1078,8 @@ function monitorPageHtml() {
 
     function render(summary){
       $('lastUpdated').textContent = ago(summary.generatedAt);
+      const reset = summary.dailyReset || {};
+      $('dailyResetChip').textContent = 'تصفير اليوم بعد: ' + (reset.hoursLabel || '—');
 
       const workerOk = summary.system?.worker ? 'شغال' : 'غير واضح';
       $('workerStatus').textContent = workerOk;
@@ -1070,6 +1099,7 @@ function monitorPageHtml() {
       $('pusherBar').style.width = Math.min(100, Number(pusher.usagePercentMonth || 0)) + '%';
       $('pusherTodayTag').textContent = 'اليوم: ' + fmt(pusher.messagesToday);
       $('pusherRemainingTag').textContent = 'المتبقي: ' + fmt(pusher.remainingMessages);
+      $('pusherResetTag').textContent = 'يتصفّر بعد: ' + ((summary.dailyReset && summary.dailyReset.hoursLabel) || '—');
       const [puText, puKind] = usageLevel(pusher.usagePercentMonth);
       setBadge($('pusherUsageBadge'), puText, puKind);
 
@@ -1077,7 +1107,7 @@ function monitorPageHtml() {
       $('liveConnections').textContent = fmt(live.connectionsNow);
       $('liveRooms').textContent = fmt(live.roomsActiveNow);
       $('liveRoomsToday').textContent = fmt(live.roomsSeenToday);
-      $('liveRoomsTracked').textContent = fmt(live.roomsTracked);
+      $('liveRoomsTracked').textContent = fmt(live.roomsEndedVisible);
       const [lvText, lvKind] = liveLevel(live.connectionsNow, live.roomsActiveNow, summary.cloudflare?.errorRatePercent);
       setBadge($('liveBadge'), lvText, lvKind);
 
@@ -1091,6 +1121,7 @@ function monitorPageHtml() {
       $('cfErrors').textContent = 'أخطاء اللعبة اليوم: ' + fmt(cf.errorsToday);
       $('cfErrorRate').textContent = 'نسبة الأخطاء المهمة: ' + pct(cf.errorRatePercent);
       $('cfLatency').textContent = 'متوسط الاستجابة: ' + ms(cf.avgLatencyMs);
+      $('cfResetTag').textContent = 'يتصفّر بعد: ' + ((summary.dailyReset && summary.dailyReset.hoursLabel) || '—');
       $('cf2xx').textContent = '2xx: ' + fmt(cf.status2xx);
       $('cf4xx').textContent = '4xx مهم: ' + fmt(cf.status4xx);
       $('cfExt404').textContent = '404 خارجية: ' + fmt(cf.external404Today);
@@ -1462,9 +1493,17 @@ export class RoomDO {
   }
 
   _setRoomFromReq(request) {
-    if (this.roomName) return;
     const rn = request.headers.get("x-room-name");
     if (rn) this.roomName = rn;
+  }
+
+  async _rememberRoomName(request) {
+    const rn = request.headers.get("x-room-name");
+    if (!rn) return;
+    this.roomName = rn;
+    try {
+      await this.state.storage.put("roomName", rn);
+    } catch {}
   }
 
   async _loadMetrics(now = Date.now()) {
@@ -1579,7 +1618,9 @@ export class RoomDO {
       info.pusherMsgsToday = toFiniteNumber(info.pusherMsgsToday, 0);
       info.lastStatus = toFiniteNumber(info.lastStatus, 0);
       info.rev = toFiniteNumber(info.rev, 0);
-      const recent = Math.max(info.lastSeenAt, info.lastActionAt, info.lastStateAt, info.lastStatsAt, info.lastPusherAt, info.firstSeenAt);
+      info.expiredAt = toFiniteNumber(info.expiredAt, 0);
+      info.endedReason = String(info.endedReason || "");
+      const recent = Math.max(info.lastSeenAt, info.lastActionAt, info.lastStateAt, info.lastStatsAt, info.lastPusherAt, info.firstSeenAt, info.expiredAt);
       if (recent && now - recent > MONITOR_ROOM_STALE_MS) continue;
       out[room] = info;
     }
@@ -1598,6 +1639,7 @@ export class RoomDO {
     const errorRate = Number(summary?.cloudflare?.errorRatePercent || 0);
     const avgLatencyMs = Number(summary?.cloudflare?.avgLatencyMs || 0);
     const activeRooms = Number(summary?.live?.roomsActiveNow || 0);
+    const endedRooms = Number(summary?.live?.roomsEndedVisible || 0);
     const cfUsage = Number(summary?.cloudflare?.usagePercentMonth || 0);
     const external404Today = Number(summary?.cloudflare?.external404Today || 0);
 
@@ -1674,6 +1716,14 @@ export class RoomDO {
       });
     }
 
+    if (endedRooms > 0) {
+      alerts.push({
+        level: "info",
+        title: "يوجد جلسات انتهت بالخمول",
+        text: `تم تمييز ${endedRooms} غرف منتهية باللون الأحمر، وهي غير محسوبة ضمن الحالي.`
+      });
+    }
+
     if (!alerts.length) {
       alerts.push({
         level: "info",
@@ -1734,6 +1784,8 @@ export class RoomDO {
           pusherMsgsToday: 0,
         };
         info.firstSeenAt = toFiniteNumber(info.firstSeenAt, ts) || ts;
+        info.expiredAt = 0;
+        info.endedReason = "";
         info.lastSeenAt = ts;
         info.lastPath = path;
         info.lastStatus = status;
@@ -1777,11 +1829,31 @@ export class RoomDO {
           pusherMsgsToday: 0,
         };
         info.firstSeenAt = toFiniteNumber(info.firstSeenAt, ts) || ts;
+        info.expiredAt = 0;
+        info.endedReason = "";
         info.lastSeenAt = Math.max(toFiniteNumber(info.lastSeenAt, 0), ts);
         info.lastPusherAt = ts;
         info.pusherMsgsToday = toFiniteNumber(info.pusherMsgsToday, 0) + 1;
         info.rev = toFiniteNumber(evt?.rev, toFiniteNumber(info.rev, 0));
         info.pids = this._gcSeen(info.pids || {}, ts);
+        m.rooms[room] = info;
+      }
+    }
+
+    if (type === "room_expired") {
+      const ts = toFiniteNumber(evt?.ts, now);
+      if (room && room !== MONITOR_ROOM) {
+        const info = (m.rooms[room] && typeof m.rooms[room] === "object") ? m.rooms[room] : {
+          firstSeenAt: ts,
+          pids: {},
+          requestsToday: 0,
+          pusherMsgsToday: 0,
+        };
+        info.firstSeenAt = toFiniteNumber(info.firstSeenAt, ts) || ts;
+        info.expiredAt = ts;
+        info.endedReason = String(evt?.reason || "idle_timeout");
+        info.lastSeenAt = Math.max(toFiniteNumber(info.lastSeenAt, 0), ts);
+        info.pids = {};
         m.rooms[room] = info;
       }
     }
@@ -1792,6 +1864,7 @@ export class RoomDO {
 
   async fetch(request) {
     this._setRoomFromReq(request);
+    await this._rememberRoomName(request);
     const url = new URL(request.url);
 
     if (url.pathname === "/monitor-event" && request.method === "POST") {
@@ -1806,11 +1879,13 @@ export class RoomDO {
       const m = await this._loadMonitor(now);
       await this.state.storage.put("monitor", m);
 
-      const planMessages = clampMin(Number(this.env?.PUSHER_PLAN_MESSAGES || DEFAULT_PUSHER_PLAN_MESSAGES), 1);
+      const planMessages = clampMin(Number(this.env?.PUSHER_PLAN_MESSAGES || this.env?.PUSHER_MESSAGES_LIMIT || DEFAULT_PUSHER_PLAN_MESSAGES), 1);
       const rooms = [];
       let connectionsNow = 0;
       let roomsActiveNow = 0;
       let roomsSeenToday = 0;
+      let roomsEndedVisible = 0;
+      let roomsTrackedCurrent = 0;
 
       for (const [room, raw] of Object.entries(m.rooms || {})) {
         const info = raw || {};
@@ -1819,16 +1894,25 @@ export class RoomDO {
         const lastSeenAt = toFiniteNumber(info.lastSeenAt, 0);
         const lastActionAt = toFiniteNumber(info.lastActionAt, 0);
         const lastPusherAt = toFiniteNumber(info.lastPusherAt, 0);
-        const isActive = clientsNow > 0 || (now - Math.max(lastActionAt, lastPusherAt, lastSeenAt) <= MONITOR_ACTIVE_ROOM_MS);
+        const expiredAt = toFiniteNumber(info.expiredAt, 0);
+        const isEnded = expiredAt > 0;
+        const isActive = !isEnded && (clientsNow > 0 || (now - Math.max(lastActionAt, lastPusherAt, lastSeenAt) <= MONITOR_ACTIVE_ROOM_MS));
 
-        if (isActive) roomsActiveNow += 1;
-        connectionsNow += clientsNow;
-        if (toFiniteNumber(info.requestsToday, 0) > 0 || toFiniteNumber(info.pusherMsgsToday, 0) > 0) roomsSeenToday += 1;
+        if (isEnded) roomsEndedVisible += 1;
+        else {
+          roomsTrackedCurrent += 1;
+          if (isActive) roomsActiveNow += 1;
+          connectionsNow += clientsNow;
+          if (toFiniteNumber(info.requestsToday, 0) > 0 || toFiniteNumber(info.pusherMsgsToday, 0) > 0) roomsSeenToday += 1;
+        }
 
         rooms.push({
           room,
           clientsNow,
           isActive,
+          isEnded,
+          expiredAt,
+          endedReason: String(info.endedReason || ""),
           lastSeenAt,
           lastActionAt,
           lastPusherAt,
@@ -1841,9 +1925,10 @@ export class RoomDO {
       }
 
       rooms.sort((a, b) => {
+        if (Number(a.isEnded) !== Number(b.isEnded)) return Number(a.isEnded) - Number(b.isEnded);
         if (Number(b.isActive) !== Number(a.isActive)) return Number(b.isActive) - Number(a.isActive);
         if (b.clientsNow !== a.clientsNow) return b.clientsNow - a.clientsNow;
-        return toFiniteNumber(b.lastSeenAt, 0) - toFiniteNumber(a.lastSeenAt, 0);
+        return Math.max(toFiniteNumber(b.lastSeenAt, 0), toFiniteNumber(b.expiredAt, 0)) - Math.max(toFiniteNumber(a.lastSeenAt, 0), toFiniteNumber(a.expiredAt, 0));
       });
 
       const requestsToday = toFiniteNumber(m.requestsToday, 0);
@@ -1869,6 +1954,8 @@ export class RoomDO {
       const knownBreakdown = breakdownAction + breakdownState + breakdownPusher + breakdownMonitor;
       const breakdownOther = Math.max(0, requestsToday - knownBreakdown);
 
+      const resetInfo = utcResetCountdown(now);
+
       const summary = {
         ok: true,
         generatedAt: now,
@@ -1884,11 +1971,19 @@ export class RoomDO {
           remainingMessages: Math.max(0, planMessages - messagesMonth),
           usagePercentMonth,
         },
+        dailyReset: {
+          resetAt: resetInfo.resetAt,
+          hoursRemaining: resetInfo.hoursRemaining,
+          minutesRemaining: resetInfo.minutesRemaining,
+          hoursLabel: `${resetInfo.hoursRemaining}س`,
+        },
         live: {
           connectionsNow,
           roomsActiveNow,
           roomsSeenToday,
           roomsTracked: rooms.length,
+          roomsTrackedCurrent,
+          roomsEndedVisible,
         },
         cloudflare: {
           requestsToday,
@@ -2022,6 +2117,7 @@ export class RoomDO {
   async alarm() {
     const now = Date.now();
     const last = Number((await this.state.storage.get("lastActiveAt")) || 0);
+    const storedRoomName = String((await this.state.storage.get("roomName")) || this.roomName || "");
 
     if (last && now - last < this.IDLE_MS) {
       try {
@@ -2033,6 +2129,22 @@ export class RoomDO {
     }
 
     try {
+      if (storedRoomName && storedRoomName !== MONITOR_ROOM) {
+        await monitorStub(this.env).fetch("https://do/monitor-event", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-room-name": MONITOR_ROOM,
+          },
+          body: JSON.stringify({
+            type: "room_expired",
+            ts: now,
+            room: storedRoomName,
+            reason: "idle_timeout",
+          }),
+        }).catch(() => null);
+      }
+
       if (typeof this.state.storage.deleteAll === "function") {
         await this.state.storage.deleteAll();
       } else {
