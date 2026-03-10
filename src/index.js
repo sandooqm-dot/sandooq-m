@@ -375,147 +375,386 @@ function monitorPageHtml() {
   <title>مراقبة سباق الحروف</title>
   <style>
     :root{
-      --bg:#0f172a;
-      --card:#111827;
-      --card2:#0b1220;
-      --line:#233046;
-      --text:#f8fafc;
-      --muted:#9ca3af;
-      --blue:#60a5fa;
-      --green:#22c55e;
-      --yellow:#f59e0b;
-      --red:#ef4444;
-      --cyan:#22d3ee;
+      --bg:#0a1020;
+      --bg2:#101a31;
+      --panel:#111b2f;
+      --panel2:#0d1628;
+      --panel3:#15213a;
+      --line:rgba(148,163,184,.18);
+      --text:#f8fbff;
+      --text2:#d7e1f0;
+      --muted:#8ea0bd;
+      --blue:#4f8cff;
+      --cyan:#28c7fa;
+      --green:#19c37d;
+      --yellow:#f7b538;
+      --red:#ff5d73;
+      --shadow:0 18px 40px rgba(2,8,23,.28);
+      --radius:22px;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,#081121 0%,#0f172a 100%);color:var(--text);font-family:Arial,sans-serif}
-    .wrap{width:min(1180px,100%);margin:0 auto;padding:18px}
-    .top{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:16px}
-    .titleBox{display:flex;flex-direction:column;gap:8px}
-    .title{font-size:28px;font-weight:800}
-    .sub{color:var(--muted);font-size:14px}
-    .btns{display:flex;gap:10px;flex-wrap:wrap}
-    button{border:0;border-radius:14px;padding:12px 16px;background:#1d4ed8;color:#fff;font-weight:700;cursor:pointer}
-    button.secondary{background:#1f2937;border:1px solid var(--line)}
-    .statusBar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
-    .pill{background:rgba(17,24,39,.88);border:1px solid var(--line);border-radius:18px;padding:14px}
-    .pill .k{color:var(--muted);font-size:12px;margin-bottom:8px}
-    .pill .v{font-size:20px;font-weight:800}
-    .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
-    .card{grid-column:span 12;background:rgba(17,24,39,.94);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:0 14px 30px rgba(0,0,0,.22)}
-    .card.half{grid-column:span 6}
-    .card.third{grid-column:span 4}
-    .cardHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
-    .cardTitle{font-size:20px;font-weight:800;display:flex;align-items:center;gap:10px}
-    .help{position:relative}
-    .helpBtn{width:28px;height:28px;border-radius:999px;background:#172033;border:1px solid var(--line);color:#fff;padding:0;font-size:14px}
-    .helpBox{display:none;position:absolute;top:38px;left:0;z-index:10;width:min(320px,82vw);background:#09111f;border:1px solid var(--line);border-radius:16px;padding:12px;color:#e5e7eb;line-height:1.75;font-size:13px;box-shadow:0 16px 36px rgba(0,0,0,.35)}
-    .help.open .helpBox{display:block}
-    .muted{color:var(--muted)}
-    .bigNum{font-size:34px;font-weight:900;line-height:1.1}
-    .metaRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-    .tag{padding:7px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--line);background:#0b1220}
-    .ok{color:#052e16;background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.45)}
-    .warn{color:#78350f;background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.45)}
-    .bad{color:#7f1d1d;background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.45)}
-    .info{color:#083344;background:rgba(34,211,238,.18);border-color:rgba(34,211,238,.45)}
-    .progress{height:14px;background:#09101d;border-radius:999px;overflow:hidden;border:1px solid var(--line);margin:14px 0 10px}
-    .bar{height:100%;width:0%;background:linear-gradient(90deg,#22c55e 0%,#f59e0b 65%,#ef4444 100%);transition:width .25s ease}
-    .cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .mini{background:#0b1220;border:1px solid var(--line);border-radius:18px;padding:14px}
-    .mini .n{font-size:24px;font-weight:800;margin-top:6px}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:11px 10px;border-bottom:1px solid #1e293b;text-align:right;font-size:14px;vertical-align:top}
-    th{color:#cbd5e1;font-size:13px;background:#0b1220;position:sticky;top:0}
-    .tableWrap{overflow:auto;border:1px solid var(--line);border-radius:18px}
-    .alerts{display:grid;gap:10px}
-    .alert{border-radius:16px;padding:12px 14px;border:1px solid var(--line);background:#0b1220}
-    .alert strong{display:block;margin-bottom:6px}
-    .empty{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:16px;background:#0b1220}
-    .footerNote{font-size:12px;color:var(--muted);line-height:1.9;margin-top:8px}
-    @media (max-width:960px){
-      .statusBar{grid-template-columns:repeat(2,minmax(0,1fr))}
-      .card.half,.card.third{grid-column:span 12}
-      .cols2{grid-template-columns:1fr}
+    html,body{margin:0}
+    body{
+      color:var(--text);
+      font-family:Arial,sans-serif;
+      background:
+        radial-gradient(1200px 520px at 100% -10%, rgba(79,140,255,.16), transparent 55%),
+        radial-gradient(800px 420px at 0% 0%, rgba(40,199,250,.10), transparent 50%),
+        linear-gradient(180deg, #060b16 0%, #0a1020 36%, #0f1830 100%);
+      min-height:100vh;
     }
-    @media (max-width:640px){
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size:32px 32px;
+      pointer-events:none;
+      opacity:.22;
+    }
+    .wrap{position:relative; width:min(1440px,100%); margin:0 auto; padding:18px}
+    .hero{
+      display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+      padding:18px 18px 16px;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(17,27,47,.92), rgba(12,20,38,.92));
+      border-radius:28px;
+      box-shadow:var(--shadow);
+      margin-bottom:14px;
+      backdrop-filter: blur(8px);
+    }
+    .heroTitle{font-size:30px; font-weight:900; line-height:1.15; letter-spacing:-.2px}
+    .heroSub{margin-top:8px; color:var(--muted); font-size:14px; line-height:1.9}
+    .heroMeta{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+    .ghostTag{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 12px; border-radius:999px;
+      background:rgba(255,255,255,.05); border:1px solid var(--line);
+      color:var(--text2); font-size:12px; font-weight:700;
+    }
+    .controls{display:flex; gap:10px; flex-wrap:wrap}
+    button{
+      border:0; border-radius:16px; padding:13px 18px;
+      font-weight:800; font-size:15px; cursor:pointer; color:#fff;
+      background:linear-gradient(135deg, var(--blue), #355dff);
+      box-shadow:0 12px 26px rgba(53,93,255,.24);
+    }
+    button.secondary{
+      background:rgba(255,255,255,.05);
+      border:1px solid var(--line);
+      box-shadow:none;
+      color:var(--text);
+    }
+
+    .quickRow{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0,1fr));
+      gap:10px;
+      margin-bottom:14px;
+    }
+    .quickCard{
+      min-height:88px;
+      padding:12px 12px 10px;
+      border-radius:22px;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(16,26,49,.95), rgba(10,16,32,.95));
+      box-shadow:var(--shadow);
+      display:flex; flex-direction:column; justify-content:space-between;
+    }
+    .quickLabel{font-size:11px; color:var(--muted); font-weight:700; line-height:1.4}
+    .quickValue{font-size:22px; font-weight:900; line-height:1.15}
+    .quickValue.good{color:var(--green)}
+    .quickValue.warnTxt{color:var(--yellow)}
+    .quickValue.badTxt{color:var(--red)}
+
+    .mainGrid{
+      display:grid;
+      grid-template-columns:repeat(12, minmax(0,1fr));
+      gap:14px;
+    }
+    .card{
+      grid-column:span 12;
+      border:1px solid var(--line);
+      border-radius:28px;
+      background:linear-gradient(180deg, rgba(17,27,47,.94), rgba(10,16,32,.96));
+      box-shadow:var(--shadow);
+      padding:16px;
+      overflow:hidden;
+    }
+    .card.third{grid-column:span 4}
+    .card.half{grid-column:span 6}
+    .cardHead{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      margin-bottom:14px;
+    }
+    .headSide{display:flex; align-items:center; gap:12px; min-width:0}
+    .accent{
+      width:12px; height:48px; border-radius:999px;
+      background:linear-gradient(180deg, var(--cyan), var(--blue));
+      box-shadow:0 8px 24px rgba(40,199,250,.26);
+      flex:none;
+    }
+    .cardTitle{font-size:17px; font-weight:900; display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+    .cardDesc{color:var(--muted); font-size:12px; line-height:1.8; margin-top:4px}
+    .help{position:relative}
+    .helpBtn{
+      width:30px; height:30px; border-radius:999px; padding:0;
+      background:rgba(255,255,255,.06); border:1px solid var(--line);
+      box-shadow:none; color:#fff; font-size:14px;
+    }
+    .helpBox{
+      display:none; position:absolute; top:40px; left:0; z-index:10;
+      width:min(330px, 82vw);
+      padding:12px 13px;
+      border-radius:18px;
+      border:1px solid var(--line);
+      background:#0a1120;
+      color:#ecf4ff; font-size:13px; line-height:1.9;
+      box-shadow:0 18px 38px rgba(0,0,0,.38);
+      white-space:pre-line;
+    }
+    .help.open .helpBox{display:block}
+
+    .tag{
+      display:inline-flex; align-items:center; justify-content:center;
+      min-height:34px;
+      padding:8px 12px; border-radius:999px;
+      font-size:12px; font-weight:800;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.05); color:var(--text2);
+      white-space:nowrap;
+    }
+    .ok{background:rgba(25,195,125,.16); border-color:rgba(25,195,125,.45); color:#cbffe8}
+    .warn{background:rgba(247,181,56,.16); border-color:rgba(247,181,56,.45); color:#fff0c9}
+    .bad{background:rgba(255,93,115,.16); border-color:rgba(255,93,115,.45); color:#ffd7dd}
+    .info{background:rgba(40,199,250,.12); border-color:rgba(40,199,250,.38); color:#d6f6ff}
+
+    .heroNumber{
+      font-size:40px; font-weight:900; line-height:1.05; letter-spacing:-.6px;
+      margin:8px 0 6px;
+    }
+    .heroNumber.ltr{direction:ltr; unicode-bidi:embed; text-align:right}
+    .subLine{color:var(--muted); font-size:14px}
+    .progressShell{
+      margin:16px 0 12px;
+      height:12px; border-radius:999px; overflow:hidden;
+      background:#0b1324; border:1px solid var(--line);
+    }
+    .bar{
+      width:0%; height:100%;
+      background:linear-gradient(90deg, var(--green) 0%, var(--cyan) 38%, var(--yellow) 72%, var(--red) 100%);
+      transition:width .25s ease;
+      border-radius:999px;
+    }
+
+    .metricGrid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px}
+    .metric{
+      padding:13px 14px;
+      border-radius:20px;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
+      border:1px solid var(--line);
+      min-height:88px;
+    }
+    .metricLabel{color:var(--muted); font-size:12px; line-height:1.6}
+    .metricValue{margin-top:6px; font-size:28px; font-weight:900}
+    .metricValue.small{font-size:24px}
+    .metaRow{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+
+    .sectionTitle{
+      font-size:15px; font-weight:900; margin-bottom:10px;
+      color:var(--text2);
+    }
+
+    .tableWrap{
+      overflow:auto;
+      border-radius:22px;
+      border:1px solid var(--line);
+      background:rgba(8,14,28,.5);
+    }
+    table{width:100%; border-collapse:collapse; min-width:760px}
+    th,td{
+      padding:12px 10px; text-align:right; border-bottom:1px solid rgba(148,163,184,.12);
+      font-size:13px; vertical-align:top;
+    }
+    th{
+      position:sticky; top:0; z-index:1;
+      background:#0d1628; color:#cfe0fb; font-size:12px;
+    }
+
+    .alerts{display:grid; gap:10px}
+    .alert{
+      padding:14px 14px;
+      border-radius:18px;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      line-height:1.85;
+    }
+    .alert strong{display:block; margin-bottom:4px}
+    .empty{
+      text-align:center; padding:18px;
+      color:var(--muted);
+      border-radius:18px;
+      border:1px dashed rgba(148,163,184,.18);
+      background:rgba(255,255,255,.02);
+    }
+    .footerNote{margin-top:12px; color:var(--muted); font-size:12px; line-height:1.95}
+
+    @media (max-width:1150px){
+      .card.third{grid-column:span 6}
+    }
+    @media (max-width:860px){
       .wrap{padding:12px}
-      .title{font-size:24px}
-      .bigNum{font-size:28px}
-      .statusBar{grid-template-columns:1fr}
-      th,td{font-size:12px;padding:9px 8px}
+      .hero{padding:14px}
+      .heroTitle{font-size:26px}
+      .card.third,.card.half{grid-column:span 12}
+    }
+    @media (max-width:680px){
+      .hero{border-radius:24px}
+      .quickRow{gap:8px}
+      .quickCard{padding:10px 9px; min-height:80px; border-radius:18px}
+      .quickLabel{font-size:10px}
+      .quickValue{font-size:16px}
+      .controls{width:100%}
+      .controls button{flex:1}
+      .card{padding:14px; border-radius:24px}
+      .cardHead{align-items:flex-start}
+      .accent{width:10px; height:40px}
+      .cardTitle{font-size:16px}
+      .cardDesc{font-size:11px}
+      .heroNumber{font-size:34px}
+      .metricGrid{grid-template-columns:repeat(2, minmax(0,1fr))}
+      .metric{min-height:78px; padding:12px}
+      .metricValue{font-size:24px}
+      .metricValue.small{font-size:20px}
+      .footerNote{font-size:11px}
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
-      <div class="titleBox">
-        <div class="title">لوحة مراقبة سباق الحروف</div>
-        <div class="sub">قراءة فقط — لا ترسل أوامر للغرف ولا تؤثر على اللاعبين أثناء اللعب</div>
+    <section class="hero">
+      <div>
+        <div class="heroTitle">لوحة مراقبة سباق الحروف</div>
+        <div class="heroSub">لوحة عربية واحدة تجمع لك Pusher و Cloudflare وحالة الغرف الحالية — قراءة فقط ولا ترسل أي أوامر أثناء اللعب.</div>
+        <div class="heroMeta">
+          <div class="ghostTag">رابط واحد للمتابعة من الجوال</div>
+          <div class="ghostTag">تحديث تلقائي كل 5 ثوانٍ</div>
+          <div class="ghostTag">لا تؤثر على اللاعبين</div>
+        </div>
       </div>
-      <div class="btns">
+      <div class="controls">
         <button id="refreshBtn">تحديث الآن</button>
-        <button id="autoBtn" class="secondary">الإيقاف المؤقت للتحديث</button>
+        <button id="autoBtn" class="secondary">إيقاف التحديث</button>
       </div>
-    </div>
+    </section>
 
-    <div class="statusBar">
-      <div class="pill"><div class="k">آخر تحديث</div><div id="lastUpdated" class="v">—</div></div>
-      <div class="pill"><div class="k">حالة الـ Worker</div><div id="workerStatus" class="v">—</div></div>
-      <div class="pill"><div class="k">حالة Pusher</div><div id="pusherStatus" class="v">—</div></div>
-      <div class="pill"><div class="k">التقييم العام</div><div id="overallStatus" class="v">—</div></div>
-    </div>
+    <section class="quickRow">
+      <div class="quickCard">
+        <div class="quickLabel">آخر تحديث</div>
+        <div id="lastUpdated" class="quickValue">—</div>
+      </div>
+      <div class="quickCard">
+        <div class="quickLabel">حالة الـ Worker</div>
+        <div id="workerStatus" class="quickValue">—</div>
+      </div>
+      <div class="quickCard">
+        <div class="quickLabel">حالة Pusher</div>
+        <div id="pusherStatus" class="quickValue">—</div>
+      </div>
+      <div class="quickCard">
+        <div class="quickLabel">التقييم العام</div>
+        <div id="overallStatus" class="quickValue">—</div>
+      </div>
+    </section>
 
-    <div class="grid">
-      <section class="card half">
+    <div class="mainGrid">
+      <section class="card third">
         <div class="cardHead">
-          <div class="cardTitle">استهلاك رسائل Pusher <span class="help" data-help>
-            <button class="helpBtn" type="button">؟</button>
-            <div class="helpBox">تعرض هذه اللوحة عدد الرسائل التي أرسلها هذا الـ Worker إلى Pusher خلال الشهر الحالي، مقارنة بحد الخطة المحدد عندك.\n\nالحدود المقترحة:\n- طبيعي: أقل من 50%\n- متوسط: من 50% إلى 80%\n- قلق: أكثر من 80%</div>
-          </span></div>
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">استهلاك رسائل Pusher
+                <span class="help" data-help>
+                  <button class="helpBtn" type="button">؟</button>
+                  <div class="helpBox">تعرض هذه اللوحة عدد الرسائل التي أرسلها هذا الـ Worker إلى Pusher خلال الشهر الحالي، مقارنة بحد الخطة المحدد عندك.
+
+الحدود المقترحة:
+- طبيعي: أقل من 50%
+- متوسط: من 50% إلى 80%
+- قلق: أكثر من 80%</div>
+                </span>
+              </div>
+              <div class="cardDesc">مفيدة لمعرفة الاستهلاك الحالي من اشتراكك الشهري بشكل سريع.</div>
+            </div>
+          </div>
           <div id="pusherUsageBadge" class="tag info">بانتظار البيانات</div>
         </div>
-        <div class="bigNum" id="pusherMain">—</div>
-        <div class="muted" id="pusherSub">—</div>
-        <div class="progress"><div id="pusherBar" class="bar"></div></div>
+        <div id="pusherMain" class="heroNumber ltr">—</div>
+        <div id="pusherSub" class="subLine">—</div>
+        <div class="progressShell"><div id="pusherBar" class="bar"></div></div>
         <div class="metaRow">
-          <div class="tag info" id="pusherTodayTag">اليوم: —</div>
-          <div class="tag info" id="pusherRemainingTag">المتبقي: —</div>
+          <div id="pusherTodayTag" class="tag info">اليوم: —</div>
+          <div id="pusherRemainingTag" class="tag info">المتبقي: —</div>
         </div>
       </section>
 
-      <section class="card half">
+      <section class="card third">
         <div class="cardHead">
-          <div class="cardTitle">التزامن الحالي المباشر <span class="help" data-help>
-            <button class="helpBtn" type="button">؟</button>
-            <div class="helpBox">تعرض هذه اللوحة الصورة الحالية للعبة: عدد الاتصالات المباشرة الآن، وعدد الغرف النشطة الآن، وعدد الغرف التي ظهرت اليوم.\n\nالحدود المقترحة:\n- طبيعي: الحمل واضح أنه مريح\n- متوسط: زيادة ملحوظة لكن مستقرة\n- قلق: زيادة قوية أو غرف كثيرة مع أخطاء</div>
-          </span></div>
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">التزامن الحالي المباشر
+                <span class="help" data-help>
+                  <button class="helpBtn" type="button">؟</button>
+                  <div class="helpBox">تعرض هذه اللوحة الصورة الحالية للعبة: عدد الاتصالات المباشرة الآن، وعدد الغرف النشطة الآن، وعدد الغرف التي ظهرت اليوم.
+
+الحدود المقترحة:
+- طبيعي: حمل مريح
+- متوسط: زيادة ملحوظة لكن مستقرة
+- قلق: زيادة قوية أو غرف كثيرة مع أخطاء</div>
+                </span>
+              </div>
+              <div class="cardDesc">أهم أرقام اللعب الحي الآن في مكان واحد.</div>
+            </div>
+          </div>
           <div id="liveBadge" class="tag info">بانتظار البيانات</div>
         </div>
-        <div class="cols2">
-          <div class="mini"><div class="muted">الاتصالات الحالية الآن</div><div class="n" id="liveConnections">—</div></div>
-          <div class="mini"><div class="muted">الغرف النشطة الآن</div><div class="n" id="liveRooms">—</div></div>
-          <div class="mini"><div class="muted">الغرف التي ظهرت اليوم</div><div class="n" id="liveRoomsToday">—</div></div>
-          <div class="mini"><div class="muted">إجمالي الغرف المتتبعة</div><div class="n" id="liveRoomsTracked">—</div></div>
+        <div class="metricGrid">
+          <div class="metric"><div class="metricLabel">الاتصالات الحالية الآن</div><div id="liveConnections" class="metricValue">—</div></div>
+          <div class="metric"><div class="metricLabel">الغرف النشطة الآن</div><div id="liveRooms" class="metricValue">—</div></div>
+          <div class="metric"><div class="metricLabel">الغرف التي ظهرت اليوم</div><div id="liveRoomsToday" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">إجمالي الغرف المتتبعة</div><div id="liveRoomsTracked" class="metricValue small">—</div></div>
         </div>
       </section>
 
-      <section class="card half">
+      <section class="card third">
         <div class="cardHead">
-          <div class="cardTitle">مؤشرات Cloudflare Worker <span class="help" data-help>
-            <button class="helpBtn" type="button">؟</button>
-            <div class="helpBox">هذه اللوحة تعرض أهم المؤشرات التشغيلية من نفس الـ Worker: عدد الطلبات، نسبة الأخطاء، متوسط زمن الاستجابة، وتوزيع الحالات.\n\nالحدود المقترحة:\n- نسبة الأخطاء: طبيعي أقل من 0.5% — متوسط حتى 2% — قلق فوق 2%\n- متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 800ms — قلق فوق 800ms</div>
-          </span></div>
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">مؤشرات Cloudflare Worker
+                <span class="help" data-help>
+                  <button class="helpBtn" type="button">؟</button>
+                  <div class="helpBox">هذه اللوحة تعرض أهم المؤشرات التشغيلية من نفس الـ Worker: عدد الطلبات، نسبة الأخطاء، متوسط زمن الاستجابة، وتوزيع الحالات.
+
+الحدود المقترحة:
+- نسبة الأخطاء: طبيعي أقل من 0.5% — متوسط حتى 2% — قلق فوق 2%
+- متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 800ms — قلق فوق 800ms</div>
+                </span>
+              </div>
+              <div class="cardDesc">مهم لمعرفة هل الـ Worker مرتاح أو فيه بطء وأخطاء.</div>
+            </div>
+          </div>
           <div id="cfBadge" class="tag info">بانتظار البيانات</div>
         </div>
-        <div class="cols2">
-          <div class="mini"><div class="muted">طلبات اليوم</div><div class="n" id="cfRequests">—</div></div>
-          <div class="mini"><div class="muted">أخطاء اليوم</div><div class="n" id="cfErrors">—</div></div>
-          <div class="mini"><div class="muted">نسبة الأخطاء</div><div class="n" id="cfErrorRate">—</div></div>
-          <div class="mini"><div class="muted">متوسط الاستجابة</div><div class="n" id="cfLatency">—</div></div>
+        <div class="metricGrid">
+          <div class="metric"><div class="metricLabel">طلبات اليوم</div><div id="cfRequests" class="metricValue">—</div></div>
+          <div class="metric"><div class="metricLabel">أخطاء اليوم</div><div id="cfErrors" class="metricValue">—</div></div>
+          <div class="metric"><div class="metricLabel">نسبة الأخطاء</div><div id="cfErrorRate" class="metricValue small">—</div></div>
+          <div class="metric"><div class="metricLabel">متوسط الاستجابة</div><div id="cfLatency" class="metricValue small">—</div></div>
         </div>
-        <div class="metaRow" style="margin-top:14px">
+        <div class="metaRow">
           <div id="cf2xx" class="tag info">2xx: —</div>
           <div id="cf4xx" class="tag warn">4xx: —</div>
           <div id="cf5xx" class="tag bad">5xx: —</div>
@@ -524,10 +763,18 @@ function monitorPageHtml() {
 
       <section class="card half">
         <div class="cardHead">
-          <div class="cardTitle">الحالة العامة والتنبيهات <span class="help" data-help>
-            <button class="helpBtn" type="button">؟</button>
-            <div class="helpBox">هذه اللوحة تجمع أهم التنبيهات التي تحتاج تراقبها بسرعة: اقتراب حد رسائل Pusher، ارتفاع الأخطاء، بطء الاستجابة، أو غرفة عليها نشاط غير طبيعي.</div>
-          </span></div>
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">الحالة العامة والتنبيهات
+                <span class="help" data-help>
+                  <button class="helpBtn" type="button">؟</button>
+                  <div class="helpBox">هذه اللوحة تجمع أهم التنبيهات التي تحتاج تراقبها بسرعة: اقتراب حد رسائل Pusher، ارتفاع الأخطاء، بطء الاستجابة، أو غرفة عليها نشاط غير طبيعي.</div>
+                </span>
+              </div>
+              <div class="cardDesc">مختصر سريع للأشياء التي تحتاج انتباهك الآن.</div>
+            </div>
+          </div>
           <div id="alertsBadge" class="tag info">بانتظار البيانات</div>
         </div>
         <div id="alertsBox" class="alerts">
@@ -535,12 +782,15 @@ function monitorPageHtml() {
         </div>
       </section>
 
-      <section class="card">
+      <section class="card half">
         <div class="cardHead">
-          <div class="cardTitle">الغرف والمتصلون الآن <span class="help" data-help>
-            <button class="helpBtn" type="button">؟</button>
-            <div class="helpBox">يعرض هذا الجدول الغرف المتتبعة: عدد المتصلين الآن، آخر نشاط، آخر إرسال إلى Pusher، وعدد الطلبات والرسائل لكل غرفة اليوم.</div>
-          </span></div>
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">الغرف النشطة الآن</div>
+              <div class="cardDesc">جدول حي يوضح الغرف الحالية، عدد المتصلين فيها، وآخر نشاط.</div>
+            </div>
+          </div>
           <div id="roomsBadge" class="tag info">بانتظار البيانات</div>
         </div>
         <div class="tableWrap">
@@ -549,17 +799,17 @@ function monitorPageHtml() {
               <tr>
                 <th>الغرفة</th>
                 <th>الحالة</th>
-                <th>المتصلون الآن</th>
-                <th>آخر نشاط</th>
-                <th>آخر إرسال Pusher</th>
+                <th>المتصلون</th>
+                <th>آخر ظهور</th>
+                <th>آخر Pusher</th>
                 <th>طلبات اليوم</th>
-                <th>رسائل الغرفة اليوم</th>
+                <th>رسائل اليوم</th>
                 <th>آخر مسار</th>
                 <th>Rev</th>
               </tr>
             </thead>
             <tbody id="roomsBody">
-              <tr><td colspan="9" class="empty">بانتظار البيانات…</td></tr>
+              <tr><td colspan="9" class="empty">لا توجد غرف متتبعة بعد</td></tr>
             </tbody>
           </table>
         </div>
@@ -567,7 +817,13 @@ function monitorPageHtml() {
 
       <section class="card">
         <div class="cardHead">
-          <div class="cardTitle">آخر الأخطاء المهمة</div>
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">آخر الأخطاء المهمة</div>
+              <div class="cardDesc">آخر الأخطاء أو الاستجابات غير الطبيعية داخل الـ Worker.</div>
+            </div>
+          </div>
           <div id="errorsBadge" class="tag info">بانتظار البيانات</div>
         </div>
         <div class="tableWrap">
@@ -587,8 +843,9 @@ function monitorPageHtml() {
           </table>
         </div>
         <div class="footerNote">
-          ملاحظة مهمة: رقم رسائل Pusher في هذه الصفحة هو عداد داخلي مبني على الرسائل التي يرسلها هذا الـ Worker إلى Pusher، وهو عملي جدًا للمراقبة اليومية، لكنه ليس بديلاً رسميًا عن صفحة الفوترة داخل Pusher.\n
-          أما قسم Cloudflare هنا فهو مؤشرات تشغيلية من نفس الـ Worker، هدفه يعطيك نظرة عربية سريعة من رابط واحد بدون تنقل بين اللوحات.
+          ملاحظة: رقم رسائل Pusher هنا هو عداد داخلي مبني على الرسائل التي يرسلها هذا الـ Worker إلى Pusher، وهو ممتاز للمراقبة اليومية، لكنه ليس بديلًا رسميًا عن صفحة الفوترة داخل Pusher.
+          <br>
+          أما مؤشرات Cloudflare هنا فهي مؤشرات تشغيلية من نفس الـ Worker، هدفها تعطيك نظرة عربية سريعة من رابط واحد بدون تنقل بين عدة لوحات.
         </div>
       </section>
     </div>
@@ -658,6 +915,13 @@ function monitorPageHtml() {
       return ['ممتاز','ok'];
     }
 
+    function colorQuickValue(el, kind){
+      el.classList.remove('good','warnTxt','badTxt');
+      if (kind === 'ok') el.classList.add('good');
+      else if (kind === 'warn') el.classList.add('warnTxt');
+      else if (kind === 'bad') el.classList.add('badTxt');
+    }
+
     function renderAlerts(alerts){
       const box = $('alertsBox');
       if (!alerts || !alerts.length) {
@@ -724,12 +988,17 @@ function monitorPageHtml() {
     function render(summary){
       $('lastUpdated').textContent = ago(summary.generatedAt);
 
-      $('workerStatus').textContent = summary.system?.worker ? 'شغال' : 'غير واضح';
-      $('pusherStatus').textContent = summary.system?.pusherConfigured ? 'مربوط' : 'غير مضبوط';
+      const workerOk = summary.system?.worker ? 'شغال' : 'غير واضح';
+      $('workerStatus').textContent = workerOk;
+      colorQuickValue($('workerStatus'), summary.system?.worker ? 'ok' : 'warn');
+
+      const pusherOk = summary.system?.pusherConfigured ? 'مربوط' : 'غير مضبوط';
+      $('pusherStatus').textContent = pusherOk;
+      colorQuickValue($('pusherStatus'), summary.system?.pusherConfigured ? 'ok' : 'warn');
 
       const [overallText, overallKind] = overallLevel(summary);
       $('overallStatus').textContent = overallText;
-      $('overallStatus').style.color = overallKind === 'ok' ? '#22c55e' : (overallKind === 'warn' ? '#f59e0b' : '#ef4444');
+      colorQuickValue($('overallStatus'), overallKind);
 
       const pusher = summary.pusher || {};
       $('pusherMain').textContent = fmt(pusher.messagesMonth) + ' / ' + fmt(pusher.planMessages);
@@ -801,7 +1070,7 @@ function monitorPageHtml() {
     $('refreshBtn').addEventListener('click', refresh);
     $('autoBtn').addEventListener('click', () => {
       paused = !paused;
-      $('autoBtn').textContent = paused ? 'استئناف التحديث' : 'الإيقاف المؤقت للتحديث';
+      $('autoBtn').textContent = paused ? 'استئناف التحديث' : 'إيقاف التحديث';
     });
 
     refresh();
