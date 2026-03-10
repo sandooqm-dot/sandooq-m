@@ -120,6 +120,33 @@ function roomMetricsPathKey(pathname) {
   }
 }
 
+function isKnownGamePath(pathname) {
+  switch (String(pathname || "")) {
+    case "/state":
+    case "/action":
+    case "/stats":
+    case "/health":
+    case "/pusher/auth":
+    case "/pusher/config":
+    case "/pusher/trigger":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function isIgnorableExternal404(pathname, status) {
+  return Number(status || 0) === 404 && !isKnownGamePath(pathname);
+}
+
+function isImportantRequestError(pathname, status) {
+  const s = Number(status || 0);
+  if (s >= 500) return true;
+  if (s < 400) return false;
+  if (isIgnorableExternal404(pathname, s)) return false;
+  return true;
+}
+
 /* eslint-disable */
 // ---------- MD5 (small, pure JS) ----------
 function md5cycle(x, k) {
@@ -757,8 +784,9 @@ function monitorPageHtml() {
 - تفصيل طلبات اللعب مقابل طلبات الحالة والمراقبة وPusher
 
 الحدود المقترحة:
-- نسبة الأخطاء: طبيعي أقل من 0.5% — متوسط حتى 2% — قلق فوق 2%
-- متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 800ms — قلق فوق 800ms</div>
+- نسبة أخطاء اللعبة المهمة: طبيعي أقل من 0.5% — متوسط حتى 2% — قلق فوق 2%
+- متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 800ms — قلق فوق 800ms
+- طلبات 404 الخارجية تُعرض منفصلة ولا تدخل ضمن أخطاء اللعبة المهمة</div>
                 </span>
               </div>
               <div class="cardDesc">يوضح الخطة الحالية، استهلاك الشهر، والفرق بين أنواع الطلبات داخل الـ Worker.</div>
@@ -775,13 +803,14 @@ function monitorPageHtml() {
         <div class="metaRow">
           <div id="cfMonthUsageTag" class="tag info">استهلاك الشهر: —</div>
           <div id="cfRequests" class="tag info">طلبات اليوم: —</div>
-          <div id="cfErrors" class="tag warn">أخطاء اليوم: —</div>
+          <div id="cfErrors" class="tag warn">أخطاء اللعبة اليوم: —</div>
           <div id="cfLatency" class="tag info">متوسط الاستجابة: —</div>
-          <div id="cfErrorRate" class="tag info">نسبة الأخطاء: —</div>
+          <div id="cfErrorRate" class="tag info">نسبة الأخطاء المهمة: —</div>
         </div>
         <div class="metaRow">
           <div id="cf2xx" class="tag info">2xx: —</div>
-          <div id="cf4xx" class="tag warn">4xx: —</div>
+          <div id="cf4xx" class="tag warn">4xx مهم: —</div>
+          <div id="cfExt404" class="tag info">404 خارجية: —</div>
           <div id="cf5xx" class="tag bad">5xx: —</div>
         </div>
         <div class="sectionTitle">تفصيل طلبات الـ Worker</div>
@@ -792,7 +821,7 @@ function monitorPageHtml() {
           <div class="metric"><div class="metricLabel">طلبات المراقبة</div><div id="cfReqMonitor" class="metricValue small">—</div></div>
         </div>
         <div class="metaRow">
-          <div id="cfReqOther" class="tag info">طلبات أخرى: —</div>
+          <div id="cfReqOther" class="tag info">طلبات خارجية/أخرى: —</div>
         </div>
       </section>
 
@@ -1059,18 +1088,19 @@ function monitorPageHtml() {
       $('cfFreeLimit').textContent = fmt(cf.freeDailyRequests) + ' / يوم';
       $('cfMonthUsageTag').textContent = 'استهلاك الشهر: ' + pct(cf.usagePercentMonth);
       $('cfRequests').textContent = 'طلبات اليوم: ' + fmt(cf.requestsToday);
-      $('cfErrors').textContent = 'أخطاء اليوم: ' + fmt(cf.errorsToday);
-      $('cfErrorRate').textContent = 'نسبة الأخطاء: ' + pct(cf.errorRatePercent);
+      $('cfErrors').textContent = 'أخطاء اللعبة اليوم: ' + fmt(cf.errorsToday);
+      $('cfErrorRate').textContent = 'نسبة الأخطاء المهمة: ' + pct(cf.errorRatePercent);
       $('cfLatency').textContent = 'متوسط الاستجابة: ' + ms(cf.avgLatencyMs);
       $('cf2xx').textContent = '2xx: ' + fmt(cf.status2xx);
-      $('cf4xx').textContent = '4xx: ' + fmt(cf.status4xx);
+      $('cf4xx').textContent = '4xx مهم: ' + fmt(cf.status4xx);
+      $('cfExt404').textContent = '404 خارجية: ' + fmt(cf.external404Today);
       $('cf5xx').textContent = '5xx: ' + fmt(cf.status5xx);
       const wb = summary.requestBreakdown || {};
       $('cfReqAction').textContent = fmt(wb.action);
       $('cfReqState').textContent = fmt(wb.state);
       $('cfReqPusher').textContent = fmt(wb.pusher);
       $('cfReqMonitor').textContent = fmt(wb.monitor);
-      $('cfReqOther').textContent = 'طلبات أخرى: ' + fmt(wb.other);
+      $('cfReqOther').textContent = 'طلبات خارجية/أخرى: ' + fmt(wb.other);
       const er = errorLevel(cf.errorRatePercent);
       const lt = latencyLevel(cf.avgLatencyMs);
       const cu = usageLevel(cf.usagePercentMonth);
@@ -1468,7 +1498,10 @@ export class RoomDO {
     if (prevDay !== day) {
       m.requestsToday = 0;
       m.errorsToday = 0;
+      m.rawErrorsToday = 0;
       m.notFoundToday = 0;
+      m.external404Today = 0;
+      m.important4xxToday = 0;
       m.status2xx = 0;
       m.status4xx = 0;
       m.status5xx = 0;
@@ -1493,7 +1526,10 @@ export class RoomDO {
     m.month = month;
     m.requestsToday = toFiniteNumber(m.requestsToday, 0);
     m.errorsToday = toFiniteNumber(m.errorsToday, 0);
+    m.rawErrorsToday = toFiniteNumber(m.rawErrorsToday, m.errorsToday);
     m.notFoundToday = toFiniteNumber(m.notFoundToday, 0);
+    m.external404Today = toFiniteNumber(m.external404Today, m.notFoundToday);
+    m.important4xxToday = toFiniteNumber(m.important4xxToday, Math.max(0, toFiniteNumber(m.status4xx, 0) - toFiniteNumber(m.external404Today, m.notFoundToday)));
     m.status2xx = toFiniteNumber(m.status2xx, 0);
     m.status4xx = toFiniteNumber(m.status4xx, 0);
     m.status5xx = toFiniteNumber(m.status5xx, 0);
@@ -1563,6 +1599,7 @@ export class RoomDO {
     const avgLatencyMs = Number(summary?.cloudflare?.avgLatencyMs || 0);
     const activeRooms = Number(summary?.live?.roomsActiveNow || 0);
     const cfUsage = Number(summary?.cloudflare?.usagePercentMonth || 0);
+    const external404Today = Number(summary?.cloudflare?.external404Today || 0);
 
     if (usage >= 80) {
       alerts.push({
@@ -1629,6 +1666,14 @@ export class RoomDO {
       });
     }
 
+    if (external404Today > 0 && !alerts.some(a => a.level === "bad" || a.level === "warn")) {
+      alerts.push({
+        level: "info",
+        title: "تم رصد طلبات خارجية غير مهمة",
+        text: `تم استبعاد ${external404Today} من طلبات 404 الخارجية من تنبيهات اللعبة حتى لا تظهر كمشكلة داخلية.`
+      });
+    }
+
     if (!alerts.length) {
       alerts.push({
         level: "info",
@@ -1662,8 +1707,14 @@ export class RoomDO {
       else if (status >= 400) m.status4xx += 1;
       else if (status >= 200) m.status2xx += 1;
 
-      if (status >= 400) m.errorsToday += 1;
+      const ignorable404 = isIgnorableExternal404(path, status);
+      const importantError = isImportantRequestError(path, status);
+
+      if (status >= 400) m.rawErrorsToday += 1;
+      if (importantError) m.errorsToday += 1;
       if (status === 404) m.notFoundToday += 1;
+      if (ignorable404) m.external404Today += 1;
+      if (status >= 400 && status < 500 && importantError) m.important4xxToday += 1;
 
       const route = (m.routes[pathKey] && typeof m.routes[pathKey] === "object") ? m.routes[pathKey] : {
         count: 0,
@@ -1702,7 +1753,7 @@ export class RoomDO {
         m.rooms[room] = info;
       }
 
-      if (status >= 400) {
+      if (importantError) {
         m.lastErrors = this._pushLastError(m.lastErrors, {
           ts,
           status,
@@ -1797,7 +1848,10 @@ export class RoomDO {
 
       const requestsToday = toFiniteNumber(m.requestsToday, 0);
       const requestsMonth = toFiniteNumber(m.requestsMonth, 0);
-      const errorsToday = toFiniteNumber(m.errorsToday, 0);
+      const rawErrorsToday = toFiniteNumber(m.rawErrorsToday, toFiniteNumber(m.errorsToday, 0));
+      const external404Today = toFiniteNumber(m.external404Today, toFiniteNumber(m.notFoundToday, 0));
+      const important4xxToday = toFiniteNumber(m.important4xxToday, Math.max(0, toFiniteNumber(m.status4xx, 0) - external404Today));
+      const errorsToday = Math.max(0, toFiniteNumber(m.errorsToday, rawErrorsToday - external404Today));
       const avgLatencyMs = requestsToday > 0 ? (toFiniteNumber(m.totalLatencyMsToday, 0) / requestsToday) : 0;
       const errorRatePercent = requestsToday > 0 ? (errorsToday / requestsToday) * 100 : 0;
       const messagesMonth = toFiniteNumber(m.pusherMsgsMonth, 0);
@@ -1840,10 +1894,13 @@ export class RoomDO {
           requestsToday,
           requestsMonth,
           errorsToday,
+          rawErrorsToday,
+          external404Today,
           errorRatePercent,
           avgLatencyMs,
           status2xx: toFiniteNumber(m.status2xx, 0),
-          status4xx: toFiniteNumber(m.status4xx, 0),
+          status4xx: important4xxToday,
+          rawStatus4xx: toFiniteNumber(m.status4xx, 0),
           status5xx: toFiniteNumber(m.status5xx, 0),
           planName: cfPlanName,
           planRequestsMonth: cfPlanRequestsMonth,
