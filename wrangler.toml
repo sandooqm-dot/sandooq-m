@@ -4,7 +4,20 @@ compatibility_date = "2026-02-19"
 
 [vars]
 ALLOWED_ORIGINS = "https://horof.sandooq-games.com,https://sync.horof.sandooq-games.com"
+
+# حد رسائل بوشر الشهري
 PUSHER_MESSAGES_LIMIT = "4000000"
+
+# نضيفه أيضًا للتوافق إذا احتجناه داخل اللوحة
+PUSHER_PLAN_MESSAGES = "4000000"
+
+# خطة Cloudflare الحالية
+CF_PLAN_NAME = "Workers Paid ($5)"
+CF_PLAN_REQUESTS_MONTH = "10000000"
+CF_FREE_DAILY_REQUESTS = "100000"
+
+# انتهاء الغرفة بعد ساعتين خمول
+ROOM_IDLE_MS = "7200000"
 
 [[durable_objects.bindings]]
 name = "ROOMS"
