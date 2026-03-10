@@ -3,7 +3,8 @@ main = "src/index.js"
 compatibility_date = "2026-02-19"
 
 [vars]
-ALLOWED_ORIGINS = "https://horof.sandooq-games.com"
+ALLOWED_ORIGINS = "https://horof.sandooq-games.com,https://sync.horof.sandooq-games.com"
+PUSHER_MESSAGES_LIMIT = "4000000"
 
 [[durable_objects.bindings]]
 name = "ROOMS"
