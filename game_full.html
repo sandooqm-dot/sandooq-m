@@ -238,6 +238,22 @@
     .btnBlue{background:#e9eefc;color:#1f4fa3;border:4px solid rgba(0,0,0,.80);box-shadow:0 8px 0 rgba(0,0,0,.18);}
     .tvPickList{display:flex;flex-direction:column;gap:10px;margin-top:12px}
     .tvPickBtn{width:100%;font-size:18px}
+    .tvPickBtn.selectedTv{background:#16a34a !important;color:#fff !important;}
+    .tvCurrentNote{margin-top:10px;color:#111;text-align:center;font-size:14px;font-weight:900}
+    .playerTvBadge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      margin-inline-start:8px;
+      padding:4px 10px;
+      border-radius:999px;
+      background:rgba(125,211,252,.25);
+      border:2px solid rgba(125,211,252,.70);
+      color:#fff;
+      font-size:14px;
+      font-weight:900;
+      vertical-align:middle;
+    }
 
     .teams{display:flex;gap:12px;flex-wrap:wrap}
     .teamCol{flex:1;min-width:240px;border-radius:16px;padding:12px;color:#fff;border:4px solid rgba(0,0,0,.70);box-shadow:0 12px 24px rgba(0,0,0,.18)}
@@ -2017,7 +2033,9 @@ if(homeBtn && role !== "host"){
         timer: { sel:10, dur:10, running:false, startTs:0, done:false },
         questionMode: "default",
         customQuestions: {},
-        customQuestionsUpdatedAt: 0
+        customQuestionsUpdatedAt: 0,
+        questionCursorDefault: {},
+        questionCursorCustom: {}
       },
       me: null
     };
@@ -2788,6 +2806,39 @@ if(homeBtn && role !== "host"){
       return (m === "custom") ? "custom" : "default";
     }
 
+    function getQuestionCursorField(mode){
+      return (mode === "custom") ? "questionCursorCustom" : "questionCursorDefault";
+    }
+
+    function getQuestionListByMode(room, letter, mode){
+      if(!letter) return [];
+      const useMode = (mode === "custom" || mode === "default") ? mode : getQuestionMode(room);
+      return (useMode === "custom") ? getCustomList(room, letter) : (QUESTIONS[letter] || []);
+    }
+
+    function getNextQuestionSelection(room, letter, mode){
+      const useMode = (mode === "custom" || mode === "default") ? mode : getQuestionMode(room);
+      const list = getQuestionListByMode(room, letter, useMode);
+      const cursorField = getQuestionCursorField(useMode);
+      const cursorMap = (room && room[cursorField] && typeof room[cursorField] === "object") ? room[cursorField] : {};
+
+      if(!list.length){
+        return { mode: useMode, list, cursorField, qIndex: 0, nextCursor: 0 };
+      }
+
+      let qIndex = Number(cursorMap?.[letter] || 0);
+      if(!Number.isFinite(qIndex) || qIndex < 0) qIndex = 0;
+      qIndex = qIndex % list.length;
+
+      return {
+        mode: useMode,
+        list,
+        cursorField,
+        qIndex,
+        nextCursor: (qIndex + 1) % list.length
+      };
+    }
+
     const SETTINGS_UI = { ready:false, els:{}, roomLatest:null };
 
     function ensureSettingsModal(){
@@ -2918,13 +2969,23 @@ if(homeBtn && role !== "host"){
       main.classList.remove("inGame");
       const players = room.players || {};
       const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
+      const selectedDisplayPid = (room.displayPid != null) ? String(room.displayPid) : "";
+      const displayPlayer = selectedDisplayPid && players[selectedDisplayPid]
+        ? ({ id: selectedDisplayPid, ...players[selectedDisplayPid] })
+        : null;
 
-      const tvListHtml = list.length
-        ? list.map(p => `<button class="btn btnYellow tvPickBtn" data-tv-pid="${escapeHtml(p.id)}">${escapeHtml(p.name || "لاعب")}</button>`).join("")
-        : `<div class="smallNote" style="color:#111;text-align:center;margin-top:8px">لا يوجد لاعبين بعد</div>`;
+      const tvListHtml = displayPlayer
+        ? `
+          <button class="btn tvPickBtn selectedTv" data-tv-pid="${escapeHtml(displayPlayer.id)}">${escapeHtml(displayPlayer.name || "لاعب")}</button>
+          <div class="tvCurrentNote">تم اختيار هذا اللاعب كجهاز عرض الشاشة. اضغط عليه لإرجاعه مع اللاعبين.</div>
+        `
+        : (list.length
+            ? list.map(p => `<button class="btn btnYellow tvPickBtn" data-tv-pid="${escapeHtml(p.id)}">${escapeHtml(p.name || "لاعب")}</button>`).join("")
+            : `<div class="smallNote" style="color:#111;text-align:center;margin-top:8px">لا يوجد لاعبين بعد</div>`);
 
-      const green = list.filter(p => p.team === "green");
-      const orange = list.filter(p => p.team === "orange");
+      const green = list.filter(p => p.team === "green" && String(p.id) !== selectedDisplayPid);
+      const orange = list.filter(p => p.team === "orange" && String(p.id) !== selectedDisplayPid);
+      const tvBtnLabel = displayPlayer ? `جهاز العرض: ${escapeHtml(displayPlayer.name || "لاعب")}` : "عرض الشاشة";
 
       main.innerHTML = `
         <div class="lobbyCard">
@@ -2950,7 +3011,7 @@ if(homeBtn && role !== "host"){
           <div class="row">
             <button id="shareBtn" class="btn btnYellow">مشاركة اللعبة للاعبين</button>
             <button id="startBtn" class="btn btnGreen">ابدأ اللعبة</button>
-            <button id="tvBtn" class="btn btnBlue">عرض الشاشة</button>
+            <button id="tvBtn" class="btn btnBlue">${tvBtnLabel}</button>
           </div>
 
           <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
@@ -2993,7 +3054,7 @@ if(homeBtn && role !== "host"){
             <div class="shareModal">
               <button id="tvClose" class="shareClose" aria-label="إغلاق">×</button>
               <div class="shareTitle">جهاز عرض الشاشة</div>
-              <div class="shareSmall" style="color:#111;text-align:center">اختر اللاعب الذي سيعمل كجهاز عرض.</div>
+              <div class="shareSmall" style="color:#111;text-align:center">اختر لاعبًا واحدًا فقط ليعمل كجهاز عرض. إذا كان هناك لاعب مختار فسيظهر وحده هنا، واضغط عليه لإرجاعه مع اللاعبين.</div>
               <div class="tvPickList">${tvListHtml}</div>
             </div>
           </div>
@@ -3125,7 +3186,8 @@ if(homeBtn && role !== "host"){
           const sel = btn.getAttribute("data-tv-pid");
           if(!sel) return;
           try{
-            await update(ref(db, `rooms/${code}`), { displayPid: sel });
+            const nextDisplayPid = (selectedDisplayPid && String(selectedDisplayPid) === String(sel)) ? null : sel;
+            await update(ref(db, `rooms/${code}`), { displayPid: nextDisplayPid });
           }catch(e){}
           closeTv();
         });
@@ -3555,12 +3617,13 @@ if(homeBtn && role !== "host"){
           const cur = LIVE.room.current || {};
           if(!cur.letter) return;
 
-          const mode = getQuestionMode(LIVE.room);
-          const list = (mode === "custom") ? getCustomList(LIVE.room, cur.letter) : (QUESTIONS[cur.letter] || []);
-          if(!list.length) return;
+          const pick = getNextQuestionSelection(LIVE.room, cur.letter);
+          if(!pick.list.length) return;
 
-          const nextIndex = (Number(cur.qIndex || 0) + 1) % list.length;
-          await update(roomRef, { current: { ...cur, qIndex: nextIndex } });
+          const updates = {};
+          updates[`rooms/${code}/current`] = { ...cur, qIndex: pick.qIndex };
+          updates[`rooms/${code}/${pick.cursorField}/${cur.letter}`] = pick.nextCursor;
+          await update(ref(db), updates);
         });
       }
 
@@ -3615,10 +3678,15 @@ if(homeBtn && role !== "host"){
               winEvent = { team, ts: Date.now(), map: activeMapNow };
             }
 
+            const pick = getNextQuestionSelection(LIVE.room, letter);
+
             const updates = {};
             updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = next;
             updates[`rooms/${code}/buzzer`] = null;
-            updates[`rooms/${code}/current`] = { letter, qIndex: 0, row: r, col: c, map: activeMapNow };
+            updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
+            if(pick.list.length){
+              updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
+            }
             updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
             if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
 
@@ -4160,7 +4228,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         timer: (room.timer && typeof room.timer === "object") ? room.timer : { sel:10, dur:10, running:false, startTs:0, done:false },
         questionMode: String(room.questionMode || "default"),
         customQuestions: (room.customQuestions && typeof room.customQuestions === "object") ? room.customQuestions : {},
-        customQuestionsUpdatedAt: Number(room.customQuestionsUpdatedAt || 0)
+        customQuestionsUpdatedAt: Number(room.customQuestionsUpdatedAt || 0),
+        questionCursorDefault: (room.questionCursorDefault && typeof room.questionCursorDefault === "object") ? room.questionCursorDefault : {},
+        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {}
       };
     }
 
@@ -4255,7 +4325,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           afterRender(room);
           return;
         }else{
-          const sig = Object.entries(players)
+          const sig = `${String(room.displayPid || "")}|` + Object.entries(players)
             .map(([id,p]) => `${id}:${p?.team||""}:${p?.name||""}:${Number(p?.joinedAt||0)}`)
             .sort()
             .join("|");
