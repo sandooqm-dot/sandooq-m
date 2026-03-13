@@ -456,6 +456,8 @@
     }
     .teamPill.green{ background:rgba(26,163,74,.95); }
     .teamPill.orange{ background:rgba(242,140,0,.95); }
+    .teamPill.clickable{ cursor:pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    .teamPill.clickable:active{ transform: translateY(1px); }
 
     .scoreBox{
       width:64px;
@@ -2453,6 +2455,56 @@ if(homeBtn && role !== "host"){
       return { greenWin, orangeWin };
     }
 
+    async function assignCurrentCellToTeam(team){
+      if(role !== "host") return;
+      if(LIVE.room.status !== "started") return;
+      if(team !== "green" && team !== "orange") return;
+
+      const cur = LIVE.room.current || {};
+      const activeMapNow = Number(LIVE.room.activeMap || 0);
+      const r = Number(cur.row);
+      const c = Number(cur.col);
+
+      if(!Number.isFinite(r) || !Number.isFinite(c)) return;
+      if(r < 0 || r > 4 || c < 0 || c > 4) return;
+
+      const k = cellKey(r,c);
+      const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
+      const next = team === "green" ? 2 : 3;
+
+      const nextStates = { ...(mapStatesNow || {}) };
+      nextStates[k] = next;
+
+      const winners = computeWinners(nextStates);
+      const prevWin = (LIVE.room.winState && LIVE.room.winState[String(activeMapNow)]) ? LIVE.room.winState[String(activeMapNow)] : { greenWin:false, orangeWin:false };
+
+      let winEvent = null;
+      const greenNew = !!winners.greenWin && !prevWin.greenWin;
+      const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
+
+      if(greenNew || orangeNew){
+        let winTeam = team;
+        if(greenNew && !orangeNew) winTeam = "green";
+        else if(orangeNew && !greenNew) winTeam = "orange";
+        winEvent = { team: winTeam, ts: Date.now(), map: activeMapNow };
+      }
+
+      const updates = {};
+      updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = next;
+      updates[`rooms/${code}/buzzer`] = null;
+      updates[`rooms/${code}/current`] = {
+        ...cur,
+        letter: MAPS[activeMapNow][r][c],
+        row: r,
+        col: c,
+        map: activeMapNow
+      };
+      updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
+      if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
+
+      await update(ref(db), updates);
+    }
+
     let LAST_WIN_TS = 0;
 
     // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
@@ -3340,10 +3392,10 @@ if(homeBtn && role !== "host"){
             </div>
 
             <div class="scoreBoard">
-              <div class="teamPill green">الفريق الأخضر</div>
+              <div id="teamGreenBtn" class="teamPill green ${isHost ? "clickable" : ""}">الفريق الأخضر</div>
               <div id="scoreGreen" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(sg) ? sg : 0}</div>
               <div id="scoreOrange" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(so) ? so : 0}</div>
-              <div class="teamPill orange">الفريق البرتقالي</div>
+              <div id="teamOrangeBtn" class="teamPill orange ${isHost ? "clickable" : ""}">الفريق البرتقالي</div>
             </div>
           </div>
 
@@ -3390,6 +3442,8 @@ if(homeBtn && role !== "host"){
       GAME_UI.els.zoom = document.getElementById("zoom");
       GAME_UI.els.scoreGreen = document.getElementById("scoreGreen");
       GAME_UI.els.scoreOrange = document.getElementById("scoreOrange");
+      GAME_UI.els.teamGreenBtn = document.getElementById("teamGreenBtn");
+      GAME_UI.els.teamOrangeBtn = document.getElementById("teamOrangeBtn");
       GAME_UI.els.firstPressBar = document.getElementById("firstPressBar");
       GAME_UI.els.freezeBtn = document.getElementById("freezeBtn");
       GAME_UI.els.nextQ = document.getElementById("nextQ");
@@ -3535,8 +3589,26 @@ if(homeBtn && role !== "host"){
       if(isHost){
         const sG = GAME_UI.els.scoreGreen;
         const sO = GAME_UI.els.scoreOrange;
+        const tG = GAME_UI.els.teamGreenBtn;
+        const tO = GAME_UI.els.teamOrangeBtn;
+
         if(sG) sG.addEventListener("click", () => openScoreStepper("green", sG, Number(sG.textContent||0)));
         if(sO) sO.addEventListener("click", () => openScoreStepper("orange", sO, Number(sO.textContent||0)));
+
+        if(tG && !tG.__teamHooked){
+          tG.__teamHooked = true;
+          tG.addEventListener("click", async () => {
+            closeTip();
+            await assignCurrentCellToTeam("green");
+          });
+        }
+        if(tO && !tO.__teamHooked){
+          tO.__teamHooked = true;
+          tO.addEventListener("click", async () => {
+            closeTip();
+            await assignCurrentCellToTeam("orange");
+          });
+        }
       }
 
       // ✅ Timer click (host)
@@ -3650,45 +3722,52 @@ if(homeBtn && role !== "host"){
             const r = Number(cell.getAttribute("data-row"));
             const c = Number(cell.getAttribute("data-col"));
             const k = cellKey(r,c);
+            const letter = MAPS[Number(LIVE.room.activeMap || 0)][r][c];
 
             const activeMapNow = Number(LIVE.room.activeMap || 0);
             const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
-
             const st = Number(mapStatesNow?.[k] ?? 0);
-            const next = (st + 1) % 4;
-
-            const letter = MAPS[activeMapNow][r][c];
-
-            const nextStates = { ...(mapStatesNow || {}) };
-            nextStates[k] = next;
-
-            const winners = computeWinners(nextStates);
-            const prevWin = (LIVE.room.winState && LIVE.room.winState[String(activeMapNow)]) ? LIVE.room.winState[String(activeMapNow)] : { greenWin:false, orangeWin:false };
-
-            let winEvent = null;
-            const greenNew = !!winners.greenWin && !prevWin.greenWin;
-            const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
-
-            if(greenNew || orangeNew){
-              let team = null;
-              if(next === 2 && greenNew) team = "green";
-              else if(next === 3 && orangeNew) team = "orange";
-              else team = greenNew ? "green" : "orange";
-
-              winEvent = { team, ts: Date.now(), map: activeMapNow };
-            }
-
-            const pick = getNextQuestionSelection(LIVE.room, letter);
+            const cur = LIVE.room.current || {};
+            const curMap = Number(cur.map ?? activeMapNow);
+            const isCurrentCell = (Number(cur.row) === r && Number(cur.col) === c && curMap === activeMapNow);
 
             const updates = {};
-            updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = next;
             updates[`rooms/${code}/buzzer`] = null;
-            updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
-            if(pick.list.length){
-              updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
+
+            if(st === 0){
+              const nextStates = { ...(mapStatesNow || {}) };
+
+              if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
+                const prevKey = cellKey(Number(cur.row), Number(cur.col));
+                if(prevKey !== k && Number(nextStates?.[prevKey] ?? 0) === 1){
+                  delete nextStates[prevKey];
+                  updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
+                }
+              }
+
+              nextStates[k] = 1;
+
+              const pick = getNextQuestionSelection(LIVE.room, letter);
+              updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
+              updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
+              if(pick.list.length){
+                updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
+              }
+
+              await update(ref(db), updates);
+              return;
             }
+
+            const nextStates = { ...(mapStatesNow || {}) };
+            delete nextStates[k];
+
+            const winners = computeWinners(nextStates);
+            updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = null;
             updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
-            if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
+
+            if(isCurrentCell){
+              updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:activeMapNow };
+            }
 
             await update(ref(db), updates);
           });
