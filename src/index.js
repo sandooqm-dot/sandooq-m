@@ -1481,6 +1481,18 @@ const DEFAULT_IDLE_MS = 2 * 60 * 60 * 1000; // ساعتين
 const SEEN_TTL_MS = 90 * 1000; // آخر 90 ثانية نحسبها "متصل"
 const SEEN_GC_MAX = 200; // حماية من التضخم
 
+function normalizeBuzzerPayload(raw, now, currentSeq = 0) {
+  raw = (raw && typeof raw === "object") ? raw : {};
+  return {
+    pid: normalizePid(raw.pid || ""),
+    name: String(raw.name || "").trim().slice(0, 80),
+    team: String(raw.team || "").trim().slice(0, 30),
+    ts: toFiniteNumber(raw.ts, now) || now,
+    serverTs: now,
+    seq: toFiniteNumber(currentSeq, 0) + 1,
+  };
+}
+
 export class RoomDO {
   constructor(state, env) {
     this.state = state;
@@ -2078,12 +2090,131 @@ export class RoomDO {
       try { body = await request.json(); } catch {}
 
       const current = (await this.state.storage.get("state")) || {};
-      const patch = (body && typeof body === "object" && !Array.isArray(body)) ? body : {};
-      const next = { ...current, ...patch };
-
       const now = Date.now();
       const currentRev = Number((await this.state.storage.get("rev")) || 0);
-      const nextRev = currentRev + 1;
+
+      let nextRev = currentRev;
+      let next = current;
+      let patch = (body && typeof body === "object" && !Array.isArray(body)) ? { ...body } : {};
+
+      let accepted = true;
+      const actionType = String(body?.type || "");
+
+      // ✅ مسار رسمي خاص بالجرس
+      if (actionType === "buzz") {
+        const existingBuzzer = current?.buzzer ?? null;
+
+        if (current?.status !== "started") {
+          return json({
+            ok: true,
+            accepted: false,
+            reason: "GAME_NOT_STARTED",
+            winner: existingBuzzer,
+            state: current,
+            rev: currentRev,
+            ts: now
+          });
+        }
+
+        if (current?.freeze) {
+          return json({
+            ok: true,
+            accepted: false,
+            reason: "BUZZER_FROZEN",
+            winner: existingBuzzer,
+            state: current,
+            rev: currentRev,
+            ts: now
+          });
+        }
+
+        if (existingBuzzer) {
+          return json({
+            ok: true,
+            accepted: false,
+            reason: "LOCKED",
+            winner: existingBuzzer,
+            state: current,
+            rev: currentRev,
+            ts: now
+          });
+        }
+
+        const nextBuzzer = normalizeBuzzerPayload({
+          pid: body.pid,
+          name: body.name,
+          team: body.team,
+          ts: body.ts
+        }, now, Number(current?.buzzerSeq || 0));
+
+        next = {
+          ...current,
+          buzzer: nextBuzzer,
+          buzzerSeq: nextBuzzer.seq
+        };
+
+        patch = {
+          buzzer: nextBuzzer,
+          buzzerSeq: nextBuzzer.seq
+        };
+
+        nextRev = currentRev + 1;
+
+        await this.state.storage.put("state", next);
+        await this.state.storage.put("rev", nextRev);
+        await this.state.storage.put("lastActiveAt", now);
+
+        try {
+          await this.state.storage.setAlarm(now + this.IDLE_MS);
+        } catch (e) {
+          console.log("setAlarm_failed", String(e?.message || e));
+        }
+
+        const m = await this._loadMetrics(now);
+        m.actionsToday = Number(m.actionsToday || 0) + 1;
+        m.seen = this._gcSeen(m.seen, now);
+        const clientsNow = this._clientsNow(m.seen, now);
+        m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
+        await this.state.storage.put("metrics", m);
+
+        return json({
+          ok: true,
+          accepted: true,
+          action: "buzz",
+          winner: nextBuzzer,
+          state: next,
+          rev: nextRev,
+          patch,
+          ts: now
+        });
+      }
+
+      // ✅ حماية إضافية لأي كود قديم يحاول يكتب buzzer مباشرة
+      const existingBuzzer = current?.buzzer ?? null;
+      if (Object.prototype.hasOwnProperty.call(patch, "buzzer")) {
+        const incomingBuzzer = patch.buzzer;
+
+        if (incomingBuzzer === null) {
+          const safePatch = { ...patch };
+          // إذا انمسح الجرس يدويًا، لا نزيد seq إلا إذا جاء صريح
+          next = { ...current, ...safePatch };
+        } else if (!existingBuzzer) {
+          const normalized = normalizeBuzzerPayload(incomingBuzzer, now, Number(current?.buzzerSeq || 0));
+          patch.buzzer = normalized;
+          patch.buzzerSeq = normalized.seq;
+          next = { ...current, ...patch };
+        } else {
+          const safePatch = { ...patch };
+          delete safePatch.buzzer;
+          delete safePatch.buzzerSeq;
+          next = { ...current, ...safePatch };
+          accepted = false;
+        }
+      } else {
+        next = { ...current, ...patch };
+      }
+
+      nextRev = currentRev + 1;
 
       await this.state.storage.put("state", next);
       await this.state.storage.put("rev", nextRev);
@@ -2104,6 +2235,7 @@ export class RoomDO {
 
       return json({
         ok: true,
+        accepted,
         state: next,
         rev: nextRev,
         patch,
