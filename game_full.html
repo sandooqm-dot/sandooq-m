@@ -2552,35 +2552,36 @@ if(homeBtn && role !== "host"){
     }
 
     async function claimBuzzerSafely(mm){
-      const buzzerRef = ref(db, `rooms/${code}/buzzer`);
-
-      // ✅ مهم: نسحب آخر حالة قبل محاولة الحجز لتقليل تعارض السباق بين الأجهزة.
+      // ✅ الجرس الآن يُحسم رسميًا من السيرفر عبر type:"buzz"
+      // وليس من runTransaction المحلي، حتى لا يتبدل الفائز عند الضغطات المتقاربة.
       await _pullOnce(true);
 
       const latestBefore = _get(SYNC.state, `rooms/${code}/buzzer`);
       if(latestBefore && latestBefore.ts){
-        return { committed:false, winner: latestBefore };
+        return { committed:false, winner: latestBefore, reason:"LOCKED_BEFORE" };
       }
 
       const attemptTs = Date.now();
-      const res = await runTransaction(buzzerRef, (cur) => {
-        if(cur === null){
-          return { pid, name: mm.name, team: mm.team, ts: attemptTs };
-        }
-        return;
-      });
+      const res = await _action({
+        type: "buzz",
+        pid,
+        name: mm.name,
+        team: mm.team,
+        ts: attemptTs
+      }).catch(() => null);
 
-      // ✅ نسحب مرة ثانية للتأكد من الفائز النهائي بعد الكتابة.
+      // ✅ دائمًا نسحب آخر حالة بعد المحاولة، لأن السيرفر هو الحكم النهائي.
       await _pullOnce(true);
-      const finalWinner = _get(SYNC.state, `rooms/${code}/buzzer`) || null;
+      const finalWinner = _get(SYNC.state, `rooms/${code}/buzzer`) || (res && res.winner) || null;
       const finalSig = getBuzzerSig(finalWinner);
       const mySig = `${String(pid||"")}|${Number(attemptTs)}`;
 
       return {
-        committed: !!(res && res.committed && finalSig === mySig),
+        committed: !!(res && res.ok && res.accepted === true && finalSig === mySig),
         winner: finalWinner,
         attemptedSig: mySig,
-        finalSig
+        finalSig,
+        reason: (res && res.reason) || ""
       };
     }
 
