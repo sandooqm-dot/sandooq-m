@@ -1866,6 +1866,8 @@ if(homeBtn && role !== "host"){
       function makeAudio(cands, opts){
         const a = new Audio();
         a.preload = "auto";
+        a.playsInline = true;
+        a.crossOrigin = "anonymous";
         if(opts && "loop" in opts) a.loop = !!opts.loop;
         if(opts && typeof opts.volume === "number") a.volume = Math.max(0, Math.min(1, opts.volume));
 
@@ -1885,61 +1887,119 @@ if(homeBtn && role !== "host"){
         unlocked:false,
         bell:null,
         music:null,
+        _unlockBound:false,
+        _lastPrimeAt:0,
+        _pendingRetryBell:false,
+        _pendingRetryMusic:false,
+        _primeOne(a){
+          if(!a) return;
+          const v = Number.isFinite(a.volume) ? a.volume : 1;
+          try{
+            a.volume = 0;
+            const p = a.play();
+            const done = () => {
+              try{ a.pause(); }catch(e){}
+              try{ a.currentTime = 0; }catch(e){}
+              try{ a.volume = v; }catch(e){}
+            };
+            if(p && typeof p.then === "function"){
+              p.then(() => {
+                this.unlocked = true;
+                done();
+              }).catch(() => {
+                this.unlocked = false;
+                done();
+              });
+            }else{
+              this.unlocked = true;
+              done();
+            }
+          }catch(e){
+            this.unlocked = false;
+          }
+        },
+        prime(){
+          const now = Date.now();
+          if(now - this._lastPrimeAt < 300) return;
+          this._lastPrimeAt = now;
+          this._primeOne(this.bell);
+          this._primeOne(this.music);
+        },
+        bindUnlock(){
+          if(this._unlockBound) return;
+          this._unlockBound = true;
+          const onUserGesture = () => { this.prime(); };
+          window.addEventListener("pointerdown", onUserGesture, { capture:true, passive:true });
+          window.addEventListener("touchstart",  onUserGesture, { capture:true, passive:true });
+          window.addEventListener("click",       onUserGesture, { capture:true, passive:true });
+          window.addEventListener("keydown",     onUserGesture, { capture:true });
+          document.addEventListener("visibilitychange", () => {
+            if(document.visibilityState === "visible"){
+              this.unlocked = false;
+            }
+          }, { passive:true });
+          window.addEventListener("pageshow", () => {
+            this.unlocked = false;
+          }, { passive:true });
+        },
         init(){
-          if(this.ready) return;
-          this.ready = true;
+          if(!this.ready){
+            this.ready = true;
+            this.bell  = makeAudio(bellCandidates,  { volume:0.95, loop:false });
+            this.music = makeAudio(musicCandidates, { volume:0.95, loop:false }); // ✅ (5) صوت عالي
+          }
+          this.bindUnlock();
+        },
+        _playWithRetry(kind){
+          this.init();
+          const a = kind === "music" ? this.music : this.bell;
+          if(!a) return false;
+          try{
+            a.pause();
+            a.currentTime = 0;
+          }catch(e){}
 
-          this.bell  = makeAudio(bellCandidates,  { volume:0.95, loop:false });
-          this.music = makeAudio(musicCandidates, { volume:0.95, loop:false }); // ✅ (5) صوت عالي
-
-          const unlock = () => {
-            if(this.unlocked) return;
-            this.unlocked = true;
-
-            // iOS/Safari: لازم Gesture قبل تشغيل الصوت
-            [this.bell, this.music].forEach(a => {
-              if(!a) return;
-              const v = Number.isFinite(a.volume) ? a.volume : 1;
-              try{
-                a.volume = 0;
-                const p = a.play();
-                const done = () => { try{ a.pause(); a.currentTime = 0; a.volume = v; }catch(e){} };
-                if(p && typeof p.then === "function"){
-                  p.then(done).catch(done);
-                }else{
-                  done();
-                }
-              }catch(e){}
-            });
-          };
-
-          window.addEventListener("pointerdown", unlock, { once:true, capture:true });
-          window.addEventListener("touchstart",  unlock, { once:true, capture:true });
-          window.addEventListener("click",       unlock, { once:true, capture:true });
+          try{
+            const p = a.play();
+            if(p && typeof p.then === "function"){
+              p.then(() => {
+                this.unlocked = true;
+              }).catch(() => {
+                this.unlocked = false;
+                const retryFlag = kind === "music" ? "_pendingRetryMusic" : "_pendingRetryBell";
+                if(this[retryFlag]) return;
+                this[retryFlag] = true;
+                this.prime();
+                setTimeout(() => {
+                  this[retryFlag] = false;
+                  try{
+                    a.pause();
+                    a.currentTime = 0;
+                    const p2 = a.play();
+                    if(p2 && typeof p2.then === "function"){
+                      p2.then(() => { this.unlocked = true; }).catch(() => { this.unlocked = false; });
+                    }else{
+                      this.unlocked = true;
+                    }
+                  }catch(e){
+                    this.unlocked = false;
+                  }
+                }, 60);
+              });
+            }else{
+              this.unlocked = true;
+            }
+            return true;
+          }catch(e){
+            this.unlocked = false;
+            return false;
+          }
         },
         playBell(){
-          this.init();
-          const a = this.bell;
-          if(!a) return false;
-          try{
-            a.pause();
-            a.currentTime = 0;
-            const p = a.play();
-            if(p && typeof p.catch === "function") p.catch(()=>{});
-            return true;
-          }catch(e){ return false; }
+          return this._playWithRetry("bell");
         },
         playMusic(){
-          this.init();
-          const a = this.music;
-          if(!a) return false;
-          try{
-            a.pause();
-            a.currentTime = 0;
-            const p = a.play();
-            if(p && typeof p.catch === "function") p.catch(()=>{});
-            return true;
-          }catch(e){ return false; }
+          return this._playWithRetry("music");
         }
       };
       return api;
