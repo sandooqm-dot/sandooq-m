@@ -2510,8 +2510,79 @@ if(homeBtn && role !== "host"){
     // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
 
+    // ✅ (جديد) تثبيت أول جرس بشكل بصري حتى لا يتبدل الاسم فجأة بسبب وصول تحديث متأخر
+    let STABLE_BUZZER = null;
+
     // ✅ (3) تتبع آخر جرس شغّل المؤقت تلقائياً
     let LAST_AUTO_TIMER_SIG = "";
+
+    function getBuzzerSig(b){
+      if(!b || !b.ts) return "";
+      return `${String(b.pid||"")}|${Number(b.ts)}`;
+    }
+
+    function resolveStableBuzzer(rawBuzzer, timerLike){
+      const rawSig = getBuzzerSig(rawBuzzer);
+      const timer = normalizeTimer(timerLike || {});
+
+      if(!rawSig){
+        STABLE_BUZZER = null;
+        return null;
+      }
+
+      if(!STABLE_BUZZER || !getBuzzerSig(STABLE_BUZZER)){
+        STABLE_BUZZER = rawBuzzer;
+        return STABLE_BUZZER;
+      }
+
+      const stableTs = Number(STABLE_BUZZER?.ts || 0);
+      const rawTs = Number(rawBuzzer?.ts || 0);
+
+      // أثناء نفس الجولة: لا نسمح لجرس أحدث أن يستبدل الجرس الأول بصرياً.
+      // وإذا وصل جرس أقدم (تأخر بالشبكة) نعتمد الأقدم لأنه الأقرب لأن يكون الفائز الحقيقي.
+      if(timer.running || stableTs){
+        if(rawTs && stableTs && rawTs < stableTs){
+          STABLE_BUZZER = rawBuzzer;
+        }
+        return STABLE_BUZZER;
+      }
+
+      STABLE_BUZZER = rawBuzzer;
+      return STABLE_BUZZER;
+    }
+
+    async function claimBuzzerSafely(mm){
+      const buzzerRef = ref(db, `rooms/${code}/buzzer`);
+
+      // ✅ مهم: نسحب آخر حالة قبل محاولة الحجز لتقليل تعارض السباق بين الأجهزة.
+      await _pullOnce(true);
+
+      const latestBefore = _get(SYNC.state, `rooms/${code}/buzzer`);
+      if(latestBefore && latestBefore.ts){
+        return { committed:false, winner: latestBefore };
+      }
+
+      const attemptTs = Date.now();
+      const res = await runTransaction(buzzerRef, (cur) => {
+        if(cur === null){
+          return { pid, name: mm.name, team: mm.team, ts: attemptTs };
+        }
+        return;
+      });
+
+      // ✅ نسحب مرة ثانية للتأكد من الفائز النهائي بعد الكتابة.
+      await _pullOnce(true);
+      const finalWinner = _get(SYNC.state, `rooms/${code}/buzzer`) || null;
+      const finalSig = getBuzzerSig(finalWinner);
+      const mySig = `${String(pid||"")}|${Number(attemptTs)}`;
+
+      return {
+        committed: !!(res && res.committed && finalSig === mySig),
+        winner: finalWinner,
+        attemptedSig: mySig,
+        finalSig
+      };
+    }
 
     // ✅ (2) منع الزيادة عن 13 لاعب (قصّ الزائدين بأقدم joinedAt)
     let PRUNE_IN_FLIGHT = false;
@@ -3784,23 +3855,23 @@ if(homeBtn && role !== "host"){
           if(rr.freeze) return;
           if(!mm) return;
 
-          const buzzerRef = ref(db, `rooms/${code}/buzzer`);
+          if(GAME_UI.__buzzBusy) return;
+          GAME_UI.__buzzBusy = true;
 
-          const res = await runTransaction(buzzerRef, (cur) => {
-            if(cur === null){
-              return { pid, name: mm.name, team: mm.team, ts: Date.now() };
-            }
-            return;
-          });
+          try{
+            const res = await claimBuzzerSafely(mm);
 
-          if(res && res.committed){
-            try{
-              const v = (res.snapshot && typeof res.snapshot.val === "function") ? res.snapshot.val() : null;
+            if(res && res.committed){
+              const v = res.winner || null;
               if(v && v.ts){
                 LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
+                STABLE_BUZZER = v;
               }
-            }catch(e){}
-            if(!playRong()) fallbackBeep();
+              if(!playRong()) fallbackBeep();
+            }
+          }catch(e){}
+          finally{
+            setTimeout(() => { GAME_UI.__buzzBusy = false; }, 220);
           }
         });
       }
@@ -4016,7 +4087,7 @@ zoom.addEventListener("input", applyZoomFix);
 
       // First press bar
       const firstPressBar = GAME_UI.els.firstPressBar;
-      const buzzer = room.buzzer;
+      const buzzer = resolveStableBuzzer(room.buzzer, room.timer);
       if(buzzer && buzzer.name && firstPressBar){
         firstPressBar.classList.add("filled");
         firstPressBar.style.background = teamColor(buzzer.team);
@@ -4228,7 +4299,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       // ✅ (3) تشغيل المؤقت تلقائياً عند اعتماد أول لاعب يضغط الجرس
       try{
         if(role === "host"){
-          const b = room.buzzer;
+          const b = resolveStableBuzzer(room.buzzer, room.timer);
           const t = normalizeTimer(room.timer || {});
           if(b && b.ts){
             const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
@@ -4254,7 +4325,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       // ✅ (تعديل 2) تشغيل rong فقط عند جهاز اللاعب الذي ضغط أولاً
       try{
-        const b = room.buzzer;
+        const b = resolveStableBuzzer(room.buzzer, room.timer);
         if(b && b.ts){
           const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
           if(sig && sig !== LAST_BUZZER_SIG){
@@ -4269,6 +4340,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           }
         }else{
           LAST_BUZZER_SIG = "";
+          STABLE_BUZZER = null;
         }
       }catch(e){}
 
