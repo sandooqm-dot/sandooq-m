@@ -676,7 +676,7 @@
     }
     .qText{
       line-height:1.5;
-      font-size:34px;
+      font-size:31px;
       font-weight:800;
       font-family:"Baloo Bhaijaan 2", Arial, sans-serif;
       color:#111;
@@ -910,6 +910,22 @@
       box-shadow:0 6px 0 rgba(0,0,0,.18);
     }
     .settingsBtn:active{ transform: translateY(1px); box-shadow:0 5px 0 rgba(0,0,0,.18); }
+
+    .settingsHomeBtn{
+      width:min(70%, 220px);
+      height:56px;
+      margin:38px auto 0;
+      display:block;
+      border-radius:999px;
+      border:4px solid rgba(0,0,0,.9);
+      background:#fff;
+      color:#111;
+      font-weight:900;
+      font-size:24px;
+      cursor:pointer;
+      box-shadow:0 6px 0 rgba(0,0,0,.18), 0 0 0 4px rgba(255,255,255,.35) inset;
+    }
+    .settingsHomeBtn:active{ transform: translateY(1px); box-shadow:0 5px 0 rgba(0,0,0,.18), 0 0 0 4px rgba(255,255,255,.35) inset; }
 
     .settingsView{
       display:none;
@@ -1188,7 +1204,7 @@
       h1{ font-size:46px; }
       .gameName{ min-height:52px; }
       .pillBtn{ height:72px; font-size:26px; }
-      .qText{ font-size:30px; }
+      .qText{ font-size:28px; }
     }
   </style>
 </head>
@@ -1206,8 +1222,6 @@
     <div id="main" class="card">جاري التحميل...</div>
   </div>
 
-  <button id="homeBtn" class="footerBtn" onclick="location.href='index.html'">الرئيسية</button>
-  <div class="rights">© جميع الحقوق محفوظة لمتجر صندوق المسابقات</div>
 
   <!-- ✅ نافذة شرح ? -->
   <div id="tipPopup" class="tipPopup"></div>
@@ -1836,7 +1850,6 @@ _startPolling();
 const main = document.getElementById("main");
 const gameNameEl = document.getElementById("gameName");
 
-// ✅ (تعديل) زر الرئيسية للمقدم فقط
 const homeBtn = document.getElementById("homeBtn");
 if(homeBtn && role !== "host"){
   homeBtn.style.display = "none";
@@ -3043,6 +3056,7 @@ if(homeBtn && role !== "host"){
             <button id="sTimer" class="settingsBtn" type="button">تعديل المؤقت</button>
             <button id="sAddQ" class="settingsBtn" type="button">اضافة الاسئلة</button>
             <button id="sMore" class="settingsBtn" type="button">العابنا الاخرى</button>
+            <button id="sHome" class="settingsHomeBtn" type="button">الرئيسية</button>
 
             <div id="timerMiniPicker" class="timerMiniPicker" aria-label="اختيار وقت المؤقت">
               <div class="timerMiniList">
@@ -3110,6 +3124,10 @@ if(homeBtn && role !== "host"){
       bd.querySelector("#sMore").addEventListener("click", () => {
         closeSettings();
         openStoreUrl();
+      });
+
+      bd.querySelector("#sHome").addEventListener("click", () => {
+        location.href = "index.html";
       });
 
       bd.querySelector("#sAddQ").addEventListener("click", () => {
