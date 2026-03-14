@@ -688,7 +688,9 @@
     /* ✅ زر تفاعلي للجواب */
     .answerBtn{
       margin:0 auto;
-      width:min(86%, 420px);
+      width:fit-content;
+      max-width:min(86%, 420px);
+      min-width:180px;
       padding:14px 22px;
       border-radius:999px;
       text-align:center;
@@ -699,6 +701,8 @@
       box-shadow:0 16px 24px rgba(0,0,0,.18);
       cursor:pointer;
       display:none;
+      white-space:normal;
+      line-height:1.25;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       user-select:none;
