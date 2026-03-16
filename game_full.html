@@ -4145,8 +4145,8 @@ if(homeBtn && role !== "host"){
         mapScale.style.transformOrigin = "center top";
 
         const baseH = mapBox.offsetHeight || 0;
-        const extra = Math.max(0, baseH * (z - 1));
-        mapOuter.style.marginBottom = `${extra}px`;
+        const delta = baseH * (z - 1);
+        mapOuter.style.marginBottom = `${Math.round(delta)}px`;
       }
       GAME_UI.applyZoomFix = applyZoomFix;
 
@@ -4199,20 +4199,35 @@ if(homeBtn && role !== "host"){
           stepY = cellH * 0.76;
         }
 
-        let i = 0;
+        const cellsMeta = [];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for(let row=0; row<size; row++){
           for(let col=0; col<size; col++){
             let x = marginX + (col * stepX);
-            let y = marginY + (row * stepY) - (H * 0.015);
+            let y = marginY + (row * stepY);
             if(shape !== "square") x += (row % 2) * (cellW / 2);
-            const poly = GAME_UI.cells[i];
-            const txt = GAME_UI.letterEls[i];
-            poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
-            txt.setAttribute("x", (x + cellW/2).toFixed(2));
-            txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
-            txt.textContent = board?.letters?.[row]?.[col] || "";
-            i++;
+            cellsMeta.push({ row, col, x, y });
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + cellW);
+            maxY = Math.max(maxY, y + cellH);
           }
+        }
+
+        const offsetX = ((W - (maxX - minX)) / 2) - minX;
+        const offsetY = ((H - (maxY - minY)) / 2) - minY;
+
+        let i = 0;
+        for(const meta of cellsMeta){
+          const x = meta.x + offsetX;
+          const y = meta.y + offsetY;
+          const poly = GAME_UI.cells[i];
+          const txt = GAME_UI.letterEls[i];
+          poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
+          txt.setAttribute("x", (x + cellW/2).toFixed(2));
+          txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+          txt.textContent = board?.letters?.[meta.row]?.[meta.col] || "";
+          i++;
         }
 
         applyZoomFix();
@@ -4592,20 +4607,33 @@ if(homeBtn && role !== "host"){
         }else{
           cellW = usableW / (size + 0.5); cellH = usableH / (size * 0.84 + 0.25); stepX = cellW; stepY = cellH * 0.76;
         }
-        let i = 0;
+        const cellsMeta = [];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for(let row=0; row<size; row++){
           for(let col=0; col<size; col++){
             let x = marginX + (col * stepX);
-            let y = marginY + (row * stepY) - (H * 0.015);
+            let y = marginY + (row * stepY);
             if(shape !== "square") x += (row % 2) * (cellW / 2);
-            const poly = GAME_UI.cells[i];
-            const txt = GAME_UI.letterEls[i];
-            poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
-            txt.setAttribute("x", (x + cellW/2).toFixed(2));
-            txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
-            txt.textContent = board?.letters?.[row]?.[col] || "";
-            i++;
+            cellsMeta.push({ row, col, x, y });
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + cellW);
+            maxY = Math.max(maxY, y + cellH);
           }
+        }
+        const offsetX = ((W - (maxX - minX)) / 2) - minX;
+        const offsetY = ((H - (maxY - minY)) / 2) - minY;
+        let i = 0;
+        for(const meta of cellsMeta){
+          const x = meta.x + offsetX;
+          const y = meta.y + offsetY;
+          const poly = GAME_UI.cells[i];
+          const txt = GAME_UI.letterEls[i];
+          poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
+          txt.setAttribute("x", (x + cellW/2).toFixed(2));
+          txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+          txt.textContent = board?.letters?.[meta.row]?.[meta.col] || "";
+          i++;
         }
         applyZoomFix();
       }
