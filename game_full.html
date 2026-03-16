@@ -2429,21 +2429,39 @@ if(homeBtn && role !== "host"){
       return curMap === activeMapNow && st === 1;
     }
 
+    const OFFICIAL_COLOR_PAIRS = {
+      "green-orange": { a:"#31b80f", b:"#ff8a3d" },
+      "blue-pink":    { a:"#0f58ad", b:"#ff3ca6" },
+      "purple-mint":  { a:"#7a1fc3", b:"#49f0b8" },
+      "cream-rose":   { a:"#edd39a", b:"#f58b96" },
+      "sand-sage":    { a:"#efc06b", b:"#8fb691" },
+      "yellow-sky":   { a:"#ffe87a", b:"#9ad3ff" },
+      "salmon-teal":  { a:"#ff815d", b:"#12a9b0" },
+      "navy-rose":    { a:"#132f67", b:"#de5f95" }
+    };
+
+    function getOfficialPair(room){
+      const settings = (room && room.settings && typeof room.settings === "object") ? room.settings : {};
+      const pairId = String(settings.colorPairId || "").trim();
+      return OFFICIAL_COLOR_PAIRS[pairId] || null;
+    }
+
     function getVisualTeams(room){
       const r = (room && typeof room === "object") ? room : {};
       const teams = (r.teams && typeof r.teams === "object") ? r.teams : {};
       const settings = (r.settings && typeof r.settings === "object") ? r.settings : {};
       const colorPair = (settings.colorPair && typeof settings.colorPair === "object") ? settings.colorPair : {};
+      const officialPair = getOfficialPair(r);
       const a = teams.a || {};
       const b = teams.b || {};
       return {
         green: {
           name: String(a.name || settings.team1Name || 'الفريق الأول'),
-          color: String(a.color || colorPair.a || '#1aa34a')
+          color: String(officialPair?.a || a.color || colorPair.a || '#31b80f')
         },
         orange: {
           name: String(b.name || settings.team2Name || 'الفريق الثاني'),
-          color: String(b.color || colorPair.b || '#f28c00')
+          color: String(officialPair?.b || b.color || colorPair.b || '#ff8a3d')
         }
       };
     }
