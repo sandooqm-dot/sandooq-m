@@ -357,8 +357,8 @@
 
     .zoomWrap{
       flex:1 1 auto;
-      min-width:160px;
-      max-width:420px;
+      min-width:220px;
+      max-width:none;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -2149,6 +2149,35 @@ if(homeBtn && role !== "host"){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
     }
 
+    function getVisualTeams(room){
+      const r = (room && typeof room === "object") ? room : {};
+      const teams = (r.teams && typeof r.teams === "object") ? r.teams : {};
+      const settings = (r.settings && typeof r.settings === "object") ? r.settings : {};
+      const colorPair = (settings.colorPair && typeof settings.colorPair === "object") ? settings.colorPair : {};
+      const a = teams.a || {};
+      const b = teams.b || {};
+      return {
+        green: {
+          name: String(a.name || settings.team1Name || 'الفريق الأول'),
+          color: String(a.color || colorPair.a || '#1aa34a')
+        },
+        orange: {
+          name: String(b.name || settings.team2Name || 'الفريق الثاني'),
+          color: String(b.color || colorPair.b || '#f28c00')
+        }
+      };
+    }
+
+    function getVisualScores(room){
+      const scores = (room && room.scores && typeof room.scores === 'object') ? room.scores : {};
+      const sg = Number(scores.a ?? scores.green ?? 0);
+      const so = Number(scores.b ?? scores.orange ?? 0);
+      return {
+        green: Number.isFinite(sg) ? sg : 0,
+        orange: Number.isFinite(so) ? so : 0
+      };
+    }
+
     function escapeHtml(s){
       return String(s ?? "").replace(/[&<>"']/g, c => ({
         "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -3033,7 +3062,8 @@ if(homeBtn && role !== "host"){
         return { mode: useMode, list, cursorField, qIndex: 0, nextCursor: 0 };
       }
 
-      let qIndex = Number(cursorMap?.[letter] || 0);
+      const hasSavedCursor = Object.prototype.hasOwnProperty.call(cursorMap || {}, letter);
+      let qIndex = hasSavedCursor ? Number(cursorMap?.[letter]) : Math.floor(Math.random() * list.length);
       if(!Number.isFinite(qIndex) || qIndex < 0) qIndex = 0;
       qIndex = qIndex % list.length;
 
@@ -3064,12 +3094,11 @@ if(homeBtn && role !== "host"){
             <button id="sHome" class="settingsHomeBtn" type="button">الرئيسية</button>
 
             <div id="timerMiniPicker" class="timerMiniPicker" aria-label="اختيار وقت المؤقت">
-              <div class="timerMiniList">
-                <button class="timerMiniItem" data-t="10" type="button">١٠</button>
-                <button class="timerMiniItem" data-t="15" type="button">١٥</button>
-                <button class="timerMiniItem" data-t="20" type="button">٢٠</button>
-                <button class="timerMiniItem" data-t="25" type="button">٢٥</button>
-                <button class="timerMiniItem" data-t="30" type="button">٣٠</button>
+              <div class="timerMiniList" style="padding:14px 12px;display:block">
+                <div style="text-align:center;color:#111;font-size:18px;font-weight:900;margin-bottom:10px">حدد وقت المؤقت</div>
+                <input id="timerMiniRange" type="range" min="1" max="50" step="1" value="10" aria-label="وقت المؤقت">
+                <div id="timerMiniValue" style="margin-top:10px;text-align:center;color:#111;font-size:22px;font-weight:900">10</div>
+                <button id="timerMiniApply" class="settingsBtn" type="button" style="margin-top:12px;width:100%">حفظ الوقت</button>
               </div>
             </div>
           </div>
@@ -3095,7 +3124,7 @@ if(homeBtn && role !== "host"){
                 <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
                 <li><b>المؤقت:</b> يبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
                 <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
-                <li><b>تغيير الخريطة:</b> للتنقل بين الخرائط الثلاث.</li>
+                <li><b>الخلايا:</b> يتم تغيير الحروف ومسح التلوين تلقائيًا عند بدء الجولة الجديدة.</li>
               </ul>
             </div>
             <button id="helpBack" class="settingsBackMini" type="button">رجوع</button>
@@ -3143,15 +3172,26 @@ if(homeBtn && role !== "host"){
 
       bd.querySelector("#sTimer").addEventListener("click", () => {
         const tm = bd.querySelector("#timerMiniPicker");
-        if(!tm) return;
+        const range = bd.querySelector("#timerMiniRange");
+        const valueEl = bd.querySelector("#timerMiniValue");
+        if(!tm || !range || !valueEl) return;
+        const curSel = Number((SETTINGS_UI.roomLatest && SETTINGS_UI.roomLatest.timer && SETTINGS_UI.roomLatest.timer.sel) || LIVE.room?.timer?.sel || 10);
+        range.value = String(Math.max(1, Math.min(50, curSel || 10)));
+        valueEl.textContent = String(range.value);
         tm.style.display = (tm.style.display === "block") ? "none" : "block";
       });
 
-      bd.querySelectorAll(".timerMiniItem").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const v = Number(btn.getAttribute("data-t"));
-          if(![10,15,20,25,30].includes(v)) return;
-
+      const timerMiniRange = bd.querySelector("#timerMiniRange");
+      const timerMiniValue = bd.querySelector("#timerMiniValue");
+      const timerMiniApply = bd.querySelector("#timerMiniApply");
+      if(timerMiniRange && timerMiniValue){
+        timerMiniRange.addEventListener("input", () => {
+          timerMiniValue.textContent = String(timerMiniRange.value || 10);
+        });
+      }
+      if(timerMiniApply && timerMiniRange){
+        timerMiniApply.addEventListener("click", async () => {
+          const v = Math.max(1, Math.min(50, Number(timerMiniRange.value || 10)));
           await update(ref(db, `rooms/${code}/timer`), {
             sel: v,
             dur: v,
@@ -3159,11 +3199,10 @@ if(homeBtn && role !== "host"){
             done: false,
             startTs: 0
           });
-
           const tm = bd.querySelector("#timerMiniPicker");
           if(tm) tm.style.display = "none";
         });
-      });
+      }
 
       SETTINGS_UI.ready = true;
       SETTINGS_UI.els = { backdrop: bd, closeSettings };
@@ -3506,9 +3545,10 @@ if(homeBtn && role !== "host"){
 
       const modeBtnTitle = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
 
-      const scores = room.scores || { green:0, orange:0 };
-      const sg = Number(scores.green ?? 0);
-      const so = Number(scores.orange ?? 0);
+      const visualTeams = getVisualTeams(room);
+      const visualScores = getVisualScores(room);
+      const sg = visualScores.green;
+      const so = visualScores.orange;
 
       main.innerHTML = `
         <div class="gameLayout">
@@ -3528,13 +3568,6 @@ if(homeBtn && role !== "host"){
               </div>
 
               ${isHost ? `
-                <button id="mapBtn" class="circleBtn" type="button" aria-label="تغيير الخريطة" title="تغيير الخريطة">
-                  ${ICON_SWAP}
-                  <span class="helpDot" data-tip="تغيير الخريطة: التنقل بين الخرائط الثلاث.">؟</span>
-                </button>
-              ` : ``}
-
-              ${isHost ? `
                 <button id="clearBoardBtn" class="circleBtn" type="button" aria-label="تفريغ الخريطة" title="تفريغ الخريطة">
                   ${ICON_CLEAR}
                   <span class="helpDot" data-tip="تفريغ الخريطة: مسح ألوان الخلايا وإرجاعها للوضع الافتراضي.">؟</span>
@@ -3552,10 +3585,10 @@ if(homeBtn && role !== "host"){
             </div>
 
             <div class="scoreBoard">
-              <div id="teamGreenBtn" class="teamPill green ${isHost ? "clickable" : ""}">الفريق الأخضر</div>
+              <div id="teamGreenBtn" class="teamPill green ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.green.color)}">${escapeHtml(visualTeams.green.name)}</div>
               <div id="scoreGreen" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(sg) ? sg : 0}</div>
               <div id="scoreOrange" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(so) ? so : 0}</div>
-              <div id="teamOrangeBtn" class="teamPill orange ${isHost ? "clickable" : ""}">الفريق البرتقالي</div>
+              <div id="teamOrangeBtn" class="teamPill orange ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.orange.color)}">${escapeHtml(visualTeams.orange.name)}</div>
             </div>
           </div>
 
@@ -3607,7 +3640,6 @@ if(homeBtn && role !== "host"){
       GAME_UI.els.firstPressBar = document.getElementById("firstPressBar");
       GAME_UI.els.freezeBtn = document.getElementById("freezeBtn");
       GAME_UI.els.nextQ = document.getElementById("nextQ");
-      GAME_UI.els.mapBtn = document.getElementById("mapBtn");
       GAME_UI.els.clearBoardBtn = document.getElementById("clearBoardBtn");
       GAME_UI.els.qModeBtn = document.getElementById("qModeBtn");
       GAME_UI.els.settingsBtn = document.getElementById("settingsBtn");
@@ -3818,21 +3850,6 @@ if(homeBtn && role !== "host"){
           const z = Number(zoom.value || 1);
           localStorage.setItem(ZOOM_KEY, String(z));
           applyZoomFix();
-        });
-      }
-
-      // ✅ Map swap
-      if(isHost && GAME_UI.els.mapBtn){
-        GAME_UI.els.mapBtn.addEventListener("click", async () => {
-          closeTip();
-          const curMap = Number(LIVE.room.activeMap || 0);
-          const next = (curMap + 1) % 3;
-          await update(roomRef, {
-            activeMap: next,
-            buzzer: null,
-            current: { letter: null, qIndex: 0, row: null, col: null, map: next },
-            winState: null
-          });
         });
       }
 
@@ -4157,10 +4174,18 @@ zoom.addEventListener("input", applyZoomFix);
       applyTimerDom();
 
       // Scores
-      const sg = Number(room?.scores?.green ?? 0);
-      const so = Number(room?.scores?.orange ?? 0);
-      if(GAME_UI.els.scoreGreen) GAME_UI.els.scoreGreen.textContent = String(Number.isFinite(sg) ? sg : 0);
-      if(GAME_UI.els.scoreOrange) GAME_UI.els.scoreOrange.textContent = String(Number.isFinite(so) ? so : 0);
+      const visualTeamsNow = getVisualTeams(room);
+      const visualScoresNow = getVisualScores(room);
+      if(GAME_UI.els.scoreGreen) GAME_UI.els.scoreGreen.textContent = String(visualScoresNow.green);
+      if(GAME_UI.els.scoreOrange) GAME_UI.els.scoreOrange.textContent = String(visualScoresNow.orange);
+      if(GAME_UI.els.teamGreenBtn){
+        GAME_UI.els.teamGreenBtn.textContent = visualTeamsNow.green.name;
+        GAME_UI.els.teamGreenBtn.style.background = visualTeamsNow.green.color;
+      }
+      if(GAME_UI.els.teamOrangeBtn){
+        GAME_UI.els.teamOrangeBtn.textContent = visualTeamsNow.orange.name;
+        GAME_UI.els.teamOrangeBtn.style.background = visualTeamsNow.orange.color;
+      }
 
       // Freeze UI
       if(isHost && GAME_UI.els.freezeBtn){
@@ -4179,7 +4204,8 @@ zoom.addEventListener("input", applyZoomFix);
       const buzzer = resolveStableBuzzer(room.buzzer, room.timer);
       if(buzzer && buzzer.name && firstPressBar){
         firstPressBar.classList.add("filled");
-        firstPressBar.style.background = teamColor(buzzer.team);
+        const visualTeamsForBuzz = getVisualTeams(room);
+        firstPressBar.style.background = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
         firstPressBar.textContent = buzzer.name;
       }else if(firstPressBar){
         firstPressBar.classList.remove("filled");
@@ -4460,7 +4486,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         activeMap,
         freeze: !!room.freeze,
         buzzer: room.buzzer ?? null,
-        scores: (room.scores && typeof room.scores === "object") ? room.scores : { green:0, orange:0 },
+        scores: (room.scores && typeof room.scores === "object") ? room.scores : { green:0, orange:0, a:0, b:0 },
+        settings: (room.settings && typeof room.settings === "object") ? room.settings : {},
+        teams: (room.teams && typeof room.teams === "object") ? room.teams : {},
         winEvent: room.winEvent ?? null,
         winState: (room.winState && typeof room.winState === "object") ? room.winState : {},
         mapStates: (room.mapStates && typeof room.mapStates === "object") ? room.mapStates : {},
