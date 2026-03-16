@@ -316,6 +316,10 @@
       100% { opacity: 1; }
     }
     .overlaySvg .state1.pulse { animation: palePulse 0.9s ease-in-out infinite; }
+    .overlaySvg .cellLabel{ fill:#111; font-family:"AA-GALAXY", Arial, sans-serif; font-size:22px; font-weight:700; text-anchor:middle; dominant-baseline:middle; pointer-events:none; user-select:none; }
+    .overlaySvg .cellLabel.light{ fill:#fff; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+    .mapBox.gridOnly{ aspect-ratio: 1 / 1; background:rgba(255,255,255,.08); }
+    .mapBox.gridOnly img{ display:none !important; }
 
     /* ✅ صف الأزرار تحت الخريطة (نفس الصورة) */
     .mapToolsRow{
@@ -2305,6 +2309,178 @@ if(homeBtn && role !== "host"){
       return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
     }
 
+    function squarePoints(x, y, w, h){
+      const pts = [
+        [x, y], [x+w, y], [x+w, y+h], [x, y+h]
+      ];
+      return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
+    }
+
+    function pentagonPoints(x, y, w, h){
+      const pts = [
+        [x + w*0.50, y],
+        [x + w, y + h*0.36],
+        [x + w*0.80, y + h],
+        [x + w*0.20, y + h],
+        [x, y + h*0.36],
+      ];
+      return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
+    }
+
+    function getGridType(room){
+      const t = String(room?.settings?.gridType || room?.grid?.type || 'hex');
+      return (t === 'square' || t === 'pentagon' || t === 'hex') ? t : 'hex';
+    }
+
+    function getGridSize(room){
+      const n = Number(room?.settings?.cellCount || room?.grid?.size || 5);
+      return Math.max(4, Math.min(6, Number.isFinite(n) ? n : 5));
+    }
+
+    function hashSeed(str){
+      let h = 2166136261 >>> 0;
+      str = String(str || '');
+      for(let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+
+    function seededRand(seed){
+      let a = (seed >>> 0) || 1;
+      return function(){
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    function shuffleSeeded(arr, seedStr){
+      const out = arr.slice();
+      const rnd = seededRand(hashSeed(seedStr));
+      for(let i=out.length-1;i>0;i--){
+        const j = Math.floor(rnd() * (i+1));
+        const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+      }
+      return out;
+    }
+
+    function getGridLetters(room){
+      const n = getGridSize(room);
+      const needed = n * n;
+      const base = [];
+      while(base.length < needed){
+        base.push(...ALL_LETTERS);
+      }
+      const seed = `${room?.code || code}|${room?.round?.current || 1}|${room?.createdAt || 0}|${room?.settings?.gridType || 'hex'}|${n}`;
+      const list = shuffleSeeded(base.slice(0, needed), seed);
+      const rows = [];
+      for(let r=0;r<n;r++) rows.push(list.slice(r*n, (r+1)*n));
+      return rows;
+    }
+
+    function getGridLetter(room, r, c){
+      const rows = getGridLetters(room || {});
+      return (rows?.[r]?.[c]) || '';
+    }
+
+    function buildOverlayCells(overlay, room, interactive){
+      overlay.innerHTML = '';
+      overlay.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const n = getGridSize(room);
+      const cells = [];
+      const labels = [];
+      for(let row=0; row<n; row++){
+        for(let col=0; col<n; col++){
+          const poly = document.createElementNS(svgNS, 'polygon');
+          poly.classList.add('cell', 'state0');
+          poly.setAttribute('data-row', row);
+          poly.setAttribute('data-col', col);
+          overlay.appendChild(poly);
+          cells.push(poly);
+
+          const txt = document.createElementNS(svgNS, 'text');
+          txt.classList.add('cellLabel');
+          txt.setAttribute('data-row', row);
+          txt.setAttribute('data-col', col);
+          txt.textContent = getGridLetter(room, row, col);
+          overlay.appendChild(txt);
+          labels.push(txt);
+        }
+      }
+      overlay.style.pointerEvents = interactive ? 'auto' : 'none';
+      return { cells, labels };
+    }
+
+    function placeDynamicCells(room, overlay, cells, labels, boxEl){
+      const n = getGridSize(room);
+      const type = getGridType(room);
+      const W = boxEl.clientWidth || 600;
+      const H = boxEl.clientHeight || W;
+      if(!W || !H) return;
+      overlay.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      overlay.setAttribute('preserveAspectRatio', 'none');
+
+      const pad = Math.max(14, W * 0.045);
+      const innerW = W - pad*2;
+      const innerH = H - pad*2;
+      let i = 0;
+      if(type === 'square'){
+        const gap = innerW * 0.02;
+        const cellW = (innerW - gap*(n-1)) / n;
+        const cellH = (innerH - gap*(n-1)) / n;
+        for(let r=0;r<n;r++){
+          for(let c=0;c<n;c++){
+            const x = pad + c*(cellW+gap);
+            const y = pad + r*(cellH+gap);
+            cells[i].setAttribute('points', squarePoints(x,y,cellW,cellH));
+            labels[i].setAttribute('x', (x + cellW/2).toFixed(2));
+            labels[i].setAttribute('y', (y + cellH/2 + 1).toFixed(2));
+            labels[i].textContent = getGridLetter(room,r,c);
+            i++;
+          }
+        }
+      }else if(type === 'pentagon'){
+        const gap = innerW * 0.018;
+        const cellW = (innerW - gap*(n-1)) / n;
+        const cellH = (innerH - gap*(n-1)) / n;
+        for(let r=0;r<n;r++){
+          for(let c=0;c<n;c++){
+            const x = pad + c*(cellW+gap);
+            const y = pad + r*(cellH+gap);
+            cells[i].setAttribute('points', pentagonPoints(x,y,cellW,cellH));
+            labels[i].setAttribute('x', (x + cellW/2).toFixed(2));
+            labels[i].setAttribute('y', (y + cellH*0.56).toFixed(2));
+            labels[i].textContent = getGridLetter(room,r,c);
+            i++;
+          }
+        }
+      }else{
+        const cellW = innerW / (n + 0.6);
+        const cellH = innerH / (n + 0.25);
+        const stepX = cellW * 0.86;
+        const stepY = cellH * 0.76;
+        const totalW = stepX*(n-1) + cellW + cellW*0.5;
+        const totalH = stepY*(n-1) + cellH;
+        const x0 = (W - totalW)/2;
+        const y0 = (H - totalH)/2;
+        for(let r=0;r<n;r++){
+          for(let c=0;c<n;c++){
+            const x = x0 + c*stepX + (r%2 ? cellW*0.43 : 0);
+            const y = y0 + r*stepY;
+            cells[i].setAttribute('points', hexPointsPointyTop(x,y,cellW,cellH));
+            labels[i].setAttribute('x', (x + cellW/2).toFixed(2));
+            labels[i].setAttribute('y', (y + cellH/2 + 1).toFixed(2));
+            labels[i].textContent = getGridLetter(room,r,c);
+            i++;
+          }
+        }
+      }
+    }
+
     const TIMER_UI = {
       tick: null,
       lastSecond: null,
@@ -2551,65 +2727,59 @@ if(homeBtn && role !== "host"){
       if(TIP_OPEN) closeTip();
     }, true);
 
-    function neighborsHex(r,c){
-      const odd = (r % 2) === 1;
-      const out = [];
-      out.push([r, c-1], [r, c+1]);
-      if(odd){
-        out.push([r-1, c], [r-1, c+1], [r+1, c], [r+1, c+1]);
+    function neighborsFor(room, r, c){
+      const n = getGridSize(room || LIVE.room || {});
+      const type = getGridType(room || LIVE.room || {});
+      let out = [];
+      if(type === 'square'){
+        out = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+      }else if(type === 'pentagon'){
+        out = [[r-1,c],[r+1,c],[r,c-1],[r,c+1], ((r+c)%2===0?[r-1,c+1]:[r+1,c-1])];
       }else{
-        out.push([r-1, c-1], [r-1, c], [r+1, c-1], [r+1, c]);
+        const odd = (r % 2) === 1;
+        out = [[r, c-1], [r, c+1]];
+        if(odd) out.push([r-1, c], [r-1, c+1], [r+1, c], [r+1, c+1]);
+        else out.push([r-1, c-1], [r-1, c], [r+1, c-1], [r+1, c]);
       }
-      return out.filter(([rr,cc]) => rr>=0 && rr<5 && cc>=0 && cc<5);
+      return out.filter(([rr,cc]) => rr>=0 && rr<n && cc>=0 && cc<n);
     }
 
-    function computeWinners(mapStatesForMap){
+    function computeWinners(mapStatesForMap, roomArg){
+      const room = roomArg || LIVE.room || {};
+      const n = getGridSize(room);
       const getSt = (r,c) => Number(mapStatesForMap?.[cellKey(r,c)] ?? 0);
 
       const qG = [];
       const seenG = new Set();
-      for(let r=0;r<5;r++){
-        if(getSt(r,0) === 2){
-          qG.push([r,0]);
-          seenG.add(cellKey(r,0));
-        }
+      for(let r=0;r<n;r++){
+        if(getSt(r,0) === 2){ qG.push([r,0]); seenG.add(cellKey(r,0)); }
       }
       let greenWin = false;
       while(qG.length){
         const [r,c] = qG.shift();
-        if(c === 4){ greenWin = true; break; }
-        for(const [rr,cc] of neighborsHex(r,c)){
+        if(c === n-1){ greenWin = true; break; }
+        for(const [rr,cc] of neighborsFor(room,r,c)){
           const k = cellKey(rr,cc);
           if(seenG.has(k)) continue;
-          if(getSt(rr,cc) === 2){
-            seenG.add(k);
-            qG.push([rr,cc]);
-          }
+          if(getSt(rr,cc) === 2){ seenG.add(k); qG.push([rr,cc]); }
         }
       }
 
       const qO = [];
       const seenO = new Set();
-      for(let c=0;c<5;c++){
-        if(getSt(0,c) === 3){
-          qO.push([0,c]);
-          seenO.add(cellKey(0,c));
-        }
+      for(let c=0;c<n;c++){
+        if(getSt(0,c) === 3){ qO.push([0,c]); seenO.add(cellKey(0,c)); }
       }
       let orangeWin = false;
       while(qO.length){
         const [r,c] = qO.shift();
-        if(r === 4){ orangeWin = true; break; }
-        for(const [rr,cc] of neighborsHex(r,c)){
+        if(r === n-1){ orangeWin = true; break; }
+        for(const [rr,cc] of neighborsFor(room,r,c)){
           const k = cellKey(rr,cc);
           if(seenO.has(k)) continue;
-          if(getSt(rr,cc) === 3){
-            seenO.add(k);
-            qO.push([rr,cc]);
-          }
+          if(getSt(rr,cc) === 3){ seenO.add(k); qO.push([rr,cc]); }
         }
       }
-
       return { greenWin, orangeWin };
     }
 
@@ -2635,7 +2805,7 @@ if(homeBtn && role !== "host"){
       const nextStates = { ...(mapStatesNow || {}) };
       nextStates[k] = next;
 
-      const winners = computeWinners(nextStates);
+      const winners = computeWinners(nextStates, LIVE.room);
       const prevWin = (LIVE.room.winState && LIVE.room.winState[String(activeMapNow)]) ? LIVE.room.winState[String(activeMapNow)] : { greenWin:false, orangeWin:false };
 
       let winEvent = null;
@@ -2670,7 +2840,7 @@ if(homeBtn && role !== "host"){
       updates[`rooms/${code}/buzzer`] = null;
       updates[`rooms/${code}/current`] = {
         ...cur,
-        letter: MAPS[activeMapNow][r][c],
+        letter: getGridLetter(LIVE.room, r, c),
         row: r,
         col: c,
         map: activeMapNow
@@ -3768,35 +3938,15 @@ if(homeBtn && role !== "host"){
       const mapScale = GAME_UI.els.mapScale;
       const zoom = GAME_UI.els.zoom;
 
-      const activeMap = Number(room.activeMap || 0);
-
-      const srcBase = ([
-        "maps/map1.jpeg",
-        "maps/map2.jpeg",
-        "maps/map3.jpeg"
-      ][activeMap] || "maps/map1.jpeg");
-
+      const activeMap = 0;
       GAME_UI.activeMap = activeMap;
-      GAME_UI.srcBase = srcBase;
-
-      mapImg.src = srcBase + vq;
-
-      overlay.innerHTML = "";
-      overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-      const svgNS = "http://www.w3.org/2000/svg";
-      for(let row=0; row<5; row++){
-        for(let col=0; col<5; col++){
-          const poly = document.createElementNS(svgNS, "polygon");
-          poly.classList.add("cell", "state0");
-          poly.setAttribute("data-row", row);
-          poly.setAttribute("data-col", col);
-          overlay.appendChild(poly);
-        }
-      }
-
-      GAME_UI.cells = Array.from(overlay.querySelectorAll(".cell"));
-      overlay.style.pointerEvents = isHost ? "auto" : "none";
+      GAME_UI.srcBase = 'grid-only';
+      const mapBoxEl = document.getElementById("mapBox");
+      if(mapBoxEl) mapBoxEl.classList.add('gridOnly');
+      if(mapImg){ mapImg.removeAttribute('src'); mapImg.style.display = 'none'; }
+      const built = buildOverlayCells(overlay, room, !!isHost);
+      GAME_UI.cells = built.cells;
+      GAME_UI.labels = built.labels;
 
       const ZOOM_KEY = `sabaq_zoom_${code}`;
       const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
@@ -3819,51 +3969,13 @@ if(homeBtn && role !== "host"){
       GAME_UI.applyZoomFix = applyZoomFix;
 
       function placeHexes(){
-        const W = mapImg.clientWidth;
-        const H = mapImg.clientHeight;
-        if(!W || !H) return;
-
-        overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
-        overlay.setAttribute("preserveAspectRatio", "none");
-
-        const key = GAME_UI.srcBase || srcBase;
-        const bbox = BBOX_CACHE[key];
-        if(!bbox) return;
-
-        const x0 = bbox.x0 * W;
-        const y0 = bbox.y0 * H;
-        const x1 = bbox.x1 * W;
-        const y1 = bbox.y1 * H;
-
-        const gridW = x1 - x0;
-        const gridH = y1 - y0;
-
-        const w = gridW / 5.5;
-        const h = gridH / 4.0;
-        const stepY = h * 0.75;
-
-        let i = 0;
-        for(let row=0; row<5; row++){
-          for(let col=0; col<5; col++){
-            const left = x0 + col*w + (row%2)*(w/2);
-            const top  = y0 + row*stepY;
-            GAME_UI.cells[i++].setAttribute("points", hexPointsPointyTop(left, top, w, h));
-          }
-        }
-
+        const mapBox = document.getElementById("mapBox");
+        if(!mapBox) return;
+        placeDynamicCells(room, overlay, GAME_UI.cells || [], GAME_UI.labels || [], mapBox);
         applyZoomFix();
       }
       GAME_UI.placeHexes = placeHexes;
-
-      function onMapReady(){
-        const key = GAME_UI.srcBase || srcBase;
-        if(!BBOX_CACHE[key]) BBOX_CACHE[key] = detectHexBBox(mapImg);
-        requestAnimationFrame(placeHexes);
-      }
-      GAME_UI.onMapReady = onMapReady;
-
-      if(mapImg.complete) onMapReady();
-      else mapImg.addEventListener("load", onMapReady, { once:true });
+      requestAnimationFrame(placeHexes);
 
       if(!GAME_UI.resizeBound){
         GAME_UI.resizeBound = true;
@@ -4011,7 +4123,7 @@ if(homeBtn && role !== "host"){
             const r = Number(cell.getAttribute("data-row"));
             const c = Number(cell.getAttribute("data-col"));
             const k = cellKey(r,c);
-            const letter = MAPS[Number(LIVE.room.activeMap || 0)][r][c];
+            const letter = getGridLetter(LIVE.room, r, c);
 
             const activeMapNow = Number(LIVE.room.activeMap || 0);
             const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
@@ -4050,7 +4162,7 @@ if(homeBtn && role !== "host"){
             const nextStates = { ...(mapStatesNow || {}) };
             delete nextStates[k];
 
-            const winners = computeWinners(nextStates);
+            const winners = computeWinners(nextStates, LIVE.room);
             updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = null;
             updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
 
@@ -4165,25 +4277,14 @@ if(homeBtn && role !== "host"){
       };
 
       // ✅ بناء خلايا الخريطة (بدون أي تفاعل)
-      overlay.innerHTML = "";
-      overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-      const svgNS = "http://www.w3.org/2000/svg";
-      GAME_UI.cells = [];
-      for(let row=0; row<5; row++){
-        for(let col=0; col<5; col++){
-          const poly = document.createElementNS(svgNS, "polygon");
-          poly.classList.add("cell", "state0");
-          poly.setAttribute("data-row", row);
-          poly.setAttribute("data-col", col);
-          overlay.appendChild(poly);
-          GAME_UI.cells.push(poly);
-        }
-      }
+      const builtTv = buildOverlayCells(overlay, room, false);
+      GAME_UI.cells = builtTv.cells;
+      GAME_UI.labels = builtTv.labels;
       overlay.style.pointerEvents = "none";
       mapBox.style.pointerEvents = "none";
 
       // ✅ حمّل الخريطة فعليًا (كان السورس ما ينحط)
-      mapImg.src = src;
+      if(mapBox) mapBox.classList.add("gridOnly"); if(mapImg){ mapImg.removeAttribute("src"); mapImg.style.display = "none"; }
 
       function applyZoomFix(){
         const z = Number(zoom.value || 1);
@@ -4201,8 +4302,8 @@ if(homeBtn && role !== "host"){
       GAME_UI.applyZoomFix = applyZoomFix;
 
       function placeHexes(){
-        const W = mapImg.clientWidth;
-        const H = mapImg.clientHeight;
+        const W = mapBox.clientWidth;
+        const H = mapBox.clientHeight;
         if(!W || !H) return;
 
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -4383,7 +4484,8 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         GAME_UI._lastMapStates = {};
       }
       if(GAME_UI.cells && GAME_UI.cells.length){
-        for(const cell of GAME_UI.cells){
+        for(let idx=0; idx<GAME_UI.cells.length; idx++){
+          const cell = GAME_UI.cells[idx];
           const r = Number(cell.getAttribute("data-row"));
           const c = Number(cell.getAttribute("data-col"));
           const k = cellKey(r,c);
@@ -4391,6 +4493,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           if(GAME_UI._lastMapStates[k] !== st){
             GAME_UI._lastMapStates[k] = st;
             setStateClass(cell, st);
+            const lbl = GAME_UI.labels && GAME_UI.labels[idx];
+            if(lbl){
+              lbl.classList.toggle('light', st === 2 || st === 3);
+              lbl.textContent = getGridLetter(room, r, c);
+            }
           }
         }
       }
@@ -4581,18 +4688,15 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
           if(role === "host" && Number(we.ts) !== LAST_WIN_RESET_TS && !we.isFinal){
             LAST_WIN_RESET_TS = Number(we.ts);
-            const currentMap = Number(room.activeMap || 0);
-            const nextMap = (currentMap + 1) % Math.max(1, MAPS.length);
             setTimeout(async () => {
               try{
                 const latestWinTs = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
                 if(latestWinTs !== Number(we.ts)) return;
                 const updates = {};
-                updates[`rooms/${code}/activeMap`] = nextMap;
-                updates[`rooms/${code}/mapStates/${currentMap}`] = null;
-                updates[`rooms/${code}/mapStates/${nextMap}`] = null;
+                updates[`rooms/${code}/activeMap`] = 0;
+                updates[`rooms/${code}/mapStates/0`] = null;
                 updates[`rooms/${code}/buzzer`] = null;
-                updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
+                updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:0 };
                 updates[`rooms/${code}/winState`] = null;
                 updates[`rooms/${code}/winEvent`] = null;
                 updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
@@ -4634,7 +4738,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         customQuestions: (room.customQuestions && typeof room.customQuestions === "object") ? room.customQuestions : {},
         customQuestionsUpdatedAt: Number(room.customQuestionsUpdatedAt || 0),
         questionCursorDefault: (room.questionCursorDefault && typeof room.questionCursorDefault === "object") ? room.questionCursorDefault : {},
-        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {}
+        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {},
+        round: (room.round && typeof room.round === "object") ? room.round : { current:1, targetWins:1, winner:null },
+        grid: (room.grid && typeof room.grid === "object") ? room.grid : { type:getGridType(room), size:getGridSize(room) }
       };
     }
 
