@@ -4692,6 +4692,7 @@ if(homeBtn && role !== "host"){
 
               const pick = getNextQuestionSelection(LIVE.room, letter);
 
+              let nextBoardForPatch = null;
               if(isHiddenDigitCell){
                 const nextBoard = cloneBoardState(boardNow, LIVE.room) || buildBoardState(LIVE.room, Date.now());
                 if(Array.isArray(nextBoard.letters?.[r])){
@@ -4701,6 +4702,7 @@ if(homeBtn && role !== "host"){
                   delete nextBoard.hiddenLetters[k];
                 }
                 rememberBoard(nextBoard, LIVE.room);
+                nextBoardForPatch = nextBoard;
                 updates[`rooms/${code}/board`] = nextBoard;
               }
 
@@ -4709,6 +4711,35 @@ if(homeBtn && role !== "host"){
               if(pick.list.length){
                 updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
               }
+
+              try{
+                const optimisticMapStates = { ...((LIVE.room && LIVE.room.mapStates) || {}) };
+                const optimisticCurrentMap = { ...(mapStatesNow || {}) };
+                optimisticCurrentMap[k] = 1;
+                if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
+                  const prevKey = cellKey(Number(cur.row), Number(cur.col));
+                  if(prevKey !== k && Number(mapStatesNow?.[prevKey] ?? 0) === 1){
+                    delete optimisticCurrentMap[prevKey];
+                  }
+                }
+                optimisticMapStates[String(activeMapNow)] = optimisticCurrentMap;
+                const optimisticRoom = {
+                  ...(LIVE.room || {}),
+                  buzzer: null,
+                  current: { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow },
+                  mapStates: optimisticMapStates,
+                  board: nextBoardForPatch || boardNow
+                };
+                if(nextBoardForPatch){
+                  optimisticRoom.round = {
+                    ...((LIVE.room && LIVE.room.round) || {}),
+                    boardSeed: Number(nextBoardForPatch.seed || LIVE.room?.round?.boardSeed || 0) || 0
+                  };
+                }
+                LIVE.room = normalizeLiveRoom(optimisticRoom);
+                if(nextBoardForPatch) rememberBoard(nextBoardForPatch, optimisticRoom);
+                scheduleRender();
+              }catch(e){}
 
               await update(ref(db), updates);
               return;
