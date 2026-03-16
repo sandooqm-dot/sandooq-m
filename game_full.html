@@ -4706,10 +4706,15 @@ if(homeBtn && role !== "host"){
 
             if(st === 0){
               const nextStates = { ...(mapStatesNow || {}) };
+              const isDigitRevealOnly = !!isCoveredDigit;
 
               if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
                 const prevKey = cellKey(Number(cur.row), Number(cur.col));
                 if(prevKey !== k && Number(nextStates?.[prevKey] ?? 0) === 1){
+                  delete nextStates[prevKey];
+                  updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
+                }
+                if(isDigitRevealOnly && prevKey === k && Number(nextStates?.[prevKey] ?? 0) === 1){
                   delete nextStates[prevKey];
                   updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
                 }
@@ -4718,7 +4723,7 @@ if(homeBtn && role !== "host"){
               const pick = getNextQuestionSelection(LIVE.room, letter);
 
               let nextBoardForPatch = null;
-              if(isCoveredDigit){
+              if(isDigitRevealOnly){
                 const nextBoard = cloneBoardState(boardNow, LIVE.room) || buildBoardState(LIVE.room, Date.now());
                 nextBoard.revealedDigits = {
                   ...((nextBoard.revealedDigits && typeof nextBoard.revealedDigits === "object") ? nextBoard.revealedDigits : {}),
@@ -4727,9 +4732,11 @@ if(homeBtn && role !== "host"){
                 rememberBoard(nextBoard, LIVE.room);
                 nextBoardForPatch = nextBoard;
                 updates[`rooms/${code}/board`] = nextBoard;
+                updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = null;
+              } else {
+                updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
               }
 
-              updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
               updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
               if(pick.list.length){
                 updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
@@ -4738,10 +4745,17 @@ if(homeBtn && role !== "host"){
               try{
                 const optimisticMapStates = { ...((LIVE.room && LIVE.room.mapStates) || {}) };
                 const optimisticCurrentMap = { ...(mapStatesNow || {}) };
-                optimisticCurrentMap[k] = 1;
+                if(!isDigitRevealOnly){
+                  optimisticCurrentMap[k] = 1;
+                } else {
+                  delete optimisticCurrentMap[k];
+                }
                 if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
                   const prevKey = cellKey(Number(cur.row), Number(cur.col));
                   if(prevKey !== k && Number(mapStatesNow?.[prevKey] ?? 0) === 1){
+                    delete optimisticCurrentMap[prevKey];
+                  }
+                  if(isDigitRevealOnly && prevKey === k){
                     delete optimisticCurrentMap[prevKey];
                   }
                 }
