@@ -3352,8 +3352,25 @@ if(homeBtn && role !== "host"){
       if(role !== "host") return;
       const baseRoom = LIVE.room || {};
       const board = buildBoardState(baseRoom, Date.now());
-      LAST_STABLE_BOARD = board;
+      rememberBoard(board, baseRoom);
       const totalRounds = normalizeWinRounds(baseRoom?.settings?.winRounds || baseRoom?.round?.targetWins || 1);
+      const nextRoom = normalizeLiveRoom({
+        ...baseRoom,
+        status: "started",
+        activeMap: 0,
+        board,
+        freeze: false,
+        buzzer: null,
+        scores: { green:0, orange:0, a:0, b:0 },
+        winEvent: null,
+        winState: {},
+        round: { current:1, targetWins: totalRounds, winner:null, boardSeed: Number(board.seed || 0) || 0 },
+        mapStates: { "0": {} },
+        current: { letter:null, qIndex:0, row:null, col:null, map:0 },
+        timer: { sel:Number(baseRoom?.timer?.sel || 10), dur:Number(baseRoom?.timer?.sel || 10), running:false, startTs:0, done:false }
+      });
+      LIVE.room = nextRoom;
+      scheduleRender();
       try{
         await update(roomRef, {
           status: "started",
