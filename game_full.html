@@ -279,17 +279,39 @@
     .mapBox{
       position:relative;
       width:100%;
+      aspect-ratio:1/1;
       overflow:hidden;
-      border-radius:0;
-      background:transparent;
+      border-radius:26px;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,.16), transparent 35%),
+        radial-gradient(circle at 80% 25%, rgba(255,255,255,.10), transparent 30%),
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.10));
       box-shadow:0 18px 34px rgba(0,0,0,.30);
       border:6px solid rgba(0,0,0,.80);
     }
-    .mapBox img{
-      width:100%;
-      height:auto;
-      display:block;
-      object-fit:unset;
+    .boardBg{
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at 25% 22%, rgba(255,255,255,.14), transparent 28%),
+        radial-gradient(circle at 78% 18%, rgba(255,255,255,.10), transparent 24%),
+        radial-gradient(circle at 50% 88%, rgba(255,255,255,.08), transparent 24%),
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.10));
+      pointer-events:none;
+    }
+    .boardFrameLabel{
+      position:absolute;
+      top:12px;
+      right:12px;
+      padding:8px 14px;
+      border-radius:999px;
+      background:rgba(0,0,0,.28);
+      border:2px solid rgba(255,255,255,.18);
+      color:#fff;
+      font-size:16px;
+      font-weight:900;
+      z-index:2;
+      pointer-events:none;
     }
     .overlaySvg{
       position:absolute;
@@ -297,13 +319,33 @@
       width:100%;
       height:100%;
       pointer-events:auto;
+      z-index:3;
     }
     .overlaySvg .cell{
       cursor:pointer;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      stroke: var(--hexBorder);
-      stroke-width: 1;
+      stroke: rgba(255,255,255,.32);
+      stroke-width: 2.4;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,.18));
+      transition: fill .18s ease, transform .18s ease, opacity .18s ease;
+    }
+    .overlaySvg .cell.selectedCell{
+      stroke:#ffd54a;
+      stroke-width:4;
+    }
+    .overlaySvg .cellLetter{
+      fill:#fff;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      font-size:30px;
+      font-weight:900;
+      text-anchor:middle;
+      dominant-baseline:middle;
+      pointer-events:none;
+      paint-order:stroke;
+      stroke:rgba(0,0,0,.35);
+      stroke-width:2px;
+      user-select:none;
     }
     .overlaySvg .state0{ fill: rgba(0,0,0,0.001); }
     .overlaySvg .state1{ fill: var(--hexPale); }
@@ -316,10 +358,6 @@
       100% { opacity: 1; }
     }
     .overlaySvg .state1.pulse { animation: palePulse 0.9s ease-in-out infinite; }
-    .overlaySvg .cellLabel{ fill:#111; font-family:"AA-GALAXY", Arial, sans-serif; font-size:22px; font-weight:700; text-anchor:middle; dominant-baseline:middle; pointer-events:none; user-select:none; }
-    .overlaySvg .cellLabel.light{ fill:#fff; text-shadow:0 1px 2px rgba(0,0,0,.35); }
-    .mapBox.gridOnly{ aspect-ratio: 1 / 1; background:rgba(255,255,255,.08); }
-    .mapBox.gridOnly img{ display:none !important; }
 
     /* ✅ صف الأزرار تحت الخريطة (نفس الصورة) */
     .mapToolsRow{
@@ -950,15 +988,6 @@
       text-align:right;
     }
     .settingsView h3{margin:0 0 10px;text-align:center}
-    .settingsPanel.compactGuide{width:min(92vw, 560px);height:min(84vh, 760px);background:#ffd54a;position:relative;}
-    .settingsCloseRed{position:absolute;left:10px;top:10px;width:42px;height:42px;border:none;border-radius:12px;background:#ff2d2d;color:#fff;font-size:24px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;border:4px solid rgba(0,0,0,.85);z-index:2;}
-    .guideNav{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:0 0 12px;}
-    .guideNavBtn{border:none;border-radius:12px;background:#f7f1f4;color:#4b2040;font-weight:900;padding:10px 8px;cursor:pointer;border:2px solid rgba(0,0,0,.12);font-size:15px;}
-    .guideSection{scroll-margin-top:12px;border:2px solid rgba(0,0,0,.08);border-radius:14px;padding:10px 12px;margin:10px 0;background:#fff;}
-    .guideSection h4{margin:0 0 6px;font-size:18px;color:#401436;text-align:center;}
-    .guideSection p{margin:0;line-height:1.8;font-weight:700;font-family:Arial,sans-serif;}
-    .guideList{margin:0;padding-right:18px;font-family:Arial,sans-serif;line-height:1.8;font-weight:700;}
-
     .settingsBackMini{
       width:100%;
       height:52px;
@@ -996,6 +1025,118 @@
       flex:1 1 72px;
     }
     .timerMiniItem:active{ transform: translateY(1px); }
+
+    .roundOverlay{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(15,8,22,.70);
+      z-index:39000;
+      padding:18px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .roundOverlay.show{ display:flex; }
+    .roundOverlayInner{
+      width:min(92vw, 620px);
+      background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.08));
+      border:8px solid rgba(255,255,255,.24);
+      border-radius:34px;
+      box-shadow:0 26px 42px rgba(0,0,0,.34);
+      padding:26px 20px 24px;
+      text-align:center;
+      color:#fff;
+      position:relative;
+      overflow:hidden;
+    }
+    .roundStageText{
+      margin:0 0 16px;
+      font-size:48px;
+      font-weight:900;
+      line-height:1.05;
+    }
+    .roundScoreRow{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:14px;
+      margin-bottom:16px;
+    }
+    .roundScoreCard{
+      flex:1 1 0;
+      min-width:0;
+      border-radius:24px;
+      padding:18px 14px;
+      border:5px solid rgba(255,255,255,.85);
+      box-shadow:0 16px 26px rgba(0,0,0,.24);
+    }
+    .roundScoreNum{
+      font-size:60px;
+      font-weight:900;
+      line-height:1;
+      margin-bottom:8px;
+    }
+    .roundScoreName{
+      font-size:24px;
+      font-weight:900;
+      line-height:1.2;
+      word-break:break-word;
+    }
+    .roundDash{
+      flex:0 0 auto;
+      font-size:44px;
+      font-weight:900;
+      color:rgba(255,255,255,.86);
+    }
+    .roundWinnerLine{
+      margin:0;
+      font-size:24px;
+      font-weight:900;
+      line-height:1.55;
+      color:#fff;
+    }
+    .winnerCup{
+      margin:18px auto 0;
+      width:190px;
+      max-width:70vw;
+      height:0;
+      overflow:visible;
+      opacity:0;
+      transform:translateY(22px) scale(.86);
+      transition:all .36s ease;
+      pointer-events:none;
+    }
+    .winnerCup.show{
+      height:170px;
+      opacity:1;
+      transform:translateY(0) scale(1);
+    }
+    .cupBadge{
+      position:relative;
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:flex-end;
+      justify-content:center;
+      padding-bottom:18px;
+      font-size:28px;
+      font-weight:900;
+      color:#111;
+    }
+    .cupBadge::before{
+      content:"🏆";
+      position:absolute;
+      inset:0 0 28px 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:110px;
+      line-height:1;
+      filter: drop-shadow(0 12px 16px rgba(0,0,0,.22));
+    }
+    .winnerCup.to-green .cupBadge, .winnerCup.to-orange .cupBadge{ color:#fff; }
 
     /* ✅ (5) احتفال الفوز الجديد (5 ثواني) + قصاصات */
     .winBackdrop{
@@ -1326,31 +1467,82 @@
     // ✅ (9) حد للأسئلة الخاصة
     const MAX_CUSTOM_PER_LETTER = 7;
 
-    const MAPS = [
-      [
-        ["ش","أ","ث","د","هـ"],
-        ["ي","ح","ض","ن","ك"],
-        ["غ","ظ","ق","ر","ع"],
-        ["ص","ز","س","ط","و"],
-        ["ذ","ل","ب","م","ج"]
-      ],
-      [
-        ["ق","ص","و","د","ب"],
-        ["ح","ي","ض","هـ","ث"],
-        ["ك","ط","ش","ز","م"],
-        ["أ","ر","س","ظ","ث"],
-        ["ذ","غ","هـ","ع","ج"]
-      ],
-      [
-        ["ذ","ج","أ","ب","ر"],
-        ["ي","ح","ز","ل","س"],
-        ["ث","ظ","ق","ض","ع"],
-        ["ص","ن","د","ط","غ"],
-        ["ك","خ","هـ","م","و"]
-      ]
-    ];
+    const BASE_LETTERS = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
+    const ALL_LETTERS = Array.from(new Set(BASE_LETTERS));
 
-    const ALL_LETTERS = Array.from(new Set(MAPS.flat(2)));
+    function shuffleArray(arr){
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function normalizeCellCount(v){
+      const s = String(v ?? "").trim();
+      if(["4","٤","أربعة","اربع","ربعة"].includes(s)) return 4;
+      if(["6","٦","ستة","سته"].includes(s)) return 6;
+      return 5;
+    }
+
+    function normalizeCellShape(v){
+      const s = String(v ?? "").trim().toLowerCase();
+      if(s.includes("ربع") || s.includes("square")) return "square";
+      if(s.includes("خماس") || s.includes("penta") || s.includes("pent")) return "pentagon";
+      return "hex";
+    }
+
+    function normalizeWinRounds(v){
+      const s = String(v ?? "").trim();
+      if(["2","٢","جولتان","جولتين"].includes(s)) return 2;
+      if(["3","٣","ثلاث","ثلاث جولات","ثلاثة"].includes(s)) return 3;
+      return 1;
+    }
+
+    function getBoardSize(room){
+      return normalizeCellCount(room?.settings?.cellCount || room?.settings?.cellsCount || room?.settings?.boardSize || 5);
+    }
+
+    function getBoardShape(room){
+      return normalizeCellShape(room?.settings?.cellType || room?.settings?.shape || room?.settings?.boardShape || "hex");
+    }
+
+    function generateBoardLetters(size){
+      const needed = Math.max(1, Number(size||5)) ** 2;
+      const pool = [];
+      while(pool.length < needed){
+        pool.push(...shuffleArray(BASE_LETTERS));
+      }
+      const picked = pool.slice(0, needed);
+      const rows = [];
+      for(let r=0;r<size;r++) rows.push(picked.slice(r*size, (r+1)*size));
+      return rows;
+    }
+
+    function buildBoardState(roomLike, seedTs){
+      const size = getBoardSize(roomLike || {});
+      const shape = getBoardShape(roomLike || {});
+      return {
+        size,
+        shape,
+        seed: Number(seedTs || Date.now()),
+        letters: generateBoardLetters(size)
+      };
+    }
+
+    function getBoard(room){
+      const fromRoom = room?.board;
+      if(fromRoom && Array.isArray(fromRoom.letters) && fromRoom.letters.length){
+        return {
+          size: normalizeCellCount(fromRoom.size || fromRoom.letters.length || 5),
+          shape: normalizeCellShape(fromRoom.shape || getBoardShape(room)),
+          seed: Number(fromRoom.seed || 0),
+          letters: fromRoom.letters
+        };
+      }
+      return buildBoardState(room || {}, Date.now());
+    }
 
     // أسئلة افتراضية (Fallback) إذا ما كان فيه بنك أسئلة
     const DEFAULT_QUESTIONS = {};
@@ -2155,7 +2347,11 @@ if(homeBtn && role !== "host"){
         activeMap: 0,
         freeze: false,
         buzzer: null,
-        scores: { green:0, orange:0 },
+        scores: { green:0, orange:0, a:0, b:0 },
+        settings: {},
+        teams: {},
+        board: buildBoardState({}, Date.now()),
+        round: { current:1, targetWins:1, winner:null },
         winEvent: null,
         winState: {},
         mapStates: {},
@@ -2197,12 +2393,14 @@ if(homeBtn && role !== "host"){
     function hasPendingSelectedCell(roomLike){
       const room = roomLike || LIVE.room || {};
       const cur = room.current || {};
+      const board = getBoard(room);
+      const size = Math.max(1, Number(board.size || 5));
       const activeMapNow = Number(room.activeMap || 0);
       const curMap = Number(cur.map ?? activeMapNow);
       const r = Number(cur.row);
       const c = Number(cur.col);
       if(!Number.isFinite(r) || !Number.isFinite(c)) return false;
-      if(r < 0 || r > 4 || c < 0 || c > 4) return false;
+      if(r < 0 || r >= size || c < 0 || c >= size) return false;
       const mapStatesNow = (room.mapStates && room.mapStates[String(activeMapNow)]) ? room.mapStates[String(activeMapNow)] : {};
       const st = Number(mapStatesNow?.[cellKey(r,c)] ?? 0);
       return curMap === activeMapNow && st === 1;
@@ -2316,178 +2514,6 @@ if(homeBtn && role !== "host"){
         [x,       y + h*0.25],
       ];
       return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
-    }
-
-    function squarePoints(x, y, w, h){
-      const pts = [
-        [x, y], [x+w, y], [x+w, y+h], [x, y+h]
-      ];
-      return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
-    }
-
-    function pentagonPoints(x, y, w, h){
-      const pts = [
-        [x + w*0.50, y],
-        [x + w, y + h*0.36],
-        [x + w*0.80, y + h],
-        [x + w*0.20, y + h],
-        [x, y + h*0.36],
-      ];
-      return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
-    }
-
-    function getGridType(room){
-      const t = String(room?.settings?.gridType || room?.grid?.type || 'hex');
-      return (t === 'square' || t === 'pentagon' || t === 'hex') ? t : 'hex';
-    }
-
-    function getGridSize(room){
-      const n = Number(room?.settings?.cellCount || room?.grid?.size || 5);
-      return Math.max(4, Math.min(6, Number.isFinite(n) ? n : 5));
-    }
-
-    function hashSeed(str){
-      let h = 2166136261 >>> 0;
-      str = String(str || '');
-      for(let i=0;i<str.length;i++){
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 16777619);
-      }
-      return h >>> 0;
-    }
-
-    function seededRand(seed){
-      let a = (seed >>> 0) || 1;
-      return function(){
-        a |= 0; a = a + 0x6D2B79F5 | 0;
-        let t = Math.imul(a ^ a >>> 15, 1 | a);
-        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-      };
-    }
-
-    function shuffleSeeded(arr, seedStr){
-      const out = arr.slice();
-      const rnd = seededRand(hashSeed(seedStr));
-      for(let i=out.length-1;i>0;i--){
-        const j = Math.floor(rnd() * (i+1));
-        const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
-      }
-      return out;
-    }
-
-    function getGridLetters(room){
-      const n = getGridSize(room);
-      const needed = n * n;
-      const base = [];
-      while(base.length < needed){
-        base.push(...ALL_LETTERS);
-      }
-      const seed = `${room?.code || code}|${room?.round?.current || 1}|${room?.createdAt || 0}|${room?.settings?.gridType || 'hex'}|${n}`;
-      const list = shuffleSeeded(base.slice(0, needed), seed);
-      const rows = [];
-      for(let r=0;r<n;r++) rows.push(list.slice(r*n, (r+1)*n));
-      return rows;
-    }
-
-    function getGridLetter(room, r, c){
-      const rows = getGridLetters(room || {});
-      return (rows?.[r]?.[c]) || '';
-    }
-
-    function buildOverlayCells(overlay, room, interactive){
-      overlay.innerHTML = '';
-      overlay.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-      const svgNS = 'http://www.w3.org/2000/svg';
-      const n = getGridSize(room);
-      const cells = [];
-      const labels = [];
-      for(let row=0; row<n; row++){
-        for(let col=0; col<n; col++){
-          const poly = document.createElementNS(svgNS, 'polygon');
-          poly.classList.add('cell', 'state0');
-          poly.setAttribute('data-row', row);
-          poly.setAttribute('data-col', col);
-          overlay.appendChild(poly);
-          cells.push(poly);
-
-          const txt = document.createElementNS(svgNS, 'text');
-          txt.classList.add('cellLabel');
-          txt.setAttribute('data-row', row);
-          txt.setAttribute('data-col', col);
-          txt.textContent = getGridLetter(room, row, col);
-          overlay.appendChild(txt);
-          labels.push(txt);
-        }
-      }
-      overlay.style.pointerEvents = interactive ? 'auto' : 'none';
-      return { cells, labels };
-    }
-
-    function placeDynamicCells(room, overlay, cells, labels, boxEl){
-      const n = getGridSize(room);
-      const type = getGridType(room);
-      const W = boxEl.clientWidth || 600;
-      const H = boxEl.clientHeight || W;
-      if(!W || !H) return;
-      overlay.setAttribute('viewBox', `0 0 ${W} ${H}`);
-      overlay.setAttribute('preserveAspectRatio', 'none');
-
-      const pad = Math.max(14, W * 0.045);
-      const innerW = W - pad*2;
-      const innerH = H - pad*2;
-      let i = 0;
-      if(type === 'square'){
-        const gap = innerW * 0.02;
-        const cellW = (innerW - gap*(n-1)) / n;
-        const cellH = (innerH - gap*(n-1)) / n;
-        for(let r=0;r<n;r++){
-          for(let c=0;c<n;c++){
-            const x = pad + c*(cellW+gap);
-            const y = pad + r*(cellH+gap);
-            cells[i].setAttribute('points', squarePoints(x,y,cellW,cellH));
-            labels[i].setAttribute('x', (x + cellW/2).toFixed(2));
-            labels[i].setAttribute('y', (y + cellH/2 + 1).toFixed(2));
-            labels[i].textContent = getGridLetter(room,r,c);
-            i++;
-          }
-        }
-      }else if(type === 'pentagon'){
-        const gap = innerW * 0.018;
-        const cellW = (innerW - gap*(n-1)) / n;
-        const cellH = (innerH - gap*(n-1)) / n;
-        for(let r=0;r<n;r++){
-          for(let c=0;c<n;c++){
-            const x = pad + c*(cellW+gap);
-            const y = pad + r*(cellH+gap);
-            cells[i].setAttribute('points', pentagonPoints(x,y,cellW,cellH));
-            labels[i].setAttribute('x', (x + cellW/2).toFixed(2));
-            labels[i].setAttribute('y', (y + cellH*0.56).toFixed(2));
-            labels[i].textContent = getGridLetter(room,r,c);
-            i++;
-          }
-        }
-      }else{
-        const cellW = innerW / (n + 0.6);
-        const cellH = innerH / (n + 0.25);
-        const stepX = cellW * 0.86;
-        const stepY = cellH * 0.76;
-        const totalW = stepX*(n-1) + cellW + cellW*0.5;
-        const totalH = stepY*(n-1) + cellH;
-        const x0 = (W - totalW)/2;
-        const y0 = (H - totalH)/2;
-        for(let r=0;r<n;r++){
-          for(let c=0;c<n;c++){
-            const x = x0 + c*stepX + (r%2 ? cellW*0.43 : 0);
-            const y = y0 + r*stepY;
-            cells[i].setAttribute('points', hexPointsPointyTop(x,y,cellW,cellH));
-            labels[i].setAttribute('x', (x + cellW/2).toFixed(2));
-            labels[i].setAttribute('y', (y + cellH/2 + 1).toFixed(2));
-            labels[i].textContent = getGridLetter(room,r,c);
-            i++;
-          }
-        }
-      }
     }
 
     const TIMER_UI = {
@@ -2646,7 +2672,7 @@ if(homeBtn && role !== "host"){
       if(window[key]) return;
       window[key] = true;
 
-      update(ref(db, `rooms/${code}`), { scores: { green:0, orange:0 } });
+      update(ref(db, `rooms/${code}`), { scores: { green:0, orange:0, a:0, b:0 } });
     }
 
     function buildJoinUrl(roomCode){
@@ -2736,59 +2762,75 @@ if(homeBtn && role !== "host"){
       if(TIP_OPEN) closeTip();
     }, true);
 
-    function neighborsFor(room, r, c){
-      const n = getGridSize(room || LIVE.room || {});
-      const type = getGridType(room || LIVE.room || {});
-      let out = [];
-      if(type === 'square'){
-        out = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
-      }else if(type === 'pentagon'){
-        out = [[r-1,c],[r+1,c],[r,c-1],[r,c+1], ((r+c)%2===0?[r-1,c+1]:[r+1,c-1])];
+    function getNeighborsForCell(row, col, board){
+      const size = Math.max(1, Number(board?.size || 5));
+      const shape = normalizeCellShape(board?.shape || "hex");
+      const out = [];
+      if(shape === "square"){
+        out.push([row, col-1], [row, col+1], [row-1, col], [row+1, col]);
       }else{
-        const odd = (r % 2) === 1;
-        out = [[r, c-1], [r, c+1]];
-        if(odd) out.push([r-1, c], [r-1, c+1], [r+1, c], [r+1, c+1]);
-        else out.push([r-1, c-1], [r-1, c], [r+1, c-1], [r+1, c]);
+        const odd = (row % 2) === 1;
+        out.push([row, col-1], [row, col+1]);
+        if(odd){
+          out.push([row-1, col], [row-1, col+1], [row+1, col], [row+1, col+1]);
+        }else{
+          out.push([row-1, col-1], [row-1, col], [row+1, col-1], [row+1, col]);
+        }
+        if(shape === "pentagon"){
+          out.push([row-1, col], [row+1, col]);
+        }
       }
-      return out.filter(([rr,cc]) => rr>=0 && rr<n && cc>=0 && cc<n);
+      return out.filter(([rr,cc]) => rr>=0 && rr<size && cc>=0 && cc<size);
     }
 
-    function computeWinners(mapStatesForMap, roomArg){
-      const room = roomArg || LIVE.room || {};
-      const n = getGridSize(room);
+    function computeWinners(mapStatesForMap, board){
+      const size = Math.max(1, Number(board?.size || 5));
       const getSt = (r,c) => Number(mapStatesForMap?.[cellKey(r,c)] ?? 0);
 
       const qG = [];
       const seenG = new Set();
-      for(let r=0;r<n;r++){
-        if(getSt(r,0) === 2){ qG.push([r,0]); seenG.add(cellKey(r,0)); }
+      for(let r=0;r<size;r++){
+        if(getSt(r,0) === 2){
+          qG.push([r,0]);
+          seenG.add(cellKey(r,0));
+        }
       }
       let greenWin = false;
       while(qG.length){
         const [r,c] = qG.shift();
-        if(c === n-1){ greenWin = true; break; }
-        for(const [rr,cc] of neighborsFor(room,r,c)){
+        if(c === size-1){ greenWin = true; break; }
+        for(const [rr,cc] of getNeighborsForCell(r,c,board)){
           const k = cellKey(rr,cc);
           if(seenG.has(k)) continue;
-          if(getSt(rr,cc) === 2){ seenG.add(k); qG.push([rr,cc]); }
+          if(getSt(rr,cc) === 2){
+            seenG.add(k);
+            qG.push([rr,cc]);
+          }
         }
       }
 
       const qO = [];
       const seenO = new Set();
-      for(let c=0;c<n;c++){
-        if(getSt(0,c) === 3){ qO.push([0,c]); seenO.add(cellKey(0,c)); }
+      for(let c=0;c<size;c++){
+        if(getSt(0,c) === 3){
+          qO.push([0,c]);
+          seenO.add(cellKey(0,c));
+        }
       }
       let orangeWin = false;
       while(qO.length){
         const [r,c] = qO.shift();
-        if(r === n-1){ orangeWin = true; break; }
-        for(const [rr,cc] of neighborsFor(room,r,c)){
+        if(r === size-1){ orangeWin = true; break; }
+        for(const [rr,cc] of getNeighborsForCell(r,c,board)){
           const k = cellKey(rr,cc);
           if(seenO.has(k)) continue;
-          if(getSt(rr,cc) === 3){ seenO.add(k); qO.push([rr,cc]); }
+          if(getSt(rr,cc) === 3){
+            seenO.add(k);
+            qO.push([rr,cc]);
+          }
         }
       }
+
       return { greenWin, orangeWin };
     }
 
@@ -2798,15 +2840,17 @@ if(homeBtn && role !== "host"){
       if(team !== "green" && team !== "orange") return;
 
       const cur = LIVE.room.current || {};
-      const activeMapNow = Number(LIVE.room.activeMap || 0);
+      const board = getBoard(LIVE.room);
+      const boardKey = Number(LIVE.room.activeMap || 0);
+      const size = Math.max(1, Number(board.size || 5));
       const r = Number(cur.row);
       const c = Number(cur.col);
 
       if(!Number.isFinite(r) || !Number.isFinite(c)) return;
-      if(r < 0 || r > 4 || c < 0 || c > 4) return;
+      if(r < 0 || r >= size || c < 0 || c >= size) return;
 
       const k = cellKey(r,c);
-      const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
+      const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(boardKey)]) ? LIVE.room.mapStates[String(boardKey)] : {};
       const currentState = Number(mapStatesNow?.[k] ?? 0);
       if(currentState !== 1) return;
 
@@ -2814,16 +2858,16 @@ if(homeBtn && role !== "host"){
       const nextStates = { ...(mapStatesNow || {}) };
       nextStates[k] = next;
 
-      const winners = computeWinners(nextStates, LIVE.room);
-      const prevWin = (LIVE.room.winState && LIVE.room.winState[String(activeMapNow)]) ? LIVE.room.winState[String(activeMapNow)] : { greenWin:false, orangeWin:false };
+      const winners = computeWinners(nextStates, board);
+      const prevWin = (LIVE.room.winState && LIVE.room.winState[String(boardKey)]) ? LIVE.room.winState[String(boardKey)] : { greenWin:false, orangeWin:false };
 
       let winEvent = null;
       const greenNew = !!winners.greenWin && !prevWin.greenWin;
       const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
 
       const scoresNow = (LIVE.room.scores && typeof LIVE.room.scores === "object") ? LIVE.room.scores : { green:0, orange:0 };
-      let nextGreenScore = Number(scoresNow.green ?? 0) || 0;
-      let nextOrangeScore = Number(scoresNow.orange ?? 0) || 0;
+      let nextGreenScore = Number(scoresNow.green ?? scoresNow.a ?? 0) || 0;
+      let nextOrangeScore = Number(scoresNow.orange ?? scoresNow.b ?? 0) || 0;
 
       if(greenNew || orangeNew){
         let winTeam = team;
@@ -2831,11 +2875,11 @@ if(homeBtn && role !== "host"){
         else if(orangeNew && !greenNew) winTeam = "orange";
         if(winTeam === "green") nextGreenScore += 1;
         else nextOrangeScore += 1;
-        const targetWins = Math.max(1, Number(LIVE.room?.round?.targetWins || LIVE.room?.settings?.winRounds || 1));
+        const targetWins = normalizeWinRounds(LIVE.room?.round?.targetWins || LIVE.room?.settings?.winRounds || 1);
         winEvent = {
           team: winTeam,
           ts: Date.now(),
-          map: activeMapNow,
+          map: boardKey,
           greenScore: nextGreenScore,
           orangeScore: nextOrangeScore,
           targetWins,
@@ -2844,17 +2888,18 @@ if(homeBtn && role !== "host"){
         };
       }
 
+      const letter = board?.letters?.[r]?.[c] || cur.letter || "";
       const updates = {};
-      updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = next;
+      updates[`rooms/${code}/mapStates/${boardKey}/${k}`] = next;
       updates[`rooms/${code}/buzzer`] = null;
       updates[`rooms/${code}/current`] = {
         ...cur,
-        letter: getGridLetter(LIVE.room, r, c),
+        letter,
         row: r,
         col: c,
-        map: activeMapNow
+        map: boardKey
       };
-      updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
+      updates[`rooms/${code}/winState/${boardKey}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
       if(winEvent){
         updates[`rooms/${code}/winEvent`] = winEvent;
         updates[`rooms/${code}/scores/green`] = nextGreenScore;
@@ -3378,8 +3423,7 @@ if(homeBtn && role !== "host"){
       bd.id = "settingsBackdrop";
       bd.className = "settingsBackdrop";
       bd.innerHTML = `
-        <div class="settingsPanel compactGuide" role="dialog" aria-modal="true" aria-label="الإعدادات">
-          <button id="settingsCloseX" class="settingsCloseRed" type="button">✕</button>
+        <div class="settingsPanel" role="dialog" aria-modal="true" aria-label="الإعدادات">
           <div id="settingsMenu">
             <button id="sHelp" class="settingsBtn" type="button">التعليمات</button>
             <button id="sTimer" class="settingsBtn" type="button">تعديل المؤقت</button>
@@ -3399,55 +3443,33 @@ if(homeBtn && role !== "host"){
 
           <div id="helpView" class="settingsView">
             <h3>تعليمات اللعبة</h3>
-            <div class="guideNav">
-              <button type="button" class="guideNavBtn" data-target="guideHow">طريقة اللعب</button>
-              <button type="button" class="guideNavBtn" data-target="guideBtns">وظائف الأزرار</button>
-              <button type="button" class="guideNavBtn" data-target="guidePlayers">دخول اللاعبين</button>
-              <button type="button" class="guideNavBtn" data-target="guideTimer">المؤقت</button>
-              <button type="button" class="guideNavBtn" data-target="guideCells">الخريطة والخلايا</button>
-              <button type="button" class="guideNavBtn" data-target="guideWin">الفوز والنتيجة</button>
-            </div>
+            <div style="line-height:1.75;font-weight:700">
+              <p><b>فكرة اللعبة:</b> يختار المقدم حرفًا من الخريطة، ثم يظهر سؤال لهذا الحرف. أول لاعب يضغط زر الإجابة يظهر اسمه في الشريط.</p>
+              <p><b>دخول اللاعبين:</b> ينضم اللاعبون عبر رابط الدخول أو من خلال الباركود.</p>
 
-            <section id="guideHow" class="guideSection">
-              <h4>شرح طريقة اللعب</h4>
-              <p>المقدم يضغط على خلية حرف من الخريطة فيتم تأشيرها ويظهر السؤال مباشرة. بعد ذلك يضغط اللاعبون زر الإجابة، ويظهر اسم أول لاعب ضغط. ثم يضغط المقدم على اسم الفريق المستحق فتتلوّن الخلية بلونه.</p>
-            </section>
-
-            <section id="guideBtns" class="guideSection">
-              <h4>شرح وظائف الأزرار</h4>
-              <ul class="guideList">
-                <li>تجميد الأزرار: يمنع اللاعبين مؤقتًا من الضغط.</li>
-                <li>تغيير السؤال: يعرض السؤال التالي لنفس الحرف.</li>
-                <li>تفريغ الخريطة: يمسح ألوان الخلايا فقط.</li>
-                <li>تغيير نوع الأسئلة: يبدّل بين أسئلة اللعبة والأسئلة الخاصة.</li>
-                <li>الزوم: لتكبير وتصغير الخريطة.</li>
+              <p><b>طريقة اللعب باختصار:</b></p>
+              <ul>
+                <li>المقدم يضغط على خلية حرف في الخريطة لاختيار الحرف.</li>
+                <li>يظهر السؤال داخل بطاقة السؤال.</li>
+                <li>اللاعبون يضغطون زر "اضغط هنا للإجابة". أول لاعب يضغط يظهر اسمه.</li>
+                <li>المقدم يضغط على الحرف أولًا، ثم يضغط على اسم الفريق لتلوين الخلية لذلك الفريق.</li>
               </ul>
-            </section>
 
-            <section id="guidePlayers" class="guideSection">
-              <h4>دخول اللاعبين</h4>
-              <p>يقوم المقدم بإنشاء اللعبة ثم يشارك مع اللاعبين رابط الدخول أو الباركود. يدخل كل لاعب من جهازه، يكتب اسمه، ثم ينضم إلى الغرفة وينتظر بدء اللعب.</p>
-            </section>
-
-            <section id="guideTimer" class="guideSection">
-              <h4>المؤقت</h4>
-              <p>وقت المؤقت يتم اختياره من السلايدر داخل الإعدادات من 1 إلى 50 ثانية. يبدأ المؤقت تلقائيًا عند أول لاعب يضغط الجرس، ويمكن تصفيره بالضغط على دائرة المؤقت.</p>
-            </section>
-
-            <section id="guideCells" class="guideSection">
-              <h4>الخريطة والخلايا</h4>
-              <p>الخريطة تتكون من خلايا تحتوي الحروف. عند بدء جولة جديدة يتم مسح التلوين تلقائيًا وتغيير أماكن الحروف تلقائيًا. لون التأشير يوضح الحرف المختار حاليًا قبل اعتماده لأحد الفريقين.</p>
-            </section>
-
-            <section id="guideWin" class="guideSection">
-              <h4>الفوز والنتيجة</h4>
-              <p>الفوز يُحتسب تلقائيًا عند اكتمال الاتصال الصحيح لخلايا أحد الفريقين. بعدها تظهر نتيجة الجولة، وإذا كانت هناك جولة جديدة يبدأ توزيع جديد للحروف. وإذا وصل أحد الفريقين إلى العدد المطلوب يظهر أنميشن بطل السباق.</p>
-            </section>
-
+              <p><b>شرح الأزرار للمقدم:</b></p>
+              <ul>
+                <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
+                <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
+                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للوضع الافتراضي.</li>
+                <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
+                <li><b>المؤقت:</b> يتم تحديده من السلايدر داخل الإعدادات من 1 إلى 50 ثانية، ويبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
+                <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
+                <li><b>الخلايا:</b> يتم تغيير الحروف ومسح التلوين تلقائيًا عند بدء الجولة الجديدة.</li>
+              </ul>
+            </div>
             <button id="helpBack" class="settingsBackMini" type="button">رجوع</button>
           </div>
         </div>
-            `;
+      `;
       document.body.appendChild(bd);
 
       function closeSettings(){
@@ -3460,14 +3482,6 @@ if(homeBtn && role !== "host"){
 
       bd.addEventListener("click", (e) => {
         if(e.target === bd) closeSettings();
-      });
-      bd.querySelector("#settingsCloseX").addEventListener("click", closeSettings);
-      bd.querySelectorAll(".guideNavBtn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const id = btn.getAttribute("data-target");
-          const el = bd.querySelector(`#${id}`);
-          if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
-        });
       });
 
       bd.querySelector("#helpBack").addEventListener("click", () => {
@@ -3658,14 +3672,19 @@ if(homeBtn && role !== "host"){
       });
 
       document.getElementById("startBtn").addEventListener("click", async () => {
+        const board = buildBoardState(room, Date.now());
+        const targetWins = normalizeWinRounds(room?.settings?.winRounds || room?.round?.targetWins || 1);
         await update(roomRef, {
           status: "started",
           activeMap: 0,
+          board,
           freeze: false,
           buzzer: null,
-          scores: { green:0, orange:0 },
+          scores: { green:0, orange:0, a:0, b:0 },
           winEvent: null,
           winState: null,
+          round: { current:1, targetWins, winner:null },
+          mapStates: { "0": {} },
           current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
         });
       });
@@ -3875,13 +3894,18 @@ if(homeBtn && role !== "host"){
       const sg = visualScores.green;
       const so = visualScores.orange;
 
+      const board = getBoard(room);
+      const boardShapeLabel = ({hex:"سداسية", pentagon:"خماسية", square:"رباعية"}[board.shape] || "سداسية");
+      const boardCountLabel = `${board.size} × ${board.size}`;
+
       main.innerHTML = `
         <div class="gameLayout">
           <div class="landRight">
             <div class="mapOuter">
               <div id="mapScale" class="mapScale" style="--zoom:1">
                 <div id="mapBox" class="mapBox">
-                  <img id="mapImg" src="" alt="" decoding="async">
+                  <div class="boardBg"></div>
+                  <div id="boardFrameLabel" class="boardFrameLabel">${boardShapeLabel} • ${boardCountLabel}</div>
                   <svg id="overlay" class="overlaySvg"></svg>
                 </div>
               </div>
@@ -3954,9 +3978,9 @@ if(homeBtn && role !== "host"){
       `;
 
       // ✅ حفظ مراجع DOM للتحديث بدون إعادة رسم
-      GAME_UI.els.mapImg = document.getElementById("mapImg");
       GAME_UI.els.overlay = document.getElementById("overlay");
       GAME_UI.els.mapScale = document.getElementById("mapScale");
+      GAME_UI.els.boardFrameLabel = document.getElementById("boardFrameLabel");
       GAME_UI.els.zoom = document.getElementById("zoom");
       GAME_UI.els.scoreGreen = document.getElementById("scoreGreen");
       GAME_UI.els.scoreOrange = document.getElementById("scoreOrange");
@@ -3973,20 +3997,42 @@ if(homeBtn && role !== "host"){
       GAME_UI.els.buzzBtn = document.getElementById("buzzBtn");
       GAME_UI.els.timerClock = document.getElementById("timerClock");
 
-      const mapImg = GAME_UI.els.mapImg;
       const overlay = GAME_UI.els.overlay;
       const mapScale = GAME_UI.els.mapScale;
       const zoom = GAME_UI.els.zoom;
 
-      const activeMap = 0;
+      const activeMap = Number(room.activeMap || 0);
+
       GAME_UI.activeMap = activeMap;
-      GAME_UI.srcBase = 'grid-only';
-      const mapBoxEl = document.getElementById("mapBox");
-      if(mapBoxEl) mapBoxEl.classList.add('gridOnly');
-      if(mapImg){ mapImg.removeAttribute('src'); mapImg.style.display = 'none'; }
-      const built = buildOverlayCells(overlay, room, !!isHost);
-      GAME_UI.cells = built.cells;
-      GAME_UI.labels = built.labels;
+      GAME_UI.srcBase = `${board.shape}-${board.size}`;
+      GAME_UI.board = board;
+
+      overlay.innerHTML = "";
+      overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+      const svgNS = "http://www.w3.org/2000/svg";
+      const size = Math.max(1, Number(board.size || 5));
+      for(let row=0; row<size; row++){
+        for(let col=0; col<size; col++){
+          const g = document.createElementNS(svgNS, "g");
+          const poly = document.createElementNS(svgNS, "polygon");
+          poly.classList.add("cell", "state0");
+          poly.setAttribute("data-row", row);
+          poly.setAttribute("data-col", col);
+          const txt = document.createElementNS(svgNS, "text");
+          txt.classList.add("cellLetter");
+          txt.setAttribute("data-row", row);
+          txt.setAttribute("data-col", col);
+          txt.textContent = board?.letters?.[row]?.[col] || "";
+          g.appendChild(poly);
+          g.appendChild(txt);
+          overlay.appendChild(g);
+        }
+      }
+
+      GAME_UI.cells = Array.from(overlay.querySelectorAll(".cell"));
+      GAME_UI.letterEls = Array.from(overlay.querySelectorAll(".cellLetter"));
+      overlay.style.pointerEvents = isHost ? "auto" : "none";
 
       const ZOOM_KEY = `sabaq_zoom_${code}`;
       const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
@@ -4001,6 +4047,8 @@ if(homeBtn && role !== "host"){
 
         const z = Number(zoom.value || 1);
         mapScale.style.setProperty("--zoom", z);
+        mapScale.style.transform = `scale(${z})`;
+        mapScale.style.transformOrigin = "center top";
 
         const baseH = mapBox.offsetHeight || 0;
         const extra = Math.max(0, baseH * (z - 1));
@@ -4008,32 +4056,477 @@ if(homeBtn && role !== "host"){
       }
       GAME_UI.applyZoomFix = applyZoomFix;
 
+      function polygonPointsForShape(shape, x, y, w, h){
+        if(shape === "square"){
+          return `${x},${y} ${x+w},${y} ${x+w},${y+h} ${x},${y+h}`;
+        }
+        if(shape === "pentagon"){
+          const pts = [
+            [x + w/2, y],
+            [x + w, y + h*0.36],
+            [x + w*0.82, y + h],
+            [x + w*0.18, y + h],
+            [x, y + h*0.36]
+          ];
+          return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
+        }
+        return hexPointsPointyTop(x, y, w, h);
+      }
+
       function placeHexes(){
-        placeDynamicCells(room, overlay, GAME_UI.cells || [], GAME_UI.labels || [], mapBox);
+        const W = mapScale.clientWidth || 720;
+        const H = document.getElementById("mapBox")?.clientHeight || W;
+        if(!W || !H) return;
+
+        overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
+        overlay.setAttribute("preserveAspectRatio", "none");
+
+        const shape = board.shape;
+        const marginX = W * 0.08;
+        const marginY = H * 0.10;
+        const usableW = W - marginX*2;
+        const usableH = H - marginY*2;
+
+        let cellW, cellH, stepX, stepY;
+        if(shape === "square"){
+          cellW = usableW / size;
+          cellH = usableH / size;
+          stepX = cellW;
+          stepY = cellH;
+        }else if(shape === "pentagon"){
+          cellW = usableW / (size + 0.35);
+          cellH = usableH / (size + 0.15);
+          stepX = cellW * 0.95;
+          stepY = cellH * 0.96;
+        }else{
+          cellW = usableW / (size + 0.5);
+          cellH = usableH / (size * 0.84 + 0.25);
+          stepX = cellW;
+          stepY = cellH * 0.76;
+        }
+
+        let i = 0;
+        for(let row=0; row<size; row++){
+          for(let col=0; col<size; col++){
+            let x = marginX + (col * stepX);
+            let y = marginY + (row * stepY);
+            if(shape !== "square") x += (row % 2) * (cellW / 2);
+            const poly = GAME_UI.cells[i];
+            const txt = GAME_UI.letterEls[i];
+            poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
+            txt.setAttribute("x", (x + cellW/2).toFixed(2));
+            txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+            txt.textContent = board?.letters?.[row]?.[col] || "";
+            i++;
+          }
+        }
+
         applyZoomFix();
       }
       GAME_UI.placeHexes = placeHexes;
-      requestAnimationFrame(placeHexes);
+      GAME_UI.onMapReady = () => requestAnimationFrame(placeHexes);
+      GAME_UI.onMapReady();
 
-      GAME_UI.onMapReady = onMapReady;
+      if(!GAME_UI.resizeBound){
+        GAME_UI.resizeBound = true;
+        window.addEventListener("resize", () => {
+          try{ placeHexes(); applyZoomFix(); }catch(e){}
+        });
+      }
 
-      if(mapImg.complete && mapImg.naturalWidth > 0) onMapReady();
-      else mapImg.addEventListener("load", onMapReady, { once:true });
-zoom.addEventListener("input", applyZoomFix);
+      // ✅ تحديثات (مؤقت) أولية
+      TIMER_UI.latestTimer = room.timer || {};
+      TIMER_UI.isHost = isHost;
+      ensureTimerTicker();
+      applyTimerDom();
+
+      // ✅ Tooltips
+      main.querySelectorAll(".helpDot").forEach(dot => {
+        dot.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const txt = dot.getAttribute("data-tip") || "";
+          if(TIP_OPEN && tipPopup.style.display === "block"){
+            closeTip();
+            return;
+          }
+          openTip(dot, txt);
+        });
+      });
+
+      // ✅ تلوين الخلية المحددة بعد اختيار الفريق
+      if(isHost){
+        const tG = GAME_UI.els.teamGreenBtn;
+        const tO = GAME_UI.els.teamOrangeBtn;
+
+        if(tG && !tG.__teamHooked){
+          tG.__teamHooked = true;
+          tG.addEventListener("click", async () => {
+            closeTip();
+            if(!hasPendingSelectedCell(LIVE.room)) return;
+            await assignCurrentCellToTeam("green");
+          });
+        }
+        if(tO && !tO.__teamHooked){
+          tO.__teamHooked = true;
+          tO.addEventListener("click", async () => {
+            closeTip();
+            if(!hasPendingSelectedCell(LIVE.room)) return;
+            await assignCurrentCellToTeam("orange");
+          });
+        }
+      }
+
+      // ✅ Timer click (host)
+      if(isHost && GAME_UI.els.timerClock){
+        GAME_UI.els.timerClock.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const t = normalizeTimer(TIMER_UI.latestTimer || {});
+          const sel = Number(t.sel || 10);
+
+          if(t.running || t.done){
+            await update(ref(db, `rooms/${code}/timer`), {
+              running:false,
+              done:false,
+              startTs:0,
+              dur: sel
+            });
+            return;
+          }
+
+          await update(ref(db, `rooms/${code}/timer`), {
+            sel,
+            dur: sel,
+            running:true,
+            done:false,
+            startTs: Date.now()
+          });
+        });
+      }
+
+      // ✅ Settings
+      if(isHost && GAME_UI.els.settingsBtn){
+        GAME_UI.els.settingsBtn.addEventListener("click", () => openSettings(LIVE.room));
+      }
+
+      // ✅ Q Mode toggle
+      if(isHost && GAME_UI.els.qModeBtn){
+        GAME_UI.els.qModeBtn.addEventListener("click", async () => {
+          const cur = getQuestionMode(LIVE.room);
+          const next = (cur === "custom") ? "default" : "custom";
+          await update(ref(db, `rooms/${code}`), { questionMode: next });
+        });
+      }
+
+      // ✅ Zoom
+      if(zoom){
+        zoom.addEventListener("input", () => {
+          const z = Number(zoom.value || 1);
+          localStorage.setItem(ZOOM_KEY, String(z));
+          applyZoomFix();
+        });
+      }
+
+      // ✅ Freeze
+      if(isHost && GAME_UI.els.freezeBtn){
+        GAME_UI.els.freezeBtn.addEventListener("click", async () => {
+          await update(roomRef, { freeze: !LIVE.room.freeze, buzzer: null });
+        });
+      }
+
+      // ✅ Next Q
+      if(isHost && GAME_UI.els.nextQ){
+        GAME_UI.els.nextQ.addEventListener("click", async () => {
+          const cur = LIVE.room.current || {};
+          if(!cur.letter) return;
+
+          const pick = getNextQuestionSelection(LIVE.room, cur.letter);
+          if(!pick.list.length) return;
+
+          const updates = {};
+          updates[`rooms/${code}/current`] = { ...cur, qIndex: pick.qIndex };
+          updates[`rooms/${code}/${pick.cursorField}/${cur.letter}`] = pick.nextCursor;
+          await update(ref(db), updates);
+        });
+      }
+
+      // ✅ Clear board
+      if(isHost && GAME_UI.els.clearBoardBtn){
+        GAME_UI.els.clearBoardBtn.addEventListener("click", async () => {
+          closeTip();
+          const curMap = Number(LIVE.room.activeMap || 0);
+          const updates = {};
+          updates[`rooms/${code}/mapStates/${curMap}`] = null;
+          updates[`rooms/${code}/buzzer`] = null;
+          updates[`rooms/${code}/winState`] = null;
+          await update(ref(db), updates);
+        });
+      }
+
+      // ✅ Overlay cell click (host)
+      if(isHost){
+        GAME_UI.cells.forEach(cell => {
+          cell.addEventListener("click", async (e) => {
+            e.preventDefault();
+            if(LIVE.room.status !== "started") return;
+
+            const boardNow = getBoard(LIVE.room);
+            const sizeNow = Math.max(1, Number(boardNow.size || 5));
+            const r = Number(cell.getAttribute("data-row"));
+            const c = Number(cell.getAttribute("data-col"));
+            if(r < 0 || c < 0 || r >= sizeNow || c >= sizeNow) return;
+            const k = cellKey(r,c);
+            const letter = boardNow?.letters?.[r]?.[c] || "";
+
+            const activeMapNow = Number(LIVE.room.activeMap || 0);
+            const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
+            const st = Number(mapStatesNow?.[k] ?? 0);
+            const cur = LIVE.room.current || {};
+            const curMap = Number(cur.map ?? activeMapNow);
+            const isCurrentCell = (Number(cur.row) === r && Number(cur.col) === c && curMap === activeMapNow);
+
+            const updates = {};
+            updates[`rooms/${code}/buzzer`] = null;
+
+            if(st === 0){
+              const nextStates = { ...(mapStatesNow || {}) };
+
+              if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
+                const prevKey = cellKey(Number(cur.row), Number(cur.col));
+                if(prevKey !== k && Number(nextStates?.[prevKey] ?? 0) === 1){
+                  delete nextStates[prevKey];
+                  updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
+                }
+              }
+
+              const pick = getNextQuestionSelection(LIVE.room, letter);
+              updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
+              updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
+              if(pick.list.length){
+                updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
+              }
+
+              await update(ref(db), updates);
+              return;
+            }
+
+            const nextStates = { ...(mapStatesNow || {}) };
+            delete nextStates[k];
+
+            const winners = computeWinners(nextStates, boardNow);
+            updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = null;
+            updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
+
+            if(isCurrentCell){
+              updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:activeMapNow };
+            }
+
+            await update(ref(db), updates);
+          });
+        });
+      }
+
+      // ✅ Player buzzer
+      if(GAME_UI.els.buzzBtn){
+        GAME_UI.els.buzzBtn.addEventListener("click", async () => {
+          const rr = LIVE.room;
+          const mm = LIVE.me || me;
+
+          if(rr.status !== "started") return;
+          if(rr.freeze) return;
+          if(!mm) return;
+
+          if(GAME_UI.__buzzBusy) return;
+          GAME_UI.__buzzBusy = true;
+
+          try{
+            const res = await claimBuzzerSafely(mm);
+
+            if(res && res.committed){
+              const v = res.winner || null;
+              if(v && v.ts){
+                LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
+                STABLE_BUZZER = v;
+              }
+              if(!playRong()) fallbackBeep();
+            }
+          }catch(e){}
+          finally{
+            setTimeout(() => { GAME_UI.__buzzBusy = false; }, 220);
+          }
+        });
+      }
+    }
+
+    
+    // ✅ شاشة "عرض الشاشة" (TV) — تعرض الخريطة + النتائج فقط بدون أي تحكم
+    function renderTvDisplay(room, me){
+      document.body.classList.add("tvMode");
+      main.classList.add("inGame");
+
+      const board = getBoard(room);
+      const ZOOM_KEY = `sabaq_zoom_${code}`;
+      const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "1");
+      const initialZoom = Math.max(0.8, Math.min(1.35, Number.isFinite(savedZoom) ? savedZoom : 1));
+
+      const visualTeams = getVisualTeams(room);
+      const visualScores = getVisualScores(room);
+      const boardShapeLabel = ({hex:"سداسية", pentagon:"خماسية", square:"رباعية"}[board.shape] || "سداسية");
+      const boardCountLabel = `${board.size} × ${board.size}`;
+
+      main.innerHTML = `        <div class="tvTopBar">
+          <div class="tvBarRow">
+            <div class="tvLeft">
+              <img class="tvLogo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
+              <input id="zoom" class="tvZoom" type="range" min="0.8" max="1.35" step="0.01" value="${initialZoom}" aria-label="تكبير تصغير الخريطة"/>
+            </div>
+
+            <div id="tvGameName" class="tvGameName"></div>
+
+            <div class="tvScoreWrap" aria-hidden="true">
+              <div class="scoreBoard">
+                <div id="teamGreenBtn" class="teamPill green" style="background:${escapeHtml(visualTeams.green.color)}">${escapeHtml(visualTeams.green.name)}</div>
+                <div id="scoreGreen" class="scoreBox">${visualScores.green}</div>
+                <div id="scoreOrange" class="scoreBox">${visualScores.orange}</div>
+                <div id="teamOrangeBtn" class="teamPill orange" style="background:${escapeHtml(visualTeams.orange.color)}">${escapeHtml(visualTeams.orange.name)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tvContent">
+          <div class="mapOuter">
+            <div id="mapScale" class="mapScale" style="--zoom:${initialZoom};transform:scale(${initialZoom});transform-origin:center top;">
+              <div id="mapBox" class="mapBox">
+                <div class="boardBg"></div>
+                <div id="boardFrameLabel" class="boardFrameLabel">${boardShapeLabel} • ${boardCountLabel}</div>
+                <svg id="overlay" class="overlaySvg"></svg>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      const mapOuter = main.querySelector(".mapOuter");
+      const mapScale = document.getElementById("mapScale");
+      const mapBox = document.getElementById("mapBox");
+      const overlay = document.getElementById("overlay");
+      const zoom = document.getElementById("zoom");
+
+      GAME_UI.mounted = true;
+      GAME_UI.activeMap = Number(room.activeMap || 0);
+      GAME_UI.srcBase = `${board.shape}-${board.size}`;
+      GAME_UI.board = board;
+      GAME_UI.els = {
+        overlay,
+        mapScale,
+        zoom,
+        boardFrameLabel: document.getElementById("boardFrameLabel"),
+        scoreGreen: document.getElementById("scoreGreen"),
+        scoreOrange: document.getElementById("scoreOrange"),
+        teamGreenBtn: document.getElementById("teamGreenBtn"),
+        teamOrangeBtn: document.getElementById("teamOrangeBtn"),
+        tvGameName: document.getElementById("tvGameName"),
+      };
+
+      overlay.innerHTML = "";
+      overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      const svgNS = "http://www.w3.org/2000/svg";
+      GAME_UI.cells = [];
+      GAME_UI.letterEls = [];
+      for(let row=0; row<board.size; row++){
+        for(let col=0; col<board.size; col++){
+          const g = document.createElementNS(svgNS, "g");
+          const poly = document.createElementNS(svgNS, "polygon");
+          poly.classList.add("cell", "state0");
+          poly.setAttribute("data-row", row);
+          poly.setAttribute("data-col", col);
+          const txt = document.createElementNS(svgNS, "text");
+          txt.classList.add("cellLetter");
+          txt.setAttribute("data-row", row);
+          txt.setAttribute("data-col", col);
+          txt.textContent = board?.letters?.[row]?.[col] || "";
+          g.appendChild(poly);
+          g.appendChild(txt);
+          overlay.appendChild(g);
+          GAME_UI.cells.push(poly);
+          GAME_UI.letterEls.push(txt);
+        }
+      }
+      overlay.style.pointerEvents = "none";
+      mapBox.style.pointerEvents = "none";
+
+      function applyZoomFix(){
+        const z = Number(zoom.value || 1);
+        mapScale.style.setProperty("--zoom", String(z));
+        mapScale.style.transform = `scale(${z})`;
+        mapScale.style.transformOrigin = "center top";
+        localStorage.setItem(ZOOM_KEY, String(z));
+        const baseH = mapBox.offsetHeight || 0;
+        const delta = Math.max(0, baseH * (z - 1));
+        mapOuter.style.marginBottom = `${Math.ceil(delta) + 6}px`;
+      }
+      GAME_UI.applyZoomFix = applyZoomFix;
+
+      function polygonPointsForShape(shape, x, y, w, h){
+        if(shape === "square") return `${x},${y} ${x+w},${y} ${x+w},${y+h} ${x},${y+h}`;
+        if(shape === "pentagon"){
+          const pts = [[x + w/2, y],[x + w, y + h*0.36],[x + w*0.82, y + h],[x + w*0.18, y + h],[x, y + h*0.36]];
+          return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
+        }
+        return hexPointsPointyTop(x, y, w, h);
+      }
+
+      function placeHexes(){
+        const W = mapScale.clientWidth || 720;
+        const H = mapBox.clientHeight || W;
+        if(!W || !H) return;
+        overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
+        overlay.setAttribute("preserveAspectRatio", "none");
+        const shape = board.shape;
+        const size = board.size;
+        const marginX = W * 0.08;
+        const marginY = H * 0.10;
+        const usableW = W - marginX*2;
+        const usableH = H - marginY*2;
+        let cellW, cellH, stepX, stepY;
+        if(shape === "square"){
+          cellW = usableW / size; cellH = usableH / size; stepX = cellW; stepY = cellH;
+        }else if(shape === "pentagon"){
+          cellW = usableW / (size + 0.35); cellH = usableH / (size + 0.15); stepX = cellW * 0.95; stepY = cellH * 0.96;
+        }else{
+          cellW = usableW / (size + 0.5); cellH = usableH / (size * 0.84 + 0.25); stepX = cellW; stepY = cellH * 0.76;
+        }
+        let i = 0;
+        for(let row=0; row<size; row++){
+          for(let col=0; col<size; col++){
+            let x = marginX + (col * stepX);
+            let y = marginY + (row * stepY);
+            if(shape !== "square") x += (row % 2) * (cellW / 2);
+            const poly = GAME_UI.cells[i];
+            const txt = GAME_UI.letterEls[i];
+            poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
+            txt.setAttribute("x", (x + cellW/2).toFixed(2));
+            txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+            txt.textContent = board?.letters?.[row]?.[col] || "";
+            i++;
+          }
+        }
+        applyZoomFix();
+      }
+      GAME_UI.placeHexes = placeHexes;
+      GAME_UI.onMapReady = () => requestAnimationFrame(placeHexes);
+      GAME_UI.onMapReady();
+      zoom.addEventListener("input", applyZoomFix);
       zoom.addEventListener("change", applyZoomFix);
 
-      // ضمان إعادة ضبط عند تغيير الاتجاه/الحجم (مرة واحدة فقط)
       if(!GAME_UI.resizeBound){
         GAME_UI.resizeBound = true;
         window.addEventListener("resize", ()=> {
-          if(GAME_UI.els?.mapImg){
-            placeHexes();
-            GAME_UI.applyZoomFix && GAME_UI.applyZoomFix();
-          }
+          placeHexes();
+          GAME_UI.applyZoomFix && GAME_UI.applyZoomFix();
         }, {passive:true});
       }
 
-      // تعبئة اسم اللعبة في الشريط العلوي
       const nm = String((room?.name ?? room?.gameName ?? room?.title ?? "") || "").trim();
       if(GAME_UI.els.tvGameName) GAME_UI.els.tvGameName.textContent = nm || "";
     }
@@ -4126,35 +4619,37 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
   });
 }
 
-      // Map image change (when activeMap changes)
+      // Board change (shape / count / letters)
       const activeMap = Number(room.activeMap || 0);
-      const srcBase = ([
-        'grid-only');
+      const board = getBoard(room);
+      const boardSig = JSON.stringify({
+        activeMap,
+        size: board.size,
+        shape: board.shape,
+        seed: board.seed,
+        letters: board.letters
+      });
 
-      if(GAME_UI.activeMap !== activeMap || GAME_UI.srcBase !== srcBase){
+      if(GAME_UI._boardSig !== boardSig){
+        GAME_UI._boardSig = boardSig;
         GAME_UI.activeMap = activeMap;
-        GAME_UI.srcBase = 'grid-only';
-
-        if(GAME_UI.els.mapImg){
-          const img = GAME_UI.els.mapImg;
-          img.src = srcBase + vq;
-
-          // بعد تبديل الصورة، نعيد حساب مكان الخلايا بعد التحميل
-          const onL = () => { try{ GAME_UI.onMapReady && GAME_UI.onMapReady(); }catch(e){} };
-          if(img.complete) onL();
-          else img.addEventListener("load", onL, { once:true });
+        GAME_UI.board = board;
+        GAME_UI.srcBase = `${board.shape}-${board.size}`;
+        if(GAME_UI.els.boardFrameLabel){
+          const shapeLabel = ({hex:"سداسية", pentagon:"خماسية", square:"رباعية"}[board.shape] || "سداسية");
+          GAME_UI.els.boardFrameLabel.textContent = `${shapeLabel} • ${board.size} × ${board.size}`;
         }
+        if(GAME_UI.onMapReady) GAME_UI.onMapReady();
       }
 
-      // Map states update (تحديث انتقائي بدل إعادة تلوين كل الخريطة)
       const mapStates = (room.mapStates && room.mapStates[String(activeMap)]) ? room.mapStates[String(activeMap)] : {};
       if(GAME_UI._lastMapActiveMap !== activeMap){
         GAME_UI._lastMapActiveMap = activeMap;
         GAME_UI._lastMapStates = {};
       }
       if(GAME_UI.cells && GAME_UI.cells.length){
-        for(let idx=0; idx<GAME_UI.cells.length; idx++){
-          const cell = GAME_UI.cells[idx];
+        for(let i=0;i<GAME_UI.cells.length;i++){
+          const cell = GAME_UI.cells[i];
           const r = Number(cell.getAttribute("data-row"));
           const c = Number(cell.getAttribute("data-col"));
           const k = cellKey(r,c);
@@ -4162,12 +4657,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           if(GAME_UI._lastMapStates[k] !== st){
             GAME_UI._lastMapStates[k] = st;
             setStateClass(cell, st);
-            const lbl = GAME_UI.labels && GAME_UI.labels[idx];
-            if(lbl){
-              lbl.classList.toggle('light', st === 2 || st === 3);
-              lbl.textContent = getGridLetter(room, r, c);
-            }
           }
+          const selected = Number(room?.current?.row) === r && Number(room?.current?.col) === c && Number(room?.current?.map ?? activeMap) === activeMap && st === 1;
+          cell.classList.toggle("selectedCell", !!selected);
+          const txt = GAME_UI.letterEls?.[i];
+          if(txt){ txt.textContent = board?.letters?.[r]?.[c] || ""; }
         }
       }
 
@@ -4357,17 +4851,23 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
           if(role === "host" && Number(we.ts) !== LAST_WIN_RESET_TS && !we.isFinal){
             LAST_WIN_RESET_TS = Number(we.ts);
+            const currentMap = Number(room.activeMap || 0);
+            const nextMap = currentMap + 1;
             setTimeout(async () => {
               try{
                 const latestWinTs = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
                 if(latestWinTs !== Number(we.ts)) return;
+                const nextBoard = buildBoardState(LIVE.room || room, Date.now());
                 const updates = {};
-                updates[`rooms/${code}/activeMap`] = 0;
-                updates[`rooms/${code}/mapStates/0`] = null;
+                updates[`rooms/${code}/activeMap`] = nextMap;
+                updates[`rooms/${code}/board`] = nextBoard;
+                updates[`rooms/${code}/mapStates/${currentMap}`] = null;
+                updates[`rooms/${code}/mapStates/${nextMap}`] = {};
                 updates[`rooms/${code}/buzzer`] = null;
-                updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:0 };
+                updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
                 updates[`rooms/${code}/winState`] = null;
                 updates[`rooms/${code}/winEvent`] = null;
+                updates[`rooms/${code}/timer`] = { sel:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), dur:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), running:false, startTs:0, done:false };
                 updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
                 await update(ref(db), updates);
               }catch(e){}
@@ -4385,7 +4885,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     function normalizeLiveRoom(room){
       room = (room && typeof room === "object") ? room : {};
       const activeMap = Number(room.activeMap || 0);
-      return {
+      const normalized = {
         code,
         status: room.status ?? null,
         hostKey: room.hostKey ?? null,
@@ -4398,6 +4898,8 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         scores: (room.scores && typeof room.scores === "object") ? room.scores : { green:0, orange:0, a:0, b:0 },
         settings: (room.settings && typeof room.settings === "object") ? room.settings : {},
         teams: (room.teams && typeof room.teams === "object") ? room.teams : {},
+        board: (room.board && typeof room.board === "object") ? room.board : null,
+        round: (room.round && typeof room.round === "object") ? room.round : { current:1, targetWins: normalizeWinRounds(room?.settings?.winRounds || 1), winner:null },
         winEvent: room.winEvent ?? null,
         winState: (room.winState && typeof room.winState === "object") ? room.winState : {},
         mapStates: (room.mapStates && typeof room.mapStates === "object") ? room.mapStates : {},
@@ -4407,10 +4909,10 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         customQuestions: (room.customQuestions && typeof room.customQuestions === "object") ? room.customQuestions : {},
         customQuestionsUpdatedAt: Number(room.customQuestionsUpdatedAt || 0),
         questionCursorDefault: (room.questionCursorDefault && typeof room.questionCursorDefault === "object") ? room.questionCursorDefault : {},
-        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {},
-        round: (room.round && typeof room.round === "object") ? room.round : { current:1, targetWins:1, winner:null },
-        grid: (room.grid && typeof room.grid === "object") ? room.grid : { type:getGridType(room), size:getGridSize(room) }
+        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {}
       };
+      if(!normalized.board) normalized.board = buildBoardState(normalized, Date.now());
+      return normalized;
     }
 
     function getMeFromPlayers(players){
