@@ -166,7 +166,7 @@
       border-radius:10px;
       background:var(--active);
       color:var(--activeText);
-      font-size:16px;
+      font-size:18px;
       line-height:1;
       cursor:pointer;
       box-shadow:0 6px 14px rgba(123,31,99,.16);
@@ -175,6 +175,8 @@
       justify-content:center;
       flex:0 0 34px;
       padding:0;
+      font-family:Arial, sans-serif;
+      font-weight:700;
     }
 
     .players-btn:active{
@@ -187,13 +189,6 @@
       color:#401436;
       font-size:18px;
       line-height:1;
-    }
-
-    .players-sub{
-      margin-top:8px;
-      text-align:center;
-      color:#7b5b70;
-      font-size:14px;
     }
 
     .colors-grid{
@@ -308,7 +303,7 @@
         width:32px;
         height:32px;
         flex-basis:32px;
-        font-size:15px;
+        font-size:16px;
       }
       .players-value{
         min-width:30px;
@@ -343,11 +338,10 @@
       <div class="section">
         <div class="label">عدد اللاعبين</div>
         <div class="players-box">
-          <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">◀</button>
+          <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">&lt;</button>
           <div class="players-value" id="playersValue">1</div>
-          <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">▶</button>
+          <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">&gt;</button>
         </div>
-        <div class="players-sub">من 1 إلى 13 لاعب</div>
       </div>
 
       <div class="section">
