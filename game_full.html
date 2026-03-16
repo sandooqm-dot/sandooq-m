@@ -99,9 +99,9 @@
       padding:18px 14px 8px;
     }
     .headerRow{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
+      display:grid;
+      grid-template-columns:72px minmax(0,1fr) 72px;
+      align-items:center;
       gap:12px;
       width:100%;
       direction:ltr;
@@ -112,49 +112,38 @@
       flex:0 0 auto;
     }
     h1{
-      margin:0;
-      flex:1 1 auto;
-      text-align:center;
-      color:#fff;
-      font-size:54px;
-      line-height:1.02;
-      font-weight:900;
-      text-shadow:none; /* ✅ (7) إزالة ظل عنوان “سباق الحروف” */
-      direction:rtl;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      padding-top:6px;
+      display:none !important;
     }
 
     /* ✅ (6) إزالة الإطار الأسود حول اسم اللعبة + النص أصفر بدون ظل */
     .gameName{
-      flex:0 0 auto;
-      width:min(30vw, 190px);
-      min-height:56px;
-      padding:10px 10px;
-      border-radius:10px;
-      background:rgba(0,0,0,.10);
-      border:none;                 /* ✅ إزالة البوردَر فقط */
-      color:#ffd54a;               /* ✅ أصفر واضح ومرتب */
+      grid-column:2;
+      width:100%;
+      min-height:unset;
+      padding:4px 0 0;
+      border-radius:0;
+      background:none;
+      border:none;
+      color:#fff;
       font-weight:900;
-      line-height:1.2;
+      line-height:1.15;
       text-align:center;
       overflow:hidden;
       direction:rtl;
-      box-shadow:0 8px 18px rgba(0,0,0,.22);
-      text-shadow:none;            /* ✅ بدون ظل */
+      box-shadow:none;
+      text-shadow:none;
+      align-self:center;
+      justify-self:center;
     }
     .gameName:empty{display:none;}
     .gnText{
-      display:-webkit-box;
-      -webkit-box-orient:vertical;
-      -webkit-line-clamp:2;
+      display:block;
       overflow:hidden;
       word-break:break-word;
-      white-space:normal;
-      font-size:18px;
-      text-shadow:none;            /* ✅ بدون ظل */
+      white-space:nowrap;
+      text-overflow:ellipsis;
+      font-size:30px;
+      text-shadow:none;
     }
 
     .wrap{ width:95%; max-width:900px; margin:0 auto; }
@@ -1387,7 +1376,7 @@
     /* موبايل صغير */
     @media (max-width:420px){
       h1{ font-size:46px; }
-      .gameName{ min-height:52px; }
+      .gameName{ min-height:0; }
       .pillBtn{ height:72px; font-size:26px; }
       .qText{ font-size:28px; }
     }
