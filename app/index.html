@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لعبة سباق الحروف</title>
   <style>
-    /* ✅ نفس خط اللعبة */
     @font-face{
       font-family:"AA-GALAXY";
       src:url("../AA-GALAXY.otf") format("opentype");
@@ -15,48 +14,231 @@
     }
 
     :root{
-      --bgSolid:#7b1f63;  /* ✅ (تعديل 4) خلفية سادة مثل اللعبة */
+      --bgSolid:#7b1f63;
       --yellow:#f4c400;
       --card:#ffffff;
       --text:#111;
+      --muted:#6b6b6b;
+      --line:#e9d9e4;
+      --soft:#f8f1f6;
+      --active:#7b1f63;
+      --activeText:#fff4b0;
+      --shadow:0 12px 34px rgba(0,0,0,.18);
     }
+
+    *{box-sizing:border-box}
 
     body{
       margin:0;
+      min-height:100vh;
       color:#fff;
       text-align:center;
       font-family:"AA-GALAXY", Arial, sans-serif;
-
-      /* ✅ (تعديل 4) سادة */
-      background: var(--bgSolid);
-
+      background:var(--bgSolid);
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
     }
 
-    button, input{ font-family:"AA-GALAXY", Arial, sans-serif; }
+    button, input{
+      font-family:"AA-GALAXY", Arial, sans-serif;
+    }
 
-    header{position:relative;padding:30px 16px 0}
+    header{
+      position:relative;
+      padding:26px 16px 0;
+    }
+
     .logo{
-      position:absolute;left:14px;top:14px;
-      width:86px;height:86px;object-fit:contain;
+      position:absolute;
+      left:14px;
+      top:14px;
+      width:86px;
+      height:86px;
+      object-fit:contain;
       pointer-events:none;
     }
-    h1{margin:18px 0 14px;color:var(--yellow);font-size:28px}
-    .wrap{width:92%;max-width:520px;margin:0 auto}
-    .card{background:var(--card);color:var(--text);border-radius:12px;padding:14px}
+
+    h1{
+      margin:18px 0 16px;
+      color:var(--yellow);
+      font-size:28px;
+      line-height:1.35;
+    }
+
+    .wrap{
+      width:92%;
+      max-width:560px;
+      margin:0 auto;
+      padding-bottom:28px;
+    }
+
+    .card{
+      background:var(--card);
+      color:var(--text);
+      border-radius:18px;
+      padding:16px 14px 18px;
+      box-shadow:var(--shadow);
+      text-align:right;
+    }
+
+    .section{
+      margin-bottom:16px;
+    }
+
+    .label{
+      display:block;
+      font-size:18px;
+      color:#401436;
+      margin:0 0 8px;
+      text-align:right;
+    }
+
     input{
-      width:100%;box-sizing:border-box;
-      padding:14px;margin:10px 0;
-      font-size:16px;border-radius:10px;border:0;
+      width:100%;
+      padding:14px 14px;
+      font-size:16px;
+      border-radius:12px;
+      border:2px solid var(--line);
+      background:#fff;
+      outline:none;
+      transition:border-color .15s ease, box-shadow .15s ease;
     }
-    button{
-      width:100%;padding:16px;margin-top:10px;
-      font-size:18px;border:none;border-radius:12px;cursor:pointer;
-      background:var(--yellow);color:#000
+
+    input:focus{
+      border-color:#a94789;
+      box-shadow:0 0 0 3px rgba(169,71,137,.12);
     }
-    button[disabled]{opacity:.75;cursor:not-allowed}
-    .hint{font-size:13px;opacity:.9;margin-top:8px}
+
+    .row-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .option-grid{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:10px;
+    }
+
+    .opt-btn{
+      width:100%;
+      min-height:48px;
+      padding:12px 8px;
+      border:none;
+      border-radius:12px;
+      cursor:pointer;
+      background:var(--soft);
+      color:#4e2944;
+      font-size:16px;
+      border:2px solid transparent;
+      transition:transform .12s ease, border-color .12s ease, background .12s ease, color .12s ease;
+    }
+
+    .opt-btn:active{
+      transform:scale(.98);
+    }
+
+    .opt-btn.active{
+      background:var(--active);
+      color:var(--activeText);
+      border-color:#f4c400;
+      box-shadow:0 8px 18px rgba(123,31,99,.22);
+    }
+
+    .colors-grid{
+      display:grid;
+      grid-template-columns:repeat(2, 1fr);
+      gap:10px;
+    }
+
+    .color-pair{
+      position:relative;
+      width:100%;
+      min-height:54px;
+      border:none;
+      border-radius:14px;
+      cursor:pointer;
+      overflow:hidden;
+      padding:0;
+      background:#eee;
+      border:3px solid transparent;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
+      transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+
+    .color-pair:active{
+      transform:scale(.98);
+    }
+
+    .color-pair.active{
+      border-color:#f4c400;
+      box-shadow:0 10px 22px rgba(123,31,99,.18);
+    }
+
+    .pair-split{
+      display:flex;
+      width:100%;
+      height:54px;
+    }
+
+    .pair-half{
+      flex:1;
+    }
+
+    .pair-name{
+      position:absolute;
+      inset:auto 8px 6px 8px;
+      font-size:12px;
+      color:#fff;
+      text-shadow:0 1px 2px rgba(0,0,0,.45);
+      text-align:center;
+      letter-spacing:.2px;
+      pointer-events:none;
+    }
+
+    .hint{
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.6;
+      margin-top:8px;
+      text-align:center;
+    }
+
+    .submit-btn{
+      width:100%;
+      padding:16px;
+      margin-top:6px;
+      font-size:20px;
+      border:none;
+      border-radius:14px;
+      cursor:pointer;
+      background:var(--yellow);
+      color:#000;
+      box-shadow:0 10px 20px rgba(0,0,0,.12);
+    }
+
+    .submit-btn[disabled]{
+      opacity:.75;
+      cursor:not-allowed;
+    }
+
+    @media (max-width: 420px){
+      .option-grid{
+        grid-template-columns:repeat(3, 1fr);
+        gap:8px;
+      }
+      .opt-btn{
+        font-size:15px;
+        min-height:46px;
+      }
+      .label{
+        font-size:17px;
+      }
+      .row-2{
+        gap:8px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -68,17 +250,81 @@
 
   <div class="wrap">
     <div class="card">
-      <input id="name" placeholder="ادخل اسم اللعبة">
-      <input id="players" inputmode="numeric" placeholder="ادخل عدد اللاعبين (1 إلى 13)">
-      <button id="btn">انشئ اللعبة</button>
-      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي (الحد الأقصى 13)</div>
+
+      <div class="section">
+        <label class="label" for="name">اسم المسابقة</label>
+        <input id="name" placeholder="اكتب اسم المسابقة">
+      </div>
+
+      <div class="section">
+        <div class="label">أسماء الفريقين</div>
+        <div class="row-2">
+          <input id="team1" placeholder="اسم الفريق الأول">
+          <input id="team2" placeholder="اسم الفريق الثاني">
+        </div>
+      </div>
+
+      <div class="section">
+        <label class="label" for="players">عدد اللاعبين</label>
+        <input id="players" inputmode="numeric" placeholder="اكتب عدد اللاعبين من 1 إلى 13">
+      </div>
+
+      <div class="section">
+        <div class="label">نوع الخلايا</div>
+        <div class="option-grid" id="gridTypeOptions">
+          <button type="button" class="opt-btn active" data-group="gridType" data-value="hex">سداسية</button>
+          <button type="button" class="opt-btn" data-group="gridType" data-value="pentagon">خماسية</button>
+          <button type="button" class="opt-btn" data-group="gridType" data-value="square">رباعية</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">عدد جولات الفوز</div>
+        <div class="option-grid" id="roundsOptions">
+          <button type="button" class="opt-btn active" data-group="rounds" data-value="1">جولة</button>
+          <button type="button" class="opt-btn" data-group="rounds" data-value="2">جولتان</button>
+          <button type="button" class="opt-btn" data-group="rounds" data-value="3">ثلاث جولات</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">عدد الخلايا</div>
+        <div class="option-grid" id="cellCountOptions">
+          <button type="button" class="opt-btn active" data-group="cellCount" data-value="4">أربعة</button>
+          <button type="button" class="opt-btn" data-group="cellCount" data-value="5">خمسة</button>
+          <button type="button" class="opt-btn" data-group="cellCount" data-value="6">ستة</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">لون الخلايا</div>
+        <div class="colors-grid" id="colorPairs"></div>
+      </div>
+
+      <button id="btn" class="submit-btn">إنشاء اللعبة</button>
+      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي. الحد الأقصى لعدد اللاعبين هو 13.</div>
     </div>
   </div>
 
   <script>
-    // ✅ Durable Objects (Firebase removed نهائياً)
     const params = new URLSearchParams(location.search);
     const SYNC_BASE = (params.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
+
+    const COLOR_PAIRS = [
+      { id:"rose-blue",     name:"وردي + أزرق",      a:"#e96fa8", b:"#56b4ff" },
+      { id:"navy-gold",     name:"كحلي + ذهبي",      a:"#1f3b7b", b:"#f4c400" },
+      { id:"purple-green",  name:"بنفسجي + أخضر",    a:"#7f4dd6", b:"#4caf50" },
+      { id:"orange-cyan",   name:"برتقالي + سماوي",  a:"#f28c28", b:"#35c9d6" },
+      { id:"yellow-blue",   name:"أصفر + أزرق",      a:"#f2d54b", b:"#3182f6" },
+      { id:"mint-plum",     name:"نعناعي + عنابي",   a:"#62d6b3", b:"#8d2f67" }
+    ];
+
+    const state = {
+      gridType: "hex",
+      rounds: 1,
+      cellCount: 4,
+      colorPairId: COLOR_PAIRS[0].id
+    };
 
     function normalizeDigits(str){
       const map = {
@@ -96,13 +342,17 @@
       try{
         if (crypto?.randomUUID) return crypto.randomUUID();
       }catch(e){}
-      return (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Date.now().toString(36));
+      return (
+        Math.random().toString(36).slice(2) +
+        Math.random().toString(36).slice(2) +
+        Date.now().toString(36)
+      );
     }
 
     async function fetchJSON(url, opts){
       const r = await fetch(url, opts);
       const j = await r.json().catch(()=>null);
-      return { ok: r.ok, status: r.status, json: j };
+      return { ok:r.ok, status:r.status, json:j };
     }
 
     async function roomExists(code){
@@ -112,19 +362,68 @@
       return !!(st.createdAt || st.status || st.hostKey || st.presenterKey);
     }
 
+    function getColorPair(id){
+      return COLOR_PAIRS.find(p => p.id === id) || COLOR_PAIRS[0];
+    }
+
+    function renderColorPairs(){
+      const root = document.getElementById("colorPairs");
+      root.innerHTML = "";
+
+      COLOR_PAIRS.forEach(pair => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "color-pair" + (state.colorPairId === pair.id ? " active" : "");
+        btn.setAttribute("data-pair-id", pair.id);
+        btn.innerHTML = `
+          <div class="pair-split">
+            <span class="pair-half" style="background:${pair.a}"></span>
+            <span class="pair-half" style="background:${pair.b}"></span>
+          </div>
+          <span class="pair-name">${pair.name}</span>
+        `;
+        btn.addEventListener("click", () => {
+          state.colorPairId = pair.id;
+          renderColorPairs();
+        });
+        root.appendChild(btn);
+      });
+    }
+
+    function setupOptionButtons(){
+      document.querySelectorAll(".opt-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const group = btn.dataset.group;
+          const value = btn.dataset.value;
+
+          document.querySelectorAll(`.opt-btn[data-group="${group}"]`).forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          if (group === "gridType") state.gridType = value;
+          if (group === "rounds") state.rounds = Number(value);
+          if (group === "cellCount") state.cellCount = Number(value);
+        });
+      });
+    }
+
     async function createRoom(){
       const name = document.getElementById("name").value.trim();
+      const team1 = document.getElementById("team1").value.trim() || "الفريق الأول";
+      const team2 = document.getElementById("team2").value.trim() || "الفريق الثاني";
       const pRaw = document.getElementById("players").value;
       let players = Number(normalizeDigits(pRaw).replace(/\D/g,""));
+      const pair = getColorPair(state.colorPairId);
 
-      if(!name){ alert("اكتب اسم اللعبة"); return; }
+      if(!name){
+        alert("اكتب اسم المسابقة");
+        return;
+      }
 
       if(!Number.isFinite(players) || players < 1){
         alert("عدد اللاعبين لازم يكون 1 أو أكثر");
         return;
       }
 
-      // ✅ حد أقصى 13
       if(players > 13){
         alert("الحد الأقصى لعدد اللاعبين هو 13");
         return;
@@ -133,13 +432,15 @@
       const btn = document.getElementById("btn");
       btn.disabled = true;
 
-      // ✅ توليد كود 6 أرقام غير مستخدم
       let code = "";
       for(let i=0;i<12;i++){
         const c = random6();
         try{
           const exists = await roomExists(c);
-          if(!exists){ code = c; break; }
+          if(!exists){
+            code = c;
+            break;
+          }
         }catch(e){}
       }
 
@@ -151,24 +452,90 @@
 
       const hostKey = randomKey();
 
-      // ✅ نفس شكل الحالة اللي تتوقعه اللعبة
       const room = {
         code,
         name,
+        competitionName: name,
         maxPlayers: players,
         hostKey,
+        presenterKey: hostKey,
         status: "lobby",
         createdAt: Date.now(),
+
+        settings: {
+          competitionName: name,
+          team1Name: team1,
+          team2Name: team2,
+          winRounds: state.rounds,
+          cellCount: state.cellCount,
+          gridType: state.gridType,
+          colorPairId: state.colorPairId,
+          colorPair: {
+            a: pair.a,
+            b: pair.b
+          }
+        },
+
+        teams: {
+          a: {
+            key: "a",
+            name: team1,
+            color: pair.a,
+            score: 0
+          },
+          b: {
+            key: "b",
+            name: team2,
+            color: pair.b,
+            score: 0
+          }
+        },
+
+        scores: {
+          a: 0,
+          b: 0,
+          green: 0,
+          orange: 0
+        },
+
+        round: {
+          current: 1,
+          targetWins: state.rounds,
+          winner: null
+        },
+
+        grid: {
+          type: state.gridType,
+          size: state.cellCount,
+          colorPairId: state.colorPairId,
+          colorA: pair.a,
+          colorB: pair.b,
+          selectedCellId: null,
+          selectedTeamKey: null,
+          cells: [],
+          version: 1
+        },
 
         displayPid: null,
         activeMap: 0,
         freeze: false,
         buzzer: null,
 
-        scores: { green: 0, orange: 0 },
+        current: {
+          letter: null,
+          qIndex: 0,
+          row: null,
+          col: null,
+          map: 0
+        },
 
-        current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
-        timer: { sel: 10, dur: 10, running: false, startTs: 0, done: false },
+        timer: {
+          sel: 10,
+          dur: 10,
+          running: false,
+          startTs: 0,
+          done: false
+        },
 
         questionMode: "default",
         customQuestions: {},
@@ -199,9 +566,6 @@
         u.searchParams.set("role", "host");
         u.searchParams.set("code", code);
         u.searchParams.set("key", hostKey);
-        // اختياري: تثبيت السيرفر من الرابط
-        // u.searchParams.set("sync", SYNC_BASE);
-
         location.href = u.toString();
 
       }catch(e){
@@ -210,8 +574,7 @@
       }
     }
 
-    // ✅ منع كتابة أكثر من 13 مباشرة داخل الحقل
-    (function(){
+    (function setupPlayersInput(){
       const inp = document.getElementById("players");
       if(!inp) return;
 
@@ -230,9 +593,11 @@
       });
     })();
 
+    renderColorPairs();
+    setupOptionButtons();
     document.getElementById("btn").addEventListener("click", createRoom);
   </script>
 </body>
 </html>
 
-<!-- VERSION: app/index.html — vSolidBG-Max13-DO-1 -->
+<!-- VERSION: app/index.html — vCreateSetup-Teams-Rounds-Cells-Colors-1 -->
