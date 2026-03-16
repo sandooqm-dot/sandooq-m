@@ -150,29 +150,30 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      gap:18px;
-      padding:12px 14px;
+      gap:14px;
+      padding:10px 12px;
       background:#fff;
       border:2px solid var(--line);
       border-radius:14px;
       direction:ltr;
+      min-height:64px;
     }
 
     .players-btn{
-      width:44px;
-      height:44px;
+      width:38px;
+      height:38px;
       border:none;
-      border-radius:12px;
+      border-radius:10px;
       background:var(--active);
       color:var(--activeText);
-      font-size:28px;
+      font-size:20px;
       line-height:1;
       cursor:pointer;
-      box-shadow:0 8px 18px rgba(123,31,99,.18);
+      box-shadow:0 6px 14px rgba(123,31,99,.16);
       display:flex;
       align-items:center;
       justify-content:center;
-      flex:0 0 44px;
+      flex:0 0 38px;
       padding:0;
     }
 
@@ -181,10 +182,10 @@
     }
 
     .players-value{
-      min-width:70px;
+      min-width:44px;
       text-align:center;
       color:#401436;
-      font-size:30px;
+      font-size:22px;
       line-height:1;
     }
 
@@ -299,15 +300,19 @@
       .colors-grid{
         grid-template-columns:repeat(2, 1fr);
       }
+      .players-box{
+        gap:12px;
+        min-height:60px;
+      }
       .players-btn{
-        width:42px;
-        height:42px;
-        flex-basis:42px;
-        font-size:26px;
+        width:36px;
+        height:36px;
+        flex-basis:36px;
+        font-size:18px;
       }
       .players-value{
-        min-width:62px;
-        font-size:28px;
+        min-width:40px;
+        font-size:20px;
       }
     }
   </style>
@@ -338,9 +343,9 @@
       <div class="section">
         <div class="label">عدد اللاعبين</div>
         <div class="players-box">
-          <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">›</button>
+          <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">▶</button>
           <div class="players-value" id="playersValue">1</div>
-          <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">‹</button>
+          <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">◀</button>
         </div>
         <div class="players-sub">من 1 إلى 13 لاعب</div>
       </div>
