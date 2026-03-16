@@ -293,10 +293,14 @@
       position:absolute;
       inset:0;
       background:
-        radial-gradient(circle at 25% 22%, rgba(255,255,255,.14), transparent 28%),
-        radial-gradient(circle at 78% 18%, rgba(255,255,255,.10), transparent 24%),
-        radial-gradient(circle at 50% 88%, rgba(255,255,255,.08), transparent 24%),
-        linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.10));
+        radial-gradient(circle at 24% 18%, rgba(255,255,255,.18), transparent 24%),
+        radial-gradient(circle at 78% 18%, rgba(255,255,255,.14), transparent 22%),
+        radial-gradient(circle at 50% 86%, rgba(255,255,255,.10), transparent 22%),
+        conic-gradient(from -45deg at 50% 50%,
+          var(--team-b-soft, #e7d570) 0deg 90deg,
+          var(--team-a-soft, #7cb7e8) 90deg 180deg,
+          var(--team-b-soft, #e7d570) 180deg 270deg,
+          var(--team-a-soft, #7cb7e8) 270deg 360deg);
       pointer-events:none;
     }
     .boardFrameLabel{
@@ -325,9 +329,9 @@
       cursor:pointer;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      stroke: rgba(255,255,255,.32);
-      stroke-width: 2.4;
-      filter: drop-shadow(0 8px 12px rgba(0,0,0,.18));
+      stroke: var(--cell-stroke, #7e44bd);
+      stroke-width: 5;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,.12));
       transition: fill .18s ease, transform .18s ease, opacity .18s ease;
     }
     .overlaySvg .cell.selectedCell{
@@ -335,7 +339,7 @@
       stroke-width:4;
     }
     .overlaySvg .cellLetter{
-      fill:#fff;
+      fill:var(--cell-letter, #7e44bd);
       font-family:"AA-GALAXY", Arial, sans-serif;
       font-size:30px;
       font-weight:900;
@@ -343,14 +347,20 @@
       dominant-baseline:middle;
       pointer-events:none;
       paint-order:stroke;
-      stroke:rgba(0,0,0,.35);
+      stroke:rgba(255,255,255,.72);
       stroke-width:2px;
       user-select:none;
+      transition: fill .18s ease, stroke .18s ease;
     }
-    .overlaySvg .state0{ fill: rgba(0,0,0,0.001); }
+    .overlaySvg .cellLetter.state2,
+    .overlaySvg .cellLetter.state3{
+      fill:#fff;
+      stroke:rgba(0,0,0,.18);
+    }
+    .overlaySvg .state0{ fill: var(--cell-base, #f7f7fb); }
     .overlaySvg .state1{ fill: var(--hexPale); }
-    .overlaySvg .state2{ fill: var(--hexGreen); }
-    .overlaySvg .state3{ fill: var(--hexOrange); }
+    .overlaySvg .state2{ fill: var(--team-a-color, #1aa34a); }
+    .overlaySvg .state3{ fill: var(--team-b-color, #f28c00); }
 
     @keyframes palePulse {
       0%   { opacity: 1; }
@@ -2502,6 +2512,47 @@ if(homeBtn && role !== "host"){
       el.classList.remove("state0","state1","state2","state3","pulse");
       el.classList.add(`state${st}`);
       if(st === 1) el.classList.add("pulse");
+      const txt = el?.parentNode?.querySelector?.('.cellLetter');
+      if(txt){
+        txt.classList.remove("state0","state1","state2","state3");
+        txt.classList.add(`state${st}`);
+      }
+    }
+
+    function hexToRgba(hex, alpha){
+      const raw = String(hex || '').trim();
+      if(!raw) return `rgba(123,95,191,${alpha})`;
+      if(raw.startsWith('rgba(')){
+        const parts = raw.slice(5,-1).split(',').map(s=>s.trim());
+        if(parts.length >= 3) return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+      }
+      if(raw.startsWith('rgb(')){
+        const parts = raw.slice(4,-1).split(',').map(s=>s.trim());
+        if(parts.length >= 3) return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+      }
+      let h = raw.replace('#','');
+      if(h.length === 3) h = h.split('').map(ch=>ch+ch).join('');
+      if(h.length !== 6) return `rgba(123,95,191,${alpha})`;
+      const n = parseInt(h, 16);
+      const r = (n >> 16) & 255;
+      const g = (n >> 8) & 255;
+      const b = n & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function applyBoardTheme(room){
+      const mapBox = document.getElementById('mapBox') || GAME_UI?.els?.mapBox;
+      if(!mapBox) return;
+      const visualTeams = getVisualTeams(room || LIVE.room || {});
+      const teamA = String(visualTeams?.green?.color || '#66b7ee');
+      const teamB = String(visualTeams?.orange?.color || '#e7d570');
+      mapBox.style.setProperty('--team-a-color', teamA);
+      mapBox.style.setProperty('--team-b-color', teamB);
+      mapBox.style.setProperty('--team-a-soft', hexToRgba(teamA, 0.96));
+      mapBox.style.setProperty('--team-b-soft', hexToRgba(teamB, 0.96));
+      mapBox.style.setProperty('--cell-base', '#f7f7fb');
+      mapBox.style.setProperty('--cell-stroke', '#7e44bd');
+      mapBox.style.setProperty('--cell-letter', '#7e44bd');
     }
 
     function hexPointsPointyTop(x, y, w, h){
@@ -3979,6 +4030,7 @@ if(homeBtn && role !== "host"){
 
       // ✅ حفظ مراجع DOM للتحديث بدون إعادة رسم
       GAME_UI.els.overlay = document.getElementById("overlay");
+      GAME_UI.els.mapBox = document.getElementById("mapBox");
       GAME_UI.els.mapScale = document.getElementById("mapScale");
       GAME_UI.els.boardFrameLabel = document.getElementById("boardFrameLabel");
       GAME_UI.els.zoom = document.getElementById("zoom");
@@ -4033,6 +4085,7 @@ if(homeBtn && role !== "host"){
       GAME_UI.cells = Array.from(overlay.querySelectorAll(".cell"));
       GAME_UI.letterEls = Array.from(overlay.querySelectorAll(".cellLetter"));
       overlay.style.pointerEvents = isHost ? "auto" : "none";
+      applyBoardTheme(room);
 
       const ZOOM_KEY = `sabaq_zoom_${code}`;
       const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
@@ -4418,6 +4471,7 @@ if(homeBtn && role !== "host"){
       GAME_UI.board = board;
       GAME_UI.els = {
         overlay,
+        mapBox,
         mapScale,
         zoom,
         boardFrameLabel: document.getElementById("boardFrameLabel"),
@@ -4454,6 +4508,7 @@ if(homeBtn && role !== "host"){
       }
       overlay.style.pointerEvents = "none";
       mapBox.style.pointerEvents = "none";
+      applyBoardTheme(room);
 
       function applyZoomFix(){
         const z = Number(zoom.value || 1);
@@ -4554,6 +4609,7 @@ if(homeBtn && role !== "host"){
       // Scores
       const visualTeamsNow = getVisualTeams(room);
       const visualScoresNow = getVisualScores(room);
+      applyBoardTheme(room);
       if(GAME_UI.els.scoreGreen) GAME_UI.els.scoreGreen.textContent = String(visualScoresNow.green);
       if(GAME_UI.els.scoreOrange) GAME_UI.els.scoreOrange.textContent = String(visualScoresNow.orange);
       if(GAME_UI.els.teamGreenBtn){
