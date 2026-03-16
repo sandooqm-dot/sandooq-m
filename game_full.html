@@ -461,6 +461,7 @@
     .teamPill.orange{ background:rgba(242,140,0,.95); }
     .teamPill.clickable{ cursor:pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
     .teamPill.clickable:active{ transform: translateY(1px); }
+    .teamPill.selected{ box-shadow:0 0 0 5px rgba(244,196,0,.35), 0 10px 18px rgba(0,0,0,.20); transform:translateY(-1px); }
 
     .scoreBox{
       width:64px;
@@ -2149,6 +2150,20 @@ if(homeBtn && role !== "host"){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
     }
 
+    function hasPendingSelectedCell(roomLike){
+      const room = roomLike || LIVE.room || {};
+      const cur = room.current || {};
+      const activeMapNow = Number(room.activeMap || 0);
+      const curMap = Number(cur.map ?? activeMapNow);
+      const r = Number(cur.row);
+      const c = Number(cur.col);
+      if(!Number.isFinite(r) || !Number.isFinite(c)) return false;
+      if(r < 0 || r > 4 || c < 0 || c > 4) return false;
+      const mapStatesNow = (room.mapStates && room.mapStates[String(activeMapNow)]) ? room.mapStates[String(activeMapNow)] : {};
+      const st = Number(mapStatesNow?.[cellKey(r,c)] ?? 0);
+      return curMap === activeMapNow && st === 1;
+    }
+
     function getVisualTeams(room){
       const r = (room && typeof room === "object") ? room : {};
       const teams = (r.teams && typeof r.teams === "object") ? r.teams : {};
@@ -2582,8 +2597,10 @@ if(homeBtn && role !== "host"){
 
       const k = cellKey(r,c);
       const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
-      const next = team === "green" ? 2 : 3;
+      const currentState = Number(mapStatesNow?.[k] ?? 0);
+      if(currentState !== 1) return;
 
+      const next = team === "green" ? 2 : 3;
       const nextStates = { ...(mapStatesNow || {}) };
       nextStates[k] = next;
 
@@ -2594,11 +2611,17 @@ if(homeBtn && role !== "host"){
       const greenNew = !!winners.greenWin && !prevWin.greenWin;
       const orangeNew = !!winners.orangeWin && !prevWin.orangeWin;
 
+      const scoresNow = (LIVE.room.scores && typeof LIVE.room.scores === "object") ? LIVE.room.scores : { green:0, orange:0 };
+      let nextGreenScore = Number(scoresNow.green ?? 0) || 0;
+      let nextOrangeScore = Number(scoresNow.orange ?? 0) || 0;
+
       if(greenNew || orangeNew){
         let winTeam = team;
         if(greenNew && !orangeNew) winTeam = "green";
         else if(orangeNew && !greenNew) winTeam = "orange";
         winEvent = { team: winTeam, ts: Date.now(), map: activeMapNow };
+        if(winTeam === "green") nextGreenScore += 1;
+        else nextOrangeScore += 1;
       }
 
       const updates = {};
@@ -2612,12 +2635,17 @@ if(homeBtn && role !== "host"){
         map: activeMapNow
       };
       updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
-      if(winEvent) updates[`rooms/${code}/winEvent`] = winEvent;
+      if(winEvent){
+        updates[`rooms/${code}/winEvent`] = winEvent;
+        updates[`rooms/${code}/scores/green`] = nextGreenScore;
+        updates[`rooms/${code}/scores/orange`] = nextOrangeScore;
+      }
 
       await update(ref(db), updates);
     }
 
     let LAST_WIN_TS = 0;
+    let LAST_WIN_RESET_TS = 0;
 
     // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
@@ -3107,22 +3135,23 @@ if(homeBtn && role !== "host"){
             <h3>تعليمات اللعبة</h3>
             <div style="line-height:1.75;font-weight:700">
               <p><b>فكرة اللعبة:</b> يختار المقدم حرفًا من الخريطة، ثم يظهر سؤال لهذا الحرف. أول لاعب يضغط زر الإجابة يظهر اسمه في الشريط.</p>
+              <p><b>دخول اللاعبين:</b> ينضم اللاعبون عبر رابط الدخول أو من خلال الباركود.</p>
 
               <p><b>طريقة اللعب باختصار:</b></p>
               <ul>
                 <li>المقدم يضغط على خلية حرف في الخريطة لاختيار الحرف.</li>
                 <li>يظهر السؤال داخل بطاقة السؤال.</li>
                 <li>اللاعبون يضغطون زر "اضغط هنا للإجابة". أول لاعب يضغط يظهر اسمه.</li>
-                <li>المقدم يقرر النقاط ويحدّث النتيجة من مربعات النقاط.</li>
+                <li>المقدم يضغط على الحرف أولًا، ثم يضغط على اسم الفريق لتلوين الخلية لذلك الفريق.</li>
               </ul>
 
               <p><b>شرح الأزرار للمقدم:</b></p>
               <ul>
                 <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
                 <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
-                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للأبيض.</li>
+                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للوضع الافتراضي.</li>
                 <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
-                <li><b>المؤقت:</b> يبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
+                <li><b>المؤقت:</b> يتم تحديده من السلايدر داخل الإعدادات من 1 إلى 50 ثانية، ويبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
                 <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
                 <li><b>الخلايا:</b> يتم تغيير الحروف ومسح التلوين تلقائيًا عند بدء الجولة الجديدة.</li>
               </ul>
@@ -3586,8 +3615,8 @@ if(homeBtn && role !== "host"){
 
             <div class="scoreBoard">
               <div id="teamGreenBtn" class="teamPill green ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.green.color)}">${escapeHtml(visualTeams.green.name)}</div>
-              <div id="scoreGreen" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(sg) ? sg : 0}</div>
-              <div id="scoreOrange" class="scoreBox ${isHost ? "clickable" : ""}">${Number.isFinite(so) ? so : 0}</div>
+              <div id="scoreGreen" class="scoreBox">${Number.isFinite(sg) ? sg : 0}</div>
+              <div id="scoreOrange" class="scoreBox">${Number.isFinite(so) ? so : 0}</div>
               <div id="teamOrangeBtn" class="teamPill orange ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.orange.color)}">${escapeHtml(visualTeams.orange.name)}</div>
             </div>
           </div>
@@ -3777,20 +3806,16 @@ if(homeBtn && role !== "host"){
         });
       });
 
-      // ✅ Stepper
+      // ✅ تلوين الخلية المحددة بعد اختيار الفريق
       if(isHost){
-        const sG = GAME_UI.els.scoreGreen;
-        const sO = GAME_UI.els.scoreOrange;
         const tG = GAME_UI.els.teamGreenBtn;
         const tO = GAME_UI.els.teamOrangeBtn;
-
-        if(sG) sG.addEventListener("click", () => openScoreStepper("green", sG, Number(sG.textContent||0)));
-        if(sO) sO.addEventListener("click", () => openScoreStepper("orange", sO, Number(sO.textContent||0)));
 
         if(tG && !tG.__teamHooked){
           tG.__teamHooked = true;
           tG.addEventListener("click", async () => {
             closeTip();
+            if(!hasPendingSelectedCell(LIVE.room)) return;
             await assignCurrentCellToTeam("green");
           });
         }
@@ -3798,6 +3823,7 @@ if(homeBtn && role !== "host"){
           tO.__teamHooked = true;
           tO.addEventListener("click", async () => {
             closeTip();
+            if(!hasPendingSelectedCell(LIVE.room)) return;
             await assignCurrentCellToTeam("orange");
           });
         }
@@ -4181,10 +4207,12 @@ zoom.addEventListener("input", applyZoomFix);
       if(GAME_UI.els.teamGreenBtn){
         GAME_UI.els.teamGreenBtn.textContent = visualTeamsNow.green.name;
         GAME_UI.els.teamGreenBtn.style.background = visualTeamsNow.green.color;
+        GAME_UI.els.teamGreenBtn.classList.toggle("selected", hasPendingSelectedCell(room));
       }
       if(GAME_UI.els.teamOrangeBtn){
         GAME_UI.els.teamOrangeBtn.textContent = visualTeamsNow.orange.name;
         GAME_UI.els.teamOrangeBtn.style.background = visualTeamsNow.orange.color;
+        GAME_UI.els.teamOrangeBtn.classList.toggle("selected", hasPendingSelectedCell(room));
       }
 
       // Freeze UI
@@ -4464,6 +4492,27 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
           showWin(we.team);
+
+          if(role === "host" && Number(we.ts) !== LAST_WIN_RESET_TS){
+            LAST_WIN_RESET_TS = Number(we.ts);
+            const currentMap = Number(room.activeMap || 0);
+            const nextMap = (currentMap + 1) % Math.max(1, MAPS.length);
+            setTimeout(async () => {
+              try{
+                const latestWinTs = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
+                if(latestWinTs !== Number(we.ts)) return;
+                const updates = {};
+                updates[`rooms/${code}/activeMap`] = nextMap;
+                updates[`rooms/${code}/mapStates/${currentMap}`] = null;
+                updates[`rooms/${code}/mapStates/${nextMap}`] = null;
+                updates[`rooms/${code}/buzzer`] = null;
+                updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
+                updates[`rooms/${code}/winState`] = null;
+                updates[`rooms/${code}/winEvent`] = null;
+                await update(ref(db), updates);
+              }catch(e){}
+            }, 2600);
+          }
         }
       }catch(e){}
     }
