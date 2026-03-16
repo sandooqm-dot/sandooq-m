@@ -352,13 +352,19 @@
       user-select:none;
       transition: fill .18s ease, stroke .18s ease;
     }
+    .overlaySvg .cellLetter.state0,
+    .overlaySvg .cellLetter.state1{
+      fill:var(--cell-letter, #7e44bd);
+      stroke:rgba(255,255,255,.78);
+    }
     .overlaySvg .cellLetter.state2,
     .overlaySvg .cellLetter.state3{
-      fill:#fff;
-      stroke:rgba(0,0,0,.18);
+      fill:transparent;
+      stroke:transparent;
+      opacity:0;
     }
-    .overlaySvg .state0{ fill: var(--cell-base, #f7f7fb); }
-    .overlaySvg .state1{ fill: var(--hexPale); }
+    .overlaySvg .state0{ fill: var(--cell-base, #ffffff); }
+    .overlaySvg .state1{ fill: var(--cell-base, #ffffff); }
     .overlaySvg .state2{ fill: var(--team-a-color, #1aa34a); }
     .overlaySvg .state3{ fill: var(--team-b-color, #f28c00); }
 
@@ -2550,7 +2556,7 @@ if(homeBtn && role !== "host"){
       mapBox.style.setProperty('--team-b-color', teamB);
       mapBox.style.setProperty('--team-a-soft', hexToRgba(teamA, 0.96));
       mapBox.style.setProperty('--team-b-soft', hexToRgba(teamB, 0.96));
-      mapBox.style.setProperty('--cell-base', '#f7f7fb');
+      mapBox.style.setProperty('--cell-base', '#ffffff');
       mapBox.style.setProperty('--cell-stroke', '#7e44bd');
       mapBox.style.setProperty('--cell-letter', '#7e44bd');
     }
