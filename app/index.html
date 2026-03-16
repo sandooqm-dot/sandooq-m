@@ -148,23 +148,23 @@
 
     .colors-grid{
       display:grid;
-      grid-template-columns:repeat(2, 1fr);
+      grid-template-columns:repeat(4, 1fr);
       gap:10px;
     }
 
     .color-pair{
       position:relative;
       width:100%;
-      min-height:54px;
+      min-height:76px;
       border:none;
-      border-radius:14px;
+      border-radius:16px;
       cursor:pointer;
       overflow:hidden;
       padding:0;
-      background:#eee;
+      background:#f2f2f2;
       border:3px solid transparent;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
       transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+      box-shadow:0 6px 14px rgba(0,0,0,.08);
     }
 
     .color-pair:active{
@@ -172,29 +172,46 @@
     }
 
     .color-pair.active{
-      border-color:#f4c400;
-      box-shadow:0 10px 22px rgba(123,31,99,.18);
+      border-color:#23d7e8;
+      box-shadow:0 0 0 2px rgba(35,215,232,.18), 0 10px 22px rgba(0,0,0,.15);
     }
 
-    .pair-split{
-      display:flex;
+    .pair-icon-wrap{
       width:100%;
-      height:54px;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px 6px;
+      background:#f5f5f5;
     }
 
-    .pair-half{
-      flex:1;
+    .pair-icon{
+      position:relative;
+      width:74px;
+      height:50px;
+    }
+
+    .pair-cell{
+      position:absolute;
+      width:34px;
+      height:34px;
+      top:8px;
+      clip-path:polygon(25% 6%, 75% 6%, 94% 50%, 75% 94%, 25% 94%, 6% 50%);
+      border:2px solid rgba(61,33,95,.68);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+    }
+
+    .pair-cell.left{
+      left:10px;
+    }
+
+    .pair-cell.right{
+      right:10px;
     }
 
     .pair-name{
-      position:absolute;
-      inset:auto 8px 6px 8px;
-      font-size:12px;
-      color:#fff;
-      text-shadow:0 1px 2px rgba(0,0,0,.45);
-      text-align:center;
-      letter-spacing:.2px;
-      pointer-events:none;
+      display:none;
     }
 
     .hint{
@@ -238,6 +255,9 @@
       .row-2{
         gap:8px;
       }
+      .colors-grid{
+        grid-template-columns:repeat(2, 1fr);
+      }
     }
   </style>
 </head>
@@ -270,15 +290,6 @@
       </div>
 
       <div class="section">
-        <div class="label">نوع الخلايا</div>
-        <div class="option-grid" id="gridTypeOptions">
-          <button type="button" class="opt-btn active" data-group="gridType" data-value="hex">سداسية</button>
-          <button type="button" class="opt-btn" data-group="gridType" data-value="pentagon">خماسية</button>
-          <button type="button" class="opt-btn" data-group="gridType" data-value="square">رباعية</button>
-        </div>
-      </div>
-
-      <div class="section">
         <div class="label">عدد جولات الفوز</div>
         <div class="option-grid" id="roundsOptions">
           <button type="button" class="opt-btn active" data-group="rounds" data-value="1">جولة</button>
@@ -288,11 +299,11 @@
       </div>
 
       <div class="section">
-        <div class="label">عدد الخلايا</div>
+        <div class="label">نوع الخلايا</div>
         <div class="option-grid" id="cellCountOptions">
-          <button type="button" class="opt-btn active" data-group="cellCount" data-value="4">أربعة</button>
-          <button type="button" class="opt-btn" data-group="cellCount" data-value="5">خمسة</button>
-          <button type="button" class="opt-btn" data-group="cellCount" data-value="6">ستة</button>
+          <button type="button" class="opt-btn active" data-group="cellCount" data-value="4">رباعية</button>
+          <button type="button" class="opt-btn" data-group="cellCount" data-value="5">خماسية</button>
+          <button type="button" class="opt-btn" data-group="cellCount" data-value="6">سداسية</button>
         </div>
       </div>
 
@@ -311,16 +322,17 @@
     const SYNC_BASE = (params.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
 
     const COLOR_PAIRS = [
-      { id:"rose-blue",     name:"وردي + أزرق",      a:"#e96fa8", b:"#56b4ff" },
-      { id:"navy-gold",     name:"كحلي + ذهبي",      a:"#1f3b7b", b:"#f4c400" },
-      { id:"purple-green",  name:"بنفسجي + أخضر",    a:"#7f4dd6", b:"#4caf50" },
-      { id:"orange-cyan",   name:"برتقالي + سماوي",  a:"#f28c28", b:"#35c9d6" },
-      { id:"yellow-blue",   name:"أصفر + أزرق",      a:"#f2d54b", b:"#3182f6" },
-      { id:"mint-plum",     name:"نعناعي + عنابي",   a:"#62d6b3", b:"#8d2f67" }
+      { id:"cream-rose",     name:"كريمي + وردي",      a:"#edd39a", b:"#f58b96" },
+      { id:"purple-mint",    name:"بنفسجي + نعناعي",   a:"#7a1fc3", b:"#49f0b8" },
+      { id:"blue-pink",      name:"أزرق + وردي",       a:"#0f58ad", b:"#ff3ca6" },
+      { id:"green-orange",   name:"أخضر + برتقالي",    a:"#31b80f", b:"#ff8a3d" },
+      { id:"navy-rose",      name:"كحلي + وردي",       a:"#132f67", b:"#de5f95" },
+      { id:"salmon-teal",    name:"برتقالي + تركواز",  a:"#ff815d", b:"#12a9b0" },
+      { id:"yellow-sky",     name:"أصفر + سماوي",      a:"#ffe87a", b:"#9ad3ff" },
+      { id:"sand-sage",      name:"رملي + زيتي",       a:"#efc06b", b:"#8fb691" }
     ];
 
     const state = {
-      gridType: "hex",
       rounds: 1,
       cellCount: 4,
       colorPairId: COLOR_PAIRS[0].id
@@ -376,9 +388,11 @@
         btn.className = "color-pair" + (state.colorPairId === pair.id ? " active" : "");
         btn.setAttribute("data-pair-id", pair.id);
         btn.innerHTML = `
-          <div class="pair-split">
-            <span class="pair-half" style="background:${pair.a}"></span>
-            <span class="pair-half" style="background:${pair.b}"></span>
+          <div class="pair-icon-wrap">
+            <div class="pair-icon" aria-hidden="true">
+              <span class="pair-cell left" style="background:${pair.a}"></span>
+              <span class="pair-cell right" style="background:${pair.b}"></span>
+            </div>
           </div>
           <span class="pair-name">${pair.name}</span>
         `;
@@ -399,7 +413,6 @@
           document.querySelectorAll(`.opt-btn[data-group="${group}"]`).forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
 
-          if (group === "gridType") state.gridType = value;
           if (group === "rounds") state.rounds = Number(value);
           if (group === "cellCount") state.cellCount = Number(value);
         });
@@ -468,7 +481,7 @@
           team2Name: team2,
           winRounds: state.rounds,
           cellCount: state.cellCount,
-          gridType: state.gridType,
+          gridType: state.cellCount === 4 ? "square" : state.cellCount === 5 ? "pentagon" : "hex",
           colorPairId: state.colorPairId,
           colorPair: {
             a: pair.a,
@@ -505,7 +518,7 @@
         },
 
         grid: {
-          type: state.gridType,
+          type: state.cellCount === 4 ? "square" : state.cellCount === 5 ? "pentagon" : "hex",
           size: state.cellCount,
           colorPairId: state.colorPairId,
           colorA: pair.a,
@@ -599,5 +612,3 @@
   </script>
 </body>
 </html>
-
-<!-- VERSION: app/index.html — vCreateSetup-Teams-Rounds-Cells-Colors-1 -->
