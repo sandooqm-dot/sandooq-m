@@ -335,10 +335,10 @@
       transition: fill .18s ease, transform .18s ease, opacity .18s ease;
     }
     .overlaySvg .cell.selectedCell{
-      stroke:#f4c400;
-      stroke-width:8;
-      fill: var(--cell-base, #ffffff) !important;
-      filter: drop-shadow(0 0 0 rgba(0,0,0,0)) drop-shadow(0 0 10px rgba(244,196,0,.55));
+      stroke: var(--cell-stroke, #6f35b2);
+      stroke-width: 5;
+      fill: #ffe600 !important;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,.10));
     }
     .overlaySvg .cellLetter{
       fill:var(--cell-letter, #5d2a9d);
@@ -366,7 +366,7 @@
       opacity:0;
     }
     .overlaySvg .state0{ fill: var(--cell-base, #ffffff); }
-    .overlaySvg .state1{ fill: var(--cell-base, #ffffff); }
+    .overlaySvg .state1{ fill: #ffe600; }
     .overlaySvg .state2{ fill: var(--team-a-color, #1aa34a); }
     .overlaySvg .state3{ fill: var(--team-b-color, #f28c00); }
 
@@ -2523,7 +2523,6 @@ if(homeBtn && role !== "host"){
     function setStateClass(el, st){
       el.classList.remove("state0","state1","state2","state3","pulse");
       el.classList.add(`state${st}`);
-      if(st === 1) el.classList.add("pulse");
       const txt = el?.parentNode?.querySelector?.('.cellLetter');
       if(txt){
         txt.classList.remove("state0","state1","state2","state3");
@@ -4726,8 +4725,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
             GAME_UI._lastMapStates[k] = st;
             setStateClass(cell, st);
           }
-          const selected = Number(room?.current?.row) === r && Number(room?.current?.col) === c && Number(room?.current?.map ?? activeMap) === activeMap && st === 1;
-          cell.classList.toggle("selectedCell", !!selected);
+          cell.classList.remove("selectedCell");
           const txt = GAME_UI.letterEls?.[i];
           if(txt){ txt.textContent = board?.letters?.[r]?.[c] || ""; }
         }
