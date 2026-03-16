@@ -330,35 +330,36 @@
       cursor:pointer;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      stroke: var(--cell-stroke, #5d2a9d);
-      stroke-width: 5;
+      stroke: var(--cell-stroke, #4d2388);
+      stroke-width: 5.5;
       filter: drop-shadow(0 6px 10px rgba(0,0,0,.12));
       transition: fill .18s ease, transform .18s ease, opacity .18s ease;
     }
     .overlaySvg .cell.selectedCell{
-      stroke: var(--cell-stroke, #6f35b2);
-      stroke-width: 5;
+      stroke: var(--cell-stroke, #4d2388);
+      stroke-width: 5.5;
       fill: #ffe600 !important;
       filter: drop-shadow(0 4px 8px rgba(0,0,0,.10));
     }
     .overlaySvg .cellLetter{
-      fill:var(--cell-letter, #5d2a9d);
+      fill:var(--cell-letter, #4d2388);
       font-family:"AA-GALAXY", Arial, sans-serif;
       font-size:30px;
       font-weight:900;
       text-anchor:middle;
       dominant-baseline:middle;
       pointer-events:none;
-      paint-order:stroke;
-      stroke:rgba(255,255,255,.72);
-      stroke-width:2px;
+      paint-order:normal;
+      stroke:none;
+      stroke-width:0;
+      filter:none;
       user-select:none;
       transition: fill .18s ease, stroke .18s ease;
     }
     .overlaySvg .cellLetter.state0,
     .overlaySvg .cellLetter.state1{
-      fill:var(--cell-letter, #5d2a9d);
-      stroke:rgba(255,255,255,.78);
+      fill:var(--cell-letter, #4d2388);
+      stroke:none;
     }
     .overlaySvg .cellLetter.state2,
     .overlaySvg .cellLetter.state3{
@@ -2581,8 +2582,8 @@ if(homeBtn && role !== "host"){
       mapBox.style.setProperty('--team-a-soft', hexToRgba(teamA, 0.96));
       mapBox.style.setProperty('--team-b-soft', hexToRgba(teamB, 0.96));
       mapBox.style.setProperty('--cell-base', '#ffffff');
-      mapBox.style.setProperty('--cell-stroke', '#5d2a9d');
-      mapBox.style.setProperty('--cell-letter', '#5d2a9d');
+      mapBox.style.setProperty('--cell-stroke', '#4d2388');
+      mapBox.style.setProperty('--cell-letter', '#4d2388');
     }
 
     function hexPointsPointyTop(x, y, w, h){
