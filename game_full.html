@@ -329,18 +329,19 @@
       cursor:pointer;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      stroke: var(--cell-stroke, #6f34b2);
+      stroke: var(--cell-stroke, #5d2a9d);
       stroke-width: 5;
       filter: drop-shadow(0 6px 10px rgba(0,0,0,.12));
       transition: fill .18s ease, transform .18s ease, opacity .18s ease;
     }
     .overlaySvg .cell.selectedCell{
-      stroke:#6f34b2;
-      stroke-width:6;
+      stroke:#f4c400;
+      stroke-width:8;
       fill: var(--cell-base, #ffffff) !important;
+      filter: drop-shadow(0 0 0 rgba(0,0,0,0)) drop-shadow(0 0 10px rgba(244,196,0,.55));
     }
     .overlaySvg .cellLetter{
-      fill:var(--cell-letter, #6f34b2);
+      fill:var(--cell-letter, #5d2a9d);
       font-family:"AA-GALAXY", Arial, sans-serif;
       font-size:30px;
       font-weight:900;
@@ -355,7 +356,7 @@
     }
     .overlaySvg .cellLetter.state0,
     .overlaySvg .cellLetter.state1{
-      fill:var(--cell-letter, #6f34b2);
+      fill:var(--cell-letter, #5d2a9d);
       stroke:rgba(255,255,255,.78);
     }
     .overlaySvg .cellLetter.state2,
@@ -369,14 +370,15 @@
     .overlaySvg .state2{ fill: var(--team-a-color, #1aa34a); }
     .overlaySvg .state3{ fill: var(--team-b-color, #f28c00); }
 
-    @keyframes palePulse {
-      0%   { transform: scale(1); }
-      50%  { transform: scale(1.035); }
-      100% { transform: scale(1); }
+    @keyframes selectGlow {
+      0%   { stroke-width: 7; filter: drop-shadow(0 0 6px rgba(244,196,0,.30)); }
+      50%  { stroke-width: 9; filter: drop-shadow(0 0 12px rgba(244,196,0,.55)); }
+      100% { stroke-width: 7; filter: drop-shadow(0 0 6px rgba(244,196,0,.30)); }
     }
     .overlaySvg .state1.pulse {
-      animation: palePulse 0.9s ease-in-out infinite;
+      animation: selectGlow 0.9s ease-in-out infinite;
       fill: var(--cell-base, #ffffff) !important;
+      stroke:#f4c400 !important;
     }
 
     /* ✅ صف الأزرار تحت الخريطة (نفس الصورة) */
@@ -2561,8 +2563,8 @@ if(homeBtn && role !== "host"){
       mapBox.style.setProperty('--team-a-soft', hexToRgba(teamA, 0.96));
       mapBox.style.setProperty('--team-b-soft', hexToRgba(teamB, 0.96));
       mapBox.style.setProperty('--cell-base', '#ffffff');
-      mapBox.style.setProperty('--cell-stroke', '#6f34b2');
-      mapBox.style.setProperty('--cell-letter', '#6f34b2');
+      mapBox.style.setProperty('--cell-stroke', '#5d2a9d');
+      mapBox.style.setProperty('--cell-letter', '#5d2a9d');
     }
 
     function hexPointsPointyTop(x, y, w, h){
