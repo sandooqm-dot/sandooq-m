@@ -16,11 +16,11 @@
     :root{
       --bgSolid:#7b1f63;
       --yellow:#f4c400;
-      --card:#ffffff;
+      --card:#f7eef5;
       --text:#111;
       --muted:#6b6b6b;
-      --line:#e9d9e4;
-      --soft:#f8f1f6;
+      --line:#e6d1e0;
+      --soft:#f2e8ef;
       --active:#7b1f63;
       --activeText:#fff4b0;
       --shadow:0 12px 34px rgba(0,0,0,.18);
@@ -82,15 +82,15 @@
     }
 
     .section{
-      margin-bottom:16px;
+      margin-bottom:18px;
     }
 
     .label{
       display:block;
       font-size:18px;
       color:#401436;
-      margin:0 0 8px;
-      text-align:right;
+      margin:0 0 10px;
+      text-align:center;
     }
 
     input{
@@ -144,6 +144,53 @@
       color:var(--activeText);
       border-color:#f4c400;
       box-shadow:0 8px 18px rgba(123,31,99,.22);
+    }
+
+    .players-box{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:12px;
+      padding:10px 12px;
+      background:#fff;
+      border:2px solid var(--line);
+      border-radius:14px;
+      direction:ltr;
+    }
+
+    .players-btn{
+      width:50px;
+      height:50px;
+      border:none;
+      border-radius:14px;
+      background:var(--active);
+      color:var(--activeText);
+      font-size:28px;
+      cursor:pointer;
+      box-shadow:0 8px 18px rgba(123,31,99,.22);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 50px;
+    }
+
+    .players-btn:active{
+      transform:scale(.97);
+    }
+
+    .players-value{
+      min-width:92px;
+      text-align:center;
+      color:#401436;
+      font-size:30px;
+      line-height:1;
+    }
+
+    .players-sub{
+      margin-top:6px;
+      text-align:center;
+      color:#7b5b70;
+      font-size:14px;
     }
 
     .colors-grid{
@@ -214,18 +261,10 @@
       display:none;
     }
 
-    .hint{
-      font-size:13px;
-      color:var(--muted);
-      line-height:1.6;
-      margin-top:8px;
-      text-align:center;
-    }
-
     .submit-btn{
       width:100%;
       padding:16px;
-      margin-top:6px;
+      margin-top:8px;
       font-size:20px;
       border:none;
       border-radius:14px;
@@ -258,6 +297,15 @@
       .colors-grid{
         grid-template-columns:repeat(2, 1fr);
       }
+      .players-btn{
+        width:46px;
+        height:46px;
+        flex-basis:46px;
+      }
+      .players-value{
+        min-width:78px;
+        font-size:28px;
+      }
     }
   </style>
 </head>
@@ -285,16 +333,21 @@
       </div>
 
       <div class="section">
-        <label class="label" for="players">عدد اللاعبين</label>
-        <input id="players" inputmode="numeric" placeholder="اكتب عدد اللاعبين من 1 إلى 13">
+        <div class="label">عدد اللاعبين</div>
+        <div class="players-box">
+          <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">+</button>
+          <div class="players-value" id="playersValue">1</div>
+          <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">−</button>
+        </div>
+        <div class="players-sub">من 1 إلى 13 لاعب</div>
       </div>
 
       <div class="section">
         <div class="label">عدد جولات الفوز</div>
         <div class="option-grid" id="roundsOptions">
           <button type="button" class="opt-btn active" data-group="rounds" data-value="1">جولة</button>
-          <button type="button" class="opt-btn" data-group="rounds" data-value="2">جولتان</button>
           <button type="button" class="opt-btn" data-group="rounds" data-value="3">ثلاث جولات</button>
+          <button type="button" class="opt-btn" data-group="rounds" data-value="5">خمس جولات</button>
         </div>
       </div>
 
@@ -313,7 +366,6 @@
       </div>
 
       <button id="btn" class="submit-btn">إنشاء اللعبة</button>
-      <div class="hint">تقدر تكتب الأرقام عربي أو إنجليزي. الحد الأقصى لعدد اللاعبين هو 13.</div>
     </div>
   </div>
 
@@ -335,16 +387,9 @@
     const state = {
       rounds: 1,
       cellCount: 4,
-      colorPairId: COLOR_PAIRS[0].id
+      colorPairId: COLOR_PAIRS[0].id,
+      players: 1
     };
-
-    function normalizeDigits(str){
-      const map = {
-        "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
-        "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
-      };
-      return String(str ?? "").trim().replace(/[٠-٩۰-۹]/g, d => map[d] ?? d);
-    }
 
     function random6(){
       return String(Math.floor(100000 + Math.random()*900000));
@@ -419,26 +464,37 @@
       });
     }
 
+    function updatePlayersView(){
+      const el = document.getElementById("playersValue");
+      if(el) el.textContent = String(state.players);
+    }
+
+    function setupPlayersControl(){
+      const plus = document.getElementById("playersPlus");
+      const minus = document.getElementById("playersMinus");
+
+      plus.addEventListener("click", () => {
+        state.players = Math.min(13, state.players + 1);
+        updatePlayersView();
+      });
+
+      minus.addEventListener("click", () => {
+        state.players = Math.max(1, state.players - 1);
+        updatePlayersView();
+      });
+
+      updatePlayersView();
+    }
+
     async function createRoom(){
       const name = document.getElementById("name").value.trim();
       const team1 = document.getElementById("team1").value.trim() || "الفريق الأول";
       const team2 = document.getElementById("team2").value.trim() || "الفريق الثاني";
-      const pRaw = document.getElementById("players").value;
-      let players = Number(normalizeDigits(pRaw).replace(/\D/g,""));
+      const players = state.players;
       const pair = getColorPair(state.colorPairId);
 
       if(!name){
         alert("اكتب اسم المسابقة");
-        return;
-      }
-
-      if(!Number.isFinite(players) || players < 1){
-        alert("عدد اللاعبين لازم يكون 1 أو أكثر");
-        return;
-      }
-
-      if(players > 13){
-        alert("الحد الأقصى لعدد اللاعبين هو 13");
         return;
       }
 
@@ -587,27 +643,9 @@
       }
     }
 
-    (function setupPlayersInput(){
-      const inp = document.getElementById("players");
-      if(!inp) return;
-
-      inp.addEventListener("input", () => {
-        const raw = inp.value;
-        const digits = normalizeDigits(raw).replace(/\D/g, "");
-        if(digits === ""){
-          inp.value = "";
-          return;
-        }
-        let n = Number(digits);
-        if(!Number.isFinite(n)) n = 1;
-        if(n > 13) n = 13;
-        if(n < 1) n = 1;
-        inp.value = String(n);
-      });
-    })();
-
     renderColorPairs();
     setupOptionButtons();
+    setupPlayersControl();
     document.getElementById("btn").addEventListener("click", createRoom);
   </script>
 </body>
