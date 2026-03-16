@@ -1250,6 +1250,27 @@
     </div>
   </div>
 
+  <div id="roundOverlay" class="roundOverlay" aria-hidden="true">
+    <div class="roundOverlayInner">
+      <h2 id="roundStageText" class="roundStageText">الجولة الثانية</h2>
+      <div class="roundScoreRow">
+        <div id="roundCardGreen" class="roundScoreCard">
+          <div id="roundScoreGreen" class="roundScoreNum">0</div>
+          <div id="roundNameGreen" class="roundScoreName">الفريق الأول</div>
+        </div>
+        <div class="roundDash">-</div>
+        <div id="roundCardOrange" class="roundScoreCard">
+          <div id="roundScoreOrange" class="roundScoreNum">0</div>
+          <div id="roundNameOrange" class="roundScoreName">الفريق الثاني</div>
+        </div>
+      </div>
+      <p id="roundWinnerLine" class="roundWinnerLine"></p>
+      <div id="winnerCup" class="winnerCup" aria-hidden="true">
+        <div class="cupBadge">بطل السباق</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ✅ (مهم) تسجيل Service Worker بدري قبل أي imports (نفس فكرة index/join) -->
   <script>
     (function(){
@@ -1878,6 +1899,16 @@ if(homeBtn && role !== "host"){
     const confettiRain = document.getElementById("confettiRain");
     const winCongrats = document.getElementById("winCongrats");
     const winWinner = document.getElementById("winWinner");
+    const roundOverlay = document.getElementById("roundOverlay");
+    const roundStageText = document.getElementById("roundStageText");
+    const roundCardGreen = document.getElementById("roundCardGreen");
+    const roundCardOrange = document.getElementById("roundCardOrange");
+    const roundScoreGreen = document.getElementById("roundScoreGreen");
+    const roundScoreOrange = document.getElementById("roundScoreOrange");
+    const roundNameGreen = document.getElementById("roundNameGreen");
+    const roundNameOrange = document.getElementById("roundNameOrange");
+    const roundWinnerLine = document.getElementById("roundWinnerLine");
+    const winnerCup = document.getElementById("winnerCup");
 
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
@@ -2619,9 +2650,19 @@ if(homeBtn && role !== "host"){
         let winTeam = team;
         if(greenNew && !orangeNew) winTeam = "green";
         else if(orangeNew && !greenNew) winTeam = "orange";
-        winEvent = { team: winTeam, ts: Date.now(), map: activeMapNow };
         if(winTeam === "green") nextGreenScore += 1;
         else nextOrangeScore += 1;
+        const targetWins = Math.max(1, Number(LIVE.room?.round?.targetWins || LIVE.room?.settings?.winRounds || 1));
+        winEvent = {
+          team: winTeam,
+          ts: Date.now(),
+          map: activeMapNow,
+          greenScore: nextGreenScore,
+          orangeScore: nextOrangeScore,
+          targetWins,
+          isFinal: (nextGreenScore >= targetWins || nextOrangeScore >= targetWins),
+          nextRound: (nextGreenScore + nextOrangeScore + 1)
+        };
       }
 
       const updates = {};
@@ -2639,6 +2680,10 @@ if(homeBtn && role !== "host"){
         updates[`rooms/${code}/winEvent`] = winEvent;
         updates[`rooms/${code}/scores/green`] = nextGreenScore;
         updates[`rooms/${code}/scores/orange`] = nextOrangeScore;
+        updates[`rooms/${code}/scores/a`] = nextGreenScore;
+        updates[`rooms/${code}/scores/b`] = nextOrangeScore;
+        updates[`rooms/${code}/round/current`] = Math.max(1, Number(winEvent.isFinal ? (nextGreenScore + nextOrangeScore) : winEvent.nextRound));
+        updates[`rooms/${code}/round/winner`] = winEvent.isFinal ? winEvent.team : null;
       }
 
       await update(ref(db), updates);
@@ -2852,33 +2897,74 @@ if(homeBtn && role !== "host"){
       setTimeout(() => { clearConfetti(); }, Math.max(0, Number(durationMs)||0));
     }
 
-    function showWin(team){
+    function hideRoundOverlay(){
+      if(roundOverlay) roundOverlay.classList.remove("show");
+      if(winnerCup){
+        winnerCup.className = "winnerCup";
+      }
+    }
+
+    function showRoundResultOverlay(room, winEvent){
+      if(!roundOverlay || !winEvent) return;
+      const visualTeams = getVisualTeams(room);
+      const scores = getVisualScores(room);
+      const targetWins = Math.max(1, Number(winEvent.targetWins || room?.round?.targetWins || room?.settings?.winRounds || 1));
+      const isFinal = !!winEvent.isFinal;
+      const nextRound = Math.max(1, Number(winEvent.nextRound || (scores.green + scores.orange + 1)));
+
+      roundCardGreen.style.background = visualTeams.green.color;
+      roundCardOrange.style.background = visualTeams.orange.color;
+      roundScoreGreen.textContent = String(scores.green);
+      roundScoreOrange.textContent = String(scores.orange);
+      roundNameGreen.textContent = visualTeams.green.name;
+      roundNameOrange.textContent = visualTeams.orange.name;
+
+      if(isFinal){
+        roundStageText.textContent = "بطل السباق";
+        const winnerName = winEvent.team === "green" ? visualTeams.green.name : visualTeams.orange.name;
+        roundWinnerLine.textContent = `${winnerName} حسم المسابقة بنتيجة ${scores.green} - ${scores.orange}`;
+        winnerCup.className = `winnerCup show ${winEvent.team === "green" ? 'to-green' : 'to-orange'}`;
+      }else{
+        roundStageText.textContent = `الجولة ${toArabicRoundWord(nextRound)}`;
+        const winnerName = winEvent.team === "green" ? visualTeams.green.name : visualTeams.orange.name;
+        roundWinnerLine.textContent = `${winnerName} فاز بالجولة الحالية. المتبقي للوصول إلى ${targetWins} جولات.`;
+        winnerCup.className = "winnerCup";
+      }
+
+      roundOverlay.classList.add("show");
+    }
+
+    function toArabicRoundWord(n){
+      const map = {1:"الأولى",2:"الثانية",3:"الثالثة",4:"الرابعة",5:"الخامسة",6:"السادسة",7:"السابعة"};
+      return map[n] || String(n);
+    }
+
+    function showWin(team, room, winEvent){
       if(!team) return;
 
       if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
       stopVois();
 
       winBackdrop.style.display = "flex";
+      winCongrats.textContent = (winEvent && winEvent.isFinal) ? "انتهت المسابقة" : "مبرووك";
 
-      winCongrats.textContent = "مبرووك";
-      if(team === "green"){
-        winWinner.textContent = "فاز الفريق الأخضر";
-      }else{
-        winWinner.textContent = "فاز الفريق البرتقالي";
-      }
+      const visualTeams = getVisualTeams(room || LIVE.room || {});
+      const winnerName = (team === "green" ? visualTeams.green.name : visualTeams.orange.name);
+      winWinner.textContent = (winEvent && winEvent.isFinal) ? `${winnerName} هو بطل السباق` : `فاز ${winnerName} بالجولة`;
 
-      startConfetti(5000);
+      showRoundResultOverlay(room || LIVE.room || {}, winEvent || {});
+      startConfetti((winEvent && winEvent.isFinal) ? 6000 : 3500);
 
-      // ✅ (5) تشغيل الصوت 5 ثواني
-      if(!playVoisFor(5000)){
+      if(!playVoisFor((winEvent && winEvent.isFinal) ? 6000 : 3500)){
         fallbackBeep();
       }
 
       WIN_HIDE_T = setTimeout(()=> {
         winBackdrop.style.display = "none";
+        hideRoundOverlay();
         clearConfetti();
         stopVois();
-      }, 5000);
+      }, (winEvent && winEvent.isFinal) ? 5600 : 2600);
     }
 
     winBackdrop.addEventListener("click", () => {
@@ -4491,9 +4577,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         const we = room.winEvent;
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
-          showWin(we.team);
+          showWin(we.team, room, we);
 
-          if(role === "host" && Number(we.ts) !== LAST_WIN_RESET_TS){
+          if(role === "host" && Number(we.ts) !== LAST_WIN_RESET_TS && !we.isFinal){
             LAST_WIN_RESET_TS = Number(we.ts);
             const currentMap = Number(room.activeMap || 0);
             const nextMap = (currentMap + 1) % Math.max(1, MAPS.length);
@@ -4509,9 +4595,10 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
                 updates[`rooms/${code}/winState`] = null;
                 updates[`rooms/${code}/winEvent`] = null;
+                updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
                 await update(ref(db), updates);
               }catch(e){}
-            }, 2600);
+            }, 2800);
           }
         }
       }catch(e){}
