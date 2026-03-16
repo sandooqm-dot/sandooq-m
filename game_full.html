@@ -950,6 +950,15 @@
       text-align:right;
     }
     .settingsView h3{margin:0 0 10px;text-align:center}
+    .settingsPanel.compactGuide{width:min(92vw, 560px);height:min(84vh, 760px);background:#ffd54a;position:relative;}
+    .settingsCloseRed{position:absolute;left:10px;top:10px;width:42px;height:42px;border:none;border-radius:12px;background:#ff2d2d;color:#fff;font-size:24px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;border:4px solid rgba(0,0,0,.85);z-index:2;}
+    .guideNav{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:0 0 12px;}
+    .guideNavBtn{border:none;border-radius:12px;background:#f7f1f4;color:#4b2040;font-weight:900;padding:10px 8px;cursor:pointer;border:2px solid rgba(0,0,0,.12);font-size:15px;}
+    .guideSection{scroll-margin-top:12px;border:2px solid rgba(0,0,0,.08);border-radius:14px;padding:10px 12px;margin:10px 0;background:#fff;}
+    .guideSection h4{margin:0 0 6px;font-size:18px;color:#401436;text-align:center;}
+    .guideSection p{margin:0;line-height:1.8;font-weight:700;font-family:Arial,sans-serif;}
+    .guideList{margin:0;padding-right:18px;font-family:Arial,sans-serif;line-height:1.8;font-weight:700;}
+
     .settingsBackMini{
       width:100%;
       height:52px;
@@ -3369,7 +3378,8 @@ if(homeBtn && role !== "host"){
       bd.id = "settingsBackdrop";
       bd.className = "settingsBackdrop";
       bd.innerHTML = `
-        <div class="settingsPanel" role="dialog" aria-modal="true" aria-label="الإعدادات">
+        <div class="settingsPanel compactGuide" role="dialog" aria-modal="true" aria-label="الإعدادات">
+          <button id="settingsCloseX" class="settingsCloseRed" type="button">✕</button>
           <div id="settingsMenu">
             <button id="sHelp" class="settingsBtn" type="button">التعليمات</button>
             <button id="sTimer" class="settingsBtn" type="button">تعديل المؤقت</button>
@@ -3389,33 +3399,55 @@ if(homeBtn && role !== "host"){
 
           <div id="helpView" class="settingsView">
             <h3>تعليمات اللعبة</h3>
-            <div style="line-height:1.75;font-weight:700">
-              <p><b>فكرة اللعبة:</b> يختار المقدم حرفًا من الخريطة، ثم يظهر سؤال لهذا الحرف. أول لاعب يضغط زر الإجابة يظهر اسمه في الشريط.</p>
-              <p><b>دخول اللاعبين:</b> ينضم اللاعبون عبر رابط الدخول أو من خلال الباركود.</p>
-
-              <p><b>طريقة اللعب باختصار:</b></p>
-              <ul>
-                <li>المقدم يضغط على خلية حرف في الخريطة لاختيار الحرف.</li>
-                <li>يظهر السؤال داخل بطاقة السؤال.</li>
-                <li>اللاعبون يضغطون زر "اضغط هنا للإجابة". أول لاعب يضغط يظهر اسمه.</li>
-                <li>المقدم يضغط على الحرف أولًا، ثم يضغط على اسم الفريق لتلوين الخلية لذلك الفريق.</li>
-              </ul>
-
-              <p><b>شرح الأزرار للمقدم:</b></p>
-              <ul>
-                <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
-                <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
-                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للوضع الافتراضي.</li>
-                <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
-                <li><b>المؤقت:</b> يتم تحديده من السلايدر داخل الإعدادات من 1 إلى 50 ثانية، ويبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
-                <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
-                <li><b>الخلايا:</b> يتم تغيير الحروف ومسح التلوين تلقائيًا عند بدء الجولة الجديدة.</li>
-              </ul>
+            <div class="guideNav">
+              <button type="button" class="guideNavBtn" data-target="guideHow">طريقة اللعب</button>
+              <button type="button" class="guideNavBtn" data-target="guideBtns">وظائف الأزرار</button>
+              <button type="button" class="guideNavBtn" data-target="guidePlayers">دخول اللاعبين</button>
+              <button type="button" class="guideNavBtn" data-target="guideTimer">المؤقت</button>
+              <button type="button" class="guideNavBtn" data-target="guideCells">الخريطة والخلايا</button>
+              <button type="button" class="guideNavBtn" data-target="guideWin">الفوز والنتيجة</button>
             </div>
+
+            <section id="guideHow" class="guideSection">
+              <h4>شرح طريقة اللعب</h4>
+              <p>المقدم يضغط على خلية حرف من الخريطة فيتم تأشيرها ويظهر السؤال مباشرة. بعد ذلك يضغط اللاعبون زر الإجابة، ويظهر اسم أول لاعب ضغط. ثم يضغط المقدم على اسم الفريق المستحق فتتلوّن الخلية بلونه.</p>
+            </section>
+
+            <section id="guideBtns" class="guideSection">
+              <h4>شرح وظائف الأزرار</h4>
+              <ul class="guideList">
+                <li>تجميد الأزرار: يمنع اللاعبين مؤقتًا من الضغط.</li>
+                <li>تغيير السؤال: يعرض السؤال التالي لنفس الحرف.</li>
+                <li>تفريغ الخريطة: يمسح ألوان الخلايا فقط.</li>
+                <li>تغيير نوع الأسئلة: يبدّل بين أسئلة اللعبة والأسئلة الخاصة.</li>
+                <li>الزوم: لتكبير وتصغير الخريطة.</li>
+              </ul>
+            </section>
+
+            <section id="guidePlayers" class="guideSection">
+              <h4>دخول اللاعبين</h4>
+              <p>يقوم المقدم بإنشاء اللعبة ثم يشارك مع اللاعبين رابط الدخول أو الباركود. يدخل كل لاعب من جهازه، يكتب اسمه، ثم ينضم إلى الغرفة وينتظر بدء اللعب.</p>
+            </section>
+
+            <section id="guideTimer" class="guideSection">
+              <h4>المؤقت</h4>
+              <p>وقت المؤقت يتم اختياره من السلايدر داخل الإعدادات من 1 إلى 50 ثانية. يبدأ المؤقت تلقائيًا عند أول لاعب يضغط الجرس، ويمكن تصفيره بالضغط على دائرة المؤقت.</p>
+            </section>
+
+            <section id="guideCells" class="guideSection">
+              <h4>الخريطة والخلايا</h4>
+              <p>الخريطة تتكون من خلايا تحتوي الحروف. عند بدء جولة جديدة يتم مسح التلوين تلقائيًا وتغيير أماكن الحروف تلقائيًا. لون التأشير يوضح الحرف المختار حاليًا قبل اعتماده لأحد الفريقين.</p>
+            </section>
+
+            <section id="guideWin" class="guideSection">
+              <h4>الفوز والنتيجة</h4>
+              <p>الفوز يُحتسب تلقائيًا عند اكتمال الاتصال الصحيح لخلايا أحد الفريقين. بعدها تظهر نتيجة الجولة، وإذا كانت هناك جولة جديدة يبدأ توزيع جديد للحروف. وإذا وصل أحد الفريقين إلى العدد المطلوب يظهر أنميشن بطل السباق.</p>
+            </section>
+
             <button id="helpBack" class="settingsBackMini" type="button">رجوع</button>
           </div>
         </div>
-      `;
+            `;
       document.body.appendChild(bd);
 
       function closeSettings(){
@@ -3428,6 +3460,14 @@ if(homeBtn && role !== "host"){
 
       bd.addEventListener("click", (e) => {
         if(e.target === bd) closeSettings();
+      });
+      bd.querySelector("#settingsCloseX").addEventListener("click", closeSettings);
+      bd.querySelectorAll(".guideNavBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-target");
+          const el = bd.querySelector(`#${id}`);
+          if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+        });
       });
 
       bd.querySelector("#helpBack").addEventListener("click", () => {
@@ -3969,380 +4009,12 @@ if(homeBtn && role !== "host"){
       GAME_UI.applyZoomFix = applyZoomFix;
 
       function placeHexes(){
-        const mapBox = document.getElementById("mapBox");
-        if(!mapBox) return;
         placeDynamicCells(room, overlay, GAME_UI.cells || [], GAME_UI.labels || [], mapBox);
         applyZoomFix();
       }
       GAME_UI.placeHexes = placeHexes;
       requestAnimationFrame(placeHexes);
 
-      if(!GAME_UI.resizeBound){
-        GAME_UI.resizeBound = true;
-        window.addEventListener("resize", () => {
-          try{ placeHexes(); applyZoomFix(); }catch(e){}
-        });
-      }
-
-      // ✅ تحديثات (مؤقت) أولية
-      TIMER_UI.latestTimer = room.timer || {};
-      TIMER_UI.isHost = isHost;
-      ensureTimerTicker();
-      applyTimerDom();
-
-      // ✅ Tooltips
-      main.querySelectorAll(".helpDot").forEach(dot => {
-        dot.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const txt = dot.getAttribute("data-tip") || "";
-          if(TIP_OPEN && tipPopup.style.display === "block"){
-            closeTip();
-            return;
-          }
-          openTip(dot, txt);
-        });
-      });
-
-      // ✅ تلوين الخلية المحددة بعد اختيار الفريق
-      if(isHost){
-        const tG = GAME_UI.els.teamGreenBtn;
-        const tO = GAME_UI.els.teamOrangeBtn;
-
-        if(tG && !tG.__teamHooked){
-          tG.__teamHooked = true;
-          tG.addEventListener("click", async () => {
-            closeTip();
-            if(!hasPendingSelectedCell(LIVE.room)) return;
-            await assignCurrentCellToTeam("green");
-          });
-        }
-        if(tO && !tO.__teamHooked){
-          tO.__teamHooked = true;
-          tO.addEventListener("click", async () => {
-            closeTip();
-            if(!hasPendingSelectedCell(LIVE.room)) return;
-            await assignCurrentCellToTeam("orange");
-          });
-        }
-      }
-
-      // ✅ Timer click (host)
-      if(isHost && GAME_UI.els.timerClock){
-        GAME_UI.els.timerClock.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          const t = normalizeTimer(TIMER_UI.latestTimer || {});
-          const sel = Number(t.sel || 10);
-
-          if(t.running || t.done){
-            await update(ref(db, `rooms/${code}/timer`), {
-              running:false,
-              done:false,
-              startTs:0,
-              dur: sel
-            });
-            return;
-          }
-
-          await update(ref(db, `rooms/${code}/timer`), {
-            sel,
-            dur: sel,
-            running:true,
-            done:false,
-            startTs: Date.now()
-          });
-        });
-      }
-
-      // ✅ Settings
-      if(isHost && GAME_UI.els.settingsBtn){
-        GAME_UI.els.settingsBtn.addEventListener("click", () => openSettings(LIVE.room));
-      }
-
-      // ✅ Q Mode toggle
-      if(isHost && GAME_UI.els.qModeBtn){
-        GAME_UI.els.qModeBtn.addEventListener("click", async () => {
-          const cur = getQuestionMode(LIVE.room);
-          const next = (cur === "custom") ? "default" : "custom";
-          await update(ref(db, `rooms/${code}`), { questionMode: next });
-        });
-      }
-
-      // ✅ Zoom
-      if(zoom){
-        zoom.addEventListener("input", () => {
-          const z = Number(zoom.value || 1);
-          localStorage.setItem(ZOOM_KEY, String(z));
-          applyZoomFix();
-        });
-      }
-
-      // ✅ Freeze
-      if(isHost && GAME_UI.els.freezeBtn){
-        GAME_UI.els.freezeBtn.addEventListener("click", async () => {
-          await update(roomRef, { freeze: !LIVE.room.freeze, buzzer: null });
-        });
-      }
-
-      // ✅ Next Q
-      if(isHost && GAME_UI.els.nextQ){
-        GAME_UI.els.nextQ.addEventListener("click", async () => {
-          const cur = LIVE.room.current || {};
-          if(!cur.letter) return;
-
-          const pick = getNextQuestionSelection(LIVE.room, cur.letter);
-          if(!pick.list.length) return;
-
-          const updates = {};
-          updates[`rooms/${code}/current`] = { ...cur, qIndex: pick.qIndex };
-          updates[`rooms/${code}/${pick.cursorField}/${cur.letter}`] = pick.nextCursor;
-          await update(ref(db), updates);
-        });
-      }
-
-      // ✅ Clear board
-      if(isHost && GAME_UI.els.clearBoardBtn){
-        GAME_UI.els.clearBoardBtn.addEventListener("click", async () => {
-          closeTip();
-          const curMap = Number(LIVE.room.activeMap || 0);
-          const updates = {};
-          updates[`rooms/${code}/mapStates/${curMap}`] = null;
-          updates[`rooms/${code}/buzzer`] = null;
-          updates[`rooms/${code}/winState`] = null;
-          await update(ref(db), updates);
-        });
-      }
-
-      // ✅ Overlay cell click (host)
-      if(isHost){
-        GAME_UI.cells.forEach(cell => {
-          cell.addEventListener("click", async (e) => {
-            e.preventDefault();
-            if(LIVE.room.status !== "started") return;
-
-            const r = Number(cell.getAttribute("data-row"));
-            const c = Number(cell.getAttribute("data-col"));
-            const k = cellKey(r,c);
-            const letter = getGridLetter(LIVE.room, r, c);
-
-            const activeMapNow = Number(LIVE.room.activeMap || 0);
-            const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
-            const st = Number(mapStatesNow?.[k] ?? 0);
-            const cur = LIVE.room.current || {};
-            const curMap = Number(cur.map ?? activeMapNow);
-            const isCurrentCell = (Number(cur.row) === r && Number(cur.col) === c && curMap === activeMapNow);
-
-            const updates = {};
-            updates[`rooms/${code}/buzzer`] = null;
-
-            if(st === 0){
-              const nextStates = { ...(mapStatesNow || {}) };
-
-              if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
-                const prevKey = cellKey(Number(cur.row), Number(cur.col));
-                if(prevKey !== k && Number(nextStates?.[prevKey] ?? 0) === 1){
-                  delete nextStates[prevKey];
-                  updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
-                }
-              }
-
-              nextStates[k] = 1;
-
-              const pick = getNextQuestionSelection(LIVE.room, letter);
-              updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
-              updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
-              if(pick.list.length){
-                updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
-              }
-
-              await update(ref(db), updates);
-              return;
-            }
-
-            const nextStates = { ...(mapStatesNow || {}) };
-            delete nextStates[k];
-
-            const winners = computeWinners(nextStates, LIVE.room);
-            updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = null;
-            updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winners.greenWin, orangeWin: !!winners.orangeWin };
-
-            if(isCurrentCell){
-              updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:activeMapNow };
-            }
-
-            await update(ref(db), updates);
-          });
-        });
-      }
-
-      // ✅ Player buzzer
-      if(GAME_UI.els.buzzBtn){
-        GAME_UI.els.buzzBtn.addEventListener("click", async () => {
-          const rr = LIVE.room;
-          const mm = LIVE.me || me;
-
-          if(rr.status !== "started") return;
-          if(rr.freeze) return;
-          if(!mm) return;
-
-          if(GAME_UI.__buzzBusy) return;
-          GAME_UI.__buzzBusy = true;
-
-          try{
-            const res = await claimBuzzerSafely(mm);
-
-            if(res && res.committed){
-              const v = res.winner || null;
-              if(v && v.ts){
-                LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
-                STABLE_BUZZER = v;
-              }
-              if(!playRong()) fallbackBeep();
-            }
-          }catch(e){}
-          finally{
-            setTimeout(() => { GAME_UI.__buzzBusy = false; }, 220);
-          }
-        });
-      }
-    }
-
-    
-    // ✅ شاشة "عرض الشاشة" (TV) — تعرض الخريطة + النتائج فقط بدون أي تحكم
-    function renderTvDisplay(room, me){
-      document.body.classList.add("tvMode");
-      main.classList.add("inGame");
-
-      const activeMap = Number(room.activeMap || 0);
-      const srcBase = ["maps/map1.jpeg","maps/map2.jpeg","maps/map3.jpeg"][activeMap] || "maps/map1.jpeg";
-      const src = srcBase + vq;
-
-      const ZOOM_KEY = `sabaq_zoom_${code}`;
-      const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "1");
-      const initialZoom = Math.max(0.8, Math.min(1.35, Number.isFinite(savedZoom) ? savedZoom : 1));
-
-      const sg = Number(room?.scores?.green ?? 0);
-      const so = Number(room?.scores?.orange ?? 0);
-
-      main.innerHTML = `        <div class="tvTopBar">
-          <div class="tvBarRow">
-            <div class="tvLeft">
-              <img class="tvLogo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
-              <input id="zoom" class="tvZoom" type="range" min="0.8" max="1.35" step="0.01" value="${initialZoom}" aria-label="تكبير تصغير الخريطة"/>
-            </div>
-
-            <div id="tvGameName" class="tvGameName"></div>
-
-            <div class="tvScoreWrap" aria-hidden="true">
-              <div class="scoreBoard">
-                <div class="teamPill green">الفريق الأخضر</div>
-                <div id="scoreGreen" class="scoreBox">${Number.isFinite(sg) ? sg : 0}</div>
-                <div id="scoreOrange" class="scoreBox">${Number.isFinite(so) ? so : 0}</div>
-                <div class="teamPill orange">الفريق البرتقالي</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="tvContent">
-          <div class="mapOuter">
-            <div id="mapScale" class="mapScale" style="--zoom:${initialZoom};transform:scale(${initialZoom});transform-origin:center top;">
-              <div id="mapBox" class="mapBox">
-                <img id="mapImg" src="" alt="" decoding="async">
-                <svg id="overlay" class="overlaySvg"></svg>
-              </div>
-            </div>
-          </div>
-        </div>`;
-
-      const mapOuter = main.querySelector(".mapOuter");
-      const mapScale = document.getElementById("mapScale");
-      const mapBox = document.getElementById("mapBox");
-      const mapImg = document.getElementById("mapImg");
-      const overlay = document.getElementById("overlay");
-      const zoom = document.getElementById("zoom");
-
-      // تحديث مراجع واجهة اللعب (نستخدم نفس IDs حتى نعيد استخدام updateGameUI)
-      GAME_UI.mounted = true;
-      GAME_UI.activeMap = activeMap;
-      GAME_UI.srcBase = srcBase;
-      GAME_UI.els = {
-        mapImg,
-        overlay,
-        mapScale,
-        zoom,
-        scoreGreen: document.getElementById("scoreGreen"),
-        scoreOrange: document.getElementById("scoreOrange"),
-        tvGameName: document.getElementById("tvGameName"),
-      };
-
-      // ✅ بناء خلايا الخريطة (بدون أي تفاعل)
-      const builtTv = buildOverlayCells(overlay, room, false);
-      GAME_UI.cells = builtTv.cells;
-      GAME_UI.labels = builtTv.labels;
-      overlay.style.pointerEvents = "none";
-      mapBox.style.pointerEvents = "none";
-
-      // ✅ حمّل الخريطة فعليًا (كان السورس ما ينحط)
-      if(mapBox) mapBox.classList.add("gridOnly"); if(mapImg){ mapImg.removeAttribute("src"); mapImg.style.display = "none"; }
-
-      function applyZoomFix(){
-        const z = Number(zoom.value || 1);
-        mapScale.style.setProperty("--zoom", String(z));
-        // ✅ دعم مباشر للـ transform (عشان الـ iOS ما يصير السلايدر منظر)
-        mapScale.style.transform = `scale(${z})`;
-        mapScale.style.transformOrigin = "center top";
-        localStorage.setItem(ZOOM_KEY, String(z));
-
-        // اضبط المساحة أسفل الخريطة حتى لا تنقص عند التكبير
-        const baseH = mapBox.offsetHeight || 0;
-        const delta = Math.max(0, baseH * (z - 1));
-        mapOuter.style.marginBottom = `${Math.ceil(delta) + 6}px`;
-      }
-      GAME_UI.applyZoomFix = applyZoomFix;
-
-      function placeHexes(){
-        const W = mapBox.clientWidth;
-        const H = mapBox.clientHeight;
-        if(!W || !H) return;
-
-        overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
-        overlay.setAttribute("preserveAspectRatio", "none");
-
-        const key = GAME_UI.srcBase || srcBase;
-        const bbox = BBOX_CACHE[key];
-        if(!bbox) return;
-
-        const x0 = bbox.x0 * W;
-        const y0 = bbox.y0 * H;
-        const x1 = bbox.x1 * W;
-        const y1 = bbox.y1 * H;
-
-        const gridW = x1 - x0;
-        const gridH = y1 - y0;
-
-        const w = gridW / 5.5;
-        const h = gridH / 4.0;
-        const stepY = h * 0.75;
-
-        let i = 0;
-        for(let row=0; row<5; row++){
-          for(let col=0; col<5; col++){
-            const left = x0 + col*w + (row%2)*(w/2);
-            const top  = y0 + row*stepY;
-            GAME_UI.cells[i++].setAttribute("points", hexPointsPointyTop(left, top, w, h));
-          }
-        }
-
-        applyZoomFix();
-      }
-      GAME_UI.placeHexes = placeHexes;
-
-      function onMapReady(){
-        const key = GAME_UI.srcBase || srcBase;
-        if(!BBOX_CACHE[key]) BBOX_CACHE[key] = detectHexBBox(mapImg);
-        requestAnimationFrame(placeHexes);
-      }
       GAME_UI.onMapReady = onMapReady;
 
       if(mapImg.complete && mapImg.naturalWidth > 0) onMapReady();
@@ -4457,14 +4129,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       // Map image change (when activeMap changes)
       const activeMap = Number(room.activeMap || 0);
       const srcBase = ([
-        "maps/map1.jpeg",
-        "maps/map2.jpeg",
-        "maps/map3.jpeg"
-      ][activeMap] || "maps/map1.jpeg");
+        'grid-only');
 
       if(GAME_UI.activeMap !== activeMap || GAME_UI.srcBase !== srcBase){
         GAME_UI.activeMap = activeMap;
-        GAME_UI.srcBase = srcBase;
+        GAME_UI.srcBase = 'grid-only';
 
         if(GAME_UI.els.mapImg){
           const img = GAME_UI.els.mapImg;
