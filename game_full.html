@@ -279,7 +279,7 @@
     .mapBox{
       position:relative;
       width:100%;
-      aspect-ratio:1 / 0.70;
+      aspect-ratio:1 / 0.78;
       overflow:hidden;
       border-radius:26px;
       background:
@@ -1073,6 +1073,7 @@
       color:#fff;
       position:relative;
       overflow:hidden;
+      pointer-events:none;
     }
     .roundStageText{
       margin:0 0 16px;
@@ -1165,7 +1166,7 @@
     .winBackdrop{
       position:fixed;
       inset:0;
-      background:rgba(0,0,0,.55);
+      background:transparent;
       display:none;
       align-items:center;
       justify-content:center;
@@ -1205,6 +1206,7 @@
       border:8px solid rgba(0,0,0,.85);
       box-shadow:0 28px 44px rgba(0,0,0,.32);
       padding:18px 14px 20px;
+      display:none;
       text-align:center;
       position:relative;
       overflow:hidden;
@@ -2061,7 +2063,7 @@ let __dbgEl = null;
 function _dbgEnsure(){
   if(__dbgEl) return __dbgEl;
   __dbgEl = document.createElement("div");
-  __dbgEl.style.cssText = "position:fixed;left:10px;bottom:10px;z-index:99999;background:rgba(0,0,0,.55);color:#fff;padding:6px 10px;border-radius:10px;font:12px/1.4 Arial, sans-serif;direction:ltr;max-width:90vw;white-space:pre;";
+  __dbgEl.style.cssText = "position:fixed;left:10px;bottom:10px;z-index:99999;background:transparent;color:#fff;padding:6px 10px;border-radius:10px;font:12px/1.4 Arial, sans-serif;direction:ltr;max-width:90vw;white-space:pre;";
   document.body.appendChild(__dbgEl);
   return __dbgEl;
 }
@@ -2127,6 +2129,7 @@ if(homeBtn && role !== "host"){
     const confettiRain = document.getElementById("confettiRain");
     const winCongrats = document.getElementById("winCongrats");
     const winWinner = document.getElementById("winWinner");
+    const winModal = document.querySelector(".winModal");
     const roundOverlay = document.getElementById("roundOverlay");
     const roundStageText = document.getElementById("roundStageText");
     const roundCardGreen = document.getElementById("roundCardGreen");
@@ -3250,7 +3253,13 @@ if(homeBtn && role !== "host"){
       if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
       stopVois();
 
-      winBackdrop.style.display = "flex";
+      if(winBackdrop){
+        winBackdrop.style.display = "flex";
+      }
+      if(winModal){
+        winModal.style.display = "none";
+      }
+
       winCongrats.textContent = (winEvent && winEvent.isFinal) ? "انتهت المسابقة" : "مبرووك";
 
       const visualTeams = getVisualTeams(room || LIVE.room || {});
@@ -3258,27 +3267,29 @@ if(homeBtn && role !== "host"){
       winWinner.textContent = (winEvent && winEvent.isFinal) ? `${winnerName} هو بطل السباق` : `فاز ${winnerName} بالجولة`;
 
       showRoundResultOverlay(room || LIVE.room || {}, winEvent || {});
-      startConfetti((winEvent && winEvent.isFinal) ? 6000 : 3500);
+      startConfetti(5000);
 
-      if(!playVoisFor((winEvent && winEvent.isFinal) ? 6000 : 3500)){
+      if(!playVoisFor(5000)){
         fallbackBeep();
       }
 
       WIN_HIDE_T = setTimeout(()=> {
-        winBackdrop.style.display = "none";
+        if(winBackdrop) winBackdrop.style.display = "none";
         hideRoundOverlay();
         clearConfetti();
         stopVois();
-      }, (winEvent && winEvent.isFinal) ? 5600 : 2600);
+      }, 5000);
     }
 
-    winBackdrop.addEventListener("click", () => {
-      winBackdrop.style.display = "none";
-      clearConfetti();
-      stopVois();
-      if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
-      WIN_HIDE_T = null;
-    });
+    if(winBackdrop){
+      winBackdrop.addEventListener("click", () => {
+        if(winBackdrop) winBackdrop.style.display = "none";
+        clearConfetti();
+        stopVois();
+        if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
+        WIN_HIDE_T = null;
+      });
+    }
 
     const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
 
