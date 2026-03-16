@@ -1052,7 +1052,7 @@
     }
     .roundOverlay.show{ display:flex; }
     .roundOverlayInner{
-      width:min(92vw, 620px);
+      width:min(94vw, 700px);
       background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.08));
       border:8px solid rgba(255,255,255,.24);
       border-radius:34px;
@@ -1061,8 +1061,12 @@
       text-align:center;
       color:#fff;
       position:relative;
-      overflow:hidden;
+      overflow:visible;
       pointer-events:auto;
+    }
+    .roundOverlayInner.finalMode{
+      padding:132px 20px 34px;
+      min-height:min(88vh, 620px);
     }
     .roundStageText{
       margin:0 0 16px;
@@ -1072,7 +1076,7 @@
     }
     .roundScoreRow{
       display:flex;
-      align-items:center;
+      align-items:stretch;
       justify-content:center;
       gap:14px;
       margin-bottom:16px;
@@ -1080,15 +1084,19 @@
     .roundScoreCard{
       flex:1 1 0;
       min-width:0;
+      min-height:238px;
       border-radius:24px;
       padding:18px 14px;
       border:5px solid rgba(255,255,255,.85);
       box-shadow:0 16px 26px rgba(0,0,0,.24);
       position:relative;
       overflow:visible;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
     }
     .roundScoreCard.finalWinnerCard{
-      padding-top:132px;
+      z-index:2;
     }
     .roundScoreNum{
       font-size:60px;
@@ -1134,9 +1142,10 @@
     .winnerCup.inCard{
       position:absolute;
       left:50%;
-      top:-136px;
+      top:-116px;
       margin:0;
       transform:translateX(-50%) translateY(22px) scale(.86);
+      z-index:5;
     }
     .winnerCup.show.inCard{
       transform:translateX(-50%) translateY(0) scale(1);
@@ -1171,7 +1180,7 @@
       justify-content:center;
       align-items:center;
       flex-wrap:wrap;
-      margin-top:18px;
+      margin-top:24px;
     }
     .roundFinalActions.show{ display:flex; }
 
@@ -1573,17 +1582,30 @@
       };
     }
 
+    let LAST_STABLE_BOARD = null;
+
+    function normalizeBoardState(boardLike, roomLike){
+      if(!boardLike || !Array.isArray(boardLike.letters) || !boardLike.letters.length) return null;
+      return {
+        size: normalizeCellCount(boardLike.size || boardLike.letters.length || 5),
+        shape: normalizeCellShape(boardLike.shape || getBoardShape(roomLike)),
+        seed: Number(boardLike.seed || 0),
+        letters: boardLike.letters
+      };
+    }
+
     function getBoard(room){
-      const fromRoom = room?.board;
-      if(fromRoom && Array.isArray(fromRoom.letters) && fromRoom.letters.length){
-        return {
-          size: normalizeCellCount(fromRoom.size || fromRoom.letters.length || 5),
-          shape: normalizeCellShape(fromRoom.shape || getBoardShape(room)),
-          seed: Number(fromRoom.seed || 0),
-          letters: fromRoom.letters
-        };
+      const fromRoom = normalizeBoardState(room?.board, room);
+      if(fromRoom){
+        LAST_STABLE_BOARD = fromRoom;
+        return fromRoom;
       }
-      return buildBoardState(room || {}, Date.now());
+      if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
+        return LAST_STABLE_BOARD;
+      }
+      const generated = buildBoardState(room || {}, Date.now());
+      LAST_STABLE_BOARD = generated;
+      return generated;
     }
 
     // أسئلة افتراضية (Fallback) إذا ما كان فيه بنك أسئلة
@@ -3241,6 +3263,8 @@ if(homeBtn && role !== "host"){
     function hideRoundOverlay(){
       FINAL_OVERLAY_ACTIVE = false;
       if(roundOverlay) roundOverlay.classList.remove("show");
+      const overlayInner = roundOverlay ? roundOverlay.querySelector('.roundOverlayInner') : null;
+      if(overlayInner) overlayInner.classList.remove('finalMode');
       if(roundStageText) roundStageText.style.display = "";
       if(roundWinnerLine) roundWinnerLine.textContent = "";
       if(roundFinalActions) roundFinalActions.classList.remove("show");
@@ -3258,6 +3282,7 @@ if(homeBtn && role !== "host"){
       if(role !== "host") return;
       const baseRoom = LIVE.room || {};
       const board = buildBoardState(baseRoom, Date.now());
+      LAST_STABLE_BOARD = board;
       const totalRounds = normalizeWinRounds(baseRoom?.settings?.winRounds || baseRoom?.round?.targetWins || 1);
       try{
         await update(roomRef, {
@@ -3311,6 +3336,7 @@ if(homeBtn && role !== "host"){
 
       if(isFinal){
         FINAL_OVERLAY_ACTIVE = true;
+        if(overlayInner) overlayInner.classList.add('finalMode');
         roundStageText.textContent = "";
         roundStageText.style.display = "none";
         roundWinnerLine.textContent = "";
@@ -3323,6 +3349,7 @@ if(homeBtn && role !== "host"){
         }
       }else{
         FINAL_OVERLAY_ACTIVE = false;
+        if(overlayInner) overlayInner.classList.remove('finalMode');
         roundStageText.style.display = "";
         roundStageText.textContent = `الجولة ${toArabicRoundWord(endedRound)}`;
         roundWinnerLine.textContent = "";
@@ -4861,6 +4888,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       if(GAME_UI._boardSig !== boardSig){
         GAME_UI._boardSig = boardSig;
+        LAST_STABLE_BOARD = board;
         GAME_UI.activeMap = activeMap;
         GAME_UI.board = board;
         GAME_UI.srcBase = `${board.shape}-${board.size}`;
@@ -5086,6 +5114,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 const latestWinTs = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
                 if(latestWinTs !== Number(we.ts)) return;
                 const nextBoard = buildBoardState(LIVE.room || room, Date.now());
+                LAST_STABLE_BOARD = nextBoard;
                 const updates = {};
                 updates[`rooms/${code}/activeMap`] = nextMap;
                 updates[`rooms/${code}/board`] = nextBoard;
@@ -5099,7 +5128,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
                 await update(ref(db), updates);
               }catch(e){}
-            }, 350);
+            }, 80);
           }
         }
       }catch(e){}
@@ -5139,7 +5168,8 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         questionCursorDefault: (room.questionCursorDefault && typeof room.questionCursorDefault === "object") ? room.questionCursorDefault : {},
         questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {}
       };
-      if(!normalized.board) normalized.board = buildBoardState(normalized, Date.now());
+      if(!normalized.board) normalized.board = LAST_STABLE_BOARD || buildBoardState(normalized, Date.now());
+      if(normalized.board) LAST_STABLE_BOARD = normalized.board;
       return normalized;
     }
 
