@@ -4530,7 +4530,7 @@ if(homeBtn && role !== "host"){
           poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
           txt.setAttribute("x", (x + cellW/2).toFixed(2));
           txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
-          txt.textContent = board?.letters?.[meta.row]?.[meta.col] || "";
+          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
 
@@ -4981,7 +4981,7 @@ if(homeBtn && role !== "host"){
           poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
           txt.setAttribute("x", (x + cellW/2).toFixed(2));
           txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
-          txt.textContent = board?.letters?.[meta.row]?.[meta.col] || "";
+          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
         applyZoomFix();
