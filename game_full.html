@@ -2603,9 +2603,11 @@ if(homeBtn && role !== "host"){
       const c = Number(cur.col);
       if(!Number.isFinite(r) || !Number.isFinite(c)) return false;
       if(r < 0 || r >= size || c < 0 || c >= size) return false;
+      const k = cellKey(r,c);
       const mapStatesNow = (room.mapStates && room.mapStates[String(activeMapNow)]) ? room.mapStates[String(activeMapNow)] : {};
-      const st = Number(mapStatesNow?.[cellKey(r,c)] ?? 0);
-      return curMap === activeMapNow && st === 1;
+      const st = Number(mapStatesNow?.[k] ?? 0);
+      const isDigitOriginCell = !!(board?.digitCells && board.digitCells[k]);
+      return curMap === activeMapNow && (st === 1 || (isDigitOriginCell && !!cur.letter));
     }
 
     const OFFICIAL_COLOR_PAIRS = {
@@ -3112,7 +3114,8 @@ if(homeBtn && role !== "host"){
       const k = cellKey(r,c);
       const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(boardKey)]) ? LIVE.room.mapStates[String(boardKey)] : {};
       const currentState = Number(mapStatesNow?.[k] ?? 0);
-      if(currentState !== 1) return;
+      const isDigitOriginCell = !!(board?.digitCells && board.digitCells[k]);
+      if(currentState !== 1 && !(isDigitOriginCell && !!cur.letter)) return;
 
       const next = team === "green" ? 2 : 3;
       const nextStates = { ...(mapStatesNow || {}) };
@@ -4699,6 +4702,7 @@ if(homeBtn && role !== "host"){
               const pick = getNextQuestionSelection(LIVE.room, letter);
 
               let nextBoardForPatch = null;
+              const isDigitOriginCell = !!(boardNow?.digitCells && boardNow.digitCells[k]);
               if(isHiddenDigitCell){
                 const nextBoard = cloneBoardState(boardNow, LIVE.room) || buildBoardState(LIVE.room, Date.now());
                 if(Array.isArray(nextBoard.letters?.[r])){
@@ -4713,7 +4717,9 @@ if(homeBtn && role !== "host"){
                 updates[`rooms/${code}/board`] = nextBoard;
               }
 
-              updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
+              if(!isDigitOriginCell){
+                updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
+              }
               updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
               if(pick.list.length){
                 updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
@@ -4722,7 +4728,11 @@ if(homeBtn && role !== "host"){
               try{
                 const optimisticMapStates = { ...((LIVE.room && LIVE.room.mapStates) || {}) };
                 const optimisticCurrentMap = { ...(mapStatesNow || {}) };
-                optimisticCurrentMap[k] = 1;
+                if(!isDigitOriginCell){
+                  optimisticCurrentMap[k] = 1;
+                }else{
+                  delete optimisticCurrentMap[k];
+                }
                 if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
                   const prevKey = cellKey(Number(cur.row), Number(cur.col));
                   if(prevKey !== k && Number(mapStatesNow?.[prevKey] ?? 0) === 1){
