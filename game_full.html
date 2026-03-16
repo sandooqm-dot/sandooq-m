@@ -1530,6 +1530,26 @@
       return a;
     }
 
+    function makeSeededRand(seed){
+      let s = Number(seed || 0) >>> 0;
+      if(!s) s = 0x9e3779b9;
+      return function(){
+        s = (s + 0x6D2B79F5) >>> 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function shuffleArraySeeded(arr, rand){
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(rand()*(i+1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
     function normalizeCellCount(v){
       const s = String(v ?? "").trim();
       if(["4","٤","أربعة","اربع","ربعة"].includes(s)) return 4;
@@ -1559,11 +1579,12 @@
       return normalizeCellShape(room?.settings?.cellType || room?.settings?.shape || room?.settings?.boardShape || "hex");
     }
 
-    function generateBoardLetters(size){
+    function generateBoardLetters(size, seed){
       const needed = Math.max(1, Number(size||5)) ** 2;
+      const rand = makeSeededRand(seed || Date.now());
       const pool = [];
       while(pool.length < needed){
-        pool.push(...shuffleArray(BASE_LETTERS));
+        pool.push(...shuffleArraySeeded(BASE_LETTERS, rand));
       }
       const picked = pool.slice(0, needed);
       const rows = [];
@@ -1571,18 +1592,31 @@
       return rows;
     }
 
+    function cloneBoardState(boardLike, roomLike){
+      const n = normalizeBoardState(boardLike, roomLike);
+      if(!n) return null;
+      return {
+        size: n.size,
+        shape: n.shape,
+        seed: n.seed,
+        letters: Array.isArray(n.letters) ? n.letters.map(row => Array.isArray(row) ? row.slice() : []) : []
+      };
+    }
+
     function buildBoardState(roomLike, seedTs){
       const size = getBoardSize(roomLike || {});
       const shape = getBoardShape(roomLike || {});
+      const seed = Number(seedTs || Date.now()) || Date.now();
       return {
         size,
         shape,
-        seed: Number(seedTs || Date.now()),
-        letters: generateBoardLetters(size)
+        seed,
+        letters: generateBoardLetters(size, seed)
       };
     }
 
     let LAST_STABLE_BOARD = null;
+    const BOARD_CACHE_BY_SEED = new Map();
 
     function normalizeBoardState(boardLike, roomLike){
       if(!boardLike || !Array.isArray(boardLike.letters) || !boardLike.letters.length) return null;
@@ -1594,6 +1628,16 @@
       };
     }
 
+    function rememberBoard(boardLike, roomLike){
+      const board = cloneBoardState(boardLike, roomLike);
+      if(!board) return null;
+      if(Number(board.seed || 0) > 0){
+        BOARD_CACHE_BY_SEED.set(Number(board.seed), board);
+      }
+      LAST_STABLE_BOARD = board;
+      return board;
+    }
+
     function getExpectedBoardSeed(room){
       const seed = Number(room?.round?.boardSeed || 0);
       return Number.isFinite(seed) && seed > 0 ? seed : 0;
@@ -1602,25 +1646,36 @@
     function getBoard(room){
       const expectedSeed = getExpectedBoardSeed(room);
       const fromRoom = normalizeBoardState(room?.board, room);
+
       if(fromRoom && (!expectedSeed || Number(fromRoom.seed || 0) === expectedSeed)){
-        LAST_STABLE_BOARD = fromRoom;
-        return fromRoom;
+        return rememberBoard(fromRoom, room);
       }
+
+      if(expectedSeed && BOARD_CACHE_BY_SEED.has(expectedSeed)){
+        const cached = BOARD_CACHE_BY_SEED.get(expectedSeed);
+        LAST_STABLE_BOARD = cached;
+        return cached;
+      }
+
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
         if(!expectedSeed || Number(LAST_STABLE_BOARD.seed || 0) === expectedSeed){
           return LAST_STABLE_BOARD;
         }
       }
-      if(fromRoom){
-        LAST_STABLE_BOARD = fromRoom;
-        return fromRoom;
+
+      if(expectedSeed){
+        return rememberBoard(buildBoardState(room || {}, expectedSeed), room);
       }
+
+      if(fromRoom){
+        return rememberBoard(fromRoom, room);
+      }
+
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
         return LAST_STABLE_BOARD;
       }
-      const generated = buildBoardState(room || {}, Date.now());
-      LAST_STABLE_BOARD = generated;
-      return generated;
+
+      return rememberBoard(buildBoardState(room || {}, Date.now()), room);
     }
 
     // أسئلة افتراضية (Fallback) إذا ما كان فيه بنك أسئلة
@@ -5207,8 +5262,25 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         questionCursorDefault: (room.questionCursorDefault && typeof room.questionCursorDefault === "object") ? room.questionCursorDefault : {},
         questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {}
       };
-      if(!normalized.board) normalized.board = LAST_STABLE_BOARD || buildBoardState(normalized, Date.now());
-      if(normalized.board) LAST_STABLE_BOARD = normalized.board;
+
+      const expectedSeed = getExpectedBoardSeed(normalized);
+      const roomBoard = normalizeBoardState(room?.board, normalized);
+
+      if(roomBoard && (!expectedSeed || Number(roomBoard.seed || 0) === expectedSeed)){
+        normalized.board = rememberBoard(roomBoard, normalized);
+      }else if(expectedSeed && BOARD_CACHE_BY_SEED.has(expectedSeed)){
+        normalized.board = BOARD_CACHE_BY_SEED.get(expectedSeed);
+        LAST_STABLE_BOARD = normalized.board;
+      }else if(expectedSeed){
+        normalized.board = rememberBoard(buildBoardState(normalized, expectedSeed), normalized);
+      }else if(roomBoard){
+        normalized.board = rememberBoard(roomBoard, normalized);
+      }else if(LAST_STABLE_BOARD){
+        normalized.board = LAST_STABLE_BOARD;
+      }else{
+        normalized.board = rememberBoard(buildBoardState(normalized, Date.now()), normalized);
+      }
+
       return normalized;
     }
 
