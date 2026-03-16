@@ -1061,8 +1061,8 @@
       text-align:center;
       color:#fff;
       position:relative;
-      overflow:hidden;
-      pointer-events:none;
+      overflow:visible;
+      pointer-events:auto;
     }
     .roundStageText{
       margin:0 0 16px;
@@ -1084,6 +1084,8 @@
       padding:18px 14px;
       border:5px solid rgba(255,255,255,.85);
       box-shadow:0 16px 26px rgba(0,0,0,.24);
+      position:relative;
+      overflow:visible;
     }
     .roundScoreNum{
       font-size:60px;
@@ -1109,22 +1111,27 @@
       font-weight:900;
       line-height:1.55;
       color:#fff;
+      min-height:0;
     }
     .winnerCup{
-      margin:18px auto 0;
+      position:absolute;
+      top:-136px;
+      left:50%;
+      margin:0;
       width:190px;
       max-width:70vw;
       height:0;
       overflow:visible;
       opacity:0;
-      transform:translateY(22px) scale(.86);
+      transform:translateX(-50%) translateY(22px) scale(.86);
       transition:all .36s ease;
       pointer-events:none;
+      z-index:3;
     }
     .winnerCup.show{
       height:170px;
       opacity:1;
-      transform:translateY(0) scale(1);
+      transform:translateX(-50%) translateY(0) scale(1);
     }
     .cupBadge{
       position:relative;
@@ -1150,6 +1157,31 @@
       filter: drop-shadow(0 12px 16px rgba(0,0,0,.22));
     }
     .winnerCup.to-green .cupBadge, .winnerCup.to-orange .cupBadge{ color:#fff; }
+    .roundFinalActions{
+      display:none;
+      margin-top:18px;
+      gap:12px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+    .roundFinalActions.show{ display:flex; }
+    .roundFinalBtn{
+      min-width:220px;
+      padding:14px 18px;
+      border:none;
+      border-radius:18px;
+      cursor:pointer;
+      font-size:22px;
+      font-weight:900;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      border:4px solid rgba(0,0,0,.85);
+      box-shadow:0 8px 0 rgba(0,0,0,.18);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .roundFinalBtn:active{ transform: translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.18); }
+    .roundFinalBtn.start{ background:#ffd54a; color:#111; }
+    .roundFinalBtn.end{ background:#ff2d2d; color:#fff; }
 
     /* ✅ (5) احتفال الفوز الجديد (5 ثواني) + قصاصات */
     .winBackdrop{
@@ -1419,7 +1451,7 @@
   </div>
 
   <div id="roundOverlay" class="roundOverlay" aria-hidden="true">
-    <div class="roundOverlayInner">
+    <div id="roundOverlayInner" class="roundOverlayInner">
       <h2 id="roundStageText" class="roundStageText">الجولة الثانية</h2>
       <div class="roundScoreRow">
         <div id="roundCardGreen" class="roundScoreCard">
@@ -1434,7 +1466,11 @@
       </div>
       <p id="roundWinnerLine" class="roundWinnerLine"></p>
       <div id="winnerCup" class="winnerCup" aria-hidden="true">
-        <div class="cupBadge">بطل السباق</div>
+        <div class="cupBadge"></div>
+      </div>
+      <div id="roundFinalActions" class="roundFinalActions">
+        <button id="restartRaceBtn" class="roundFinalBtn start" type="button">ابدأ سباق جديد</button>
+        <button id="endRaceBtn" class="roundFinalBtn end" type="button">إنهاء اللعبة</button>
       </div>
     </div>
   </div>
@@ -2120,6 +2156,7 @@ if(homeBtn && role !== "host"){
     const winWinner = document.getElementById("winWinner");
     const winModal = document.querySelector(".winModal");
     const roundOverlay = document.getElementById("roundOverlay");
+    const roundOverlayInner = document.getElementById("roundOverlayInner");
     const roundStageText = document.getElementById("roundStageText");
     const roundCardGreen = document.getElementById("roundCardGreen");
     const roundCardOrange = document.getElementById("roundCardOrange");
@@ -2129,6 +2166,9 @@ if(homeBtn && role !== "host"){
     const roundNameOrange = document.getElementById("roundNameOrange");
     const roundWinnerLine = document.getElementById("roundWinnerLine");
     const winnerCup = document.getElementById("winnerCup");
+    const roundFinalActions = document.getElementById("roundFinalActions");
+    const restartRaceBtn = document.getElementById("restartRaceBtn");
+    const endRaceBtn = document.getElementById("endRaceBtn");
 
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
@@ -3198,16 +3238,56 @@ if(homeBtn && role !== "host"){
       if(roundOverlay) roundOverlay.classList.remove("show");
       if(winnerCup){
         winnerCup.className = "winnerCup";
+        try{ roundOverlayInner && roundOverlayInner.appendChild(winnerCup); }catch(e){}
       }
+      if(roundFinalActions){
+        roundFinalActions.classList.remove("show");
+        roundFinalActions.style.display = "none";
+      }
+      if(roundWinnerLine) roundWinnerLine.textContent = "";
+    }
+
+    async function restartRaceNow(){
+      if(role !== "host") return;
+      const room = LIVE.room || {};
+      const targetWins = normalizeWinRounds(room?.round?.targetWins || room?.settings?.winRounds || 1);
+      const newBoard = buildBoardState(room, Date.now());
+      const timerSel = Math.max(1, Number(room?.timer?.sel || 10));
+      const updates = {};
+      updates[`rooms/${code}/status`] = "started";
+      updates[`rooms/${code}/activeMap`] = 0;
+      updates[`rooms/${code}/board`] = newBoard;
+      updates[`rooms/${code}/freeze`] = false;
+      updates[`rooms/${code}/buzzer`] = null;
+      updates[`rooms/${code}/scores`] = { green:0, orange:0, a:0, b:0 };
+      updates[`rooms/${code}/winEvent`] = null;
+      updates[`rooms/${code}/winState`] = null;
+      updates[`rooms/${code}/round`] = { current:1, targetWins, winner:null };
+      updates[`rooms/${code}/mapStates`] = { "0": {} };
+      updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:0 };
+      updates[`rooms/${code}/timer`] = { sel:timerSel, dur:timerSel, running:false, startTs:0, done:false };
+      LAST_WIN_TS = 0;
+      LAST_WIN_RESET_TS = 0;
+      LAST_BUZZER_SIG = "";
+      STABLE_BUZZER = null;
+      TIMER_UI.__doneSent = false;
+      hideRoundOverlay();
+      if(winBackdrop) winBackdrop.style.display = "none";
+      clearConfetti();
+      stopVois();
+      if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
+      WIN_HIDE_T = null;
+      await update(ref(db), updates);
+      scheduleRender();
     }
 
     function showRoundResultOverlay(room, winEvent){
       if(!roundOverlay || !winEvent) return;
       const visualTeams = getVisualTeams(room);
       const scores = getVisualScores(room);
-      const targetWins = Math.max(1, Number(winEvent.targetWins || room?.round?.targetWins || room?.settings?.winRounds || 1));
       const isFinal = !!winEvent.isFinal;
-      const nextRound = Math.max(1, Number(winEvent.nextRound || (scores.green + scores.orange + 1)));
+      const finishedRound = Math.max(1, Number(scores.green || 0) + Number(scores.orange || 0));
+      const winnerCard = (winEvent.team === "green") ? roundCardGreen : roundCardOrange;
 
       roundCardGreen.style.background = visualTeams.green.color;
       roundCardOrange.style.background = visualTeams.orange.color;
@@ -3215,17 +3295,24 @@ if(homeBtn && role !== "host"){
       roundScoreOrange.textContent = String(scores.orange);
       roundNameGreen.textContent = visualTeams.green.name;
       roundNameOrange.textContent = visualTeams.orange.name;
+      roundWinnerLine.textContent = "";
+
+      if(winnerCup){
+        try{ winnerCard.appendChild(winnerCup); }catch(e){}
+        winnerCup.className = `winnerCup show ${winEvent.team === "green" ? 'to-green' : 'to-orange'}`;
+      }
 
       if(isFinal){
-        roundStageText.textContent = "بطل السباق";
-        const winnerName = winEvent.team === "green" ? visualTeams.green.name : visualTeams.orange.name;
-        roundWinnerLine.textContent = `${winnerName} حسم المسابقة بنتيجة ${scores.green} - ${scores.orange}`;
-        winnerCup.className = `winnerCup show ${winEvent.team === "green" ? 'to-green' : 'to-orange'}`;
+        roundStageText.textContent = `الجولة ${toArabicRoundWord(finishedRound)}`;
       }else{
-        roundStageText.textContent = `الجولة ${toArabicRoundWord(nextRound)}`;
-        const winnerName = winEvent.team === "green" ? visualTeams.green.name : visualTeams.orange.name;
-        roundWinnerLine.textContent = `${winnerName} فاز بالجولة الحالية. المتبقي للوصول إلى ${targetWins} جولات.`;
-        winnerCup.className = "winnerCup";
+        roundStageText.textContent = `الجولة ${toArabicRoundWord(finishedRound)}`;
+        if(winnerCup) winnerCup.className = "winnerCup";
+      }
+
+      if(roundFinalActions){
+        const showFinalActions = isFinal && role === "host";
+        roundFinalActions.classList.toggle("show", showFinalActions);
+        roundFinalActions.style.display = showFinalActions ? "flex" : "none";
       }
 
       roundOverlay.classList.add("show");
@@ -3253,13 +3340,18 @@ if(homeBtn && role !== "host"){
 
       const visualTeams = getVisualTeams(room || LIVE.room || {});
       const winnerName = (team === "green" ? visualTeams.green.name : visualTeams.orange.name);
-      winWinner.textContent = (winEvent && winEvent.isFinal) ? `${winnerName} هو بطل السباق` : `فاز ${winnerName} بالجولة`;
+      winWinner.textContent = (winEvent && winEvent.isFinal) ? `${winnerName} فاز بالمباراة` : `فاز ${winnerName} بالجولة`;
 
       showRoundResultOverlay(room || LIVE.room || {}, winEvent || {});
       startConfetti(5000);
 
       if(!playVoisFor(5000)){
         fallbackBeep();
+      }
+
+      if(winEvent && winEvent.isFinal){
+        WIN_HIDE_T = null;
+        return;
       }
 
       WIN_HIDE_T = setTimeout(()=> {
@@ -3271,12 +3363,36 @@ if(homeBtn && role !== "host"){
     }
 
     if(winBackdrop){
-      winBackdrop.addEventListener("click", () => {
+      winBackdrop.addEventListener("click", (e) => {
+        if(LIVE.room?.winEvent?.isFinal) return;
         if(winBackdrop) winBackdrop.style.display = "none";
+        hideRoundOverlay();
         clearConfetti();
         stopVois();
         if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
         WIN_HIDE_T = null;
+      });
+    }
+
+    if(restartRaceBtn){
+      restartRaceBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await restartRaceNow();
+      });
+    }
+
+    if(endRaceBtn){
+      endRaceBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        location.href = "index.html";
+      });
+    }
+
+    if(roundOverlayInner){
+      roundOverlayInner.addEventListener("click", (e) => {
+        e.stopPropagation();
       });
     }
 
@@ -4971,18 +5087,38 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 const latestWinTs = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
                 if(latestWinTs !== Number(we.ts)) return;
                 const nextBoard = buildBoardState(LIVE.room || room, Date.now());
+                const timerSel = Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10);
                 const updates = {};
                 updates[`rooms/${code}/activeMap`] = nextMap;
-                updates[`rooms/${code}/board`] = nextBoard;
+                updates[`rooms/${code}/board`] = { ...nextBoard, refreshTs: Date.now() };
                 updates[`rooms/${code}/mapStates/${currentMap}`] = null;
                 updates[`rooms/${code}/mapStates/${nextMap}`] = {};
                 updates[`rooms/${code}/buzzer`] = null;
                 updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
+                updates[`rooms/${code}/freeze`] = false;
                 updates[`rooms/${code}/winState`] = null;
                 updates[`rooms/${code}/winEvent`] = null;
-                updates[`rooms/${code}/timer`] = { sel:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), dur:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), running:false, startTs:0, done:false };
+                updates[`rooms/${code}/timer`] = { sel:timerSel, dur:timerSel, running:false, startTs:0, done:false };
                 updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
+                LAST_BUZZER_SIG = "";
+                STABLE_BUZZER = null;
+                TIMER_UI.__doneSent = false;
+                if(GAME_UI && GAME_UI.letterEls && GAME_UI.letterEls.length){
+                  try{
+                    for(let rr=0; rr<nextBoard.letters.length; rr++){
+                      for(let cc=0; cc<nextBoard.letters[rr].length; cc++){
+                        const idx = rr * nextBoard.size + cc;
+                        const txt = GAME_UI.letterEls[idx];
+                        if(txt) txt.textContent = nextBoard.letters?.[rr]?.[cc] || "";
+                      }
+                    }
+                    GAME_UI._boardSig = "";
+                    GAME_UI.board = nextBoard;
+                    if(GAME_UI.onMapReady) requestAnimationFrame(() => GAME_UI.onMapReady());
+                  }catch(e){}
+                }
                 await update(ref(db), updates);
+                scheduleRender();
               }catch(e){}
             }, 2800);
           }
