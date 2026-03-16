@@ -279,7 +279,7 @@
     .mapBox{
       position:relative;
       width:100%;
-      aspect-ratio:1 / 0.78;
+      aspect-ratio:1 / 0.70;
       overflow:hidden;
       border-radius:26px;
       background:
@@ -330,36 +330,35 @@
       cursor:pointer;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      stroke: var(--cell-stroke, #4d2388);
-      stroke-width: 5.5;
+      stroke: var(--cell-stroke, #5d2a9d);
+      stroke-width: 5;
       filter: drop-shadow(0 6px 10px rgba(0,0,0,.12));
       transition: fill .18s ease, transform .18s ease, opacity .18s ease;
     }
     .overlaySvg .cell.selectedCell{
-      stroke: var(--cell-stroke, #4d2388);
-      stroke-width: 5.5;
+      stroke: var(--cell-stroke, #6f35b2);
+      stroke-width: 5;
       fill: #ffe600 !important;
       filter: drop-shadow(0 4px 8px rgba(0,0,0,.10));
     }
     .overlaySvg .cellLetter{
-      fill:var(--cell-letter, #4d2388);
+      fill:var(--cell-letter, #5d2a9d);
       font-family:"AA-GALAXY", Arial, sans-serif;
       font-size:30px;
       font-weight:900;
       text-anchor:middle;
       dominant-baseline:middle;
       pointer-events:none;
-      paint-order:normal;
-      stroke:none;
-      stroke-width:0;
-      filter:none;
+      paint-order:stroke;
+      stroke:rgba(255,255,255,.72);
+      stroke-width:2px;
       user-select:none;
       transition: fill .18s ease, stroke .18s ease;
     }
     .overlaySvg .cellLetter.state0,
     .overlaySvg .cellLetter.state1{
-      fill:var(--cell-letter, #4d2388);
-      stroke:none;
+      fill:var(--cell-letter, #5d2a9d);
+      stroke:rgba(255,255,255,.78);
     }
     .overlaySvg .cellLetter.state2,
     .overlaySvg .cellLetter.state3{
@@ -2582,8 +2581,8 @@ if(homeBtn && role !== "host"){
       mapBox.style.setProperty('--team-a-soft', hexToRgba(teamA, 0.96));
       mapBox.style.setProperty('--team-b-soft', hexToRgba(teamB, 0.96));
       mapBox.style.setProperty('--cell-base', '#ffffff');
-      mapBox.style.setProperty('--cell-stroke', '#4d2388');
-      mapBox.style.setProperty('--cell-letter', '#4d2388');
+      mapBox.style.setProperty('--cell-stroke', '#5d2a9d');
+      mapBox.style.setProperty('--cell-letter', '#5d2a9d');
     }
 
     function hexPointsPointyTop(x, y, w, h){
@@ -4167,7 +4166,7 @@ if(homeBtn && role !== "host"){
 
         const shape = board.shape;
         const marginX = W * 0.08;
-        const marginY = H * 0.10;
+        const marginY = H * 0.05;
         const usableW = W - marginX*2;
         const usableH = H - marginY*2;
 
@@ -4193,7 +4192,7 @@ if(homeBtn && role !== "host"){
         for(let row=0; row<size; row++){
           for(let col=0; col<size; col++){
             let x = marginX + (col * stepX);
-            let y = marginY + (row * stepY);
+            let y = marginY + (row * stepY) - (H * 0.015);
             if(shape !== "square") x += (row % 2) * (cellW / 2);
             const poly = GAME_UI.cells[i];
             const txt = GAME_UI.letterEls[i];
@@ -4571,7 +4570,7 @@ if(homeBtn && role !== "host"){
         const shape = board.shape;
         const size = board.size;
         const marginX = W * 0.08;
-        const marginY = H * 0.10;
+        const marginY = H * 0.05;
         const usableW = W - marginX*2;
         const usableH = H - marginY*2;
         let cellW, cellH, stepX, stepY;
@@ -4586,7 +4585,7 @@ if(homeBtn && role !== "host"){
         for(let row=0; row<size; row++){
           for(let col=0; col<size; col++){
             let x = marginX + (col * stepX);
-            let y = marginY + (row * stepY);
+            let y = marginY + (row * stepY) - (H * 0.015);
             if(shape !== "square") x += (row % 2) * (cellW / 2);
             const poly = GAME_UI.cells[i];
             const txt = GAME_UI.letterEls[i];
