@@ -1618,17 +1618,20 @@
       const flat = visiblePool.slice(0, total);
       const digitPositions = shuffleArraySeeded(Array.from({length: total}, (_,i)=>i), rand).slice(0, HEX_PLACEHOLDER_DIGITS.length);
       const hiddenLetters = {};
+      const digitCells = {};
 
       digitPositions.forEach((flatIndex, idx) => {
         const row = Math.floor(flatIndex / size);
         const col = flatIndex % size;
+        const k = cellKey(row, col);
         flat[flatIndex] = HEX_PLACEHOLDER_DIGITS[idx];
-        hiddenLetters[cellKey(row, col)] = hiddenPool[idx % hiddenPool.length] || supportedLetters[0] || BASE_LETTERS[0] || "أ";
+        hiddenLetters[k] = hiddenPool[idx % hiddenPool.length] || supportedLetters[0] || BASE_LETTERS[0] || "أ";
+        digitCells[k] = 1;
       });
 
       const rows = [];
       for(let r=0; r<size; r++) rows.push(flat.slice(r * size, (r + 1) * size));
-      return { letters: rows, hiddenLetters };
+      return { letters: rows, hiddenLetters, digitCells };
     }
 
     function generateBoardLetters(size, seed){
@@ -1652,7 +1655,8 @@
         shape: n.shape,
         seed: n.seed,
         letters: Array.isArray(n.letters) ? n.letters.map(row => Array.isArray(row) ? row.slice() : []) : [],
-        hiddenLetters: (n.hiddenLetters && typeof n.hiddenLetters === "object") ? { ...n.hiddenLetters } : {}
+        hiddenLetters: (n.hiddenLetters && typeof n.hiddenLetters === "object") ? { ...n.hiddenLetters } : {},
+        digitCells: (n.digitCells && typeof n.digitCells === "object") ? { ...n.digitCells } : {}
       };
     }
 
@@ -1668,7 +1672,8 @@
         shape,
         seed,
         letters: special.letters,
-        hiddenLetters: special.hiddenLetters || {}
+        hiddenLetters: special.hiddenLetters || {},
+        digitCells: special.digitCells || {}
       };
     }
 
@@ -1682,7 +1687,8 @@
         shape: normalizeCellShape(boardLike.shape || getBoardShape(roomLike)),
         seed: Number(boardLike.seed || 0),
         letters: boardLike.letters,
-        hiddenLetters: (boardLike.hiddenLetters && typeof boardLike.hiddenLetters === "object") ? boardLike.hiddenLetters : {}
+        hiddenLetters: (boardLike.hiddenLetters && typeof boardLike.hiddenLetters === "object") ? boardLike.hiddenLetters : {},
+        digitCells: (boardLike.digitCells && typeof boardLike.digitCells === "object") ? boardLike.digitCells : {}
       };
     }
 
@@ -4701,6 +4707,7 @@ if(homeBtn && role !== "host"){
                 if(nextBoard.hiddenLetters && typeof nextBoard.hiddenLetters === "object"){
                   delete nextBoard.hiddenLetters[k];
                 }
+                nextBoard.digitCells = { ...((nextBoard.digitCells && typeof nextBoard.digitCells === "object") ? nextBoard.digitCells : {}), [k]: 1 };
                 rememberBoard(nextBoard, LIVE.room);
                 nextBoardForPatch = nextBoard;
                 updates[`rooms/${code}/board`] = nextBoard;
@@ -5079,7 +5086,8 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         shape: board.shape,
         seed: board.seed,
         letters: board.letters,
-        hiddenLetters: board.hiddenLetters || {}
+        hiddenLetters: board.hiddenLetters || {},
+        digitCells: board.digitCells || {}
       });
 
       if(GAME_UI._boardSig !== boardSig){
@@ -5107,9 +5115,12 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           const c = Number(cell.getAttribute("data-col"));
           const k = cellKey(r,c);
           const st = Number(mapStates?.[k] ?? 0);
-          if(GAME_UI._lastMapStates[k] !== st){
-            GAME_UI._lastMapStates[k] = st;
-            setStateClass(cell, st);
+          const visibleValue = String(board?.letters?.[r]?.[c] || "");
+          const isDigitOriginCell = !!(board?.digitCells && board.digitCells[k]) || isArabicPlaceholderDigit(visibleValue);
+          const visualSt = (isDigitOriginCell && st === 1) ? 0 : st;
+          if(GAME_UI._lastMapStates[k] !== visualSt){
+            GAME_UI._lastMapStates[k] = visualSt;
+            setStateClass(cell, visualSt);
           }
           cell.classList.remove("selectedCell");
           const txt = GAME_UI.letterEls?.[i];
