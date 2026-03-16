@@ -1594,8 +1594,23 @@
       };
     }
 
+    function getExpectedBoardSeed(room){
+      const seed = Number(room?.round?.boardSeed || 0);
+      return Number.isFinite(seed) && seed > 0 ? seed : 0;
+    }
+
     function getBoard(room){
+      const expectedSeed = getExpectedBoardSeed(room);
       const fromRoom = normalizeBoardState(room?.board, room);
+      if(fromRoom && (!expectedSeed || Number(fromRoom.seed || 0) === expectedSeed)){
+        LAST_STABLE_BOARD = fromRoom;
+        return fromRoom;
+      }
+      if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
+        if(!expectedSeed || Number(LAST_STABLE_BOARD.seed || 0) === expectedSeed){
+          return LAST_STABLE_BOARD;
+        }
+      }
       if(fromRoom){
         LAST_STABLE_BOARD = fromRoom;
         return fromRoom;
@@ -2419,7 +2434,7 @@ if(homeBtn && role !== "host"){
         settings: {},
         teams: {},
         board: buildBoardState({}, Date.now()),
-        round: { current:1, targetWins:1, winner:null },
+        round: { current:1, targetWins:1, winner:null, boardSeed: 0 },
         winEvent: null,
         winState: {},
         mapStates: {},
@@ -3294,7 +3309,7 @@ if(homeBtn && role !== "host"){
           scores: { green:0, orange:0, a:0, b:0 },
           winEvent: null,
           winState: null,
-          round: { current:1, targetWins: totalRounds, winner:null },
+          round: { current:1, targetWins: totalRounds, winner:null, boardSeed: Number(board.seed || 0) || 0 },
           mapStates: { "0": {} },
           current: { letter:null, qIndex:0, row:null, col:null, map:0 },
           timer: { sel:Number(baseRoom?.timer?.sel || 10), dur:Number(baseRoom?.timer?.sel || 10), running:false, startTs:0, done:false }
@@ -3897,6 +3912,7 @@ if(homeBtn && role !== "host"){
       document.getElementById("startBtn").addEventListener("click", async () => {
         const board = buildBoardState(room, Date.now());
         const targetWins = normalizeWinRounds(room?.settings?.winRounds || room?.round?.targetWins || 1);
+        LAST_STABLE_BOARD = board;
         await update(roomRef, {
           status: "started",
           activeMap: 0,
@@ -3906,7 +3922,7 @@ if(homeBtn && role !== "host"){
           scores: { green:0, orange:0, a:0, b:0 },
           winEvent: null,
           winState: null,
-          round: { current:1, targetWins, winner:null },
+          round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
           mapStates: { "0": {} },
           current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
         });
@@ -4511,6 +4527,8 @@ if(homeBtn && role !== "host"){
             if(LIVE.room.status !== "started") return;
 
             const boardNow = getBoard(LIVE.room);
+            const expectedBoardSeed = Number(LIVE.room?.round?.boardSeed || 0);
+            if(expectedBoardSeed && Number(boardNow?.seed || 0) !== expectedBoardSeed) return;
             const sizeNow = Math.max(1, Number(boardNow.size || 5));
             const r = Number(cell.getAttribute("data-row"));
             const c = Number(cell.getAttribute("data-col"));
@@ -5126,6 +5144,27 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 updates[`rooms/${code}/winEvent`] = null;
                 updates[`rooms/${code}/timer`] = { sel:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), dur:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), running:false, startTs:0, done:false };
                 updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
+                updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || 0;
+                try{
+                  LIVE.room = normalizeLiveRoom({
+                    ...(LIVE.room || room || {}),
+                    activeMap: nextMap,
+                    board: nextBoard,
+                    buzzer: null,
+                    current: { letter:null, qIndex:0, row:null, col:null, map:nextMap },
+                    winState: {},
+                    winEvent: null,
+                    timer: { sel:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), dur:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), running:false, startTs:0, done:false },
+                    round: {
+                      ...((LIVE.room && LIVE.room.round) || (room && room.round) || {}),
+                      current: Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1))),
+                      winner: null,
+                      boardSeed: Number(nextBoard.seed || 0) || 0
+                    },
+                    mapStates: { ...(LIVE.room?.mapStates || room?.mapStates || {}), [String(currentMap)]: {}, [String(nextMap)]: {} }
+                  });
+                  scheduleRender();
+                }catch(e){}
                 await update(ref(db), updates);
               }catch(e){}
             }, 80);
@@ -5156,7 +5195,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         settings: (room.settings && typeof room.settings === "object") ? room.settings : {},
         teams: (room.teams && typeof room.teams === "object") ? room.teams : {},
         board: (room.board && typeof room.board === "object") ? room.board : null,
-        round: (room.round && typeof room.round === "object") ? room.round : { current:1, targetWins: normalizeWinRounds(room?.settings?.winRounds || 1), winner:null },
+        round: (room.round && typeof room.round === "object") ? room.round : { current:1, targetWins: normalizeWinRounds(room?.settings?.winRounds || 1), winner:null, boardSeed: Number(room?.board?.seed || 0) || 0 },
         winEvent: room.winEvent ?? null,
         winState: (room.winState && typeof room.winState === "object") ? room.winState : {},
         mapStates: (room.mapStates && typeof room.mapStates === "object") ? room.mapStates : {},
