@@ -679,10 +679,12 @@
       { id:"sand-sage",      name:"رملي + زيتي",       a:"#efc06b", b:"#8fb691" }
     ];
 
+    const DEFAULT_COLOR_PAIR_ID = "green-orange";
+
     const state = {
       rounds: 1,
       cellCount: 4,
-      colorPairId: COLOR_PAIRS[0].id,
+      colorPairId: DEFAULT_COLOR_PAIR_ID,
       players: 1
     };
 
@@ -715,7 +717,7 @@
     }
 
     function getColorPair(id){
-      return COLOR_PAIRS.find(p => p.id === id) || COLOR_PAIRS[0];
+      return COLOR_PAIRS.find(p => p.id === id) || COLOR_PAIRS.find(p => p.id === DEFAULT_COLOR_PAIR_ID) || COLOR_PAIRS[0];
     }
 
     function renderColorPairs(){
