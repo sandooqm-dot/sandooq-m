@@ -1601,13 +1601,6 @@
       }
     }
 
-    function getRandomSupportedQuestionLetter(excludeLetter){
-      const pool = getSupportedQuestionLetters().filter(l => l && l !== excludeLetter);
-      const list = pool.length ? pool : getSupportedQuestionLetters();
-      if(!list.length) return BASE_LETTERS[0] || "أ";
-      return list[Math.floor(Math.random() * list.length)] || list[0] || "أ";
-    }
-
     function buildHexPlaceholderBoard(size, seed){
       const total = Math.max(1, Number(size || 6)) ** 2;
       const rand = makeSeededRand(seed || Date.now());
@@ -4698,9 +4691,8 @@ if(homeBtn && role !== "host"){
             const c = Number(cell.getAttribute("data-col"));
             if(r < 0 || c < 0 || r >= sizeNow || c >= sizeNow) return;
             const k = cellKey(r,c);
-            const baseLetter = String(boardNow?.letters?.[r]?.[c] || "");
+            const letter = String(boardNow?.letters?.[r]?.[c] || "");
             const isCoveredDigit = isCoveredDigitCell(boardNow, r, c);
-            const letter = isCoveredDigit ? getRandomSupportedQuestionLetter(baseLetter) : baseLetter;
 
             const activeMapNow = Number(LIVE.room.activeMap || 0);
             const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
@@ -4713,41 +4705,27 @@ if(homeBtn && role !== "host"){
             updates[`rooms/${code}/buzzer`] = null;
 
             if(st === 0){
-              const nextStates = { ...(mapStatesNow || {}) };
-              const isDigitRevealOnly = !!isCoveredDigit;
-
               if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
                 const prevKey = cellKey(Number(cur.row), Number(cur.col));
-                if(prevKey !== k && Number(nextStates?.[prevKey] ?? 0) === 1){
-                  delete nextStates[prevKey];
-                  updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
-                }
-                if(isDigitRevealOnly && prevKey === k && Number(nextStates?.[prevKey] ?? 0) === 1){
-                  delete nextStates[prevKey];
+                if(prevKey !== k && Number(mapStatesNow?.[prevKey] ?? 0) === 1){
                   updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
                 }
               }
 
-              const pick = getNextQuestionSelection(LIVE.room, letter);
-
               let nextBoardForPatch = null;
-              if(isDigitRevealOnly){
+              if(isCoveredDigit){
                 const nextBoard = cloneBoardState(boardNow, LIVE.room) || buildBoardState(LIVE.room, Date.now());
-                if(Array.isArray(nextBoard.letters?.[r])){
-                  nextBoard.letters[r][c] = letter;
-                }
                 nextBoard.revealedDigits = {
                   ...((nextBoard.revealedDigits && typeof nextBoard.revealedDigits === "object") ? nextBoard.revealedDigits : {}),
                   [k]: 1
                 };
-                rememberBoard(nextBoard, LIVE.room);
                 nextBoardForPatch = nextBoard;
                 updates[`rooms/${code}/board`] = nextBoard;
-                updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
-              } else {
-                updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
               }
 
+              updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
+
+              const pick = getNextQuestionSelection(LIVE.room, letter);
               updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
               if(pick.list.length){
                 updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
@@ -4761,9 +4739,6 @@ if(homeBtn && role !== "host"){
                   const prevKey = cellKey(Number(cur.row), Number(cur.col));
                   if(prevKey !== k && Number(mapStatesNow?.[prevKey] ?? 0) === 1){
                     delete optimisticCurrentMap[prevKey];
-                  }
-                  if(isDigitRevealOnly && prevKey === k){
-                    optimisticCurrentMap[prevKey] = 1;
                   }
                 }
                 optimisticMapStates[String(activeMapNow)] = optimisticCurrentMap;
@@ -5154,16 +5129,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           const c = Number(cell.getAttribute("data-col"));
           const k = cellKey(r,c);
           const st = Number(mapStates?.[k] ?? 0);
-          const cur = room.current || {};
-          const isPendingCurrentCell = (
-            Number(cur.row) === r &&
-            Number(cur.col) === c &&
-            Number(cur.map ?? activeMap) === activeMap &&
-            !!cur.letter &&
-            st !== 2 &&
-            st !== 3
-          );
-          const visualSt = isPendingCurrentCell ? 1 : st;
+          const visualSt = st;
           if(GAME_UI._lastMapStates[k] !== visualSt){
             GAME_UI._lastMapStates[k] = visualSt;
             setStateClass(cell, visualSt);
