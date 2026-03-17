@@ -1601,38 +1601,6 @@
       }
     }
 
-    function getSafeSupportedLetters(){
-      const list = getSupportedQuestionLetters();
-      return (Array.isArray(list) && list.length) ? list : BASE_LETTERS.slice();
-    }
-
-    function sanitizeBoardLetters(boardLike, roomLike){
-      if(!boardLike || !Array.isArray(boardLike.letters) || !boardLike.letters.length) return boardLike;
-
-      const supportedLetters = getSafeSupportedLetters();
-      const supportedSet = new Set(supportedLetters);
-      const seedBase = Number(boardLike.seed || roomLike?.round?.boardSeed || Date.now()) || Date.now();
-      const rand = makeSeededRand(seedBase ^ 0x51f15e);
-      let changed = false;
-      let replacementIndex = 0;
-
-      const nextLetters = boardLike.letters.map((row) => {
-        const safeRow = Array.isArray(row) ? row : [];
-        return safeRow.map((cell) => {
-          const val = String(cell ?? "").trim();
-          if(val && supportedSet.has(val)) return val;
-          if(isArabicPlaceholderDigit(val)) return val;
-          changed = true;
-          const fallback = supportedLetters[Math.floor(rand() * supportedLetters.length)] || supportedLetters[replacementIndex % supportedLetters.length] || BASE_LETTERS[0];
-          replacementIndex += 1;
-          return fallback;
-        });
-      });
-
-      if(!changed) return boardLike;
-      return { ...boardLike, letters: nextLetters };
-    }
-
     function buildHexPlaceholderBoard(size, seed){
       const total = Math.max(1, Number(size || 6)) ** 2;
       const rand = makeSeededRand(seed || Date.now());
@@ -1666,15 +1634,46 @@
     function generateBoardLetters(size, seed){
       const needed = Math.max(1, Number(size||5)) ** 2;
       const rand = makeSeededRand(seed || Date.now());
-      const supportedLetters = getSafeSupportedLetters();
       const pool = [];
       while(pool.length < needed){
-        pool.push(...shuffleArraySeeded(supportedLetters, rand));
+        pool.push(...shuffleArraySeeded(BASE_LETTERS, rand));
       }
       const picked = pool.slice(0, needed);
       const rows = [];
       for(let r=0;r<size;r++) rows.push(picked.slice(r*size, (r+1)*size));
       return rows;
+    }
+
+    function cleanupResolvedDigitMetadata(boardLike){
+      const src = (boardLike && typeof boardLike === "object") ? boardLike : {};
+      const digitCells = (src.digitCells && typeof src.digitCells === "object") ? { ...src.digitCells } : {};
+      const digitCovers = (src.digitCovers && typeof src.digitCovers === "object") ? { ...src.digitCovers } : {};
+      const revealedDigits = (src.revealedDigits && typeof src.revealedDigits === "object") ? { ...src.revealedDigits } : {};
+      let changed = false;
+
+      Object.keys(revealedDigits).forEach((k) => {
+        if(!Number(revealedDigits[k] || 0)) return;
+        if(Object.prototype.hasOwnProperty.call(digitCells, k)){
+          delete digitCells[k];
+          changed = true;
+        }
+        if(Object.prototype.hasOwnProperty.call(digitCovers, k)){
+          delete digitCovers[k];
+          changed = true;
+        }
+        delete revealedDigits[k];
+        changed = true;
+      });
+
+      if(!changed){
+        return {
+          digitCells: src.digitCells || {},
+          digitCovers: src.digitCovers || {},
+          revealedDigits: src.revealedDigits || {}
+        };
+      }
+
+      return { digitCells, digitCovers, revealedDigits };
     }
 
     function cloneBoardState(boardLike, roomLike){
@@ -1716,19 +1715,16 @@
 
     function normalizeBoardState(boardLike, roomLike){
       if(!boardLike || !Array.isArray(boardLike.letters) || !boardLike.letters.length) return null;
-      const sanitized = sanitizeBoardLetters({
-        ...boardLike,
-        letters: Array.isArray(boardLike.letters) ? boardLike.letters.map(row => Array.isArray(row) ? row.slice() : []) : []
-      }, roomLike);
+      const cleanedDigitMeta = cleanupResolvedDigitMetadata(boardLike);
       return {
-        size: normalizeCellCount(sanitized.size || sanitized.letters.length || 5),
-        shape: normalizeCellShape(sanitized.shape || getBoardShape(roomLike)),
-        seed: Number(sanitized.seed || 0),
-        letters: sanitized.letters,
-        hiddenLetters: (sanitized.hiddenLetters && typeof sanitized.hiddenLetters === "object") ? sanitized.hiddenLetters : {},
-        digitCells: (sanitized.digitCells && typeof sanitized.digitCells === "object") ? sanitized.digitCells : {},
-        digitCovers: (sanitized.digitCovers && typeof sanitized.digitCovers === "object") ? sanitized.digitCovers : {},
-        revealedDigits: (sanitized.revealedDigits && typeof sanitized.revealedDigits === "object") ? sanitized.revealedDigits : {}
+        size: normalizeCellCount(boardLike.size || boardLike.letters.length || 5),
+        shape: normalizeCellShape(boardLike.shape || getBoardShape(roomLike)),
+        seed: Number(boardLike.seed || 0),
+        letters: boardLike.letters,
+        hiddenLetters: (boardLike.hiddenLetters && typeof boardLike.hiddenLetters === "object") ? boardLike.hiddenLetters : {},
+        digitCells: cleanedDigitMeta.digitCells || {},
+        digitCovers: cleanedDigitMeta.digitCovers || {},
+        revealedDigits: cleanedDigitMeta.revealedDigits || {}
       };
     }
 
@@ -4760,10 +4756,15 @@ if(homeBtn && role !== "host"){
               let nextBoardForPatch = null;
               if(isCoveredDigit){
                 const nextBoard = cloneBoardState(boardNow, LIVE.room) || buildBoardState(LIVE.room, Date.now());
-                nextBoard.revealedDigits = {
-                  ...((nextBoard.revealedDigits && typeof nextBoard.revealedDigits === "object") ? nextBoard.revealedDigits : {}),
-                  [k]: 1
-                };
+
+                nextBoard.digitCells = { ...((nextBoard.digitCells && typeof nextBoard.digitCells === "object") ? nextBoard.digitCells : {}) };
+                nextBoard.digitCovers = { ...((nextBoard.digitCovers && typeof nextBoard.digitCovers === "object") ? nextBoard.digitCovers : {}) };
+                nextBoard.revealedDigits = { ...((nextBoard.revealedDigits && typeof nextBoard.revealedDigits === "object") ? nextBoard.revealedDigits : {}) };
+
+                delete nextBoard.digitCells[k];
+                delete nextBoard.digitCovers[k];
+                delete nextBoard.revealedDigits[k];
+
                 rememberBoard(nextBoard, LIVE.room);
                 nextBoardForPatch = nextBoard;
                 updates[`rooms/${code}/board`] = nextBoard;
@@ -5469,17 +5470,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         normalized.board = LAST_STABLE_BOARD;
       }else{
         normalized.board = rememberBoard(buildBoardState(normalized, Date.now()), normalized);
-      }
-
-      if(normalized.current && normalized.board){
-        const rr = Number(normalized.current.row);
-        const cc = Number(normalized.current.col);
-        if(Number.isFinite(rr) && Number.isFinite(cc)){
-          const safeLetter = String(normalized.board?.letters?.[rr]?.[cc] || "").trim();
-          if(safeLetter){
-            normalized.current = { ...normalized.current, letter: safeLetter };
-          }
-        }
       }
 
       return normalized;
