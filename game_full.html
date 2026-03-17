@@ -2624,8 +2624,7 @@ if(homeBtn && role !== "host"){
       const k = cellKey(r,c);
       const mapStatesNow = (room.mapStates && room.mapStates[String(activeMapNow)]) ? room.mapStates[String(activeMapNow)] : {};
       const st = Number(mapStatesNow?.[k] ?? 0);
-      const isDigitOriginCell = !!(board?.digitCells && board.digitCells[k]);
-      return curMap === activeMapNow && (st === 1 || (isDigitOriginCell && !!cur.letter));
+      return curMap === activeMapNow && st === 1;
     }
 
     const OFFICIAL_COLOR_PAIRS = {
@@ -2741,7 +2740,11 @@ if(homeBtn && role !== "host"){
     function setStateClass(el, st){
       el.classList.remove("state0","state1","state2","state3","pulse");
       el.classList.add(`state${st}`);
-      const txt = el?.parentNode?.querySelector?.('.cellLetter');
+      const row = String(el?.getAttribute?.("data-row") ?? "");
+      const col = String(el?.getAttribute?.("data-col") ?? "");
+      const txt = (row !== "" && col !== "")
+        ? el?.parentNode?.querySelector?.(`.cellLetter[data-row="${row}"][data-col="${col}"]`)
+        : null;
       if(txt){
         txt.classList.remove("state0","state1","state2","state3");
         txt.classList.add(`state${st}`);
@@ -4705,12 +4708,17 @@ if(homeBtn && role !== "host"){
             updates[`rooms/${code}/buzzer`] = null;
 
             if(st === 0){
+              const nextStates = { ...(mapStatesNow || {}) };
+
               if(Number(cur.row) >= 0 && Number(cur.col) >= 0 && curMap === activeMapNow){
                 const prevKey = cellKey(Number(cur.row), Number(cur.col));
-                if(prevKey !== k && Number(mapStatesNow?.[prevKey] ?? 0) === 1){
+                if(prevKey !== k && Number(nextStates?.[prevKey] ?? 0) === 1){
+                  delete nextStates[prevKey];
                   updates[`rooms/${code}/mapStates/${activeMapNow}/${prevKey}`] = null;
                 }
               }
+
+              const pick = getNextQuestionSelection(LIVE.room, letter);
 
               let nextBoardForPatch = null;
               if(isCoveredDigit){
@@ -4719,13 +4727,12 @@ if(homeBtn && role !== "host"){
                   ...((nextBoard.revealedDigits && typeof nextBoard.revealedDigits === "object") ? nextBoard.revealedDigits : {}),
                   [k]: 1
                 };
+                rememberBoard(nextBoard, LIVE.room);
                 nextBoardForPatch = nextBoard;
                 updates[`rooms/${code}/board`] = nextBoard;
               }
 
               updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
-
-              const pick = getNextQuestionSelection(LIVE.room, letter);
               updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
               if(pick.list.length){
                 updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
