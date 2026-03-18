@@ -2729,6 +2729,60 @@ if(homeBtn && role !== "host"){
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
 
+    function parseCssColor(rawColor){
+      const raw = String(rawColor || '').trim();
+      if(!raw) return null;
+
+      if(raw.startsWith('#')){
+        let h = raw.slice(1);
+        if(h.length === 3) h = h.split('').map(ch => ch + ch).join('');
+        if(h.length === 6){
+          const n = parseInt(h, 16);
+          return {
+            r: (n >> 16) & 255,
+            g: (n >> 8) & 255,
+            b: n & 255,
+            a: 1
+          };
+        }
+      }
+
+      const m = raw.match(/^rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(?:\s*,\s*([0-9.]+))?\s*\)$/i);
+      if(m){
+        return {
+          r: Math.max(0, Math.min(255, Number(m[1]) || 0)),
+          g: Math.max(0, Math.min(255, Number(m[2]) || 0)),
+          b: Math.max(0, Math.min(255, Number(m[3]) || 0)),
+          a: m[4] == null ? 1 : Math.max(0, Math.min(1, Number(m[4]) || 0))
+        };
+      }
+
+      return null;
+    }
+
+    function getReadableTextColor(bgColor){
+      const rgb = parseCssColor(bgColor);
+      if(!rgb) return '#fff';
+      const toLinear = (v) => {
+        const n = v / 255;
+        return n <= 0.04045 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4);
+      };
+      const luminance = (0.2126 * toLinear(rgb.r)) + (0.7152 * toLinear(rgb.g)) + (0.0722 * toLinear(rgb.b));
+      return luminance > 0.42 ? '#111' : '#fff';
+    }
+
+    function getReadableBorderColor(textColor){
+      return String(textColor || '').trim() === '#111'
+        ? 'rgba(17,17,17,.26)'
+        : 'rgba(255,255,255,.26)';
+    }
+
+    function getReadableTextShadow(textColor){
+      return String(textColor || '').trim() === '#111'
+        ? 'none'
+        : '0 10px 18px rgba(0,0,0,.25)';
+    }
+
     function applyBoardTheme(room){
       const mapBox = document.getElementById('mapBox') || GAME_UI?.els?.mapBox;
       if(!mapBox) return;
@@ -3455,8 +3509,12 @@ if(homeBtn && role !== "host"){
       const overlayInner = roundOverlay.querySelector('.roundOverlayInner');
       const winnerCard = (winEvent.team === "green") ? roundCardGreen : roundCardOrange;
 
+      const greenRoundText = getReadableTextColor(visualTeams.green.color);
+      const orangeRoundText = getReadableTextColor(visualTeams.orange.color);
       roundCardGreen.style.background = visualTeams.green.color;
+      roundCardGreen.style.color = greenRoundText;
       roundCardOrange.style.background = visualTeams.orange.color;
+      roundCardOrange.style.color = orangeRoundText;
       roundScoreGreen.textContent = String(scores.green);
       roundScoreOrange.textContent = String(scores.orange);
       roundNameGreen.textContent = visualTeams.green.name;
@@ -3929,6 +3987,9 @@ if(homeBtn && role !== "host"){
 
       const green = list.filter(p => p.team === "green" && String(p.id) !== selectedDisplayPid);
       const orange = list.filter(p => p.team === "orange" && String(p.id) !== selectedDisplayPid);
+      const visualTeams = getVisualTeams(room);
+      const greenText = getReadableTextColor(visualTeams.green.color);
+      const orangeText = getReadableTextColor(visualTeams.orange.color);
       const tvBtnLabel = displayPlayer ? `جهاز العرض: ${escapeHtml(displayPlayer.name || "لاعب")}` : "عرض الشاشة";
 
       main.innerHTML = `
@@ -3940,12 +4001,12 @@ if(homeBtn && role !== "host"){
           <div style="height:12px"></div>
 
           <div class="teams">
-            <div class="teamCol teamGreen">
-              <div class="teamTitle">الفريق الأخضر</div>
+            <div class="teamCol teamGreen" style="background:${escapeHtml(hexToRgba(visualTeams.green.color, 0.86))};color:${escapeHtml(greenText)};border-color:rgba(0,0,0,.70)">
+              <div class="teamTitle">${escapeHtml(visualTeams.green.name)}</div>
               <div id="greenList"></div>
             </div>
-            <div class="teamCol teamOrange">
-              <div class="teamTitle">الفريق البرتقالي</div>
+            <div class="teamCol teamOrange" style="background:${escapeHtml(hexToRgba(visualTeams.orange.color, 0.86))};color:${escapeHtml(orangeText)};border-color:rgba(0,0,0,.70)">
+              <div class="teamTitle">${escapeHtml(visualTeams.orange.name)}</div>
               <div id="orangeList"></div>
             </div>
           </div>
@@ -4009,11 +4070,12 @@ if(homeBtn && role !== "host"){
       const greenList = document.getElementById("greenList");
       const orangeList = document.getElementById("orangeList");
 
-      function draw(colEl, arr){
-        colEl.innerHTML = arr.map(p => `<div class="playerItem" data-id="${escapeHtml(p.id)}">${escapeHtml(p.name)}</div>`).join("") || `<div class="smallNote">لا يوجد</div>`;
+      function draw(colEl, arr, teamColor, textColor){
+        const borderColor = getReadableBorderColor(textColor);
+        colEl.innerHTML = arr.map(p => `<div class="playerItem" data-id="${escapeHtml(p.id)}" style="background:${escapeHtml(hexToRgba(teamColor, 0.96))};color:${escapeHtml(textColor)};border-color:${escapeHtml(borderColor)}">${escapeHtml(p.name)}</div>`).join("") || `<div class="smallNote" style="color:${escapeHtml(textColor)}">لا يوجد</div>`;
       }
-      draw(greenList, green);
-      draw(orangeList, orange);
+      draw(greenList, green, visualTeams.green.color, greenText);
+      draw(orangeList, orange, visualTeams.orange.color, orangeText);
 
       main.querySelectorAll(".playerItem").forEach(el => {
         el.addEventListener("click", async () => {
@@ -4289,10 +4351,10 @@ if(homeBtn && role !== "host"){
             </div>
 
             <div class="scoreBoard">
-              <div id="teamGreenBtn" class="teamPill green ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.green.color)}">${escapeHtml(visualTeams.green.name)}</div>
+              <div id="teamGreenBtn" class="teamPill green ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.green.color)};color:${escapeHtml(getReadableTextColor(visualTeams.green.color))}">${escapeHtml(visualTeams.green.name)}</div>
               <div id="scoreGreen" class="scoreBox">${Number.isFinite(sg) ? sg : 0}</div>
               <div id="scoreOrange" class="scoreBox">${Number.isFinite(so) ? so : 0}</div>
-              <div id="teamOrangeBtn" class="teamPill orange ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.orange.color)}">${escapeHtml(visualTeams.orange.name)}</div>
+              <div id="teamOrangeBtn" class="teamPill orange ${isHost ? "clickable" : ""}" style="background:${escapeHtml(visualTeams.orange.color)};color:${escapeHtml(getReadableTextColor(visualTeams.orange.color))}">${escapeHtml(visualTeams.orange.name)}</div>
             </div>
           </div>
 
@@ -4782,10 +4844,10 @@ if(homeBtn && role !== "host"){
 
             <div class="tvScoreWrap" aria-hidden="true">
               <div class="scoreBoard">
-                <div id="teamGreenBtn" class="teamPill green" style="background:${escapeHtml(visualTeams.green.color)}">${escapeHtml(visualTeams.green.name)}</div>
+                <div id="teamGreenBtn" class="teamPill green" style="background:${escapeHtml(visualTeams.green.color)};color:${escapeHtml(getReadableTextColor(visualTeams.green.color))}">${escapeHtml(visualTeams.green.name)}</div>
                 <div id="scoreGreen" class="scoreBox">${visualScores.green}</div>
                 <div id="scoreOrange" class="scoreBox">${visualScores.orange}</div>
-                <div id="teamOrangeBtn" class="teamPill orange" style="background:${escapeHtml(visualTeams.orange.color)}">${escapeHtml(visualTeams.orange.name)}</div>
+                <div id="teamOrangeBtn" class="teamPill orange" style="background:${escapeHtml(visualTeams.orange.color)};color:${escapeHtml(getReadableTextColor(visualTeams.orange.color))}">${escapeHtml(visualTeams.orange.name)}</div>
               </div>
             </div>
           </div>
@@ -4966,17 +5028,21 @@ if(homeBtn && role !== "host"){
       // Scores
       const visualTeamsNow = getVisualTeams(room);
       const visualScoresNow = getVisualScores(room);
+      const greenTeamText = getReadableTextColor(visualTeamsNow.green.color);
+      const orangeTeamText = getReadableTextColor(visualTeamsNow.orange.color);
       applyBoardTheme(room);
       if(GAME_UI.els.scoreGreen) GAME_UI.els.scoreGreen.textContent = String(visualScoresNow.green);
       if(GAME_UI.els.scoreOrange) GAME_UI.els.scoreOrange.textContent = String(visualScoresNow.orange);
       if(GAME_UI.els.teamGreenBtn){
         GAME_UI.els.teamGreenBtn.textContent = visualTeamsNow.green.name;
         GAME_UI.els.teamGreenBtn.style.background = visualTeamsNow.green.color;
+        GAME_UI.els.teamGreenBtn.style.color = greenTeamText;
         GAME_UI.els.teamGreenBtn.classList.toggle("selected", hasPendingSelectedCell(room));
       }
       if(GAME_UI.els.teamOrangeBtn){
         GAME_UI.els.teamOrangeBtn.textContent = visualTeamsNow.orange.name;
         GAME_UI.els.teamOrangeBtn.style.background = visualTeamsNow.orange.color;
+        GAME_UI.els.teamOrangeBtn.style.color = orangeTeamText;
         GAME_UI.els.teamOrangeBtn.classList.toggle("selected", hasPendingSelectedCell(room));
       }
 
@@ -4998,11 +5064,17 @@ if(homeBtn && role !== "host"){
       if(buzzer && buzzer.name && firstPressBar){
         firstPressBar.classList.add("filled");
         const visualTeamsForBuzz = getVisualTeams(room);
-        firstPressBar.style.background = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
+        const buzzBg = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
+        const buzzText = getReadableTextColor(buzzBg);
+        firstPressBar.style.background = buzzBg;
+        firstPressBar.style.color = buzzText;
+        firstPressBar.style.textShadow = getReadableTextShadow(buzzText);
         firstPressBar.textContent = buzzer.name;
       }else if(firstPressBar){
         firstPressBar.classList.remove("filled");
         firstPressBar.style.background = "rgba(255,255,255,.16)";
+        firstPressBar.style.color = "#fff";
+        firstPressBar.style.textShadow = "0 10px 18px rgba(0,0,0,.25)";
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
@@ -5543,6 +5615,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-08-2 (root-listener + fast-transaction emergency fix) -->
+  <!-- VERSION: game_full.html — v2026-03-18-1 (dynamic lobby team names + colors + readable text) -->
 </body>
 </html>
