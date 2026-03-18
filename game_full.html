@@ -3554,6 +3554,17 @@ if(homeBtn && role !== "host"){
       return map[n] || String(n);
     }
 
+    function resetFinalWinOverlayState(){
+      if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
+      WIN_HIDE_T = null;
+      if(winBackdrop) winBackdrop.style.display = "none";
+      clearConfetti();
+      stopVois();
+      hideRoundOverlay();
+      LAST_WIN_TS = 0;
+      LAST_WIN_RESET_TS = 0;
+    }
+
     function showWin(team, room, winEvent){
       if(!team) return;
 
@@ -5332,6 +5343,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       try{
         const we = room.winEvent;
+
+        if(FINAL_OVERLAY_ACTIVE && (!we || !we.ts)){
+          resetFinalWinOverlayState();
+        }
+
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
           showWin(we.team, room, we);
@@ -5615,6 +5631,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-18-1 (dynamic lobby team names + colors + readable text) -->
+  <!-- VERSION: game_full.html — v2026-03-19-1 (fix final overlay not closing for players on restart) -->
 </body>
 </html>
