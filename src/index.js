@@ -163,91 +163,6 @@ function isImportantRequestError(pathname, status) {
   return true;
 }
 
-
-function parseDateMs(value, fallback = null) {
-  const raw = String(value || "").trim();
-  if (!raw) return fallback;
-  const ms = new Date(raw).getTime();
-  return Number.isFinite(ms) && !Number.isNaN(ms) ? ms : fallback;
-}
-
-function daysInUtcMonth(year, monthIndex) {
-  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-}
-
-function shiftUtcMonth(year, monthIndex, delta) {
-  const d = new Date(Date.UTC(year, monthIndex + delta, 1));
-  return {
-    year: d.getUTCFullYear(),
-    monthIndex: d.getUTCMonth(),
-  };
-}
-
-function buildMonthlyCycleOccurrence(anchorDate, year, monthIndex) {
-  const day = Math.min(anchorDate.getUTCDate(), daysInUtcMonth(year, monthIndex));
-  return Date.UTC(
-    year,
-    monthIndex,
-    day,
-    anchorDate.getUTCHours(),
-    anchorDate.getUTCMinutes(),
-    anchorDate.getUTCSeconds(),
-    anchorDate.getUTCMilliseconds()
-  );
-}
-
-function formatRemainingShortLabel(ms) {
-  const remaining = Math.max(0, Number(ms || 0));
-  const totalHours = Math.ceil(remaining / (60 * 60 * 1000));
-  const days = Math.floor(totalHours / 24);
-  const hours = Math.max(1, totalHours - (days * 24));
-  if (days > 0) return `${days}ي ${hours}س`;
-  return `${Math.max(1, totalHours)}س`;
-}
-
-function getPusherCycleInfo(env, ts = Date.now()) {
-  const rawAnchor = String(
-    env?.PUSHER_BILLING_ANCHOR ||
-    env?.PUSHER_RESET_AT ||
-    "2026-03-19T00:00:00+03:00"
-  ).trim();
-
-  const anchorMs = parseDateMs(rawAnchor, parseDateMs("2026-03-19T00:00:00+03:00", Date.now()));
-  const anchorDate = new Date(anchorMs);
-  const nowDate = new Date(ts);
-
-  let startTs = buildMonthlyCycleOccurrence(anchorDate, nowDate.getUTCFullYear(), nowDate.getUTCMonth());
-  if (ts < startTs) {
-    const prev = shiftUtcMonth(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), -1);
-    startTs = buildMonthlyCycleOccurrence(anchorDate, prev.year, prev.monthIndex);
-  }
-
-  const startDate = new Date(startTs);
-  const next = shiftUtcMonth(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1);
-  const nextResetTs = buildMonthlyCycleOccurrence(anchorDate, next.year, next.monthIndex);
-  const remainingMs = Math.max(0, nextResetTs - ts);
-
-  return {
-    anchorRaw: rawAnchor,
-    startTs,
-    nextResetTs,
-    remainingMs,
-    key: new Date(startTs).toISOString(),
-    shortLabel: formatRemainingShortLabel(remainingMs),
-  };
-}
-
-function getLiveThresholds(planConnections) {
-  const plan = clampMin(Number(planConnections || 2000), 1);
-  return {
-    planConnections: plan,
-    warnConnections: Math.max(800, Math.round(plan * 0.40)),
-    badConnections: Math.max(1400, Math.round(plan * 0.70)),
-    warnRooms: Math.max(55, Math.round(plan * 0.0275)),
-    badRooms: Math.max(95, Math.round(plan * 0.0475)),
-  };
-}
-
 /* eslint-disable */
 // ---------- MD5 (small, pure JS) ----------
 function md5cycle(x, k) {
@@ -460,14 +375,17 @@ async function parseBodyAsObject(request) {
   return obj;
 }
 
+
 // ---------- Monitor helpers ----------
 const MONITOR_ROOM = "__monitor__";
 const MONITOR_ACTIVE_ROOM_MS = 2 * 60 * 1000;
+const MONITOR_ROOM_STALE_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_PUSHER_PLAN_MESSAGES = 4_000_000;
 const DEFAULT_PUSHER_PLAN_CONNECTIONS = 2_000;
 const DEFAULT_CF_MONTHLY_REQUESTS = 10_000_000;
 const DEFAULT_CF_FREE_DAILY_REQUESTS = 100_000;
 const DEFAULT_CF_PLAN_NAME = "Workers Paid ($5)";
+const DEFAULT_PUSHER_BILLING_START = "2026-03-19T22:14:00+03:00";
 
 function monitorStub(env) {
   const id = env.ROOMS.idFromName(MONITOR_ROOM);
@@ -495,842 +413,957 @@ function queueMonitorRequest(ctx, env, data) {
   queueMonitorEvent(ctx, env, { type: "request", ...(data || {}) });
 }
 
-function queueMonitorPusher(ctx, env, data) {
-  queueMonitorEvent(ctx, env, { type: "pusher_sent", ...(data || {}) });
+function parseDateMs(value, fallback = Date.now()) {
+  const n = Date.parse(String(value || "").trim());
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function addUtcMonths(baseTs, monthOffset) {
+  const d = new Date(baseTs);
+  d.setUTCMonth(d.getUTCMonth() + Number(monthOffset || 0));
+  return d.getTime();
+}
+
+function pusherBillingCycleInfo(now = Date.now(), anchorValue = DEFAULT_PUSHER_BILLING_START) {
+  const fallbackAnchor = parseDateMs(DEFAULT_PUSHER_BILLING_START, now);
+  const anchorTs = parseDateMs(anchorValue, fallbackAnchor);
+
+  let startTs = anchorTs;
+
+  if (now >= anchorTs) {
+    const a = new Date(anchorTs);
+    const n = new Date(now);
+    let diffMonths =
+      ((n.getUTCFullYear() - a.getUTCFullYear()) * 12) +
+      (n.getUTCMonth() - a.getUTCMonth());
+
+    startTs = addUtcMonths(anchorTs, diffMonths);
+    if (startTs > now) startTs = addUtcMonths(anchorTs, diffMonths - 1);
+
+    while (addUtcMonths(startTs, 1) <= now) {
+      startTs = addUtcMonths(startTs, 1);
+    }
+  } else {
+    while (startTs > now) {
+      startTs = addUtcMonths(startTs, -1);
+    }
+  }
+
+  const nextResetTs = addUtcMonths(startTs, 1);
+  const remainingMs = Math.max(0, nextResetTs - now);
+
+  return {
+    anchorTs,
+    startTs,
+    nextResetTs,
+    remainingMs,
+    label: humanRemainingLabel(remainingMs),
+    cycleKey: "pusher:" + String(startTs),
+  };
+}
+
+function humanRemainingLabel(ms) {
+  const totalMinutes = Math.max(1, Math.ceil(Math.max(0, Number(ms || 0)) / (60 * 1000)));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes - (days * 24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return hours > 0 ? (days + "ي " + hours + "س") : (days + "ي");
+  if (hours > 0) return minutes > 0 ? (hours + "س " + minutes + "د") : (hours + "س");
+  return Math.max(1, minutes) + "د";
 }
 
 function monitorPageHtml() {
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>مراقبة سباق الحروف</title>
-  <style>
-    :root{
-      --bg:#0a1020;
-      --bg2:#101a31;
-      --panel:#111b2f;
-      --panel2:#0d1628;
-      --panel3:#15213a;
-      --line:rgba(148,163,184,.18);
-      --text:#f8fbff;
-      --text2:#d7e1f0;
-      --muted:#8ea0bd;
-      --blue:#4f8cff;
-      --cyan:#28c7fa;
-      --green:#19c37d;
-      --yellow:#f7b538;
-      --red:#ff5d73;
-      --shadow:0 18px 40px rgba(2,8,23,.28);
-      --radius:22px;
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0}
-    body{
-      color:var(--text);
-      font-family:Arial,sans-serif;
-      background:
-        radial-gradient(1200px 520px at 100% -10%, rgba(79,140,255,.16), transparent 55%),
-        radial-gradient(800px 420px at 0% 0%, rgba(40,199,250,.10), transparent 50%),
-        linear-gradient(180deg, #060b16 0%, #0a1020 36%, #0f1830 100%);
-      min-height:100vh;
-    }
-    body::before{
-      content:"";
-      position:fixed; inset:0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
-      background-size:32px 32px;
-      pointer-events:none;
-      opacity:.22;
-    }
-    .wrap{position:relative; width:min(1440px,100%); margin:0 auto; padding:18px}
-    .hero{
-      display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
-      padding:18px 18px 16px;
-      border:1px solid var(--line);
-      background:linear-gradient(180deg, rgba(17,27,47,.92), rgba(12,20,38,.92));
-      border-radius:28px;
-      box-shadow:var(--shadow);
-      margin-bottom:14px;
-      backdrop-filter: blur(8px);
-    }
-    .heroTitle{font-size:30px; font-weight:900; line-height:1.15; letter-spacing:-.2px}
-    .heroSub{margin-top:8px; color:var(--muted); font-size:14px; line-height:1.9}
-    .heroMeta{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
-    .ghostTag{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:8px 12px; border-radius:999px;
-      background:rgba(255,255,255,.05); border:1px solid var(--line);
-      color:var(--text2); font-size:12px; font-weight:700;
-    }
-    .controls{display:flex; gap:10px; flex-wrap:wrap}
-    button{
-      border:0; border-radius:16px; padding:13px 18px;
-      font-weight:800; font-size:15px; cursor:pointer; color:#fff;
-      background:linear-gradient(135deg, var(--blue), #355dff);
-      box-shadow:0 12px 26px rgba(53,93,255,.24);
-    }
-    button.secondary{
-      background:rgba(255,255,255,.05);
-      border:1px solid var(--line);
-      box-shadow:none;
-      color:var(--text);
-    }
-
-    .quickRow{
-      display:grid;
-      grid-template-columns:repeat(5, minmax(0,1fr));
-      gap:10px;
-      margin-bottom:14px;
-    }
-    .quickCard{
-      min-height:88px;
-      padding:12px 12px 10px;
-      border-radius:22px;
-      border:1px solid var(--line);
-      background:linear-gradient(180deg, rgba(16,26,49,.95), rgba(10,16,32,.95));
-      box-shadow:var(--shadow);
-      display:flex; flex-direction:column; justify-content:space-between;
-    }
-    .quickCard.attention{
-      border-color:rgba(255,93,115,.50);
-      box-shadow:0 18px 40px rgba(255,93,115,.14);
-    }
-    .quickLabel{font-size:11px; color:var(--muted); font-weight:700; line-height:1.4}
-    .quickValue{font-size:22px; font-weight:900; line-height:1.15}
-    .quickValue.good{color:var(--green)}
-    .quickValue.warnTxt{color:var(--yellow)}
-    .quickValue.badTxt{color:var(--red)}
-
-    .mainGrid{
-      display:grid;
-      grid-template-columns:repeat(12, minmax(0,1fr));
-      gap:14px;
-    }
-    .card{
-      grid-column:span 12;
-      border:1px solid var(--line);
-      border-radius:28px;
-      background:linear-gradient(180deg, rgba(17,27,47,.94), rgba(10,16,32,.96));
-      box-shadow:var(--shadow);
-      padding:16px;
-      overflow:hidden;
-    }
-    .card.third{grid-column:span 4}
-    .card.half{grid-column:span 6}
-    .card.attention{
-      border-color:rgba(255,93,115,.52);
-      box-shadow:0 22px 44px rgba(255,93,115,.12);
-    }
-    .cardHead{
-      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-      margin-bottom:14px;
-    }
-    .headSide{display:flex; align-items:center; gap:12px; min-width:0}
-    .accent{
-      width:12px; height:48px; border-radius:999px;
-      background:linear-gradient(180deg, var(--cyan), var(--blue));
-      box-shadow:0 8px 24px rgba(40,199,250,.26);
-      flex:none;
-    }
-    .cardTitle{font-size:17px; font-weight:900; display:flex; align-items:center; gap:10px; flex-wrap:wrap}
-    .cardDesc{color:var(--muted); font-size:12px; line-height:1.8; margin-top:4px}
-    .help{position:relative}
-    .helpBtn{
-      width:30px; height:30px; border-radius:999px; padding:0;
-      background:rgba(255,255,255,.06); border:1px solid var(--line);
-      box-shadow:none; color:#fff; font-size:14px;
-    }
-    .helpBox{
-      display:none;
-      position:fixed;
-      left:14px; right:14px; bottom:14px;
-      z-index:9999;
-      width:auto; max-width:620px; margin:0 auto;
-      padding:14px 15px;
-      border-radius:18px;
-      border:1px solid var(--line);
-      background:#0a1120;
-      color:#ecf4ff; font-size:13px; line-height:1.9;
-      box-shadow:0 18px 38px rgba(0,0,0,.48);
-      white-space:pre-line;
-      max-height:62vh;
-      overflow:auto;
-    }
-    .help.open .helpBox{display:block}
-
-    .tag{
-      display:inline-flex; align-items:center; justify-content:center;
-      min-height:34px;
-      padding:8px 12px; border-radius:999px;
-      font-size:12px; font-weight:800;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.05); color:var(--text2);
-      white-space:nowrap;
-    }
-    .ok{background:rgba(25,195,125,.16); border-color:rgba(25,195,125,.45); color:#cbffe8}
-    .warn{background:rgba(247,181,56,.16); border-color:rgba(247,181,56,.45); color:#fff0c9}
-    .bad{background:rgba(255,93,115,.16); border-color:rgba(255,93,115,.45); color:#ffd7dd}
-    .info{background:rgba(40,199,250,.12); border-color:rgba(40,199,250,.38); color:#d6f6ff}
-
-    .heroNumber{
-      font-size:40px; font-weight:900; line-height:1.05; letter-spacing:-.6px;
-      margin:8px 0 6px;
-    }
-    .heroNumber.ltr{direction:ltr; unicode-bidi:embed; text-align:right}
-    .subLine{color:var(--muted); font-size:14px}
-    .progressShell{
-      margin:16px 0 12px;
-      height:12px; border-radius:999px; overflow:hidden;
-      background:#0b1324; border:1px solid var(--line);
-    }
-    .bar{
-      width:0%; height:100%;
-      background:linear-gradient(90deg, var(--green) 0%, var(--cyan) 38%, var(--yellow) 72%, var(--red) 100%);
-      transition:width .25s ease;
-      border-radius:999px;
-    }
-
-    .metricGrid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px}
-    .metric{
-      padding:13px 14px;
-      border-radius:20px;
-      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
-      border:1px solid var(--line);
-      min-height:88px;
-    }
-    .metricLabel{color:var(--muted); font-size:12px; line-height:1.6}
-    .metricValue{margin-top:6px; font-size:28px; font-weight:900}
-    .metricValue.small{font-size:24px}
-    .metaRow{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
-
-    .sectionTitle{
-      font-size:15px; font-weight:900; margin-bottom:10px;
-      color:var(--text2);
-    }
-
-    .tableWrap{
-      overflow:auto;
-      border-radius:22px;
-      border:1px solid var(--line);
-      background:rgba(8,14,28,.5);
-    }
-    table{width:100%; border-collapse:collapse; min-width:760px}
-    th,td{
-      padding:12px 10px; text-align:right; border-bottom:1px solid rgba(148,163,184,.12);
-      font-size:13px; vertical-align:top;
-    }
-    th{
-      position:sticky; top:0; z-index:1;
-      background:#0d1628; color:#cfe0fb; font-size:12px;
-    }
-
-    .alerts{display:grid; gap:10px}
-    .alert{
-      padding:14px 14px;
-      border-radius:18px;
-      background:rgba(255,255,255,.04);
-      border:1px solid var(--line);
-      line-height:1.85;
-    }
-    .alert strong{display:block; margin-bottom:4px}
-
-    .empty{
-      text-align:center; padding:18px;
-      color:var(--muted);
-      border-radius:18px;
-      border:1px dashed rgba(148,163,184,.18);
-      background:rgba(255,255,255,.02);
-    }
-    .footerNote{margin-top:12px; color:var(--muted); font-size:12px; line-height:1.95}
-
-    @media (max-width:1150px){
-      .quickRow{grid-template-columns:repeat(3, minmax(0,1fr))}
-      .card.third{grid-column:span 6}
-    }
-    @media (max-width:860px){
-      .wrap{padding:12px}
-      .hero{padding:14px}
-      .heroTitle{font-size:26px}
-      .card.third,.card.half{grid-column:span 12}
-    }
-    @media (max-width:680px){
-      .hero{border-radius:24px}
-      .quickRow{grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px}
-      .quickCard{padding:10px 9px; min-height:80px; border-radius:18px}
-      .quickLabel{font-size:10px}
-      .quickValue{font-size:16px}
-      .controls{width:100%}
-      .controls button{flex:1}
-      .card{padding:14px; border-radius:24px}
-      .cardHead{align-items:flex-start}
-      .accent{width:10px; height:40px}
-      .cardTitle{font-size:16px}
-      .cardDesc{font-size:11px}
-      .heroNumber{font-size:34px}
-      .metricGrid{grid-template-columns:repeat(2, minmax(0,1fr))}
-      .metric{min-height:78px; padding:12px}
-      .metricValue{font-size:24px}
-      .metricValue.small{font-size:20px}
-      .footerNote{font-size:11px}
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>مراقبة سباق الحروف</title>
+<style>
+:root{
+  --bg:#08101f;
+  --panel:#0e1930;
+  --panel2:#101f3d;
+  --panel3:#15284a;
+  --line:rgba(148,163,184,.16);
+  --text:#f8fbff;
+  --muted:#9db0d1;
+  --blue:#4f8cff;
+  --cyan:#27c7f8;
+  --green:#19c37d;
+  --yellow:#f6b93b;
+  --red:#ff5d73;
+  --shadow:0 18px 40px rgba(2,8,23,.32);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  color:var(--text);
+  font-family:Arial,sans-serif;
+  background:
+    radial-gradient(1200px 500px at 100% -10%, rgba(79,140,255,.16), transparent 55%),
+    radial-gradient(900px 420px at 0% 0%, rgba(39,199,248,.10), transparent 50%),
+    linear-gradient(180deg,#050b16 0%,#0a1121 38%,#0f1a32 100%);
+  min-height:100vh;
+}
+.wrap{width:min(1450px,100%); margin:0 auto; padding:16px}
+.top{
+  display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;
+  background:linear-gradient(180deg, rgba(17,27,47,.94), rgba(12,20,38,.96));
+  border:1px solid var(--line);
+  border-radius:26px;
+  padding:18px;
+  box-shadow:var(--shadow);
+}
+.title{font-size:30px; font-weight:900}
+.sub{margin-top:8px; color:var(--muted); font-size:14px}
+.topTags{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+.tag{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:34px; padding:8px 12px; border-radius:999px;
+  font-size:12px; font-weight:800; border:1px solid var(--line);
+  background:rgba(255,255,255,.05); color:#d7e6ff;
+}
+.ok{background:rgba(25,195,125,.16); border-color:rgba(25,195,125,.45); color:#cbffe8}
+.warn{background:rgba(246,185,59,.16); border-color:rgba(246,185,59,.45); color:#fff3cd}
+.bad{background:rgba(255,93,115,.16); border-color:rgba(255,93,115,.45); color:#ffd7dd}
+.info{background:rgba(39,199,248,.12); border-color:rgba(39,199,248,.38); color:#d6f8ff}
+.controls{display:flex; gap:10px; flex-wrap:wrap}
+button,a.btn{
+  border:0; border-radius:16px; padding:13px 18px;
+  font-weight:800; font-size:15px; cursor:pointer; color:#fff;
+  background:linear-gradient(135deg,var(--blue),#355dff);
+  box-shadow:0 12px 26px rgba(53,93,255,.22);
+  text-decoration:none;
+}
+button.secondary,a.btn.secondary{
+  background:rgba(255,255,255,.05); border:1px solid var(--line); box-shadow:none; color:#fff;
+}
+.section{margin-top:14px; border:1px solid var(--line); border-radius:26px; background:linear-gradient(180deg, rgba(16,26,49,.95), rgba(10,16,32,.96)); box-shadow:var(--shadow); padding:16px}
+.sectionHead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px}
+.sectionTitle{font-size:18px; font-weight:900}
+.sectionDesc{margin-top:4px; color:var(--muted); font-size:12px}
+.priorityGrid{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px}
+.grid4{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px}
+.grid3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px}
+.card{
+  border:1px solid var(--line); border-radius:20px; padding:14px;
+  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+}
+.label{font-size:12px; color:var(--muted); line-height:1.6}
+.value{margin-top:6px; font-size:28px; font-weight:900}
+.value.small{font-size:22px}
+.textGood{color:var(--green)}
+.textWarn{color:var(--yellow)}
+.textBad{color:var(--red)}
+.alerts{display:grid; gap:10px}
+.alert{padding:14px; border-radius:18px; border:1px solid var(--line); background:rgba(255,255,255,.04); line-height:1.9}
+.alert strong{display:block; margin-bottom:4px}
+.tableWrap{overflow:auto; border:1px solid var(--line); border-radius:18px; background:rgba(8,14,28,.42)}
+table{width:100%; border-collapse:collapse; min-width:720px}
+th,td{padding:12px 10px; text-align:right; border-bottom:1px solid rgba(148,163,184,.12); font-size:13px; vertical-align:top}
+th{position:sticky; top:0; background:#0d1628; color:#d6e7ff; font-size:12px}
+.empty{padding:18px; text-align:center; color:var(--muted)}
+.rooms{display:grid; gap:10px}
+.roomItem{
+  border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.03); overflow:hidden;
+}
+.roomItem summary{
+  list-style:none; cursor:pointer; padding:14px; display:flex; justify-content:space-between; gap:10px; align-items:center;
+}
+.roomItem summary::-webkit-details-marker{display:none}
+.roomMain{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.roomName{font-size:15px; font-weight:900}
+.roomMeta{display:flex; gap:8px; flex-wrap:wrap}
+.roomBody{padding:0 14px 14px}
+.roomGrid{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px}
+.mini{border:1px solid var(--line); border-radius:16px; padding:12px; background:rgba(255,255,255,.02)}
+.mini .label{font-size:11px}
+.mini .value{font-size:20px}
+.foot{margin-top:12px; color:var(--muted); font-size:12px; line-height:1.9}
+@media (max-width:1200px){
+  .priorityGrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .roomGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .wrap{padding:12px}
+  .title{font-size:25px}
+  .priorityGrid,.grid4,.grid3,.roomGrid{grid-template-columns:repeat(1,minmax(0,1fr))}
+  .value{font-size:22px}
+}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <section class="hero">
-      <div>
-        <div class="heroTitle">لوحة مراقبة سباق الحروف</div>
-        <div class="heroSub">الأخطاء المهمة بالأعلى، والغرف الهادئة أكثر من ساعتين تُحذف تلقائيًا من الصفحة.</div>
-        <div class="heroMeta">
-          <div class="ghostTag">رابط واحد للمتابعة من الجوال</div>
-          <div class="ghostTag">تحديث تلقائي كل 5 ثوانٍ</div>
-          <div class="ghostTag">لا تؤثر على اللاعبين</div>
-          <div id="dailyResetChip" class="ghostTag">تصفير اليوم بعد: —</div>
-          <div id="pusherCycleChip" class="ghostTag">تجديد Pusher بعد: —</div>
-        </div>
+<div class="wrap">
+  <section class="top">
+    <div>
+      <div class="title">لوحة مراقبة سباق الحروف</div>
+      <div class="sub">صفحة سريعة للمهم فقط: الأخطاء الفعلية، الضغط الحالي، الغرف، بوشر، وكلاودفلير.</div>
+      <div class="topTags">
+        <div id="lastUpdatedTag" class="tag info">آخر تحديث: —</div>
+        <div id="billingTag" class="tag info">دورة بوشر: —</div>
+        <div id="resetTag" class="tag info">تصفير اليوم: —</div>
       </div>
-      <div class="controls">
-        <button id="refreshBtn">تحديث الآن</button>
-        <button id="autoBtn" class="secondary">إيقاف التحديث</button>
-      </div>
-    </section>
-
-    <section class="quickRow">
-      <div class="quickCard">
-        <div class="quickLabel">آخر تحديث</div>
-        <div id="lastUpdated" class="quickValue">—</div>
-      </div>
-      <div class="quickCard">
-        <div class="quickLabel">حالة الـ Worker</div>
-        <div id="workerStatus" class="quickValue">—</div>
-      </div>
-      <div class="quickCard">
-        <div class="quickLabel">حالة Pusher</div>
-        <div id="pusherStatus" class="quickValue">—</div>
-      </div>
-      <div class="quickCard">
-        <div class="quickLabel">التقييم العام</div>
-        <div id="overallStatus" class="quickValue">—</div>
-      </div>
-      <div id="topErrorsCard" class="quickCard">
-        <div class="quickLabel">أخطاء اللعبة المهمة اليوم</div>
-        <div id="topErrorsCount" class="quickValue">—</div>
-      </div>
-    </section>
-
-    <div class="mainGrid">
-      <section id="errorsCard" class="card">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">آخر الأخطاء المهمة
-                <span class="help" data-help>
-                  <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">هذه أهم لوحة وقت الضغط:
-- تعرض آخر الأخطاء المهمة فقط
-- 404 الخارجية غير المهمة لا تدخل هنا
-- 5xx تُعتبر أخطر شيء وتحتاج انتباه فوري
-- 4xx المهمة تُعرض أيضًا بوضوح</div>
-                </span>
-              </div>
-              <div class="cardDesc">آخر الأخطاء أو الاستجابات غير الطبيعية داخل الـ Worker.</div>
-            </div>
-          </div>
-          <div id="errorsBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div class="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>الوقت</th>
-                <th>الحالة</th>
-                <th>المسار</th>
-                <th>الغرفة</th>
-                <th>التفصيل</th>
-              </tr>
-            </thead>
-            <tbody id="errorsBody">
-              <tr><td colspan="5" class="empty">لا توجد أخطاء بعد</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="card half">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">الحالة العامة والتنبيهات
-                <span class="help" data-help>
-                  <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">هذه اللوحة تجمع أهم التنبيهات التي تحتاج تراقبها بسرعة:
-- اقتراب حد رسائل Pusher
-- ارتفاع الاتصالات
-- ارتفاع الأخطاء
-- بطء الاستجابة
-- ضغط غير طبيعي على الغرف</div>
-                </span>
-              </div>
-              <div class="cardDesc">مختصر سريع للأشياء التي تحتاج انتباهك الآن.</div>
-            </div>
-          </div>
-          <div id="alertsBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div id="alertsBox" class="alerts">
-          <div class="empty">بانتظار أول تحديث…</div>
-        </div>
-      </section>
-
-      <section class="card half">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">الغرف الحالية والهادئة</div>
-              <div class="cardDesc">يعرض الغرف النشطة والهادئة فقط، وأي غرفة تتجاوز ساعتين خمول تُحذف تلقائيًا من الصفحة.</div>
-            </div>
-          </div>
-          <div id="roomsBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div class="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>الغرفة</th>
-                <th>الحالة</th>
-                <th>المتصلون</th>
-                <th>آخر ظهور</th>
-                <th>آخر Pusher</th>
-                <th>طلبات اليوم</th>
-                <th>رسائل اليوم</th>
-                <th>آخر مسار</th>
-                <th>Rev</th>
-              </tr>
-            </thead>
-            <tbody id="roomsBody">
-              <tr><td colspan="9" class="empty">لا توجد غرف متتبعة بعد</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="card third">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">استهلاك رسائل Pusher
-                <span class="help" data-help>
-                  <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">تعرض هذه اللوحة عدد الرسائل التي أرسلها هذا الـ Worker إلى Pusher منذ بداية دورة الاشتراك الحالية.
-
-الحدود المعتمدة:
-- طبيعي: أقل من 60%
-- متوسط: من 60% إلى أقل من 85%
-- قلق: 85% أو أكثر</div>
-                </span>
-              </div>
-              <div class="cardDesc">مفيدة لمعرفة الاستهلاك الحالي من اشتراكك الشهري منذ آخر تجديد.</div>
-            </div>
-          </div>
-          <div id="pusherUsageBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div id="pusherMain" class="heroNumber ltr">—</div>
-        <div id="pusherSub" class="subLine">—</div>
-        <div class="progressShell"><div id="pusherBar" class="bar"></div></div>
-        <div class="metaRow">
-          <div id="pusherTodayTag" class="tag info">اليوم: —</div>
-          <div id="pusherRemainingTag" class="tag info">المتبقي: —</div>
-          <div id="pusherResetTag" class="tag info">التجديد بعد: —</div>
-        </div>
-      </section>
-
-      <section class="card third">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">التزامن الحالي المباشر
-                <span class="help" data-help>
-                  <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">هذه اللوحة مبنية على حد اشتراكك الحالي: 2000 اتصال متزامن.
-
-الحدود المعتمدة:
-- طبيعي: أقل من 800 اتصال أو أقل من 55 غرفة نشطة
-- متوسط: من 800 إلى أقل من 1400 اتصال أو من 55 إلى أقل من 95 غرفة نشطة
-- قلق: 1400 اتصال أو أكثر أو 95 غرفة نشطة أو أكثر</div>
-                </span>
-              </div>
-              <div class="cardDesc">أهم أرقام اللعب الحي الآن في مكان واحد.</div>
-            </div>
-          </div>
-          <div id="liveBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div class="metricGrid">
-          <div class="metric"><div class="metricLabel">الاتصالات الحالية الآن</div><div id="liveConnections" class="metricValue">—</div></div>
-          <div class="metric"><div class="metricLabel">الغرف النشطة الآن</div><div id="liveRooms" class="metricValue">—</div></div>
-          <div class="metric"><div class="metricLabel">الغرف الهادئة الآن</div><div id="liveRoomsQuiet" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">الغرف التي ظهرت اليوم</div><div id="liveRoomsToday" class="metricValue small">—</div></div>
-        </div>
-      </section>
-
-      <section class="card third">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">مؤشرات واستهلاك Cloudflare
-                <span class="help" data-help>
-                  <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">هذه اللوحة تعرض مؤشرات Cloudflare التشغيلية + استهلاك الخطة الحالية بشكل واضح.
-
-المعروض هنا:
-- طلبات اليوم
-- نسبة الأخطاء المهمة
-- متوسط الاستجابة
-- استخدام الشهر الحالي من الخطة
-- مقارنة بالحد المجاني القديم 100,000 طلب يوميًا
-- تفصيل طلبات اللعب مقابل طلبات الحالة والمراقبة وPusher
-
-الحدود المعتمدة:
-- نسبة أخطاء اللعبة المهمة: طبيعي أقل من 0.7% — متوسط حتى 2% — قلق فوق 2%
-- متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 700ms — قلق فوق 700ms
-- طلبات 404 الخارجية تُعرض منفصلة ولا تدخل ضمن أخطاء اللعبة المهمة</div>
-                </span>
-              </div>
-              <div class="cardDesc">يوضح الخطة الحالية، استهلاك الشهر، والفرق بين أنواع الطلبات داخل الـ Worker.</div>
-            </div>
-          </div>
-          <div id="cfBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div class="metricGrid">
-          <div class="metric"><div class="metricLabel">الخطة الحالية</div><div id="cfPlanName" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">استخدام الشهر الحالي</div><div id="cfMonthMain" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">المتبقي من الخطة</div><div id="cfMonthRemaining" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">الحد المجاني السابق</div><div id="cfFreeLimit" class="metricValue small">—</div></div>
-        </div>
-        <div class="metaRow">
-          <div id="cfMonthUsageTag" class="tag info">استهلاك الشهر: —</div>
-          <div id="cfRequests" class="tag info">طلبات اليوم: —</div>
-          <div id="cfErrors" class="tag warn">أخطاء اللعبة اليوم: —</div>
-          <div id="cfLatency" class="tag info">متوسط الاستجابة: —</div>
-          <div id="cfErrorRate" class="tag info">نسبة الأخطاء المهمة: —</div>
-          <div id="cfResetTag" class="tag info">يتصفّر بعد: —</div>
-        </div>
-        <div class="metaRow">
-          <div id="cf2xx" class="tag info">2xx: —</div>
-          <div id="cf4xx" class="tag warn">4xx مهم: —</div>
-          <div id="cfExt404" class="tag info">404 خارجية: —</div>
-          <div id="cf5xx" class="tag bad">5xx: —</div>
-        </div>
-        <div class="sectionTitle">تفصيل طلبات الـ Worker</div>
-        <div class="metricGrid">
-          <div class="metric"><div class="metricLabel">طلبات اللعب /action</div><div id="cfReqAction" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">طلبات الحالة /state</div><div id="cfReqState" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">طلبات Pusher auth/config</div><div id="cfReqPusher" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">طلبات المراقبة</div><div id="cfReqMonitor" class="metricValue small">—</div></div>
-        </div>
-        <div class="metaRow">
-          <div id="cfReqOther" class="tag info">طلبات خارجية/أخرى: —</div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="footerNote">
-          ملاحظة: عداد رسائل Pusher هنا مبني على الرسائل التي يرسلها هذا الـ Worker إلى Pusher منذ بداية دورة الاشتراك الحالية، وليس من بداية الشهر الميلادي.
-          <br>
-          أما مؤشرات Cloudflare هنا فهي مؤشرات تشغيلية داخلية من نفس الـ Worker، هدفها تعطيك نظرة عربية سريعة من رابط واحد بدون تنقل بين عدة لوحات.
-        </div>
-      </section>
     </div>
-  </div>
+    <div class="controls">
+      <button id="refreshBtn">تحديث الآن</button>
+      <button id="autoBtn" class="secondary">إيقاف التحديث</button>
+      <a href="/monitor/details" class="btn secondary">التفاصيل الدقيقة</a>
+    </div>
+  </section>
 
-  <script>
-    const $ = (id) => document.getElementById(id);
-    const fmt = (n) => Number(n || 0).toLocaleString('en-US');
-    const pct = (n) => (Number(n || 0)).toFixed(1) + '%';
-    const ms = (n) => Math.round(Number(n || 0)) + 'ms';
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">المؤشرات العاجلة</div>
+        <div class="sectionDesc">الأهم في أعلى الصفحة: الأخطاء الفعلية، الضغط، والاستجابة.</div>
+      </div>
+      <div id="priorityBadge" class="tag info">بانتظار البيانات</div>
+    </div>
+    <div class="priorityGrid">
+      <div class="card"><div class="label">أخطاء 5xx اليوم</div><div id="priority5xx" class="value">—</div></div>
+      <div class="card"><div class="label">أخطاء 4xx المهمة</div><div id="priority4xx" class="value">—</div></div>
+      <div class="card"><div class="label">نسبة الأخطاء المهمة</div><div id="priorityErrRate" class="value small">—</div></div>
+      <div class="card"><div class="label">متوسط الاستجابة</div><div id="priorityLatency" class="value small">—</div></div>
+      <div class="card"><div class="label">الاتصالات الحالية / 2000</div><div id="priorityConnections" class="value small">—</div></div>
+      <div class="card"><div class="label">استهلاك رسائل بوشر</div><div id="priorityPusher" class="value small">—</div></div>
+    </div>
+  </section>
 
-    function ago(ts){
-      const n = Number(ts || 0);
-      if (!n) return '—';
-      const diff = Math.max(0, Date.now() - n);
-      const s = Math.floor(diff / 1000);
-      if (s < 60) return 'الآن';
-      const m = Math.floor(s / 60);
-      if (m < 60) return 'قبل ' + m + ' د';
-      const h = Math.floor(m / 60);
-      if (h < 24) return 'قبل ' + h + ' س';
-      const d = Math.floor(h / 24);
-      return 'قبل ' + d + ' ي';
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">الحالة العامة والتنبيهات</div>
+        <div class="sectionDesc">تنبيهات عربية واضحة فقط لما يستحق الانتباه.</div>
+      </div>
+      <div id="alertsBadge" class="tag info">بانتظار البيانات</div>
+    </div>
+    <div id="alertsBox" class="alerts">
+      <div class="empty">بانتظار أول تحديث…</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">آخر الأخطاء المهمة</div>
+        <div class="sectionDesc">الأخطاء غير المهمة لا تظهر هنا.</div>
+      </div>
+      <div id="errorsBadge" class="tag info">بانتظار البيانات</div>
+    </div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>الوقت</th><th>النوع</th><th>المسار</th><th>الغرفة</th><th>الشرح</th></tr></thead>
+        <tbody id="errorsBody"><tr><td colspan="5" class="empty">لا توجد أخطاء مهمة الآن</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">ملخص مباشر</div>
+        <div class="sectionDesc">كل ما يخص اللعب الحالي اليوم.</div>
+      </div>
+      <div id="overallBadge" class="tag info">بانتظار البيانات</div>
+    </div>
+    <div class="grid4">
+      <div class="card"><div class="label">حالة الـ Worker</div><div id="workerStatus" class="value small">—</div></div>
+      <div class="card"><div class="label">حالة Pusher</div><div id="pusherStatus" class="value small">—</div></div>
+      <div class="card"><div class="label">التقييم العام</div><div id="overallStatus" class="value small">—</div></div>
+      <div class="card"><div class="label">عدد الغرف الحالية</div><div id="roomsCurrent" class="value">—</div></div>
+      <div class="card"><div class="label">الاتصالات الحالية</div><div id="liveConnections" class="value">—</div></div>
+      <div class="card"><div class="label">الغرف النشطة الآن</div><div id="liveRooms" class="value">—</div></div>
+      <div class="card"><div class="label">الغرف التي لُعبت اليوم</div><div id="liveRoomsToday" class="value small">—</div></div>
+      <div class="card"><div class="label">إجمالي المتصلين اليوم</div><div id="uniquePlayersToday" class="value small">—</div></div>
+      <div class="card"><div class="label">غرف حُذفت بالخمول اليوم</div><div id="roomsExpiredToday" class="value small">—</div></div>
+      <div class="card"><div class="label">رسائل بوشر اليوم</div><div id="pusherToday" class="value small">—</div></div>
+      <div class="card"><div class="label">المتبقي من رسائل بوشر</div><div id="pusherRemaining" class="value small">—</div></div>
+      <div class="card"><div class="label">طلبات كلاودفلير اليوم</div><div id="cfRequestsToday" class="value small">—</div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">بوشر وكلاودفلير</div>
+        <div class="sectionDesc">ملخص سريع يغنيك عن التنقل للوحاتهما في المتابعة اليومية.</div>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <div class="label">رسائل بوشر من دورة الاشتراك الحالية</div>
+        <div id="pusherMain" class="value small">—</div>
+        <div id="pusherSub" class="foot"></div>
+      </div>
+      <div class="card">
+        <div class="label">استخدام طلبات كلاودفلير هذا الشهر</div>
+        <div id="cfMonthMain" class="value small">—</div>
+        <div id="cfMonthSub" class="foot"></div>
+      </div>
+      <div class="card">
+        <div class="label">تفصيل أخطاء اليوم</div>
+        <div id="cfErrMain" class="value small">—</div>
+        <div id="cfErrSub" class="foot"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">الغرف الحالية</div>
+        <div class="sectionDesc">اضغط على الغرفة لفتح التفاصيل أو إغلاقها. الغرف الخاملة ساعتين تُحذف تلقائيًا من الصفحة.</div>
+      </div>
+      <div id="roomsBadge" class="tag info">بانتظار البيانات</div>
+    </div>
+    <div id="roomsBox" class="rooms">
+      <div class="empty">لا توجد غرف حالية الآن</div>
+    </div>
+    <div class="foot">المدة = من أول ظهور للغرفة حتى الآن. عدد الداخلين = عدد المعرّفات المختلفة التي دخلت الغرفة خلال حياتها الحالية.</div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+const pct = (n) => Number(n || 0).toFixed(1) + '%';
+const msText = (n) => Math.round(Number(n || 0)) + 'ms';
+
+function ago(ts){
+  const n = Number(ts || 0);
+  if (!n) return '—';
+  const diff = Math.max(0, Date.now() - n);
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'الآن';
+  const m = Math.floor(s / 60);
+  if (m < 60) return 'قبل ' + m + ' د';
+  const h = Math.floor(m / 60);
+  if (h < 24) return 'قبل ' + h + ' س';
+  const d = Math.floor(h / 24);
+  return 'قبل ' + d + ' ي';
+}
+
+function formatDateShort(ts){
+  const n = Number(ts || 0);
+  if (!n) return '—';
+  return new Date(n).toLocaleString('ar-SA');
+}
+
+function setBadge(el, text, kind){
+  el.className = 'tag ' + kind;
+  el.textContent = text;
+}
+
+function setValueColor(el, kind){
+  el.classList.remove('textGood','textWarn','textBad');
+  if (kind === 'ok') el.classList.add('textGood');
+  if (kind === 'warn') el.classList.add('textWarn');
+  if (kind === 'bad') el.classList.add('textBad');
+}
+
+function usageLevel(p){
+  const x = Number(p || 0);
+  if (x >= 80) return ['قلق','bad'];
+  if (x >= 50) return ['متوسط','warn'];
+  return ['طبيعي','ok'];
+}
+
+function errorLevel(rate){
+  const x = Number(rate || 0);
+  if (x > 2) return ['قلق','bad'];
+  if (x >= 0.5) return ['متوسط','warn'];
+  return ['طبيعي','ok'];
+}
+
+function latencyLevel(v){
+  const x = Number(v || 0);
+  if (x > 800) return ['قلق','bad'];
+  if (x >= 300) return ['متوسط','warn'];
+  return ['طبيعي','ok'];
+}
+
+function connectionLevel(connections, maxConnections){
+  const c = Number(connections || 0);
+  const m = Math.max(1, Number(maxConnections || 2000));
+  const p = (c / m) * 100;
+  if (p >= 75) return ['قلق','bad'];
+  if (p >= 45) return ['متوسط','warn'];
+  return ['طبيعي','ok'];
+}
+
+function overallLevel(sum){
+  const p = Number(sum && sum.pusher ? sum.pusher.usagePercentMonth : 0);
+  const c = Number(sum && sum.pusher ? sum.pusher.connectionUsagePercent : 0);
+  const e = Number(sum && sum.cloudflare ? sum.cloudflare.errorRatePercent : 0);
+  const l = Number(sum && sum.cloudflare ? sum.cloudflare.avgLatencyMs : 0);
+  const s5 = Number(sum && sum.cloudflare ? sum.cloudflare.status5xx : 0);
+
+  if (s5 > 0 || p >= 80 || c >= 75 || e > 2 || l > 800) return ['يحتاج انتباه','bad'];
+  if (p >= 50 || c >= 45 || e >= 0.5 || l >= 300) return ['مستقر مع متابعة','warn'];
+  return ['ممتاز','ok'];
+}
+
+function sevRank(v){
+  if (v === 'bad') return 3;
+  if (v === 'warn') return 2;
+  return 1;
+}
+
+function translateError(row){
+  const status = Number(row && row.status || 0);
+  const path = String(row && row.path || '');
+  const msg = String(row && row.msg || '');
+
+  if (msg === 'ACTION_BAD_RESPONSE') return 'استجابة غير صالحة من غرفة اللعبة عند تنفيذ أمر.';
+  if (msg === 'PUSHER_TRIGGER_FAILED') return 'فشل إرسال التحديث إلى بوشر.';
+  if (msg === 'PUSHER_NOT_CONFIGURED') return 'بوشر غير مضبوط داخل العامل.';
+  if (msg === 'SESSION_EXPIRED') return 'الجلسة انتهت.';
+  if (msg === 'NOT_FOUND' && path === '/action') return 'تم طلب مسار لعب غير موجود.';
+  if (status >= 500 && path === '/action') return 'خطأ داخلي أثناء تنفيذ إجراء داخل اللعبة.';
+  if (status >= 500 && path === '/state') return 'تعذر قراءة حالة الغرفة من العامل.';
+  if (status >= 500 && path === '/stats') return 'تعذر قراءة إحصاءات الغرفة.';
+  if (status >= 500 && path === '/pusher/trigger') return 'فشل إرسال حدث التحديث إلى بوشر.';
+  if (status >= 500) return 'خطأ داخلي في العامل.';
+  if (status >= 400 && path === '/action') return 'تم رفض طلب مهم داخل اللعبة.';
+  if (status >= 400) return 'طلب غير ناجح داخل مسار مهم.';
+  return msg || 'سجل متابعة داخلي.';
+}
+
+function renderAlerts(alerts){
+  const box = $('alertsBox');
+  const sorted = (alerts || []).slice().sort(function(a,b){ return sevRank(b.level) - sevRank(a.level); });
+
+  if (!sorted.length) {
+    box.innerHTML = '<div class="empty">لا توجد تنبيهات مقلقة الآن — الوضع يبدو طبيعيًا.</div>';
+    setBadge($('alertsBadge'),'لا توجد تنبيهات','ok');
+    return;
+  }
+  setBadge($('alertsBadge'),'عدد التنبيهات: ' + sorted.length, sorted.some(function(a){ return a.level === 'bad'; }) ? 'bad' : 'warn');
+  box.innerHTML = sorted.map(function(a){
+    const cls = a.level === 'bad' ? 'bad' : (a.level === 'warn' ? 'warn' : 'info');
+    return '<div class="alert ' + cls + '"><strong>' + a.title + '</strong><div>' + a.text + '</div></div>';
+  }).join('');
+}
+
+function renderErrors(errors){
+  const body = $('errorsBody');
+  if (!errors || !errors.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty">لا توجد أخطاء مهمة الآن</td></tr>';
+    setBadge($('errorsBadge'),'لا توجد أخطاء','ok');
+    return;
+  }
+  setBadge($('errorsBadge'),'عدد السجلات: ' + errors.length, errors.some(function(e){ return Number(e.status || 0) >= 500; }) ? 'bad' : 'warn');
+  body.innerHTML = errors.map(function(e){
+    const s = Number(e.status || 0);
+    const cls = s >= 500 ? 'bad' : (s >= 400 ? 'warn' : 'info');
+    const kind = s === 299 ? 'معلومة' : (s >= 500 ? 'خطأ شديد' : (s >= 400 ? 'تحذير' : 'متابعة'));
+    return '<tr>' +
+      '<td>' + ago(e.ts) + '</td>' +
+      '<td><span class="tag ' + cls + '">' + kind + '</span></td>' +
+      '<td>' + (e.path || '—') + '</td>' +
+      '<td>' + (e.room || '—') + '</td>' +
+      '<td>' + translateError(e) + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function renderRooms(rooms){
+  const box = $('roomsBox');
+  if (!rooms || !rooms.length) {
+    box.innerHTML = '<div class="empty">لا توجد غرف حالية الآن</div>';
+    setBadge($('roomsBadge'),'0 غرفة حالية','info');
+    $('roomsCurrent').textContent = '0';
+    return;
+  }
+
+  $('roomsCurrent').textContent = fmt(rooms.length);
+  setBadge($('roomsBadge'),'الغرف الحالية: ' + rooms.length, rooms.length >= 70 ? 'warn' : 'info');
+
+  box.innerHTML = rooms.map(function(r){
+    const cls = r.isActive ? 'ok' : 'info';
+    const statusText = r.isActive ? 'نشطة' : 'هادئة';
+    return '' +
+      '<details class="roomItem">' +
+        '<summary>' +
+          '<div class="roomMain">' +
+            '<span class="roomName">' + r.room + '</span>' +
+            '<span class="tag ' + cls + '">' + statusText + '</span>' +
+            '<span class="tag info">الآن: ' + fmt(r.clientsNow) + '</span>' +
+            '<span class="tag info">دخلها: ' + fmt(r.uniquePlayersTotal) + '</span>' +
+            '<span class="tag info">المدة: ' + (r.durationLabel || '—') + '</span>' +
+          '</div>' +
+          '<div class="roomMeta">' +
+            '<span class="tag info">آخر ظهور: ' + ago(r.lastSeenAt) + '</span>' +
+          '</div>' +
+        '</summary>' +
+        '<div class="roomBody">' +
+          '<div class="roomGrid">' +
+            '<div class="mini"><div class="label">المتصلون الآن</div><div class="value small">' + fmt(r.clientsNow) + '</div></div>' +
+            '<div class="mini"><div class="label">إجمالي الداخلين</div><div class="value small">' + fmt(r.uniquePlayersTotal) + '</div></div>' +
+            '<div class="mini"><div class="label">مدة الغرفة</div><div class="value small">' + (r.durationLabel || '—') + '</div></div>' +
+            '<div class="mini"><div class="label">أول ظهور</div><div class="value tiny">' + formatDateShort(r.firstSeenAt) + '</div></div>' +
+            '<div class="mini"><div class="label">آخر ظهور</div><div class="value tiny">' + ago(r.lastSeenAt) + '</div></div>' +
+            '<div class="mini"><div class="label">آخر Pusher</div><div class="value tiny">' + ago(r.lastPusherAt) + '</div></div>' +
+            '<div class="mini"><div class="label">طلبات اليوم</div><div class="value small">' + fmt(r.requestsToday) + '</div></div>' +
+            '<div class="mini"><div class="label">رسائل اليوم</div><div class="value small">' + fmt(r.pusherMsgsToday) + '</div></div>' +
+          '</div>' +
+          '<div class="foot">آخر مسار: ' + (r.lastPath || '—') + ' — Rev: ' + fmt(r.rev) + '</div>' +
+        '</div>' +
+      '</details>';
+  }).join('');
+}
+
+function render(summary){
+  $('lastUpdatedTag').textContent = 'آخر تحديث: ' + ago(summary.generatedAt);
+  $('billingTag').textContent = 'بوشر من تاريخ: ' + formatDateShort(summary.pusher && summary.pusher.cycleStartAt);
+  $('resetTag').textContent = 'تصفير اليوم بعد: ' + ((summary.dailyReset && summary.dailyReset.hoursLabel) || '—');
+
+  const workerOk = summary.system && summary.system.worker ? 'شغال' : 'غير واضح';
+  $('workerStatus').textContent = workerOk;
+  setValueColor($('workerStatus'), summary.system && summary.system.worker ? 'ok' : 'warn');
+
+  const pusherOk = summary.system && summary.system.pusherConfigured ? 'مربوط' : 'غير مضبوط';
+  $('pusherStatus').textContent = pusherOk;
+  setValueColor($('pusherStatus'), summary.system && summary.system.pusherConfigured ? 'ok' : 'warn');
+
+  const overall = overallLevel(summary);
+  $('overallStatus').textContent = overall[0];
+  setValueColor($('overallStatus'), overall[1]);
+  setBadge($('overallBadge'), overall[0], overall[1]);
+
+  const p = summary.pusher || {};
+  const c = summary.cloudflare || {};
+  const live = summary.live || {};
+  const planConnections = Number(summary.system && summary.system.pusherPlanConnections || 2000);
+
+  $('priority5xx').textContent = fmt(c.status5xx);
+  setValueColor($('priority5xx'), Number(c.status5xx || 0) > 0 ? 'bad' : 'ok');
+
+  const fourKind = Number(c.status4xx || 0) >= 40 ? 'bad' : (Number(c.status4xx || 0) >= 10 ? 'warn' : 'ok');
+  $('priority4xx').textContent = fmt(c.status4xx);
+  setValueColor($('priority4xx'), fourKind);
+
+  const er = errorLevel(c.errorRatePercent);
+  $('priorityErrRate').textContent = pct(c.errorRatePercent);
+  setValueColor($('priorityErrRate'), er[1]);
+
+  const lt = latencyLevel(c.avgLatencyMs);
+  $('priorityLatency').textContent = msText(c.avgLatencyMs);
+  setValueColor($('priorityLatency'), lt[1]);
+
+  const ck = connectionLevel(live.connectionsNow, planConnections);
+  $('priorityConnections').textContent = fmt(live.connectionsNow) + ' / ' + fmt(planConnections);
+  setValueColor($('priorityConnections'), ck[1]);
+
+  const pu = usageLevel(p.usagePercentMonth);
+  $('priorityPusher').textContent = pct(p.usagePercentMonth);
+  setValueColor($('priorityPusher'), pu[1]);
+
+  const priorityKinds = [Number(c.status5xx || 0) > 0 ? 'bad' : 'ok', fourKind, er[1], lt[1], ck[1], pu[1]];
+  const priorityKind = priorityKinds.indexOf('bad') !== -1 ? 'bad' : (priorityKinds.indexOf('warn') !== -1 ? 'warn' : 'ok');
+  setBadge($('priorityBadge'), priorityKind === 'bad' ? 'تنبيه عاجل' : (priorityKind === 'warn' ? 'تحتاج متابعة' : 'الوضع طبيعي'), priorityKind);
+
+  $('liveConnections').textContent = fmt(live.connectionsNow);
+  $('liveRooms').textContent = fmt(live.roomsActiveNow);
+  $('liveRoomsToday').textContent = fmt(live.roomsSeenToday);
+  $('uniquePlayersToday').textContent = fmt(live.uniquePlayersToday);
+  $('roomsExpiredToday').textContent = fmt(live.roomsExpiredToday);
+  $('pusherToday').textContent = fmt(p.messagesToday);
+  $('pusherRemaining').textContent = fmt(p.remainingMessages);
+  $('cfRequestsToday').textContent = fmt(c.requestsToday);
+
+  $('pusherMain').textContent = fmt(p.messagesMonth) + ' / ' + fmt(p.planMessages);
+  $('pusherSub').textContent = 'المتبقي: ' + fmt(p.remainingMessages) + ' — يتصفّر بعد: ' + (p.resetLabel || '—');
+
+  $('cfMonthMain').textContent = fmt(c.requestsMonth) + ' / ' + fmt(c.planRequestsMonth);
+  $('cfMonthSub').textContent = 'المتبقي: ' + fmt(c.remainingRequestsMonth) + ' — استخدام الشهر: ' + pct(c.usagePercentMonth);
+
+  $('cfErrMain').textContent = '5xx: ' + fmt(c.status5xx) + ' — 4xx المهم: ' + fmt(c.status4xx);
+  $('cfErrSub').textContent = 'نسبة الأخطاء المهمة: ' + pct(c.errorRatePercent) + ' — 404 الخارجية: ' + fmt(c.external404Today);
+
+  renderAlerts(summary.alerts || []);
+  renderErrors(summary.lastErrors || []);
+  renderRooms(summary.rooms || []);
+}
+
+let timer = null;
+let paused = false;
+
+async function refresh(){
+  try{
+    const res = await fetch('/monitor/summary', { cache:'no-store' });
+    const data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error((data && data.msg) || 'MONITOR_FAILED');
+    render(data);
+  }catch(err){
+    setBadge($('alertsBadge'),'تعذر قراءة البيانات','bad');
+    setBadge($('errorsBadge'),'تعذر قراءة البيانات','bad');
+    setBadge($('priorityBadge'),'تعذر قراءة البيانات','bad');
+    $('alertsBox').innerHTML = '<div class="alert bad"><strong>تعذر جلب البيانات</strong><div>' + String(err && err.message ? err.message : err) + '</div></div>';
+    $('errorsBody').innerHTML = '<tr><td colspan="5" class="empty">تعذر قراءة الأخطاء الآن</td></tr>';
+  }
+}
+
+function start(){
+  if (timer) clearInterval(timer);
+  timer = setInterval(function(){ if (!paused) refresh(); }, 5000);
+}
+
+$('refreshBtn').addEventListener('click', refresh);
+$('autoBtn').addEventListener('click', function(){
+  paused = !paused;
+  $('autoBtn').textContent = paused ? 'استئناف التحديث' : 'إيقاف التحديث';
+});
+
+refresh();
+start();
+</script>
+</body>
+</html>`;
+}
+
+function monitorDetailsPageHtml() {
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>تفاصيل مراقبة سباق الحروف</title>
+<style>
+:root{
+  --bg:#08101f; --panel:#0e1930; --line:rgba(148,163,184,.16); --text:#f8fbff; --muted:#9db0d1;
+  --blue:#4f8cff; --green:#19c37d; --yellow:#f6b93b; --red:#ff5d73; --cyan:#27c7f8; --shadow:0 18px 40px rgba(2,8,23,.32);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  color:var(--text); font-family:Arial,sans-serif;
+  background:linear-gradient(180deg,#050b16 0%,#0a1121 38%,#0f1a32 100%);
+  min-height:100vh;
+}
+.wrap{width:min(1450px,100%); margin:0 auto; padding:16px}
+.top{display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; background:linear-gradient(180deg, rgba(17,27,47,.94), rgba(12,20,38,.96)); border:1px solid var(--line); border-radius:26px; padding:18px; box-shadow:var(--shadow)}
+.title{font-size:28px; font-weight:900}
+.sub{margin-top:8px; color:var(--muted); font-size:14px}
+.controls{display:flex; gap:10px; flex-wrap:wrap}
+a.btn,button{
+  border:0; border-radius:16px; padding:13px 18px; font-weight:800; font-size:15px; cursor:pointer; color:#fff; text-decoration:none;
+  background:linear-gradient(135deg,var(--blue),#355dff); box-shadow:0 12px 26px rgba(53,93,255,.22);
+}
+button.secondary,a.btn.secondary{background:rgba(255,255,255,.05); border:1px solid var(--line); box-shadow:none}
+.section{margin-top:14px; border:1px solid var(--line); border-radius:26px; background:linear-gradient(180deg, rgba(16,26,49,.95), rgba(10,16,32,.96)); box-shadow:var(--shadow); padding:16px}
+.sectionHead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px}
+.sectionTitle{font-size:18px; font-weight:900}
+.sectionDesc{margin-top:4px; color:var(--muted); font-size:12px}
+.grid3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px}
+.grid2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px}
+.card{border:1px solid var(--line); border-radius:20px; padding:14px; background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02))}
+.label{font-size:12px; color:var(--muted)}
+.value{margin-top:6px; font-size:24px; font-weight:900}
+.chartWrap{border:1px solid var(--line); border-radius:18px; padding:12px; background:rgba(255,255,255,.03)}
+.chartTitle{font-size:14px; font-weight:900; margin-bottom:8px}
+svg{width:100%; height:220px; display:block}
+.axisLabel{fill:#9db0d1; font-size:10px}
+.barReq{fill:#4f8cff}
+.barPusher{fill:#19c37d}
+.barErr{fill:#ff5d73}
+.line{stroke:#27c7f8; stroke-width:2; fill:none}
+.tableWrap{overflow:auto; border:1px solid var(--line); border-radius:18px; background:rgba(8,14,28,.42)}
+table{width:100%; border-collapse:collapse; min-width:720px}
+th,td{padding:12px 10px; text-align:right; border-bottom:1px solid rgba(148,163,184,.12); font-size:13px; vertical-align:top}
+th{position:sticky; top:0; background:#0d1628; color:#d6e7ff; font-size:12px}
+.empty{padding:18px; text-align:center; color:var(--muted)}
+.tag{display:inline-flex; align-items:center; justify-content:center; min-height:34px; padding:8px 12px; border-radius:999px; font-size:12px; font-weight:800; border:1px solid var(--line); background:rgba(255,255,255,.05); color:#d7e6ff}
+.ok{background:rgba(25,195,125,.16); border-color:rgba(25,195,125,.45); color:#cbffe8}
+.warn{background:rgba(246,185,59,.16); border-color:rgba(246,185,59,.45); color:#fff3cd}
+.bad{background:rgba(255,93,115,.16); border-color:rgba(255,93,115,.45); color:#ffd7dd}
+.info{background:rgba(39,199,248,.12); border-color:rgba(39,199,248,.38); color:#d6f8ff}
+@media (max-width:1000px){.grid3,.grid2{grid-template-columns:repeat(1,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="top">
+    <div>
+      <div class="title">التفاصيل الدقيقة</div>
+      <div class="sub">رسومات اليوم والأسبوع والشهر، مع جداول المسارات والتفاصيل الأقرب لما تحتاجه بدل فتح اللوحات الخارجية.</div>
+    </div>
+    <div class="controls">
+      <a href="/monitor" class="btn secondary">العودة للصفحة الرئيسية</a>
+      <button id="refreshBtn">تحديث الآن</button>
+      <button id="autoBtn" class="secondary">إيقاف التحديث</button>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">ملخص تقني مختصر</div>
+        <div class="sectionDesc">أهم أرقام كلاودفلير وبوشر واللعبة في مكان واحد.</div>
+      </div>
+      <div id="detailsBadge" class="tag info">بانتظار البيانات</div>
+    </div>
+    <div class="grid3">
+      <div class="card"><div class="label">طلبات اليوم</div><div id="sumReqToday" class="value">—</div></div>
+      <div class="card"><div class="label">أخطاء اللعبة المهمة اليوم</div><div id="sumErrToday" class="value">—</div></div>
+      <div class="card"><div class="label">رسائل بوشر اليوم</div><div id="sumPusherToday" class="value">—</div></div>
+      <div class="card"><div class="label">استخدام بوشر من الدورة</div><div id="sumPusherMonth" class="value">—</div></div>
+      <div class="card"><div class="label">الاتصالات الحالية / الحد</div><div id="sumConn" class="value">—</div></div>
+      <div class="card"><div class="label">الغرف التي لُعبت اليوم</div><div id="sumRoomsToday" class="value">—</div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">رسومات اليوم</div>
+        <div class="sectionDesc">بالساعات.</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="chartWrap">
+        <div class="chartTitle">طلبات اليوم بالساعة</div>
+        <div id="chartTodayRequests"></div>
+      </div>
+      <div class="chartWrap">
+        <div class="chartTitle">رسائل بوشر اليوم بالساعة</div>
+        <div id="chartTodayPusher"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">رسومات الأسبوع والشهر</div>
+        <div class="sectionDesc">بالأيام.</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="chartWrap">
+        <div class="chartTitle">طلبات آخر 7 أيام</div>
+        <div id="chartWeekRequests"></div>
+      </div>
+      <div class="chartWrap">
+        <div class="chartTitle">رسائل بوشر آخر 7 أيام</div>
+        <div id="chartWeekPusher"></div>
+      </div>
+      <div class="chartWrap">
+        <div class="chartTitle">طلبات آخر 30 يوم</div>
+        <div id="chartMonthRequests"></div>
+      </div>
+      <div class="chartWrap">
+        <div class="chartTitle">أخطاء آخر 30 يوم</div>
+        <div id="chartMonthErrors"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">تفصيل مسارات العامل</div>
+        <div class="sectionDesc">مختصر شبيه بالماتركس لكن أوضح لك بالعربي.</div>
+      </div>
+    </div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>المسار</th><th>الطلبات</th><th>الأخطاء</th><th>متوسط الاستجابة</th></tr></thead>
+        <tbody id="routesBody"><tr><td colspan="4" class="empty">بانتظار البيانات</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="sectionHead">
+      <div>
+        <div class="sectionTitle">آخر الأخطاء المهمة</div>
+        <div class="sectionDesc">آخر ما يحتاج مراجعة فقط.</div>
+      </div>
+    </div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>الوقت</th><th>الحالة</th><th>المسار</th><th>الغرفة</th><th>الشرح</th></tr></thead>
+        <tbody id="errorsBody"><tr><td colspan="5" class="empty">لا توجد أخطاء مهمة الآن</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+const pct = (n) => Number(n || 0).toFixed(1) + '%';
+const msText = (n) => Math.round(Number(n || 0)) + 'ms';
+
+function ago(ts){
+  const n = Number(ts || 0);
+  if (!n) return '—';
+  const diff = Math.max(0, Date.now() - n);
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'الآن';
+  const m = Math.floor(s / 60);
+  if (m < 60) return 'قبل ' + m + ' د';
+  const h = Math.floor(m / 60);
+  if (h < 24) return 'قبل ' + h + ' س';
+  const d = Math.floor(h / 24);
+  return 'قبل ' + d + ' ي';
+}
+
+function translateError(row){
+  const status = Number(row && row.status || 0);
+  const path = String(row && row.path || '');
+  const msg = String(row && row.msg || '');
+
+  if (msg === 'ACTION_BAD_RESPONSE') return 'استجابة غير صالحة من غرفة اللعبة عند تنفيذ أمر.';
+  if (msg === 'PUSHER_TRIGGER_FAILED') return 'فشل إرسال التحديث إلى بوشر.';
+  if (msg === 'PUSHER_NOT_CONFIGURED') return 'بوشر غير مضبوط داخل العامل.';
+  if (msg === 'NOT_FOUND' && path === '/action') return 'تم طلب مسار لعب غير موجود.';
+  if (status >= 500 && path === '/action') return 'خطأ داخلي أثناء تنفيذ إجراء داخل اللعبة.';
+  if (status >= 500 && path === '/state') return 'تعذر قراءة حالة الغرفة من العامل.';
+  if (status >= 500 && path === '/stats') return 'تعذر قراءة إحصاءات الغرفة.';
+  if (status >= 500 && path === '/pusher/trigger') return 'فشل إرسال حدث التحديث إلى بوشر.';
+  if (status >= 500) return 'خطأ داخلي في العامل.';
+  if (status >= 400 && path === '/action') return 'تم رفض طلب مهم داخل اللعبة.';
+  if (status >= 400) return 'طلب غير ناجح داخل مسار مهم.';
+  return msg || 'سجل متابعة داخلي.';
+}
+
+function setBadge(el, text, kind){
+  el.className = 'tag ' + kind;
+  el.textContent = text;
+}
+
+function renderSimpleBarChart(containerId, rows, valueKey, labelKey, barClass){
+  const root = $(containerId);
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    root.innerHTML = '<div class="empty">لا توجد بيانات بعد</div>';
+    return;
+  }
+
+  const max = Math.max(1, ...list.map(function(r){ return Number(r[valueKey] || 0); }));
+  const width = 760;
+  const height = 220;
+  const left = 34;
+  const bottom = 26;
+  const top = 12;
+  const chartWidth = width - left - 10;
+  const chartHeight = height - top - bottom;
+  const step = chartWidth / list.length;
+  const barWidth = Math.max(6, step * 0.64);
+
+  let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">';
+  svg += '<line x1="' + left + '" y1="' + top + '" x2="' + left + '" y2="' + (top + chartHeight) + '" stroke="rgba(255,255,255,.16)"/>';
+  svg += '<line x1="' + left + '" y1="' + (top + chartHeight) + '" x2="' + (left + chartWidth) + '" y2="' + (top + chartHeight) + '" stroke="rgba(255,255,255,.16)"/>';
+
+  list.forEach(function(r, i){
+    const val = Number(r[valueKey] || 0);
+    const x = left + (i * step) + ((step - barWidth) / 2);
+    const h = (val / max) * chartHeight;
+    const y = top + chartHeight - h;
+    const label = String(r[labelKey] || '');
+    svg += '<rect class="' + barClass + '" x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="' + barWidth.toFixed(2) + '" height="' + h.toFixed(2) + '"></rect>';
+    if (i % Math.ceil(list.length / 8) === 0 || list.length <= 8 || i === list.length - 1) {
+      svg += '<text class="axisLabel" x="' + (x + (barWidth/2)).toFixed(2) + '" y="' + (height - 8) + '" text-anchor="middle">' + label + '</text>';
     }
+  });
 
-    function setBadge(el, text, kind){
-      el.className = 'tag ' + kind;
-      el.textContent = text;
-    }
+  svg += '</svg>';
+  root.innerHTML = svg;
+}
 
-    function usageLevel(p){
-      const x = Number(p || 0);
-      if (x >= 85) return ['قلق','bad'];
-      if (x >= 60) return ['متوسط','warn'];
-      return ['طبيعي','ok'];
-    }
+function renderErrors(errors){
+  const body = $('errorsBody');
+  if (!errors || !errors.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty">لا توجد أخطاء مهمة الآن</td></tr>';
+    return;
+  }
+  body.innerHTML = errors.map(function(e){
+    return '<tr>' +
+      '<td>' + ago(e.ts) + '</td>' +
+      '<td>' + Number(e.status || 0) + '</td>' +
+      '<td>' + (e.path || '—') + '</td>' +
+      '<td>' + (e.room || '—') + '</td>' +
+      '<td>' + translateError(e) + '</td>' +
+      '</tr>';
+  }).join('');
+}
 
-    function errorLevel(rate){
-      const x = Number(rate || 0);
-      if (x > 2) return ['قلق','bad'];
-      if (x >= 0.7) return ['متوسط','warn'];
-      return ['طبيعي','ok'];
-    }
+function renderRoutes(routes){
+  const body = $('routesBody');
+  const list = Array.isArray(routes) ? routes : [];
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="4" class="empty">لا توجد بيانات بعد</td></tr>';
+    return;
+  }
+  body.innerHTML = list.map(function(r){
+    return '<tr>' +
+      '<td>' + (r.path || '—') + '</td>' +
+      '<td>' + fmt(r.count) + '</td>' +
+      '<td>' + fmt(r.errors) + '</td>' +
+      '<td>' + msText(r.avgLatencyMs) + '</td>' +
+      '</tr>';
+  }).join('');
+}
 
-    function latencyLevel(v){
-      const x = Number(v || 0);
-      if (x > 700) return ['قلق','bad'];
-      if (x >= 300) return ['متوسط','warn'];
-      return ['طبيعي','ok'];
-    }
+function render(summary){
+  const p = summary.pusher || {};
+  const c = summary.cloudflare || {};
+  const live = summary.live || {};
 
-    function liveLevel(connections, rooms, errRate, planConnections){
-      const plan = Math.max(1, Number(planConnections || 2000));
-      const warnConn = Math.max(800, Math.round(plan * 0.40));
-      const badConn = Math.max(1400, Math.round(plan * 0.70));
-      const warnRooms = Math.max(55, Math.round(plan * 0.0275));
-      const badRooms = Math.max(95, Math.round(plan * 0.0475));
+  $('sumReqToday').textContent = fmt(c.requestsToday);
+  $('sumErrToday').textContent = fmt(c.errorsToday);
+  $('sumPusherToday').textContent = fmt(p.messagesToday);
+  $('sumPusherMonth').textContent = pct(p.usagePercentMonth);
+  $('sumConn').textContent = fmt(live.connectionsNow) + ' / ' + fmt(summary.system && summary.system.pusherPlanConnections || 2000);
+  $('sumRoomsToday').textContent = fmt(live.roomsSeenToday);
 
-      const c = Number(connections || 0);
-      const r = Number(rooms || 0);
-      const e = Number(errRate || 0);
+  const badgeKind = Number(c.status5xx || 0) > 0 ? 'bad' : (Number(c.errorsToday || 0) > 0 ? 'warn' : 'ok');
+  setBadge($('detailsBadge'), badgeKind === 'bad' ? 'تنبيه موجود' : (badgeKind === 'warn' ? 'فيه متابعة' : 'الوضع طبيعي'), badgeKind);
 
-      if (e > 2 || c >= badConn || r >= badRooms) return ['قلق','bad'];
-      if (e >= 0.7 || c >= warnConn || r >= warnRooms) return ['متوسط','warn'];
-      return ['طبيعي','ok'];
-    }
+  renderSimpleBarChart('chartTodayRequests', summary.charts ? summary.charts.todayHours : [], 'requests', 'label', 'barReq');
+  renderSimpleBarChart('chartTodayPusher', summary.charts ? summary.charts.todayHours : [], 'pusher', 'label', 'barPusher');
+  renderSimpleBarChart('chartWeekRequests', summary.charts ? summary.charts.last7Days : [], 'requests', 'label', 'barReq');
+  renderSimpleBarChart('chartWeekPusher', summary.charts ? summary.charts.last7Days : [], 'pusher', 'label', 'barPusher');
+  renderSimpleBarChart('chartMonthRequests', summary.charts ? summary.charts.last30Days : [], 'requests', 'label', 'barReq');
+  renderSimpleBarChart('chartMonthErrors', summary.charts ? summary.charts.last30Days : [], 'errors', 'label', 'barErr');
+  renderRoutes(summary.routeStats || []);
+  renderErrors(summary.lastErrors || []);
+}
 
-    function overallLevel(sum){
-      const p = Number(sum?.pusher?.usagePercentMonth || 0);
-      const e = Number(sum?.cloudflare?.errorRatePercent || 0);
-      const l = Number(sum?.cloudflare?.avgLatencyMs || 0);
-      const live = liveLevel(
-        sum?.live?.connectionsNow,
-        sum?.live?.roomsActiveNow,
-        e,
-        sum?.live?.planConnections
-      )[1];
+let timer = null;
+let paused = false;
 
-      if (p >= 85 || e > 2 || l > 700 || live === 'bad') return ['يحتاج انتباه','bad'];
-      if (p >= 60 || e >= 0.7 || l >= 300 || live === 'warn') return ['مستقر مع متابعة','warn'];
-      return ['ممتاز','ok'];
-    }
+async function refresh(){
+  try{
+    const res = await fetch('/monitor/summary', { cache:'no-store' });
+    const data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error((data && data.msg) || 'MONITOR_FAILED');
+    render(data);
+  }catch(err){
+    setBadge($('detailsBadge'),'تعذر قراءة البيانات','bad');
+  }
+}
 
-    function colorQuickValue(el, kind){
-      el.classList.remove('good','warnTxt','badTxt');
-      if (kind === 'ok') el.classList.add('good');
-      else if (kind === 'warn') el.classList.add('warnTxt');
-      else if (kind === 'bad') el.classList.add('badTxt');
-    }
+function start(){
+  if (timer) clearInterval(timer);
+  timer = setInterval(function(){ if (!paused) refresh(); }, 5000);
+}
 
-    function renderAlerts(alerts){
-      const box = $('alertsBox');
-      if (!alerts || !alerts.length) {
-        box.innerHTML = '<div class="empty">لا توجد تنبيهات مقلقة الآن — الوضع يبدو طبيعيًا.</div>';
-        setBadge($('alertsBadge'),'لا توجد تنبيهات','ok');
-        return;
-      }
-      setBadge($('alertsBadge'),'عدد التنبيهات: ' + alerts.length, alerts.some(a => a.level === 'bad') ? 'bad' : 'warn');
-      box.innerHTML = alerts.map(a => {
-        const cls = a.level === 'bad' ? 'bad' : (a.level === 'warn' ? 'warn' : 'info');
-        return '<div class="alert '+ cls +'">' +
-          '<strong>' + a.title + '</strong>' +
-          '<div>' + a.text + '</div>' +
-          '</div>';
-      }).join('');
-    }
+$('refreshBtn').addEventListener('click', refresh);
+$('autoBtn').addEventListener('click', function(){
+  paused = !paused;
+  $('autoBtn').textContent = paused ? 'استئناف التحديث' : 'إيقاف التحديث';
+});
 
-    function renderRooms(rooms){
-      const body = $('roomsBody');
-      if (!rooms || !rooms.length) {
-        body.innerHTML = '<tr><td colspan="9" class="empty">لا توجد غرف حالية أو هادئة تحت حد الساعتين</td></tr>';
-        setBadge($('roomsBadge'),'0 غرفة','info');
-        return;
-      }
-
-      const activeCount = rooms.filter(r => r.isActive).length;
-      const quietCount = rooms.filter(r => !r.isActive).length;
-      setBadge($('roomsBadge'),'النشطة: ' + activeCount + ' | الهادئة: ' + quietCount, quietCount ? 'warn' : 'info');
-
-      body.innerHTML = rooms.map(r => {
-        const statusText = r.isActive ? 'نشطة' : 'هادئة';
-        const cls = r.isActive ? 'ok' : 'info';
-        return '<tr>' +
-          '<td>' + r.room + '</td>' +
-          '<td><span class="tag ' + cls + '">' + statusText + '</span></td>' +
-          '<td>' + fmt(r.clientsNow) + '</td>' +
-          '<td>' + ago(r.lastSeenAt) + '</td>' +
-          '<td>' + ago(r.lastPusherAt) + '</td>' +
-          '<td>' + fmt(r.requestsToday) + '</td>' +
-          '<td>' + fmt(r.pusherMsgsToday) + '</td>' +
-          '<td>' + (r.lastPath || '—') + '</td>' +
-          '<td>' + fmt(r.rev) + '</td>' +
-          '</tr>';
-      }).join('');
-    }
-
-    function renderErrors(errors, totalErrorsToday){
-      const body = $('errorsBody');
-      const errorsCard = $('errorsCard');
-      const topErrorsCard = $('topErrorsCard');
-      const total = Number(totalErrorsToday || 0);
-
-      errorsCard.classList.toggle('attention', total > 0);
-      topErrorsCard.classList.toggle('attention', total > 0);
-
-      if (!errors || !errors.length) {
-        body.innerHTML = '<tr><td colspan="5" class="empty">لا توجد أخطاء مهمة الآن</td></tr>';
-        setBadge($('errorsBadge'),'لا توجد أخطاء','ok');
-        return;
-      }
-
-      setBadge($('errorsBadge'),'عدد السجلات: ' + errors.length, errors.some(e => Number(e.status || 0) >= 500) ? 'bad' : 'warn');
-      body.innerHTML = errors.map(e => {
-        const s = Number(e.status || 0);
-        const cls = s >= 500 ? 'bad' : (s >= 400 ? 'warn' : 'info');
-        return '<tr>' +
-          '<td>' + ago(e.ts) + '</td>' +
-          '<td><span class="tag ' + cls + '">' + s + '</span></td>' +
-          '<td>' + (e.path || '—') + '</td>' +
-          '<td>' + (e.room || '—') + '</td>' +
-          '<td>' + (e.msg || '—') + '</td>' +
-          '</tr>';
-      }).join('');
-    }
-
-    function render(summary){
-      $('lastUpdated').textContent = ago(summary.generatedAt);
-
-      const reset = summary.dailyReset || {};
-      $('dailyResetChip').textContent = 'تصفير اليوم بعد: ' + (reset.hoursLabel || '—');
-
-      const pusherCycle = summary.pusher?.cycleResetLabel || '—';
-      $('pusherCycleChip').textContent = 'تجديد Pusher بعد: ' + pusherCycle;
-
-      const workerOk = summary.system?.worker ? 'شغال' : 'غير واضح';
-      $('workerStatus').textContent = workerOk;
-      colorQuickValue($('workerStatus'), summary.system?.worker ? 'ok' : 'warn');
-
-      const pusherOk = summary.system?.pusherConfigured ? 'مربوط' : 'غير مضبوط';
-      $('pusherStatus').textContent = pusherOk;
-      colorQuickValue($('pusherStatus'), summary.system?.pusherConfigured ? 'ok' : 'warn');
-
-      const [overallText, overallKind] = overallLevel(summary);
-      $('overallStatus').textContent = overallText;
-      colorQuickValue($('overallStatus'), overallKind);
-
-      const cf = summary.cloudflare || {};
-      $('topErrorsCount').textContent = fmt(cf.errorsToday);
-      colorQuickValue($('topErrorsCount'), errorLevel(cf.errorRatePercent)[1]);
-
-      const pusher = summary.pusher || {};
-      $('pusherMain').textContent = fmt(pusher.messagesMonth) + ' / ' + fmt(pusher.planMessages);
-      $('pusherSub').textContent = 'نسبة الاستخدام الحالية منذ بداية دورة الاشتراك: ' + pct(pusher.usagePercentMonth);
-      $('pusherBar').style.width = Math.min(100, Number(pusher.usagePercentMonth || 0)) + '%';
-      $('pusherTodayTag').textContent = 'اليوم: ' + fmt(pusher.messagesToday);
-      $('pusherRemainingTag').textContent = 'المتبقي: ' + fmt(pusher.remainingMessages);
-      $('pusherResetTag').textContent = 'التجديد بعد: ' + (pusher.cycleResetLabel || '—');
-      const [puText, puKind] = usageLevel(pusher.usagePercentMonth);
-      setBadge($('pusherUsageBadge'), puText, puKind);
-
-      const live = summary.live || {};
-      $('liveConnections').textContent = fmt(live.connectionsNow);
-      $('liveRooms').textContent = fmt(live.roomsActiveNow);
-      $('liveRoomsQuiet').textContent = fmt(live.roomsQuietNow);
-      $('liveRoomsToday').textContent = fmt(live.roomsSeenToday);
-      const [lvText, lvKind] = liveLevel(live.connectionsNow, live.roomsActiveNow, cf.errorRatePercent, live.planConnections);
-      setBadge($('liveBadge'), lvText, lvKind);
-
-      $('cfPlanName').textContent = String(cf.planName || '—');
-      $('cfMonthMain').textContent = fmt(cf.requestsMonth) + ' / ' + fmt(cf.planRequestsMonth);
-      $('cfMonthRemaining').textContent = fmt(cf.remainingRequestsMonth);
-      $('cfFreeLimit').textContent = fmt(cf.freeDailyRequests) + ' / يوم';
-      $('cfMonthUsageTag').textContent = 'استهلاك الشهر: ' + pct(cf.usagePercentMonth);
-      $('cfRequests').textContent = 'طلبات اليوم: ' + fmt(cf.requestsToday);
-      $('cfErrors').textContent = 'أخطاء اللعبة اليوم: ' + fmt(cf.errorsToday);
-      $('cfErrorRate').textContent = 'نسبة الأخطاء المهمة: ' + pct(cf.errorRatePercent);
-      $('cfLatency').textContent = 'متوسط الاستجابة: ' + ms(cf.avgLatencyMs);
-      $('cfResetTag').textContent = 'يتصفّر بعد: ' + ((summary.dailyReset && summary.dailyReset.hoursLabel) || '—');
-      $('cf2xx').textContent = '2xx: ' + fmt(cf.status2xx);
-      $('cf4xx').textContent = '4xx مهم: ' + fmt(cf.status4xx);
-      $('cfExt404').textContent = '404 خارجية: ' + fmt(cf.external404Today);
-      $('cf5xx').textContent = '5xx: ' + fmt(cf.status5xx);
-
-      const wb = summary.requestBreakdown || {};
-      $('cfReqAction').textContent = fmt(wb.action);
-      $('cfReqState').textContent = fmt(wb.state);
-      $('cfReqPusher').textContent = fmt(wb.pusher);
-      $('cfReqMonitor').textContent = fmt(wb.monitor);
-      $('cfReqOther').textContent = 'طلبات خارجية/أخرى: ' + fmt(wb.other);
-
-      const er = errorLevel(cf.errorRatePercent);
-      const lt = latencyLevel(cf.avgLatencyMs);
-      const cu = usageLevel(cf.usagePercentMonth);
-      const cfKind = (er[1] === 'bad' || lt[1] === 'bad' || cu[1] === 'bad') ? 'bad' : ((er[1] === 'warn' || lt[1] === 'warn' || cu[1] === 'warn') ? 'warn' : 'ok');
-      setBadge($('cfBadge'), cfKind === 'bad' ? 'قلق' : (cfKind === 'warn' ? 'متوسط' : 'طبيعي'), cfKind);
-
-      renderErrors(summary.lastErrors || [], cf.errorsToday);
-      renderAlerts(summary.alerts || []);
-      renderRooms(summary.rooms || []);
-    }
-
-    let timer = null;
-    let paused = false;
-
-    async function refresh(){
-      try{
-        const res = await fetch('/monitor/summary', { cache:'no-store' });
-        const data = await res.json();
-        if (!res.ok || !data?.ok) throw new Error(data?.msg || 'MONITOR_FAILED');
-        render(data);
-      }catch(err){
-        setBadge($('alertsBadge'),'تعذر قراءة البيانات','bad');
-        $('alertsBox').innerHTML = '<div class="alert bad"><strong>تعذر جلب البيانات</strong><div>' + String(err?.message || err) + '</div></div>';
-        $('errorsCard').classList.add('attention');
-        $('topErrorsCard').classList.add('attention');
-      }
-    }
-
-    function start(){
-      if (timer) clearInterval(timer);
-      timer = setInterval(() => { if (!paused) refresh(); }, 5000);
-    }
-
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-help] .helpBtn');
-      if (btn) {
-        const wrap = btn.parentElement;
-        document.querySelectorAll('[data-help].open').forEach(x => { if (x !== wrap) x.classList.remove('open'); });
-        wrap.classList.toggle('open');
-        return;
-      }
-      if (!e.target.closest('[data-help]')) {
-        document.querySelectorAll('[data-help].open').forEach(x => x.classList.remove('open'));
-      }
-    });
-
-    $('refreshBtn').addEventListener('click', refresh);
-    $('autoBtn').addEventListener('click', () => {
-      paused = !paused;
-      $('autoBtn').textContent = paused ? 'استئناف التحديث' : 'إيقاف التحديث';
-    });
-
-    refresh();
-    start();
-  </script>
+refresh();
+start();
+</script>
 </body>
 </html>`;
 }
@@ -1356,6 +1389,21 @@ export default {
         ts: Date.now(),
         path: url.pathname,
         pathKey: roomMetricsPathKey(url.pathname),
+        method: request.method,
+        status: 200,
+        room: MONITOR_ROOM,
+        pid: "",
+        ms: Date.now() - startedAt,
+      });
+      return withCors(request, res, env);
+    }
+
+    if (url.pathname === "/monitor/details" && request.method === "GET") {
+      const res = html(monitorDetailsPageHtml());
+      queueMonitorRequest(ctx, env, {
+        ts: Date.now(),
+        path: url.pathname,
+        pathKey: "monitorDetailsUI",
         method: request.method,
         status: 200,
         room: MONITOR_ROOM,
@@ -1516,7 +1564,7 @@ export default {
                 room,
                 pid,
                 ms: 0,
-                msg: String(e?.message || e || "PUSHER_TRIGGER_FAILED"),
+                msg: "PUSHER_TRIGGER_FAILED",
               }),
             }).catch(() => null);
           }
@@ -1639,6 +1687,24 @@ function normalizeBuzzerPayload(raw, now, currentSeq = 0) {
   };
 }
 
+function hourBucketKey(ts) {
+  return new Date(ts).toISOString().slice(0, 13);
+}
+
+function dayBucketKey(ts) {
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+function formatRoomDuration(ms) {
+  const totalMinutes = Math.max(0, Math.floor(Number(ms || 0) / (60 * 1000)));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes - (days * 24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return days + "ي " + hours + "س";
+  if (hours > 0) return hours + "س " + minutes + "د";
+  return Math.max(0, minutes) + "د";
+}
+
 export class RoomDO {
   constructor(state, env) {
     this.state = state;
@@ -1680,10 +1746,59 @@ export class RoomDO {
     return m;
   }
 
+  _trimHourly(hourly, now) {
+    const out = {};
+    const minTs = now - (48 * 60 * 60 * 1000);
+    for (const [k, v] of Object.entries(hourly || {})) {
+      const ts = Date.parse(String(k) + ":00:00Z");
+      if (Number.isFinite(ts) && ts >= minTs) out[k] = v;
+    }
+    return out;
+  }
+
+  _trimDaily(daily, now) {
+    const out = {};
+    const minTs = now - (35 * 24 * 60 * 60 * 1000);
+    for (const [k, v] of Object.entries(daily || {})) {
+      const ts = Date.parse(String(k) + "T00:00:00Z");
+      if (Number.isFinite(ts) && ts >= minTs) out[k] = v;
+    }
+    return out;
+  }
+
+  _ensureHourBucket(m, ts) {
+    const key = hourBucketKey(ts);
+    if (!m.hourly[key]) {
+      m.hourly[key] = {
+        requests: 0,
+        errors: 0,
+        pusher: 0,
+        action: 0,
+        state: 0,
+      };
+    }
+    return m.hourly[key];
+  }
+
+  _ensureDayBucket(m, ts) {
+    const key = dayBucketKey(ts);
+    if (!m.daily[key]) {
+      m.daily[key] = {
+        requests: 0,
+        errors: 0,
+        pusher: 0,
+        uniquePlayers: 0,
+        roomsPlayed: 0,
+      };
+    }
+    return m.daily[key];
+  }
+
   async _loadMonitor(now = Date.now()) {
     const day = utcDayKey(now);
     const month = utcMonthKey(now);
-    const pusherCycle = getPusherCycleInfo(this.env, now);
+    const pusherCycle = pusherBillingCycleInfo(now, this.env?.PUSHER_BILLING_START || DEFAULT_PUSHER_BILLING_START);
+
     let m = (await this.state.storage.get("monitor")) || {};
     const prevDay = String(m.day || "");
     const prevMonth = String(m.month || "");
@@ -1693,6 +1808,9 @@ export class RoomDO {
     if (!m.rooms || typeof m.rooms !== "object") m.rooms = {};
     if (!m.routes || typeof m.routes !== "object") m.routes = {};
     if (!Array.isArray(m.lastErrors)) m.lastErrors = [];
+    if (!m.hourly || typeof m.hourly !== "object") m.hourly = {};
+    if (!m.daily || typeof m.daily !== "object") m.daily = {};
+    if (!m.uniquePlayersTodaySet || typeof m.uniquePlayersTodaySet !== "object") m.uniquePlayersTodaySet = {};
 
     if (prevDay !== day) {
       m.requestsToday = 0;
@@ -1708,6 +1826,8 @@ export class RoomDO {
       m.routes = {};
       m.lastErrors = [];
       m.pusherMsgsToday = 0;
+      m.roomsExpiredToday = 0;
+      m.uniquePlayersTodaySet = {};
 
       for (const roomInfo of Object.values(m.rooms)) {
         if (!roomInfo || typeof roomInfo !== "object") continue;
@@ -1720,13 +1840,16 @@ export class RoomDO {
       m.requestsMonth = 0;
     }
 
-    if (prevPusherCycleKey !== pusherCycle.key) {
+    if (prevPusherCycleKey !== pusherCycle.cycleKey) {
       m.pusherMsgsMonth = 0;
     }
 
     m.day = day;
     m.month = month;
-    m.pusherCycleKey = pusherCycle.key;
+    m.pusherCycleKey = pusherCycle.cycleKey;
+    m.pusherCycleStartAt = pusherCycle.startTs;
+    m.pusherCycleResetAt = pusherCycle.nextResetTs;
+
     m.requestsToday = toFiniteNumber(m.requestsToday, 0);
     m.errorsToday = toFiniteNumber(m.errorsToday, 0);
     m.rawErrorsToday = toFiniteNumber(m.rawErrorsToday, m.errorsToday);
@@ -1740,8 +1863,11 @@ export class RoomDO {
     m.pusherMsgsToday = toFiniteNumber(m.pusherMsgsToday, 0);
     m.pusherMsgsMonth = toFiniteNumber(m.pusherMsgsMonth, 0);
     m.requestsMonth = toFiniteNumber(m.requestsMonth, 0);
+    m.roomsExpiredToday = toFiniteNumber(m.roomsExpiredToday, 0);
 
     m.rooms = this._gcMonitorRooms(m.rooms, now);
+    m.hourly = this._trimHourly(m.hourly, now);
+    m.daily = this._trimDaily(m.daily, now);
     return m;
   }
 
@@ -1768,10 +1894,13 @@ export class RoomDO {
 
   _gcMonitorRooms(rooms, now) {
     const out = {};
+    const staleMs = Math.max(this.IDLE_MS + (10 * 60 * 1000), MONITOR_ROOM_STALE_MS / 3);
+
     for (const [room, raw] of Object.entries(rooms || {})) {
       if (!raw || typeof raw !== "object") continue;
       const info = { ...raw };
       info.pids = this._gcSeen(info.pids || {}, now);
+      info.uniquePids = info.uniquePids && typeof info.uniquePids === "object" ? info.uniquePids : {};
       info.firstSeenAt = toFiniteNumber(info.firstSeenAt, 0);
       info.lastSeenAt = toFiniteNumber(info.lastSeenAt, 0);
       info.lastActionAt = toFiniteNumber(info.lastActionAt, 0);
@@ -1782,22 +1911,9 @@ export class RoomDO {
       info.pusherMsgsToday = toFiniteNumber(info.pusherMsgsToday, 0);
       info.lastStatus = toFiniteNumber(info.lastStatus, 0);
       info.rev = toFiniteNumber(info.rev, 0);
-      info.expiredAt = toFiniteNumber(info.expiredAt, 0);
-      info.endedReason = String(info.endedReason || "");
 
-      const recent = Math.max(
-        info.lastSeenAt,
-        info.lastActionAt,
-        info.lastStateAt,
-        info.lastStatsAt,
-        info.lastPusherAt,
-        info.firstSeenAt,
-        info.expiredAt
-      );
-
-      if (info.expiredAt > 0) continue;
-      if (recent && now - recent > this.IDLE_MS) continue;
-
+      const recent = Math.max(info.lastSeenAt, info.lastActionAt, info.lastStateAt, info.lastStatsAt, info.lastPusherAt, info.firstSeenAt);
+      if (recent && now - recent > staleMs) continue;
       out[room] = info;
     }
     return out;
@@ -1809,26 +1925,59 @@ export class RoomDO {
     return arr.slice(0, 25);
   }
 
+  _shouldStoreImportantError(path, status, msg) {
+    const s = Number(status || 0);
+    const p = String(path || "");
+    const m = String(msg || "");
+
+    if (isIgnorableExternal404(p, s)) return false;
+    if ((p === "/pusher/auth") && (s === 401 || s === 403) && m === "FORBIDDEN_PUSHER_AUTH") return false;
+    if ((p === "/monitor" || p === "/monitor/summary" || p === "/monitor/details") && s < 500) return false;
+    return isImportantRequestError(p, s);
+  }
+
   _buildAlerts(summary) {
     const alerts = [];
     const usage = Number(summary?.pusher?.usagePercentMonth || 0);
+    const connectionUsage = Number(summary?.pusher?.connectionUsagePercent || 0);
     const errorRate = Number(summary?.cloudflare?.errorRatePercent || 0);
-    const errorsToday = Number(summary?.cloudflare?.errorsToday || 0);
     const avgLatencyMs = Number(summary?.cloudflare?.avgLatencyMs || 0);
     const activeRooms = Number(summary?.live?.roomsActiveNow || 0);
-    const quietRooms = Number(summary?.live?.roomsQuietNow || 0);
+    const roomsExpiredToday = Number(summary?.live?.roomsExpiredToday || 0);
     const cfUsage = Number(summary?.cloudflare?.usagePercentMonth || 0);
     const external404Today = Number(summary?.cloudflare?.external404Today || 0);
-    const connectionsNow = Number(summary?.live?.connectionsNow || 0);
-    const liveThresholds = getLiveThresholds(summary?.live?.planConnections || DEFAULT_PUSHER_PLAN_CONNECTIONS);
+    const status5xx = Number(summary?.cloudflare?.status5xx || 0);
+    const status4xx = Number(summary?.cloudflare?.status4xx || 0);
 
-    if (usage >= 85) {
+    if (status5xx > 0) {
+      alerts.push({
+        level: "bad",
+        title: "تم رصد أخطاء 5xx",
+        text: `يوجد ${status5xx} أخطاء 5xx اليوم، وهذا يحتاج فحصًا مباشرًا فورًا.`
+      });
+    }
+
+    if (status4xx >= 40) {
+      alerts.push({
+        level: "bad",
+        title: "أخطاء 4xx المهمة مرتفعة",
+        text: `تم رصد ${status4xx} من أخطاء 4xx المهمة اليوم داخل مسارات اللعبة.`
+      });
+    } else if (status4xx >= 10) {
+      alerts.push({
+        level: "warn",
+        title: "أخطاء 4xx المهمة تحتاج متابعة",
+        text: `تم رصد ${status4xx} من أخطاء 4xx المهمة اليوم.`
+      });
+    }
+
+    if (usage >= 80) {
       alerts.push({
         level: "bad",
         title: "استهلاك رسائل Pusher اقترب من الحد",
-        text: `الاستهلاك الحالي وصل إلى ${usage.toFixed(1)}% من الحد الشهري المحدد.`
+        text: `الاستهلاك الحالي وصل إلى ${usage.toFixed(1)}% من الحد المسموح في دورة الاشتراك الحالية.`
       });
-    } else if (usage >= 60) {
+    } else if (usage >= 50) {
       alerts.push({
         level: "warn",
         title: "استهلاك رسائل Pusher في المنطقة المتوسطة",
@@ -1836,31 +1985,17 @@ export class RoomDO {
       });
     }
 
-    if (connectionsNow >= liveThresholds.badConnections) {
+    if (connectionUsage >= 75) {
       alerts.push({
         level: "bad",
-        title: "الاتصالات الحالية مرتفعة",
-        text: `عدد الاتصالات الآن ${connectionsNow} وهو قريب من منطقة الضغط العالي لاشتراك 2000 اتصال.`
+        title: "الاتصالات الحالية اقتربت من حد بوشر",
+        text: `الاستخدام الحالي للاتصالات وصل إلى ${connectionUsage.toFixed(1)}% من حد 2000 اتصال متزامن.`
       });
-    } else if (connectionsNow >= liveThresholds.warnConnections) {
+    } else if (connectionUsage >= 45) {
       alerts.push({
         level: "warn",
-        title: "الاتصالات الحالية متوسطة إلى مرتفعة",
-        text: `عدد الاتصالات الآن ${connectionsNow} ويُستحسن متابعة التزامن مباشرة.`
-      });
-    }
-
-    if (activeRooms >= liveThresholds.badRooms) {
-      alerts.push({
-        level: "bad",
-        title: "عدد الغرف النشطة مرتفع جدًا",
-        text: `يوجد الآن ${activeRooms} غرف نشطة، وهذا مستوى ضغط يحتاج متابعة دقيقة.`
-      });
-    } else if (activeRooms >= liveThresholds.warnRooms) {
-      alerts.push({
-        level: "warn",
-        title: "عدد الغرف النشطة مرتفع",
-        text: `يوجد الآن ${activeRooms} غرف نشطة، والحمل أعلى من الطبيعي.`
+        title: "الضغط المباشر على الاتصالات متصاعد",
+        text: `الاستخدام الحالي للاتصالات وصل إلى ${connectionUsage.toFixed(1)}% من حد بوشر المتزامن.`
       });
     }
 
@@ -1868,31 +2003,23 @@ export class RoomDO {
       alerts.push({
         level: "bad",
         title: "نسبة الأخطاء مرتفعة",
-        text: `نسبة الأخطاء اليوم ${errorRate.toFixed(2)}% وهي أعلى من الحد المريح.`
+        text: `نسبة الأخطاء المهمة اليوم ${errorRate.toFixed(2)}% وهي أعلى من الحد المريح.`
       });
-    } else if (errorRate >= 0.7) {
+    } else if (errorRate >= 0.5) {
       alerts.push({
         level: "warn",
         title: "نسبة الأخطاء تحتاج متابعة",
-        text: `نسبة الأخطاء اليوم ${errorRate.toFixed(2)}% وهي أعلى من الطبيعي.`
+        text: `نسبة الأخطاء المهمة اليوم ${errorRate.toFixed(2)}% وهي أعلى من الطبيعي.`
       });
     }
 
-    if (errorsToday > 0 && !alerts.some(a => a.title.includes("الأخطاء"))) {
-      alerts.push({
-        level: errorRate > 2 ? "bad" : "warn",
-        title: "تم رصد أخطاء مهمة اليوم",
-        text: `عدد أخطاء اللعبة المهمة اليوم: ${errorsToday}.`
-      });
-    }
-
-    if (cfUsage >= 90) {
+    if (cfUsage >= 85) {
       alerts.push({
         level: "bad",
         title: "استهلاك Cloudflare الشهري اقترب من الحد",
         text: `استهلاك الطلبات الشهري وصل إلى ${cfUsage.toFixed(1)}% من الخطة الحالية.`
       });
-    } else if (cfUsage >= 70) {
+    } else if (cfUsage >= 60) {
       alerts.push({
         level: "warn",
         title: "استهلاك Cloudflare الشهري يحتاج متابعة",
@@ -1900,7 +2027,7 @@ export class RoomDO {
       });
     }
 
-    if (avgLatencyMs > 700) {
+    if (avgLatencyMs > 800) {
       alerts.push({
         level: "bad",
         title: "متوسط الاستجابة بطيء",
@@ -1914,10 +2041,10 @@ export class RoomDO {
       });
     }
 
-    const hotRoom = (summary.rooms || []).find(r => Number(r.clientsNow || 0) >= 12);
+    const hotRoom = (summary.rooms || []).find(r => Number(r.clientsNow || 0) >= 10);
     if (hotRoom) {
       alerts.push({
-        level: Number(hotRoom.clientsNow || 0) >= 15 ? "bad" : "warn",
+        level: "warn",
         title: "غرفة عليها ضغط مباشر",
         text: `الغرفة ${hotRoom.room} فيها الآن ${hotRoom.clientsNow} متصلين تقريبًا.`
       });
@@ -1931,11 +2058,11 @@ export class RoomDO {
       });
     }
 
-    if (quietRooms > 0 && !alerts.some(a => a.title.includes("هادئة"))) {
+    if (roomsExpiredToday > 0) {
       alerts.push({
         level: "info",
-        title: "يوجد غرف هادئة تحت حد الحذف",
-        text: `يوجد الآن ${quietRooms} غرف هادئة، وستُحذف تلقائيًا إذا تجاوزت ساعتين خمول.`
+        title: "تم حذف غرف خاملة من الصفحة",
+        text: `تم حذف ${roomsExpiredToday} غرف من الصفحة اليوم بسبب خمولها لمدة ساعتين.`
       });
     }
 
@@ -1968,15 +2095,27 @@ export class RoomDO {
       m.requestsMonth += 1;
       m.totalLatencyMsToday += ms;
 
+      const hourBucket = this._ensureHourBucket(m, ts);
+      hourBucket.requests += 1;
+      if (pathKey === "action") hourBucket.action += 1;
+      if (pathKey === "state") hourBucket.state += 1;
+
+      const dayBucket = this._ensureDayBucket(m, ts);
+      dayBucket.requests += 1;
+
       if (status >= 500) m.status5xx += 1;
       else if (status >= 400) m.status4xx += 1;
       else if (status >= 200) m.status2xx += 1;
 
       const ignorable404 = isIgnorableExternal404(path, status);
-      const importantError = isImportantRequestError(path, status);
+      const importantError = this._shouldStoreImportantError(path, status, msg);
 
       if (status >= 400) m.rawErrorsToday += 1;
-      if (importantError) m.errorsToday += 1;
+      if (importantError) {
+        m.errorsToday += 1;
+        hourBucket.errors += 1;
+        dayBucket.errors += 1;
+      }
       if (status === 404) m.notFoundToday += 1;
       if (ignorable404) m.external404Today += 1;
       if (status >= 400 && status < 500 && importantError) m.important4xxToday += 1;
@@ -1988,19 +2127,18 @@ export class RoomDO {
       };
       route.count += 1;
       route.totalLatencyMs += ms;
-      if (status >= 400) route.errors += 1;
+      if (importantError) route.errors += 1;
       m.routes[pathKey] = route;
 
       if (room && room !== MONITOR_ROOM) {
         const info = (m.rooms[room] && typeof m.rooms[room] === "object") ? m.rooms[room] : {
           firstSeenAt: ts,
           pids: {},
+          uniquePids: {},
           requestsToday: 0,
           pusherMsgsToday: 0,
         };
         info.firstSeenAt = toFiniteNumber(info.firstSeenAt, ts) || ts;
-        info.expiredAt = 0;
-        info.endedReason = "";
         info.lastSeenAt = ts;
         info.lastPath = path;
         info.lastStatus = status;
@@ -2010,11 +2148,14 @@ export class RoomDO {
         if (path === "/state") info.lastStateAt = ts;
         if (path === "/action") info.lastActionAt = ts;
         if (path === "/stats") info.lastStatsAt = ts;
+
+        info.pids = this._gcSeen(info.pids || {}, ts);
+
         if (pid) {
-          info.pids = this._gcSeen(info.pids || {}, ts);
           info.pids[pid] = ts;
-        } else {
-          info.pids = this._gcSeen(info.pids || {}, ts);
+          info.uniquePids = info.uniquePids && typeof info.uniquePids === "object" ? info.uniquePids : {};
+          info.uniquePids[pid] = ts;
+          m.uniquePlayersTodaySet[pid] = ts;
         }
 
         m.rooms[room] = info;
@@ -2036,16 +2177,20 @@ export class RoomDO {
       m.pusherMsgsToday += 1;
       m.pusherMsgsMonth += 1;
 
+      const hourBucket = this._ensureHourBucket(m, ts);
+      hourBucket.pusher += 1;
+      const dayBucket = this._ensureDayBucket(m, ts);
+      dayBucket.pusher += 1;
+
       if (room && room !== MONITOR_ROOM) {
         const info = (m.rooms[room] && typeof m.rooms[room] === "object") ? m.rooms[room] : {
           firstSeenAt: ts,
           pids: {},
+          uniquePids: {},
           requestsToday: 0,
           pusherMsgsToday: 0,
         };
         info.firstSeenAt = toFiniteNumber(info.firstSeenAt, ts) || ts;
-        info.expiredAt = 0;
-        info.endedReason = "";
         info.lastSeenAt = Math.max(toFiniteNumber(info.lastSeenAt, 0), ts);
         info.lastPusherAt = ts;
         info.pusherMsgsToday = toFiniteNumber(info.pusherMsgsToday, 0) + 1;
@@ -2058,23 +2203,62 @@ export class RoomDO {
     if (type === "room_expired") {
       const ts = toFiniteNumber(evt?.ts, now);
       if (room && room !== MONITOR_ROOM) {
-        const info = (m.rooms[room] && typeof m.rooms[room] === "object") ? m.rooms[room] : {
-          firstSeenAt: ts,
-          pids: {},
-          requestsToday: 0,
-          pusherMsgsToday: 0,
-        };
-        info.firstSeenAt = toFiniteNumber(info.firstSeenAt, ts) || ts;
-        info.expiredAt = ts;
-        info.endedReason = String(evt?.reason || "idle_timeout");
-        info.lastSeenAt = Math.max(toFiniteNumber(info.lastSeenAt, 0), ts);
-        info.pids = {};
-        m.rooms[room] = info;
+        m.roomsExpiredToday = toFiniteNumber(m.roomsExpiredToday, 0) + 1;
+        delete m.rooms[room];
       }
     }
 
     await this.state.storage.put("monitor", m);
     return m;
+  }
+
+  _buildChartSeries(m, now) {
+    const todayHours = [];
+    const weekDays = [];
+    const monthDays = [];
+
+    for (let i = 23; i >= 0; i--) {
+      const ts = now - (i * 60 * 60 * 1000);
+      const date = new Date(ts);
+      const key = date.toISOString().slice(0, 13);
+      const bucket = m.hourly[key] || {};
+      todayHours.push({
+        key,
+        label: String(date.getUTCHours()).padStart(2, "0"),
+        requests: toFiniteNumber(bucket.requests, 0),
+        errors: toFiniteNumber(bucket.errors, 0),
+        pusher: toFiniteNumber(bucket.pusher, 0),
+      });
+    }
+
+    for (let i = 6; i >= 0; i--) {
+      const ts = now - (i * 24 * 60 * 60 * 1000);
+      const date = new Date(ts);
+      const key = date.toISOString().slice(0, 10);
+      const bucket = m.daily[key] || {};
+      weekDays.push({
+        key,
+        label: key.slice(5),
+        requests: toFiniteNumber(bucket.requests, 0),
+        errors: toFiniteNumber(bucket.errors, 0),
+        pusher: toFiniteNumber(bucket.pusher, 0),
+      });
+    }
+
+    for (let i = 29; i >= 0; i--) {
+      const ts = now - (i * 24 * 60 * 60 * 1000);
+      const key = new Date(ts).toISOString().slice(0, 10);
+      const bucket = m.daily[key] || {};
+      monthDays.push({
+        key,
+        label: key.slice(5),
+        requests: toFiniteNumber(bucket.requests, 0),
+        errors: toFiniteNumber(bucket.errors, 0),
+        pusher: toFiniteNumber(bucket.pusher, 0),
+      });
+    }
+
+    return { todayHours, last7Days: weekDays, last30Days: monthDays };
   }
 
   async fetch(request) {
@@ -2094,14 +2278,13 @@ export class RoomDO {
       const m = await this._loadMonitor(now);
       await this.state.storage.put("monitor", m);
 
-      const pusherCycle = getPusherCycleInfo(this.env, now);
       const planMessages = clampMin(Number(this.env?.PUSHER_PLAN_MESSAGES || this.env?.PUSHER_MESSAGES_LIMIT || DEFAULT_PUSHER_PLAN_MESSAGES), 1);
-      const liveThresholds = getLiveThresholds(this.env?.PUSHER_PLAN_CONNECTIONS || DEFAULT_PUSHER_PLAN_CONNECTIONS);
+      const planConnections = clampMin(Number(this.env?.PUSHER_PLAN_CONNECTIONS || DEFAULT_PUSHER_PLAN_CONNECTIONS), 1);
+      const pusherCycle = pusherBillingCycleInfo(now, this.env?.PUSHER_BILLING_START || DEFAULT_PUSHER_BILLING_START);
 
       const rooms = [];
       let connectionsNow = 0;
       let roomsActiveNow = 0;
-      let roomsQuietNow = 0;
       let roomsSeenToday = 0;
 
       for (const [room, raw] of Object.entries(m.rooms || {})) {
@@ -2112,10 +2295,10 @@ export class RoomDO {
         const lastActionAt = toFiniteNumber(info.lastActionAt, 0);
         const lastPusherAt = toFiniteNumber(info.lastPusherAt, 0);
         const isActive = (clientsNow > 0 || (now - Math.max(lastActionAt, lastPusherAt, lastSeenAt) <= MONITOR_ACTIVE_ROOM_MS));
+        const uniquePlayersTotal = Object.keys(info.uniquePids || {}).length;
+        const durationMs = Math.max(0, now - toFiniteNumber(info.firstSeenAt, now));
 
         if (isActive) roomsActiveNow += 1;
-        else roomsQuietNow += 1;
-
         connectionsNow += clientsNow;
         if (toFiniteNumber(info.requestsToday, 0) > 0 || toFiniteNumber(info.pusherMsgsToday, 0) > 0) roomsSeenToday += 1;
 
@@ -2123,6 +2306,8 @@ export class RoomDO {
           room,
           clientsNow,
           isActive,
+          isEnded: false,
+          firstSeenAt: toFiniteNumber(info.firstSeenAt, 0),
           lastSeenAt,
           lastActionAt,
           lastPusherAt,
@@ -2131,6 +2316,9 @@ export class RoomDO {
           lastPath: String(info.lastPath || ""),
           lastStatus: toFiniteNumber(info.lastStatus, 0),
           rev: toFiniteNumber(info.rev, 0),
+          uniquePlayersTotal,
+          durationMs,
+          durationLabel: formatRoomDuration(durationMs),
         });
       }
 
@@ -2148,20 +2336,31 @@ export class RoomDO {
       const errorsToday = Math.max(0, toFiniteNumber(m.errorsToday, rawErrorsToday - external404Today));
       const avgLatencyMs = requestsToday > 0 ? (toFiniteNumber(m.totalLatencyMsToday, 0) / requestsToday) : 0;
       const errorRatePercent = requestsToday > 0 ? (errorsToday / requestsToday) * 100 : 0;
+
       const messagesMonth = toFiniteNumber(m.pusherMsgsMonth, 0);
       const usagePercentMonth = Math.min(100, (messagesMonth / planMessages) * 100);
+      const connectionUsagePercent = Math.min(100, (connectionsNow / planConnections) * 100);
+
       const cfPlanRequestsMonth = clampMin(Number(this.env?.CF_PLAN_REQUESTS_MONTH || DEFAULT_CF_MONTHLY_REQUESTS), 1);
       const cfFreeDailyRequests = clampMin(Number(this.env?.CF_FREE_DAILY_REQUESTS || DEFAULT_CF_FREE_DAILY_REQUESTS), 1);
       const cfPlanName = String(this.env?.CF_PLAN_NAME || DEFAULT_CF_PLAN_NAME);
       const cfUsagePercentMonth = Math.min(100, (requestsMonth / cfPlanRequestsMonth) * 100);
+
       const routes = m.routes || {};
       const routeCount = (k) => toFiniteNumber((routes[k] && routes[k].count) || 0, 0);
       const breakdownAction = routeCount("action");
       const breakdownState = routeCount("state");
       const breakdownPusher = routeCount("pusherAuth") + routeCount("pusherConfig") + routeCount("pusherTrigger");
-      const breakdownMonitor = routeCount("monitorUI") + routeCount("monitorSummary");
+      const breakdownMonitor = routeCount("monitorUI") + routeCount("monitorSummary") + routeCount("monitorDetailsUI");
       const knownBreakdown = breakdownAction + breakdownState + breakdownPusher + breakdownMonitor;
       const breakdownOther = Math.max(0, requestsToday - knownBreakdown);
+
+      const routeStats = Object.entries(routes).map(([pathKey, data]) => ({
+        path: pathKey,
+        count: toFiniteNumber(data?.count, 0),
+        errors: toFiniteNumber(data?.errors, 0),
+        avgLatencyMs: toFiniteNumber(data?.count, 0) > 0 ? (toFiniteNumber(data?.totalLatencyMs, 0) / toFiniteNumber(data?.count, 0)) : 0,
+      })).sort((a, b) => b.count - a.count).slice(0, 12);
 
       const resetInfo = utcResetCountdown(now);
 
@@ -2172,6 +2371,7 @@ export class RoomDO {
           worker: true,
           pusherConfigured: pusherEnabled(this.env),
           monitor: true,
+          pusherPlanConnections: planConnections,
         },
         pusher: {
           messagesToday: toFiniteNumber(m.pusherMsgsToday, 0),
@@ -2179,27 +2379,27 @@ export class RoomDO {
           planMessages,
           remainingMessages: Math.max(0, planMessages - messagesMonth),
           usagePercentMonth,
-          cycleStartedAt: pusherCycle.startTs,
-          nextResetAt: pusherCycle.nextResetTs,
-          cycleResetLabel: pusherCycle.shortLabel,
+          planConnections,
+          connectionUsagePercent,
+          cycleStartAt: pusherCycle.startTs,
+          resetAt: pusherCycle.nextResetTs,
+          resetLabel: pusherCycle.label,
         },
         dailyReset: {
           resetAt: resetInfo.resetAt,
           hoursRemaining: resetInfo.hoursRemaining,
           minutesRemaining: resetInfo.minutesRemaining,
-          hoursLabel: `${resetInfo.hoursRemaining}س`,
+          hoursLabel: resetInfo.hoursLabel,
         },
         live: {
           connectionsNow,
           roomsActiveNow,
-          roomsQuietNow,
           roomsSeenToday,
           roomsTracked: rooms.length,
-          planConnections: liveThresholds.planConnections,
-          warnConnections: liveThresholds.warnConnections,
-          badConnections: liveThresholds.badConnections,
-          warnRooms: liveThresholds.warnRooms,
-          badRooms: liveThresholds.badRooms,
+          roomsTrackedCurrent: rooms.length,
+          roomsExpiredToday: toFiniteNumber(m.roomsExpiredToday, 0),
+          roomsEndedVisible: 0,
+          uniquePlayersToday: Object.keys(m.uniquePlayersTodaySet || {}).length,
         },
         cloudflare: {
           requestsToday,
@@ -2226,10 +2426,12 @@ export class RoomDO {
           monitor: breakdownMonitor,
           other: breakdownOther,
         },
+        routeStats,
+        charts: this._buildChartSeries(m, now),
         rooms: rooms.slice(0, 100),
         lastErrors: Array.isArray(m.lastErrors) ? m.lastErrors.slice(0, 25) : [],
         sources: {
-          pusher: "عداد داخلي مبني على الرسائل التي يرسلها Worker إلى Pusher منذ بداية دورة الاشتراك الحالية",
+          pusher: "عداد داخلي مبني على الرسائل التي يرسلها Worker إلى Pusher من بداية دورة الاشتراك الحالية",
           cloudflare: "مؤشرات تشغيلية داخلية من نفس Worker",
         },
       };
@@ -2304,7 +2506,6 @@ export class RoomDO {
       let accepted = true;
       const actionType = String(body?.type || "");
 
-      // ✅ مسار رسمي خاص بالجرس
       if (actionType === "buzz") {
         const existingBuzzer = current?.buzzer ?? null;
 
@@ -2393,14 +2594,12 @@ export class RoomDO {
         });
       }
 
-      // ✅ حماية إضافية لأي كود قديم يحاول يكتب buzzer مباشرة
       const existingBuzzer = current?.buzzer ?? null;
       if (Object.prototype.hasOwnProperty.call(patch, "buzzer")) {
         const incomingBuzzer = patch.buzzer;
 
         if (incomingBuzzer === null) {
           const safePatch = { ...patch };
-          // إذا انمسح الجرس يدويًا، لا نزيد seq إلا إذا جاء صريح
           next = { ...current, ...safePatch };
         } else if (!existingBuzzer) {
           const normalized = normalizeBuzzerPayload(incomingBuzzer, now, Number(current?.buzzerSeq || 0));
