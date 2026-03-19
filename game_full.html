@@ -4560,8 +4560,13 @@ if(homeBtn && role !== "host"){
           const poly = GAME_UI.cells[i];
           const txt = GAME_UI.letterEls[i];
           poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
+          const letterBase = Math.min(cellW, cellH);
+          const letterSize = shape === "square"
+            ? (letterBase * 0.52)
+            : (shape === "pentagon" ? (letterBase * 0.50) : (letterBase * 0.56));
+          txt.setAttribute("font-size", letterSize.toFixed(2));
           txt.setAttribute("x", (x + cellW/2).toFixed(2));
-          txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+          txt.setAttribute("y", (y + cellH/2 + (letterBase * 0.035)).toFixed(2));
           txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
@@ -4991,8 +4996,13 @@ if(homeBtn && role !== "host"){
           const poly = GAME_UI.cells[i];
           const txt = GAME_UI.letterEls[i];
           poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
+          const letterBase = Math.min(cellW, cellH);
+          const letterSize = shape === "square"
+            ? (letterBase * 0.52)
+            : (shape === "pentagon" ? (letterBase * 0.50) : (letterBase * 0.56));
+          txt.setAttribute("font-size", letterSize.toFixed(2));
           txt.setAttribute("x", (x + cellW/2).toFixed(2));
-          txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+          txt.setAttribute("y", (y + cellH/2 + (letterBase * 0.035)).toFixed(2));
           txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
