@@ -4560,13 +4560,16 @@ if(homeBtn && role !== "host"){
           const poly = GAME_UI.cells[i];
           const txt = GAME_UI.letterEls[i];
           poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
-          const letterBase = Math.min(cellW, cellH);
-          const letterSize = shape === "square"
-            ? (letterBase * 0.52)
-            : (shape === "pentagon" ? (letterBase * 0.50) : (letterBase * 0.56));
-          txt.setAttribute("font-size", letterSize.toFixed(2));
           txt.setAttribute("x", (x + cellW/2).toFixed(2));
-          txt.setAttribute("y", (y + cellH/2 + (letterBase * 0.035)).toFixed(2));
+          txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+
+          const isTvMode = document.body.classList.contains("tvMode");
+          const baseLetterSize = Math.min(cellW, cellH) * (isTvMode ? 0.50 : 0.44);
+          const finalLetterSize = Math.max(30, Math.min(baseLetterSize, isTvMode ? 72 : 64));
+          txt.setAttribute("font-size", finalLetterSize.toFixed(2));
+          txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
+          txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
+
           txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
@@ -4996,13 +4999,16 @@ if(homeBtn && role !== "host"){
           const poly = GAME_UI.cells[i];
           const txt = GAME_UI.letterEls[i];
           poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
-          const letterBase = Math.min(cellW, cellH);
-          const letterSize = shape === "square"
-            ? (letterBase * 0.52)
-            : (shape === "pentagon" ? (letterBase * 0.50) : (letterBase * 0.56));
-          txt.setAttribute("font-size", letterSize.toFixed(2));
           txt.setAttribute("x", (x + cellW/2).toFixed(2));
-          txt.setAttribute("y", (y + cellH/2 + (letterBase * 0.035)).toFixed(2));
+          txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
+
+          const isTvMode = document.body.classList.contains("tvMode");
+          const baseLetterSize = Math.min(cellW, cellH) * (isTvMode ? 0.50 : 0.44);
+          const finalLetterSize = Math.max(30, Math.min(baseLetterSize, isTvMode ? 72 : 64));
+          txt.setAttribute("font-size", finalLetterSize.toFixed(2));
+          txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
+          txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
+
           txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
