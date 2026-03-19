@@ -163,6 +163,91 @@ function isImportantRequestError(pathname, status) {
   return true;
 }
 
+
+function parseDateMs(value, fallback = null) {
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  const ms = new Date(raw).getTime();
+  return Number.isFinite(ms) && !Number.isNaN(ms) ? ms : fallback;
+}
+
+function daysInUtcMonth(year, monthIndex) {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+}
+
+function shiftUtcMonth(year, monthIndex, delta) {
+  const d = new Date(Date.UTC(year, monthIndex + delta, 1));
+  return {
+    year: d.getUTCFullYear(),
+    monthIndex: d.getUTCMonth(),
+  };
+}
+
+function buildMonthlyCycleOccurrence(anchorDate, year, monthIndex) {
+  const day = Math.min(anchorDate.getUTCDate(), daysInUtcMonth(year, monthIndex));
+  return Date.UTC(
+    year,
+    monthIndex,
+    day,
+    anchorDate.getUTCHours(),
+    anchorDate.getUTCMinutes(),
+    anchorDate.getUTCSeconds(),
+    anchorDate.getUTCMilliseconds()
+  );
+}
+
+function formatRemainingShortLabel(ms) {
+  const remaining = Math.max(0, Number(ms || 0));
+  const totalHours = Math.ceil(remaining / (60 * 60 * 1000));
+  const days = Math.floor(totalHours / 24);
+  const hours = Math.max(1, totalHours - (days * 24));
+  if (days > 0) return `${days}ي ${hours}س`;
+  return `${Math.max(1, totalHours)}س`;
+}
+
+function getPusherCycleInfo(env, ts = Date.now()) {
+  const rawAnchor = String(
+    env?.PUSHER_BILLING_ANCHOR ||
+    env?.PUSHER_RESET_AT ||
+    "2026-03-19T00:00:00+03:00"
+  ).trim();
+
+  const anchorMs = parseDateMs(rawAnchor, parseDateMs("2026-03-19T00:00:00+03:00", Date.now()));
+  const anchorDate = new Date(anchorMs);
+  const nowDate = new Date(ts);
+
+  let startTs = buildMonthlyCycleOccurrence(anchorDate, nowDate.getUTCFullYear(), nowDate.getUTCMonth());
+  if (ts < startTs) {
+    const prev = shiftUtcMonth(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), -1);
+    startTs = buildMonthlyCycleOccurrence(anchorDate, prev.year, prev.monthIndex);
+  }
+
+  const startDate = new Date(startTs);
+  const next = shiftUtcMonth(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1);
+  const nextResetTs = buildMonthlyCycleOccurrence(anchorDate, next.year, next.monthIndex);
+  const remainingMs = Math.max(0, nextResetTs - ts);
+
+  return {
+    anchorRaw: rawAnchor,
+    startTs,
+    nextResetTs,
+    remainingMs,
+    key: new Date(startTs).toISOString(),
+    shortLabel: formatRemainingShortLabel(remainingMs),
+  };
+}
+
+function getLiveThresholds(planConnections) {
+  const plan = clampMin(Number(planConnections || 2000), 1);
+  return {
+    planConnections: plan,
+    warnConnections: Math.max(800, Math.round(plan * 0.40)),
+    badConnections: Math.max(1400, Math.round(plan * 0.70)),
+    warnRooms: Math.max(55, Math.round(plan * 0.0275)),
+    badRooms: Math.max(95, Math.round(plan * 0.0475)),
+  };
+}
+
 /* eslint-disable */
 // ---------- MD5 (small, pure JS) ----------
 function md5cycle(x, k) {
@@ -378,8 +463,8 @@ async function parseBodyAsObject(request) {
 // ---------- Monitor helpers ----------
 const MONITOR_ROOM = "__monitor__";
 const MONITOR_ACTIVE_ROOM_MS = 2 * 60 * 1000;
-const MONITOR_ROOM_STALE_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_PUSHER_PLAN_MESSAGES = 4_000_000;
+const DEFAULT_PUSHER_PLAN_CONNECTIONS = 2_000;
 const DEFAULT_CF_MONTHLY_REQUESTS = 10_000_000;
 const DEFAULT_CF_FREE_DAILY_REQUESTS = 100_000;
 const DEFAULT_CF_PLAN_NAME = "Workers Paid ($5)";
@@ -497,7 +582,7 @@ function monitorPageHtml() {
 
     .quickRow{
       display:grid;
-      grid-template-columns:repeat(4, minmax(0,1fr));
+      grid-template-columns:repeat(5, minmax(0,1fr));
       gap:10px;
       margin-bottom:14px;
     }
@@ -509,6 +594,10 @@ function monitorPageHtml() {
       background:linear-gradient(180deg, rgba(16,26,49,.95), rgba(10,16,32,.95));
       box-shadow:var(--shadow);
       display:flex; flex-direction:column; justify-content:space-between;
+    }
+    .quickCard.attention{
+      border-color:rgba(255,93,115,.50);
+      box-shadow:0 18px 40px rgba(255,93,115,.14);
     }
     .quickLabel{font-size:11px; color:var(--muted); font-weight:700; line-height:1.4}
     .quickValue{font-size:22px; font-weight:900; line-height:1.15}
@@ -532,6 +621,10 @@ function monitorPageHtml() {
     }
     .card.third{grid-column:span 4}
     .card.half{grid-column:span 6}
+    .card.attention{
+      border-color:rgba(255,93,115,.52);
+      box-shadow:0 22px 44px rgba(255,93,115,.12);
+    }
     .cardHead{
       display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
       margin-bottom:14px;
@@ -645,10 +738,6 @@ function monitorPageHtml() {
     }
     .alert strong{display:block; margin-bottom:4px}
 
-    .rowEnded td{
-      background:rgba(255,93,115,.06);
-    }
-
     .empty{
       text-align:center; padding:18px;
       color:var(--muted);
@@ -659,6 +748,7 @@ function monitorPageHtml() {
     .footerNote{margin-top:12px; color:var(--muted); font-size:12px; line-height:1.95}
 
     @media (max-width:1150px){
+      .quickRow{grid-template-columns:repeat(3, minmax(0,1fr))}
       .card.third{grid-column:span 6}
     }
     @media (max-width:860px){
@@ -669,7 +759,7 @@ function monitorPageHtml() {
     }
     @media (max-width:680px){
       .hero{border-radius:24px}
-      .quickRow{gap:8px}
+      .quickRow{grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px}
       .quickCard{padding:10px 9px; min-height:80px; border-radius:18px}
       .quickLabel{font-size:10px}
       .quickValue{font-size:16px}
@@ -694,12 +784,13 @@ function monitorPageHtml() {
     <section class="hero">
       <div>
         <div class="heroTitle">لوحة مراقبة سباق الحروف</div>
-        <div class="heroSub"></div>
+        <div class="heroSub">الأخطاء المهمة بالأعلى، والغرف الهادئة أكثر من ساعتين تُحذف تلقائيًا من الصفحة.</div>
         <div class="heroMeta">
           <div class="ghostTag">رابط واحد للمتابعة من الجوال</div>
           <div class="ghostTag">تحديث تلقائي كل 5 ثوانٍ</div>
           <div class="ghostTag">لا تؤثر على اللاعبين</div>
           <div id="dailyResetChip" class="ghostTag">تصفير اليوم بعد: —</div>
+          <div id="pusherCycleChip" class="ghostTag">تجديد Pusher بعد: —</div>
         </div>
       </div>
       <div class="controls">
@@ -725,9 +816,110 @@ function monitorPageHtml() {
         <div class="quickLabel">التقييم العام</div>
         <div id="overallStatus" class="quickValue">—</div>
       </div>
+      <div id="topErrorsCard" class="quickCard">
+        <div class="quickLabel">أخطاء اللعبة المهمة اليوم</div>
+        <div id="topErrorsCount" class="quickValue">—</div>
+      </div>
     </section>
 
     <div class="mainGrid">
+      <section id="errorsCard" class="card">
+        <div class="cardHead">
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">آخر الأخطاء المهمة
+                <span class="help" data-help>
+                  <button class="helpBtn" type="button">؟</button>
+                  <div class="helpBox">هذه أهم لوحة وقت الضغط:
+- تعرض آخر الأخطاء المهمة فقط
+- 404 الخارجية غير المهمة لا تدخل هنا
+- 5xx تُعتبر أخطر شيء وتحتاج انتباه فوري
+- 4xx المهمة تُعرض أيضًا بوضوح</div>
+                </span>
+              </div>
+              <div class="cardDesc">آخر الأخطاء أو الاستجابات غير الطبيعية داخل الـ Worker.</div>
+            </div>
+          </div>
+          <div id="errorsBadge" class="tag info">بانتظار البيانات</div>
+        </div>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الوقت</th>
+                <th>الحالة</th>
+                <th>المسار</th>
+                <th>الغرفة</th>
+                <th>التفصيل</th>
+              </tr>
+            </thead>
+            <tbody id="errorsBody">
+              <tr><td colspan="5" class="empty">لا توجد أخطاء بعد</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card half">
+        <div class="cardHead">
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">الحالة العامة والتنبيهات
+                <span class="help" data-help>
+                  <button class="helpBtn" type="button">؟</button>
+                  <div class="helpBox">هذه اللوحة تجمع أهم التنبيهات التي تحتاج تراقبها بسرعة:
+- اقتراب حد رسائل Pusher
+- ارتفاع الاتصالات
+- ارتفاع الأخطاء
+- بطء الاستجابة
+- ضغط غير طبيعي على الغرف</div>
+                </span>
+              </div>
+              <div class="cardDesc">مختصر سريع للأشياء التي تحتاج انتباهك الآن.</div>
+            </div>
+          </div>
+          <div id="alertsBadge" class="tag info">بانتظار البيانات</div>
+        </div>
+        <div id="alertsBox" class="alerts">
+          <div class="empty">بانتظار أول تحديث…</div>
+        </div>
+      </section>
+
+      <section class="card half">
+        <div class="cardHead">
+          <div class="headSide">
+            <div class="accent"></div>
+            <div>
+              <div class="cardTitle">الغرف الحالية والهادئة</div>
+              <div class="cardDesc">يعرض الغرف النشطة والهادئة فقط، وأي غرفة تتجاوز ساعتين خمول تُحذف تلقائيًا من الصفحة.</div>
+            </div>
+          </div>
+          <div id="roomsBadge" class="tag info">بانتظار البيانات</div>
+        </div>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الغرفة</th>
+                <th>الحالة</th>
+                <th>المتصلون</th>
+                <th>آخر ظهور</th>
+                <th>آخر Pusher</th>
+                <th>طلبات اليوم</th>
+                <th>رسائل اليوم</th>
+                <th>آخر مسار</th>
+                <th>Rev</th>
+              </tr>
+            </thead>
+            <tbody id="roomsBody">
+              <tr><td colspan="9" class="empty">لا توجد غرف متتبعة بعد</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card third">
         <div class="cardHead">
           <div class="headSide">
@@ -736,15 +928,15 @@ function monitorPageHtml() {
               <div class="cardTitle">استهلاك رسائل Pusher
                 <span class="help" data-help>
                   <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">تعرض هذه اللوحة عدد الرسائل التي أرسلها هذا الـ Worker إلى Pusher خلال الشهر الحالي، مقارنة بحد الخطة المحدد عندك.
+                  <div class="helpBox">تعرض هذه اللوحة عدد الرسائل التي أرسلها هذا الـ Worker إلى Pusher منذ بداية دورة الاشتراك الحالية.
 
-الحدود المقترحة:
-- طبيعي: أقل من 50%
-- متوسط: من 50% إلى 80%
-- قلق: أكثر من 80%</div>
+الحدود المعتمدة:
+- طبيعي: أقل من 60%
+- متوسط: من 60% إلى أقل من 85%
+- قلق: 85% أو أكثر</div>
                 </span>
               </div>
-              <div class="cardDesc">مفيدة لمعرفة الاستهلاك الحالي من اشتراكك الشهري بشكل سريع.</div>
+              <div class="cardDesc">مفيدة لمعرفة الاستهلاك الحالي من اشتراكك الشهري منذ آخر تجديد.</div>
             </div>
           </div>
           <div id="pusherUsageBadge" class="tag info">بانتظار البيانات</div>
@@ -755,7 +947,7 @@ function monitorPageHtml() {
         <div class="metaRow">
           <div id="pusherTodayTag" class="tag info">اليوم: —</div>
           <div id="pusherRemainingTag" class="tag info">المتبقي: —</div>
-          <div id="pusherResetTag" class="tag info">يتصفّر بعد: —</div>
+          <div id="pusherResetTag" class="tag info">التجديد بعد: —</div>
         </div>
       </section>
 
@@ -767,12 +959,12 @@ function monitorPageHtml() {
               <div class="cardTitle">التزامن الحالي المباشر
                 <span class="help" data-help>
                   <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">تعرض هذه اللوحة الصورة الحالية للعبة: عدد الاتصالات المباشرة الآن، وعدد الغرف النشطة الآن، وعدد الغرف التي ظهرت اليوم.
+                  <div class="helpBox">هذه اللوحة مبنية على حد اشتراكك الحالي: 2000 اتصال متزامن.
 
-الحدود المقترحة:
-- طبيعي: حمل مريح
-- متوسط: زيادة ملحوظة لكن مستقرة
-- قلق: زيادة قوية أو غرف كثيرة مع أخطاء</div>
+الحدود المعتمدة:
+- طبيعي: أقل من 800 اتصال أو أقل من 55 غرفة نشطة
+- متوسط: من 800 إلى أقل من 1400 اتصال أو من 55 إلى أقل من 95 غرفة نشطة
+- قلق: 1400 اتصال أو أكثر أو 95 غرفة نشطة أو أكثر</div>
                 </span>
               </div>
               <div class="cardDesc">أهم أرقام اللعب الحي الآن في مكان واحد.</div>
@@ -783,8 +975,8 @@ function monitorPageHtml() {
         <div class="metricGrid">
           <div class="metric"><div class="metricLabel">الاتصالات الحالية الآن</div><div id="liveConnections" class="metricValue">—</div></div>
           <div class="metric"><div class="metricLabel">الغرف النشطة الآن</div><div id="liveRooms" class="metricValue">—</div></div>
+          <div class="metric"><div class="metricLabel">الغرف الهادئة الآن</div><div id="liveRoomsQuiet" class="metricValue small">—</div></div>
           <div class="metric"><div class="metricLabel">الغرف التي ظهرت اليوم</div><div id="liveRoomsToday" class="metricValue small">—</div></div>
-          <div class="metric"><div class="metricLabel">غرف منتهية ظاهرة</div><div id="liveRoomsTracked" class="metricValue small">—</div></div>
         </div>
       </section>
 
@@ -800,15 +992,15 @@ function monitorPageHtml() {
 
 المعروض هنا:
 - طلبات اليوم
-- نسبة الأخطاء
+- نسبة الأخطاء المهمة
 - متوسط الاستجابة
-- استخدام الشهر الحالي من الخطة المدفوعة
+- استخدام الشهر الحالي من الخطة
 - مقارنة بالحد المجاني القديم 100,000 طلب يوميًا
 - تفصيل طلبات اللعب مقابل طلبات الحالة والمراقبة وPusher
 
-الحدود المقترحة:
-- نسبة أخطاء اللعبة المهمة: طبيعي أقل من 0.5% — متوسط حتى 2% — قلق فوق 2%
-- متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 800ms — قلق فوق 800ms
+الحدود المعتمدة:
+- نسبة أخطاء اللعبة المهمة: طبيعي أقل من 0.7% — متوسط حتى 2% — قلق فوق 2%
+- متوسط الاستجابة: طبيعي أقل من 300ms — متوسط حتى 700ms — قلق فوق 700ms
 - طلبات 404 الخارجية تُعرض منفصلة ولا تدخل ضمن أخطاء اللعبة المهمة</div>
                 </span>
               </div>
@@ -849,89 +1041,9 @@ function monitorPageHtml() {
         </div>
       </section>
 
-      <section class="card half">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">الحالة العامة والتنبيهات
-                <span class="help" data-help>
-                  <button class="helpBtn" type="button">؟</button>
-                  <div class="helpBox">هذه اللوحة تجمع أهم التنبيهات التي تحتاج تراقبها بسرعة: اقتراب حد رسائل Pusher، ارتفاع الأخطاء، بطء الاستجابة، أو غرفة عليها نشاط غير طبيعي.</div>
-                </span>
-              </div>
-              <div class="cardDesc">مختصر سريع للأشياء التي تحتاج انتباهك الآن.</div>
-            </div>
-          </div>
-          <div id="alertsBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div id="alertsBox" class="alerts">
-          <div class="empty">بانتظار أول تحديث…</div>
-        </div>
-      </section>
-
-      <section class="card half">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">الغرف الحالية والمنتهية</div>
-              <div class="cardDesc">يعرض الغرف النشطة والهادئة، ويُظهر الغرف التي انتهت بالخمول باللون الأحمر بدون احتسابها ضمن الحالي.</div>
-            </div>
-          </div>
-          <div id="roomsBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div class="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>الغرفة</th>
-                <th>الحالة</th>
-                <th>المتصلون</th>
-                <th>آخر ظهور</th>
-                <th>آخر Pusher</th>
-                <th>طلبات اليوم</th>
-                <th>رسائل اليوم</th>
-                <th>آخر مسار</th>
-                <th>Rev</th>
-              </tr>
-            </thead>
-            <tbody id="roomsBody">
-              <tr><td colspan="9" class="empty">لا توجد غرف متتبعة بعد</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
       <section class="card">
-        <div class="cardHead">
-          <div class="headSide">
-            <div class="accent"></div>
-            <div>
-              <div class="cardTitle">آخر الأخطاء المهمة</div>
-              <div class="cardDesc">آخر الأخطاء أو الاستجابات غير الطبيعية داخل الـ Worker.</div>
-            </div>
-          </div>
-          <div id="errorsBadge" class="tag info">بانتظار البيانات</div>
-        </div>
-        <div class="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>الوقت</th>
-                <th>الحالة</th>
-                <th>المسار</th>
-                <th>الغرفة</th>
-                <th>التفصيل</th>
-              </tr>
-            </thead>
-            <tbody id="errorsBody">
-              <tr><td colspan="5" class="empty">لا توجد أخطاء بعد</td></tr>
-            </tbody>
-          </table>
-        </div>
         <div class="footerNote">
-          ملاحظة: رقم رسائل Pusher هنا هو عداد داخلي مبني على الرسائل التي يرسلها هذا الـ Worker إلى Pusher، وهو ممتاز للمراقبة اليومية، لكنه ليس بديلًا رسميًا عن صفحة الفوترة داخل Pusher.
+          ملاحظة: عداد رسائل Pusher هنا مبني على الرسائل التي يرسلها هذا الـ Worker إلى Pusher منذ بداية دورة الاشتراك الحالية، وليس من بداية الشهر الميلادي.
           <br>
           أما مؤشرات Cloudflare هنا فهي مؤشرات تشغيلية داخلية من نفس الـ Worker، هدفها تعطيك نظرة عربية سريعة من رابط واحد بدون تنقل بين عدة لوحات.
         </div>
@@ -966,31 +1078,38 @@ function monitorPageHtml() {
 
     function usageLevel(p){
       const x = Number(p || 0);
-      if (x >= 80) return ['قلق','bad'];
-      if (x >= 50) return ['متوسط','warn'];
+      if (x >= 85) return ['قلق','bad'];
+      if (x >= 60) return ['متوسط','warn'];
       return ['طبيعي','ok'];
     }
 
     function errorLevel(rate){
       const x = Number(rate || 0);
       if (x > 2) return ['قلق','bad'];
-      if (x >= 0.5) return ['متوسط','warn'];
+      if (x >= 0.7) return ['متوسط','warn'];
       return ['طبيعي','ok'];
     }
 
     function latencyLevel(v){
       const x = Number(v || 0);
-      if (x > 800) return ['قلق','bad'];
+      if (x > 700) return ['قلق','bad'];
       if (x >= 300) return ['متوسط','warn'];
       return ['طبيعي','ok'];
     }
 
-    function liveLevel(connections, rooms, errRate){
+    function liveLevel(connections, rooms, errRate, planConnections){
+      const plan = Math.max(1, Number(planConnections || 2000));
+      const warnConn = Math.max(800, Math.round(plan * 0.40));
+      const badConn = Math.max(1400, Math.round(plan * 0.70));
+      const warnRooms = Math.max(55, Math.round(plan * 0.0275));
+      const badRooms = Math.max(95, Math.round(plan * 0.0475));
+
       const c = Number(connections || 0);
       const r = Number(rooms || 0);
       const e = Number(errRate || 0);
-      if (e > 2 || c >= 120 || r >= 15) return ['قلق','bad'];
-      if (e >= 0.5 || c >= 60 || r >= 8) return ['متوسط','warn'];
+
+      if (e > 2 || c >= badConn || r >= badRooms) return ['قلق','bad'];
+      if (e >= 0.7 || c >= warnConn || r >= warnRooms) return ['متوسط','warn'];
       return ['طبيعي','ok'];
     }
 
@@ -998,8 +1117,15 @@ function monitorPageHtml() {
       const p = Number(sum?.pusher?.usagePercentMonth || 0);
       const e = Number(sum?.cloudflare?.errorRatePercent || 0);
       const l = Number(sum?.cloudflare?.avgLatencyMs || 0);
-      if (p >= 80 || e > 2 || l > 800) return ['يحتاج انتباه','bad'];
-      if (p >= 50 || e >= 0.5 || l >= 300) return ['مستقر مع متابعة','warn'];
+      const live = liveLevel(
+        sum?.live?.connectionsNow,
+        sum?.live?.roomsActiveNow,
+        e,
+        sum?.live?.planConnections
+      )[1];
+
+      if (p >= 85 || e > 2 || l > 700 || live === 'bad') return ['يحتاج انتباه','bad'];
+      if (p >= 60 || e >= 0.7 || l >= 300 || live === 'warn') return ['مستقر مع متابعة','warn'];
       return ['ممتاز','ok'];
     }
 
@@ -1030,18 +1156,19 @@ function monitorPageHtml() {
     function renderRooms(rooms){
       const body = $('roomsBody');
       if (!rooms || !rooms.length) {
-        body.innerHTML = '<tr><td colspan="9" class="empty">لا توجد غرف متتبعة حتى الآن</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" class="empty">لا توجد غرف حالية أو هادئة تحت حد الساعتين</td></tr>';
         setBadge($('roomsBadge'),'0 غرفة','info');
         return;
       }
-      const endedCount = rooms.filter(r => r.isEnded).length;
-      const currentCount = rooms.filter(r => !r.isEnded).length;
-      setBadge($('roomsBadge'),'الحالية: ' + currentCount + ' | المنتهية: ' + endedCount, endedCount ? 'warn' : 'info');
+
+      const activeCount = rooms.filter(r => r.isActive).length;
+      const quietCount = rooms.filter(r => !r.isActive).length;
+      setBadge($('roomsBadge'),'النشطة: ' + activeCount + ' | الهادئة: ' + quietCount, quietCount ? 'warn' : 'info');
+
       body.innerHTML = rooms.map(r => {
-        const statusText = r.isEnded ? 'انتهت' : (r.isActive ? 'نشطة' : 'هادئة');
-        const cls = r.isEnded ? 'bad' : (r.isActive ? 'ok' : 'info');
-        const rowCls = r.isEnded ? ' class="rowEnded"' : '';
-        return '<tr' + rowCls + '>' +
+        const statusText = r.isActive ? 'نشطة' : 'هادئة';
+        const cls = r.isActive ? 'ok' : 'info';
+        return '<tr>' +
           '<td>' + r.room + '</td>' +
           '<td><span class="tag ' + cls + '">' + statusText + '</span></td>' +
           '<td>' + fmt(r.clientsNow) + '</td>' +
@@ -1055,13 +1182,21 @@ function monitorPageHtml() {
       }).join('');
     }
 
-    function renderErrors(errors){
+    function renderErrors(errors, totalErrorsToday){
       const body = $('errorsBody');
+      const errorsCard = $('errorsCard');
+      const topErrorsCard = $('topErrorsCard');
+      const total = Number(totalErrorsToday || 0);
+
+      errorsCard.classList.toggle('attention', total > 0);
+      topErrorsCard.classList.toggle('attention', total > 0);
+
       if (!errors || !errors.length) {
         body.innerHTML = '<tr><td colspan="5" class="empty">لا توجد أخطاء مهمة الآن</td></tr>';
         setBadge($('errorsBadge'),'لا توجد أخطاء','ok');
         return;
       }
+
       setBadge($('errorsBadge'),'عدد السجلات: ' + errors.length, errors.some(e => Number(e.status || 0) >= 500) ? 'bad' : 'warn');
       body.innerHTML = errors.map(e => {
         const s = Number(e.status || 0);
@@ -1078,8 +1213,12 @@ function monitorPageHtml() {
 
     function render(summary){
       $('lastUpdated').textContent = ago(summary.generatedAt);
+
       const reset = summary.dailyReset || {};
       $('dailyResetChip').textContent = 'تصفير اليوم بعد: ' + (reset.hoursLabel || '—');
+
+      const pusherCycle = summary.pusher?.cycleResetLabel || '—';
+      $('pusherCycleChip').textContent = 'تجديد Pusher بعد: ' + pusherCycle;
 
       const workerOk = summary.system?.worker ? 'شغال' : 'غير واضح';
       $('workerStatus').textContent = workerOk;
@@ -1093,25 +1232,28 @@ function monitorPageHtml() {
       $('overallStatus').textContent = overallText;
       colorQuickValue($('overallStatus'), overallKind);
 
+      const cf = summary.cloudflare || {};
+      $('topErrorsCount').textContent = fmt(cf.errorsToday);
+      colorQuickValue($('topErrorsCount'), errorLevel(cf.errorRatePercent)[1]);
+
       const pusher = summary.pusher || {};
       $('pusherMain').textContent = fmt(pusher.messagesMonth) + ' / ' + fmt(pusher.planMessages);
-      $('pusherSub').textContent = 'نسبة الاستخدام الشهرية الحالية: ' + pct(pusher.usagePercentMonth);
+      $('pusherSub').textContent = 'نسبة الاستخدام الحالية منذ بداية دورة الاشتراك: ' + pct(pusher.usagePercentMonth);
       $('pusherBar').style.width = Math.min(100, Number(pusher.usagePercentMonth || 0)) + '%';
       $('pusherTodayTag').textContent = 'اليوم: ' + fmt(pusher.messagesToday);
       $('pusherRemainingTag').textContent = 'المتبقي: ' + fmt(pusher.remainingMessages);
-      $('pusherResetTag').textContent = 'يتصفّر بعد: ' + ((summary.dailyReset && summary.dailyReset.hoursLabel) || '—');
+      $('pusherResetTag').textContent = 'التجديد بعد: ' + (pusher.cycleResetLabel || '—');
       const [puText, puKind] = usageLevel(pusher.usagePercentMonth);
       setBadge($('pusherUsageBadge'), puText, puKind);
 
       const live = summary.live || {};
       $('liveConnections').textContent = fmt(live.connectionsNow);
       $('liveRooms').textContent = fmt(live.roomsActiveNow);
+      $('liveRoomsQuiet').textContent = fmt(live.roomsQuietNow);
       $('liveRoomsToday').textContent = fmt(live.roomsSeenToday);
-      $('liveRoomsTracked').textContent = fmt(live.roomsEndedVisible);
-      const [lvText, lvKind] = liveLevel(live.connectionsNow, live.roomsActiveNow, summary.cloudflare?.errorRatePercent);
+      const [lvText, lvKind] = liveLevel(live.connectionsNow, live.roomsActiveNow, cf.errorRatePercent, live.planConnections);
       setBadge($('liveBadge'), lvText, lvKind);
 
-      const cf = summary.cloudflare || {};
       $('cfPlanName').textContent = String(cf.planName || '—');
       $('cfMonthMain').textContent = fmt(cf.requestsMonth) + ' / ' + fmt(cf.planRequestsMonth);
       $('cfMonthRemaining').textContent = fmt(cf.remainingRequestsMonth);
@@ -1126,21 +1268,23 @@ function monitorPageHtml() {
       $('cf4xx').textContent = '4xx مهم: ' + fmt(cf.status4xx);
       $('cfExt404').textContent = '404 خارجية: ' + fmt(cf.external404Today);
       $('cf5xx').textContent = '5xx: ' + fmt(cf.status5xx);
+
       const wb = summary.requestBreakdown || {};
       $('cfReqAction').textContent = fmt(wb.action);
       $('cfReqState').textContent = fmt(wb.state);
       $('cfReqPusher').textContent = fmt(wb.pusher);
       $('cfReqMonitor').textContent = fmt(wb.monitor);
       $('cfReqOther').textContent = 'طلبات خارجية/أخرى: ' + fmt(wb.other);
+
       const er = errorLevel(cf.errorRatePercent);
       const lt = latencyLevel(cf.avgLatencyMs);
       const cu = usageLevel(cf.usagePercentMonth);
       const cfKind = (er[1] === 'bad' || lt[1] === 'bad' || cu[1] === 'bad') ? 'bad' : ((er[1] === 'warn' || lt[1] === 'warn' || cu[1] === 'warn') ? 'warn' : 'ok');
       setBadge($('cfBadge'), cfKind === 'bad' ? 'قلق' : (cfKind === 'warn' ? 'متوسط' : 'طبيعي'), cfKind);
 
+      renderErrors(summary.lastErrors || [], cf.errorsToday);
       renderAlerts(summary.alerts || []);
       renderRooms(summary.rooms || []);
-      renderErrors(summary.lastErrors || []);
     }
 
     let timer = null;
@@ -1155,6 +1299,8 @@ function monitorPageHtml() {
       }catch(err){
         setBadge($('alertsBadge'),'تعذر قراءة البيانات','bad');
         $('alertsBox').innerHTML = '<div class="alert bad"><strong>تعذر جلب البيانات</strong><div>' + String(err?.message || err) + '</div></div>';
+        $('errorsCard').classList.add('attention');
+        $('topErrorsCard').classList.add('attention');
       }
     }
 
@@ -1537,9 +1683,11 @@ export class RoomDO {
   async _loadMonitor(now = Date.now()) {
     const day = utcDayKey(now);
     const month = utcMonthKey(now);
+    const pusherCycle = getPusherCycleInfo(this.env, now);
     let m = (await this.state.storage.get("monitor")) || {};
     const prevDay = String(m.day || "");
     const prevMonth = String(m.month || "");
+    const prevPusherCycleKey = String(m.pusherCycleKey || "");
 
     if (!m || typeof m !== "object") m = {};
     if (!m.rooms || typeof m.rooms !== "object") m.rooms = {};
@@ -1569,12 +1717,16 @@ export class RoomDO {
     }
 
     if (prevMonth !== month) {
-      m.pusherMsgsMonth = 0;
       m.requestsMonth = 0;
+    }
+
+    if (prevPusherCycleKey !== pusherCycle.key) {
+      m.pusherMsgsMonth = 0;
     }
 
     m.day = day;
     m.month = month;
+    m.pusherCycleKey = pusherCycle.key;
     m.requestsToday = toFiniteNumber(m.requestsToday, 0);
     m.errorsToday = toFiniteNumber(m.errorsToday, 0);
     m.rawErrorsToday = toFiniteNumber(m.rawErrorsToday, m.errorsToday);
@@ -1632,8 +1784,20 @@ export class RoomDO {
       info.rev = toFiniteNumber(info.rev, 0);
       info.expiredAt = toFiniteNumber(info.expiredAt, 0);
       info.endedReason = String(info.endedReason || "");
-      const recent = Math.max(info.lastSeenAt, info.lastActionAt, info.lastStateAt, info.lastStatsAt, info.lastPusherAt, info.firstSeenAt, info.expiredAt);
-      if (recent && now - recent > MONITOR_ROOM_STALE_MS) continue;
+
+      const recent = Math.max(
+        info.lastSeenAt,
+        info.lastActionAt,
+        info.lastStateAt,
+        info.lastStatsAt,
+        info.lastPusherAt,
+        info.firstSeenAt,
+        info.expiredAt
+      );
+
+      if (info.expiredAt > 0) continue;
+      if (recent && now - recent > this.IDLE_MS) continue;
+
       out[room] = info;
     }
     return out;
@@ -1649,23 +1813,54 @@ export class RoomDO {
     const alerts = [];
     const usage = Number(summary?.pusher?.usagePercentMonth || 0);
     const errorRate = Number(summary?.cloudflare?.errorRatePercent || 0);
+    const errorsToday = Number(summary?.cloudflare?.errorsToday || 0);
     const avgLatencyMs = Number(summary?.cloudflare?.avgLatencyMs || 0);
     const activeRooms = Number(summary?.live?.roomsActiveNow || 0);
-    const endedRooms = Number(summary?.live?.roomsEndedVisible || 0);
+    const quietRooms = Number(summary?.live?.roomsQuietNow || 0);
     const cfUsage = Number(summary?.cloudflare?.usagePercentMonth || 0);
     const external404Today = Number(summary?.cloudflare?.external404Today || 0);
+    const connectionsNow = Number(summary?.live?.connectionsNow || 0);
+    const liveThresholds = getLiveThresholds(summary?.live?.planConnections || DEFAULT_PUSHER_PLAN_CONNECTIONS);
 
-    if (usage >= 80) {
+    if (usage >= 85) {
       alerts.push({
         level: "bad",
         title: "استهلاك رسائل Pusher اقترب من الحد",
         text: `الاستهلاك الحالي وصل إلى ${usage.toFixed(1)}% من الحد الشهري المحدد.`
       });
-    } else if (usage >= 50) {
+    } else if (usage >= 60) {
       alerts.push({
         level: "warn",
         title: "استهلاك رسائل Pusher في المنطقة المتوسطة",
         text: `الاستهلاك الحالي عند ${usage.toFixed(1)}% ويستحسن متابعته.`
+      });
+    }
+
+    if (connectionsNow >= liveThresholds.badConnections) {
+      alerts.push({
+        level: "bad",
+        title: "الاتصالات الحالية مرتفعة",
+        text: `عدد الاتصالات الآن ${connectionsNow} وهو قريب من منطقة الضغط العالي لاشتراك 2000 اتصال.`
+      });
+    } else if (connectionsNow >= liveThresholds.warnConnections) {
+      alerts.push({
+        level: "warn",
+        title: "الاتصالات الحالية متوسطة إلى مرتفعة",
+        text: `عدد الاتصالات الآن ${connectionsNow} ويُستحسن متابعة التزامن مباشرة.`
+      });
+    }
+
+    if (activeRooms >= liveThresholds.badRooms) {
+      alerts.push({
+        level: "bad",
+        title: "عدد الغرف النشطة مرتفع جدًا",
+        text: `يوجد الآن ${activeRooms} غرف نشطة، وهذا مستوى ضغط يحتاج متابعة دقيقة.`
+      });
+    } else if (activeRooms >= liveThresholds.warnRooms) {
+      alerts.push({
+        level: "warn",
+        title: "عدد الغرف النشطة مرتفع",
+        text: `يوجد الآن ${activeRooms} غرف نشطة، والحمل أعلى من الطبيعي.`
       });
     }
 
@@ -1675,7 +1870,7 @@ export class RoomDO {
         title: "نسبة الأخطاء مرتفعة",
         text: `نسبة الأخطاء اليوم ${errorRate.toFixed(2)}% وهي أعلى من الحد المريح.`
       });
-    } else if (errorRate >= 0.5) {
+    } else if (errorRate >= 0.7) {
       alerts.push({
         level: "warn",
         title: "نسبة الأخطاء تحتاج متابعة",
@@ -1683,13 +1878,21 @@ export class RoomDO {
       });
     }
 
-    if (cfUsage >= 85) {
+    if (errorsToday > 0 && !alerts.some(a => a.title.includes("الأخطاء"))) {
+      alerts.push({
+        level: errorRate > 2 ? "bad" : "warn",
+        title: "تم رصد أخطاء مهمة اليوم",
+        text: `عدد أخطاء اللعبة المهمة اليوم: ${errorsToday}.`
+      });
+    }
+
+    if (cfUsage >= 90) {
       alerts.push({
         level: "bad",
         title: "استهلاك Cloudflare الشهري اقترب من الحد",
         text: `استهلاك الطلبات الشهري وصل إلى ${cfUsage.toFixed(1)}% من الخطة الحالية.`
       });
-    } else if (cfUsage >= 60) {
+    } else if (cfUsage >= 70) {
       alerts.push({
         level: "warn",
         title: "استهلاك Cloudflare الشهري يحتاج متابعة",
@@ -1697,7 +1900,7 @@ export class RoomDO {
       });
     }
 
-    if (avgLatencyMs > 800) {
+    if (avgLatencyMs > 700) {
       alerts.push({
         level: "bad",
         title: "متوسط الاستجابة بطيء",
@@ -1711,10 +1914,10 @@ export class RoomDO {
       });
     }
 
-    const hotRoom = (summary.rooms || []).find(r => Number(r.clientsNow || 0) >= 10);
+    const hotRoom = (summary.rooms || []).find(r => Number(r.clientsNow || 0) >= 12);
     if (hotRoom) {
       alerts.push({
-        level: "warn",
+        level: Number(hotRoom.clientsNow || 0) >= 15 ? "bad" : "warn",
         title: "غرفة عليها ضغط مباشر",
         text: `الغرفة ${hotRoom.room} فيها الآن ${hotRoom.clientsNow} متصلين تقريبًا.`
       });
@@ -1728,11 +1931,11 @@ export class RoomDO {
       });
     }
 
-    if (endedRooms > 0) {
+    if (quietRooms > 0 && !alerts.some(a => a.title.includes("هادئة"))) {
       alerts.push({
         level: "info",
-        title: "يوجد جلسات انتهت بالخمول",
-        text: `تم تمييز ${endedRooms} غرف منتهية باللون الأحمر، وهي غير محسوبة ضمن الحالي.`
+        title: "يوجد غرف هادئة تحت حد الحذف",
+        text: `يوجد الآن ${quietRooms} غرف هادئة، وستُحذف تلقائيًا إذا تجاوزت ساعتين خمول.`
       });
     }
 
@@ -1891,13 +2094,15 @@ export class RoomDO {
       const m = await this._loadMonitor(now);
       await this.state.storage.put("monitor", m);
 
+      const pusherCycle = getPusherCycleInfo(this.env, now);
       const planMessages = clampMin(Number(this.env?.PUSHER_PLAN_MESSAGES || this.env?.PUSHER_MESSAGES_LIMIT || DEFAULT_PUSHER_PLAN_MESSAGES), 1);
+      const liveThresholds = getLiveThresholds(this.env?.PUSHER_PLAN_CONNECTIONS || DEFAULT_PUSHER_PLAN_CONNECTIONS);
+
       const rooms = [];
       let connectionsNow = 0;
       let roomsActiveNow = 0;
+      let roomsQuietNow = 0;
       let roomsSeenToday = 0;
-      let roomsEndedVisible = 0;
-      let roomsTrackedCurrent = 0;
 
       for (const [room, raw] of Object.entries(m.rooms || {})) {
         const info = raw || {};
@@ -1906,25 +2111,18 @@ export class RoomDO {
         const lastSeenAt = toFiniteNumber(info.lastSeenAt, 0);
         const lastActionAt = toFiniteNumber(info.lastActionAt, 0);
         const lastPusherAt = toFiniteNumber(info.lastPusherAt, 0);
-        const expiredAt = toFiniteNumber(info.expiredAt, 0);
-        const isEnded = expiredAt > 0;
-        const isActive = !isEnded && (clientsNow > 0 || (now - Math.max(lastActionAt, lastPusherAt, lastSeenAt) <= MONITOR_ACTIVE_ROOM_MS));
+        const isActive = (clientsNow > 0 || (now - Math.max(lastActionAt, lastPusherAt, lastSeenAt) <= MONITOR_ACTIVE_ROOM_MS));
 
-        if (isEnded) roomsEndedVisible += 1;
-        else {
-          roomsTrackedCurrent += 1;
-          if (isActive) roomsActiveNow += 1;
-          connectionsNow += clientsNow;
-          if (toFiniteNumber(info.requestsToday, 0) > 0 || toFiniteNumber(info.pusherMsgsToday, 0) > 0) roomsSeenToday += 1;
-        }
+        if (isActive) roomsActiveNow += 1;
+        else roomsQuietNow += 1;
+
+        connectionsNow += clientsNow;
+        if (toFiniteNumber(info.requestsToday, 0) > 0 || toFiniteNumber(info.pusherMsgsToday, 0) > 0) roomsSeenToday += 1;
 
         rooms.push({
           room,
           clientsNow,
           isActive,
-          isEnded,
-          expiredAt,
-          endedReason: String(info.endedReason || ""),
           lastSeenAt,
           lastActionAt,
           lastPusherAt,
@@ -1937,10 +2135,9 @@ export class RoomDO {
       }
 
       rooms.sort((a, b) => {
-        if (Number(a.isEnded) !== Number(b.isEnded)) return Number(a.isEnded) - Number(b.isEnded);
         if (Number(b.isActive) !== Number(a.isActive)) return Number(b.isActive) - Number(a.isActive);
         if (b.clientsNow !== a.clientsNow) return b.clientsNow - a.clientsNow;
-        return Math.max(toFiniteNumber(b.lastSeenAt, 0), toFiniteNumber(b.expiredAt, 0)) - Math.max(toFiniteNumber(a.lastSeenAt, 0), toFiniteNumber(a.expiredAt, 0));
+        return Math.max(toFiniteNumber(b.lastSeenAt, 0), toFiniteNumber(b.lastPusherAt, 0)) - Math.max(toFiniteNumber(a.lastSeenAt, 0), toFiniteNumber(a.lastPusherAt, 0));
       });
 
       const requestsToday = toFiniteNumber(m.requestsToday, 0);
@@ -1982,6 +2179,9 @@ export class RoomDO {
           planMessages,
           remainingMessages: Math.max(0, planMessages - messagesMonth),
           usagePercentMonth,
+          cycleStartedAt: pusherCycle.startTs,
+          nextResetAt: pusherCycle.nextResetTs,
+          cycleResetLabel: pusherCycle.shortLabel,
         },
         dailyReset: {
           resetAt: resetInfo.resetAt,
@@ -1992,10 +2192,14 @@ export class RoomDO {
         live: {
           connectionsNow,
           roomsActiveNow,
+          roomsQuietNow,
           roomsSeenToday,
           roomsTracked: rooms.length,
-          roomsTrackedCurrent,
-          roomsEndedVisible,
+          planConnections: liveThresholds.planConnections,
+          warnConnections: liveThresholds.warnConnections,
+          badConnections: liveThresholds.badConnections,
+          warnRooms: liveThresholds.warnRooms,
+          badRooms: liveThresholds.badRooms,
         },
         cloudflare: {
           requestsToday,
@@ -2025,7 +2229,7 @@ export class RoomDO {
         rooms: rooms.slice(0, 100),
         lastErrors: Array.isArray(m.lastErrors) ? m.lastErrors.slice(0, 25) : [],
         sources: {
-          pusher: "عداد داخلي مبني على الرسائل التي يرسلها Worker إلى Pusher",
+          pusher: "عداد داخلي مبني على الرسائل التي يرسلها Worker إلى Pusher منذ بداية دورة الاشتراك الحالية",
           cloudflare: "مؤشرات تشغيلية داخلية من نفس Worker",
         },
       };
