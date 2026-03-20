@@ -31,7 +31,7 @@
       --sectionTitle:#7b1f63;
       --sectionAccent:#18b9c8;
       --closeRed:#ea3d3d;
-      --themeOn:#1fbf63;
+      --themeOn:#27c266;
       --themeOff:#e14b4b;
     }
 
@@ -242,18 +242,18 @@
     }
 
     .theme-toggle{
-      width:92px;
-      height:40px;
+      position:relative;
+      width:96px;
+      height:42px;
       border:none;
       border-radius:999px;
       cursor:pointer;
-      position:relative;
       padding:0;
-      transition:background .18s ease, box-shadow .18s ease, transform .12s ease;
+      display:block;
+      overflow:hidden;
       box-shadow:0 8px 18px rgba(0,0,0,.14);
-      display:flex;
-      align-items:center;
-      justify-content:flex-start;
+      transition:background .18s ease, transform .12s ease;
+      background:var(--themeOff);
     }
 
     .theme-toggle:active{
@@ -269,18 +269,20 @@
     }
 
     .theme-toggle-dot{
-      width:30px;
-      height:30px;
+      position:absolute;
+      top:5px;
+      right:5px;
+      width:32px;
+      height:32px;
       border-radius:50%;
       background:#fff;
-      display:block;
-      box-shadow:0 3px 8px rgba(0,0,0,.18);
+      box-shadow:0 4px 10px rgba(0,0,0,.18);
       transition:transform .18s ease;
-      transform:translateX(6px);
+      transform:translateX(0);
     }
 
     .theme-toggle.on .theme-toggle-dot{
-      transform:translateX(56px);
+      transform:translateX(-54px);
     }
 
     .colors-grid{
@@ -561,16 +563,17 @@
         font-size:17px;
       }
       .theme-toggle{
-        width:84px;
-        height:38px;
+        width:88px;
+        height:40px;
       }
       .theme-toggle-dot{
-        width:28px;
-        height:28px;
-        transform:translateX(5px);
+        width:30px;
+        height:30px;
+        top:5px;
+        right:5px;
       }
       .theme-toggle.on .theme-toggle-dot{
-        transform:translateX(51px);
+        transform:translateX(-48px);
       }
       .action-row{
         grid-template-columns:1fr 1fr;
