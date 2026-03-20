@@ -142,7 +142,7 @@
       word-break:break-word;
       white-space:nowrap;
       text-overflow:ellipsis;
-      font-size:30px;
+      font-size:34px;
       text-shadow:none;
     }
 
@@ -197,7 +197,7 @@
     }
 
     /* ✅ صفحات اللوبي/الانتظار */
-    .codeBox{font-size:20px;font-weight:900}
+    .codeBox{font-size:24px;font-weight:900}
     .codeNum{font-size:36px;font-weight:900;letter-spacing:2px}
     .smallNote{font-size:14px;opacity:.9;margin-top:8px}
 
@@ -1340,8 +1340,8 @@
       pointer-events:none;
     }
     .tvZoom{
-      width:150px;
-      max-width:32vw;
+      width:240px;
+      max-width:42vw;
       accent-color: var(--yellow);
     }
     .tvGameName{
@@ -1349,7 +1349,7 @@
       min-width:0;
       text-align:center;
       font-weight:900;
-      font-size:20px;
+      font-size:24px;
       line-height:1.1;
       direction:rtl;
       white-space:nowrap;
@@ -1400,8 +1400,8 @@
     @media (max-width:520px){
       body.tvMode .wrap{ padding-top:86px; }
       .tvLogo{width:46px;height:46px;}
-      .tvZoom{width:120px;max-width:34vw;}
-      .tvGameName{font-size:18px;}
+      .tvZoom{width:180px;max-width:46vw;}
+      .tvGameName{font-size:22px;}
       body.tvMode .tvTopBar .teamPill{height:38px;font-size:12px;padding:0 10px;}
       body.tvMode .tvTopBar .scoreBox{width:42px;height:38px;font-size:18px;}
     }
@@ -3220,6 +3220,7 @@ if(homeBtn && role !== "host"){
 
     let LAST_WIN_TS = 0;
     let LAST_WIN_RESET_TS = 0;
+    let LAST_RESTART_TS = 0;
 
     // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
@@ -3449,9 +3450,11 @@ if(homeBtn && role !== "host"){
     async function restartRaceSameSettings(){
       if(role !== "host") return;
       const baseRoom = LIVE.room || {};
-      const board = buildBoardState(baseRoom, Date.now());
+      const restartTs = Date.now();
+      const board = buildBoardState(baseRoom, restartTs);
       rememberBoard(board, baseRoom);
       const totalRounds = normalizeWinRounds(baseRoom?.settings?.winRounds || baseRoom?.round?.targetWins || 1);
+      const timerSel = Number(baseRoom?.timer?.sel || 10);
       const nextRoom = normalizeLiveRoom({
         ...baseRoom,
         status: "started",
@@ -3462,28 +3465,30 @@ if(homeBtn && role !== "host"){
         scores: { green:0, orange:0, a:0, b:0 },
         winEvent: null,
         winState: {},
+        restartTs,
         round: { current:1, targetWins: totalRounds, winner:null, boardSeed: Number(board.seed || 0) || 0 },
         mapStates: { "0": {} },
         current: { letter:null, qIndex:0, row:null, col:null, map:0 },
-        timer: { sel:Number(baseRoom?.timer?.sel || 10), dur:Number(baseRoom?.timer?.sel || 10), running:false, startTs:0, done:false }
+        timer: { sel:timerSel, dur:timerSel, running:false, startTs:0, done:false }
       });
       LIVE.room = nextRoom;
       scheduleRender();
       try{
-        await update(roomRef, {
-          status: "started",
-          activeMap: 0,
-          board,
-          freeze: false,
-          buzzer: null,
-          scores: { green:0, orange:0, a:0, b:0 },
-          winEvent: null,
-          winState: null,
-          round: { current:1, targetWins: totalRounds, winner:null, boardSeed: Number(board.seed || 0) || 0 },
-          mapStates: { "0": {} },
-          current: { letter:null, qIndex:0, row:null, col:null, map:0 },
-          timer: { sel:Number(baseRoom?.timer?.sel || 10), dur:Number(baseRoom?.timer?.sel || 10), running:false, startTs:0, done:false }
-        });
+        const updates = {};
+        updates[`rooms/${code}/status`] = "started";
+        updates[`rooms/${code}/activeMap`] = 0;
+        updates[`rooms/${code}/board`] = board;
+        updates[`rooms/${code}/freeze`] = false;
+        updates[`rooms/${code}/buzzer`] = null;
+        updates[`rooms/${code}/scores`] = { green:0, orange:0, a:0, b:0 };
+        updates[`rooms/${code}/winEvent`] = null;
+        updates[`rooms/${code}/winState`] = {};
+        updates[`rooms/${code}/restartTs`] = restartTs;
+        updates[`rooms/${code}/round`] = { current:1, targetWins: totalRounds, winner:null, boardSeed: Number(board.seed || 0) || 0 };
+        updates[`rooms/${code}/mapStates`] = { "0": {} };
+        updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:0 };
+        updates[`rooms/${code}/timer`] = { sel:timerSel, dur:timerSel, running:false, startTs:0, done:false };
+        await update(ref(db), updates);
         if(winBackdrop) winBackdrop.style.display = "none";
         clearConfetti();
         stopVois();
@@ -3623,6 +3628,128 @@ if(homeBtn && role !== "host"){
     if(roundEndBtn) roundEndBtn.addEventListener("click", endRaceToHome);
 
     const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
+    const CUSTOM_Q_PERSIST = {
+      lastRoomSig: "",
+      lastLocalSig: "",
+      lastPushTs: 0,
+      pushing: false
+    };
+
+    function getCustomQuestionsStorageKey(){
+      try{
+        const candidates = [
+          localStorage.getItem("sandooq_user_email"),
+          localStorage.getItem("user_email"),
+          localStorage.getItem("auth_email"),
+          localStorage.getItem("customer_email")
+        ].map(v => String(v || "").trim().toLowerCase()).filter(Boolean);
+        if(candidates.length) return `horof_custom_questions_v3::${candidates[0]}`;
+      }catch(e){}
+      return "horof_custom_questions_v3";
+    }
+
+    function normalizeCustomQuestionEntry(item){
+      if(!item || typeof item !== "object") return null;
+      const q = String(item.q || "").trim();
+      const a = String(item.a || "").trim();
+      if(!q && !a) return null;
+      return { q, a };
+    }
+
+    function normalizeCustomQuestionsMap(raw){
+      const out = {};
+      const src = (raw && typeof raw === "object") ? raw : {};
+      for(const L of GAME_LETTERS){
+        const v = src[L];
+        let arr = [];
+        if(Array.isArray(v)) arr = v;
+        else if(v && typeof v === "object") arr = [v];
+        const cleaned = arr.map(normalizeCustomQuestionEntry).filter(Boolean).slice(0, MAX_CUSTOM_PER_LETTER);
+        if(cleaned.length) out[L] = cleaned;
+      }
+      return out;
+    }
+
+    function loadPersistedCustomQuestionsEnvelope(){
+      try{
+        const raw = localStorage.getItem(getCustomQuestionsStorageKey());
+        if(!raw) return { updatedAt:0, customQuestions:{} };
+        const parsed = JSON.parse(raw);
+        return {
+          updatedAt: Number(parsed?.updatedAt || 0),
+          customQuestions: normalizeCustomQuestionsMap(parsed?.customQuestions || {})
+        };
+      }catch(e){
+        return { updatedAt:0, customQuestions:{} };
+      }
+    }
+
+    function savePersistedCustomQuestions(customQuestions, updatedAt){
+      try{
+        const clean = normalizeCustomQuestionsMap(customQuestions || {});
+        localStorage.setItem(getCustomQuestionsStorageKey(), JSON.stringify({
+          version: 3,
+          updatedAt: Number(updatedAt || Date.now()) || Date.now(),
+          customQuestions: clean
+        }));
+      }catch(e){}
+    }
+
+    function getRoomWithPersistentCustomQuestions(room){
+      const baseRoom = (room && typeof room === "object") ? room : {};
+      const localEnv = loadPersistedCustomQuestionsEnvelope();
+      const roomTs = Number(baseRoom?.customQuestionsUpdatedAt || 0);
+      const localTs = Number(localEnv?.updatedAt || 0);
+      const roomMap = normalizeCustomQuestionsMap(baseRoom?.customQuestions || {});
+      const localMap = normalizeCustomQuestionsMap(localEnv?.customQuestions || {});
+      if(localTs > roomTs){
+        return {
+          ...baseRoom,
+          customQuestions: localMap,
+          customQuestionsUpdatedAt: localTs
+        };
+      }
+      return {
+        ...baseRoom,
+        customQuestions: roomMap,
+        customQuestionsUpdatedAt: roomTs
+      };
+    }
+
+    async function syncPersistentCustomQuestions(room){
+      if(role !== "host") return;
+      const liveRoom = (room && typeof room === "object") ? room : {};
+      const localEnv = loadPersistedCustomQuestionsEnvelope();
+      const localTs = Number(localEnv?.updatedAt || 0);
+      const roomTs = Number(liveRoom?.customQuestionsUpdatedAt || 0);
+      const roomMap = normalizeCustomQuestionsMap(liveRoom?.customQuestions || {});
+      const localMap = normalizeCustomQuestionsMap(localEnv?.customQuestions || {});
+      const roomSig = `${roomTs}|${JSON.stringify(roomMap)}`;
+      const localSig = `${localTs}|${JSON.stringify(localMap)}`;
+
+      CUSTOM_Q_PERSIST.lastRoomSig = roomSig;
+      CUSTOM_Q_PERSIST.lastLocalSig = localSig;
+
+      if(roomTs > 0 && roomTs >= localTs){
+        if(roomSig !== localSig){
+          savePersistedCustomQuestions(roomMap, roomTs);
+          CUSTOM_Q_PERSIST.lastLocalSig = `${roomTs}|${JSON.stringify(roomMap)}`;
+        }
+        return;
+      }
+
+      if(localTs > roomTs && localTs !== CUSTOM_Q_PERSIST.lastPushTs && !CUSTOM_Q_PERSIST.pushing){
+        CUSTOM_Q_PERSIST.pushing = true;
+        CUSTOM_Q_PERSIST.lastPushTs = localTs;
+        try{
+          const updates = {};
+          updates[`rooms/${code}/customQuestions`] = localMap;
+          updates[`rooms/${code}/customQuestionsUpdatedAt`] = localTs;
+          await update(ref(db), updates);
+        }catch(e){}
+        CUSTOM_Q_PERSIST.pushing = false;
+      }
+    }
 
     function autosizeTA(ta){
       if(!ta) return;
@@ -3631,7 +3758,8 @@ if(homeBtn && role !== "host"){
     }
 
     function getCustomList(room, letter){
-      const cq = room?.customQuestions || {};
+      const sourceRoom = (role === "host") ? getRoomWithPersistentCustomQuestions(room || {}) : (room || {});
+      const cq = sourceRoom?.customQuestions || {};
       const v = cq?.[letter];
       if(Array.isArray(v)) return v.filter(x => x && (x.q || x.a));
       if(v && typeof v === "object") return [v].filter(x => x && (x.q || x.a));
@@ -3731,10 +3859,28 @@ if(homeBtn && role !== "host"){
           return;
         }
 
-        await update(ref(db, `rooms/${code}/customQuestions`), { [letter]: out });
-        await update(ref(db, `rooms/${code}`), { customQuestionsUpdatedAt: Date.now() });
+        const latestRoom = getRoomWithPersistentCustomQuestions(CUSTOM_Q_UI.roomLatest || LIVE.room || {});
+        const mergedQuestions = normalizeCustomQuestionsMap(latestRoom?.customQuestions || {});
+        if(out.length) mergedQuestions[letter] = out;
+        else delete mergedQuestions[letter];
 
-        savedMsg.textContent = "تم الحفظ ✅";
+        const saveTs = Date.now();
+        savePersistedCustomQuestions(mergedQuestions, saveTs);
+        CUSTOM_Q_UI.roomLatest = {
+          ...latestRoom,
+          customQuestions: mergedQuestions,
+          customQuestionsUpdatedAt: saveTs
+        };
+
+        try{
+          const updates = {};
+          updates[`rooms/${code}/customQuestions`] = mergedQuestions;
+          updates[`rooms/${code}/customQuestionsUpdatedAt`] = saveTs;
+          await update(ref(db), updates);
+          savedMsg.textContent = "تم الحفظ ✅";
+        }catch(e){
+          savedMsg.textContent = "تم الحفظ على هذا الجهاز ✅";
+        }
         setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
 
         refreshAddState();
@@ -3792,7 +3938,7 @@ if(homeBtn && role !== "host"){
 
     function openCustomQuestionsModal(room){
       ensureCustomQuestionsModal();
-      CUSTOM_Q_UI.roomLatest = room || {};
+      CUSTOM_Q_UI.roomLatest = getRoomWithPersistentCustomQuestions(room || {});
       const { backdrop, cqList } = CUSTOM_Q_UI.els;
       cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
       backdrop.style.display = "flex";
@@ -4845,7 +4991,7 @@ if(homeBtn && role !== "host"){
       const board = getBoard(room);
       const ZOOM_KEY = `sabaq_zoom_${code}`;
       const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "1");
-      const initialZoom = Math.max(0.8, Math.min(1.35, Number.isFinite(savedZoom) ? savedZoom : 1));
+      const initialZoom = Math.max(0.55, Math.min(1.35, Number.isFinite(savedZoom) ? savedZoom : 1));
 
       const visualTeams = getVisualTeams(room);
       const visualScores = getVisualScores(room);
@@ -4856,7 +5002,7 @@ if(homeBtn && role !== "host"){
           <div class="tvBarRow">
             <div class="tvLeft">
               <img class="tvLogo" src="logo.png" alt="صندوق المسابقات" onerror="this.style.display='none'">
-              <input id="zoom" class="tvZoom" type="range" min="0.8" max="1.35" step="0.01" value="${initialZoom}" aria-label="تكبير تصغير الخريطة"/>
+              <input id="zoom" class="tvZoom" type="range" min="0.55" max="1.35" step="0.01" value="${initialZoom}" aria-label="تكبير تصغير الخريطة"/>
             </div>
 
             <div id="tvGameName" class="tvGameName"></div>
@@ -5136,6 +5282,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       const board = getBoard(room);
       const boardSig = JSON.stringify({
         activeMap,
+        restartTs: Number(room?.restartTs || 0),
         size: board.size,
         shape: board.shape,
         seed: board.seed,
@@ -5306,6 +5453,18 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         requestAnimationFrame(()=>{ try{ applyTimerDom(); }catch(e){} });
       }catch(e){}
 
+      try{ syncPersistentCustomQuestions(room); }catch(e){}
+
+      try{
+        const restartTs = Number(room?.restartTs || 0);
+        if(restartTs && restartTs !== LAST_RESTART_TS){
+          LAST_RESTART_TS = restartTs;
+          if(role !== "host"){
+            setTimeout(() => { try{ _pullOnce(true); }catch(e){} }, 40);
+          }
+        }
+      }catch(e){}
+
       // ✅ (2) قصّ اللاعبين إذا تجاوزوا 13
       try{ prunePlayersIfOverLimit(room); }catch(e){}
 
@@ -5440,6 +5599,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         settings: (room.settings && typeof room.settings === "object") ? room.settings : {},
         teams: (room.teams && typeof room.teams === "object") ? room.teams : {},
         board: (room.board && typeof room.board === "object") ? room.board : null,
+        restartTs: Number(room.restartTs || 0),
         round: (room.round && typeof room.round === "object") ? room.round : { current:1, targetWins: normalizeWinRounds(room?.settings?.winRounds || 1), winner:null, boardSeed: Number(room?.board?.seed || 0) || 0 },
         winEvent: room.winEvent ?? null,
         winState: (room.winState && typeof room.winState === "object") ? room.winState : {},
@@ -5647,6 +5807,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-19-1 (fix final overlay not closing for players on restart) -->
+  <!-- VERSION: game_full.html — v2026-03-20-1 (custom questions local persistence + TV zoom/name tweak + restart resync fix) -->
 </body>
 </html>
