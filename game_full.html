@@ -3628,11 +3628,19 @@ if(homeBtn && role !== "host"){
     if(roundEndBtn) roundEndBtn.addEventListener("click", endRaceToHome);
 
     const CUSTOM_Q_UI = { ready: false, roomLatest: null, els: {} };
+    const CUSTOM_Q_API_URL = "/api2/custom-questions?game=horof";
     const CUSTOM_Q_PERSIST = {
       lastRoomSig: "",
       lastLocalSig: "",
+      lastRemoteSig: "",
       lastPushTs: 0,
-      pushing: false
+      pushing: false,
+      pushingRoom: false,
+      lastRoomPushTs: 0,
+      remoteLoaded: false,
+      remoteLoading: false,
+      remote: { updatedAt:0, customQuestions:{} },
+      lastFetchFailAt: 0
     };
 
     function getCustomQuestionsStorageKey(){
@@ -3643,9 +3651,9 @@ if(homeBtn && role !== "host"){
           localStorage.getItem("auth_email"),
           localStorage.getItem("customer_email")
         ].map(v => String(v || "").trim().toLowerCase()).filter(Boolean);
-        if(candidates.length) return `horof_custom_questions_v3::${candidates[0]}`;
+        if(candidates.length) return `horof_custom_questions_v4::${candidates[0]}`;
       }catch(e){}
-      return "horof_custom_questions_v3";
+      return "horof_custom_questions_v4";
     }
 
     function normalizeCustomQuestionEntry(item){
@@ -3670,6 +3678,13 @@ if(homeBtn && role !== "host"){
       return out;
     }
 
+    function parseApiTs(v){
+      if(!v) return 0;
+      if(typeof v === "number" && Number.isFinite(v)) return Number(v);
+      const n = Date.parse(String(v));
+      return Number.isFinite(n) ? n : 0;
+    }
+
     function loadPersistedCustomQuestionsEnvelope(){
       try{
         const raw = localStorage.getItem(getCustomQuestionsStorageKey());
@@ -3688,70 +3703,223 @@ if(homeBtn && role !== "host"){
       try{
         const clean = normalizeCustomQuestionsMap(customQuestions || {});
         localStorage.setItem(getCustomQuestionsStorageKey(), JSON.stringify({
-          version: 3,
+          version: 4,
           updatedAt: Number(updatedAt || Date.now()) || Date.now(),
           customQuestions: clean
         }));
       }catch(e){}
     }
 
+    function getStoredApiToken(){
+      const keys = ["sandooq_token_v1", "sandooq_session_v1", "token", "auth_token"];
+      try{
+        for(const k of keys){
+          const v = localStorage.getItem(k);
+          if(v && String(v).trim()) return String(v).trim();
+        }
+      }catch(e){}
+      try{
+        for(const k of keys){
+          const v = sessionStorage.getItem(k);
+          if(v && String(v).trim()) return String(v).trim();
+        }
+      }catch(e){}
+      return "";
+    }
+
+    function getCustomQuestionsApiHeaders(withJson=false){
+      const headers = { "Accept": "application/json" };
+      if(withJson) headers["Content-Type"] = "application/json";
+      const token = getStoredApiToken();
+      if(token) headers["Authorization"] = `Bearer ${token}`;
+      return headers;
+    }
+
+    function getRemoteCustomQuestionsEnvelope(){
+      return {
+        updatedAt: Number(CUSTOM_Q_PERSIST.remote?.updatedAt || 0),
+        customQuestions: normalizeCustomQuestionsMap(CUSTOM_Q_PERSIST.remote?.customQuestions || {})
+      };
+    }
+
+    async function fetchRemoteCustomQuestionsEnvelope(){
+      const res = await fetch(CUSTOM_Q_API_URL, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: getCustomQuestionsApiHeaders(false)
+      });
+      const j = await res.json().catch(() => null);
+      if(!res.ok || !j?.ok){
+        throw new Error(String(j?.error || `HTTP_${res.status || 0}`));
+      }
+      return {
+        updatedAt: Math.max(parseApiTs(j?.updated_at), parseApiTs(j?.created_at)),
+        customQuestions: normalizeCustomQuestionsMap(j?.questions || {})
+      };
+    }
+
+    async function saveRemoteCustomQuestionsEnvelope(customQuestions, updatedAt){
+      const clean = normalizeCustomQuestionsMap(customQuestions || {});
+      const desiredTs = Number(updatedAt || Date.now()) || Date.now();
+      const res = await fetch(CUSTOM_Q_API_URL.replace(/\?game=horof$/, ""), {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: getCustomQuestionsApiHeaders(true),
+        body: JSON.stringify({ game: "horof", questions: clean })
+      });
+      const j = await res.json().catch(() => null);
+      if(!res.ok || !j?.ok){
+        throw new Error(String(j?.error || `HTTP_${res.status || 0}`));
+      }
+      const apiTs = Math.max(parseApiTs(j?.updated_at), parseApiTs(j?.created_at), desiredTs);
+      CUSTOM_Q_PERSIST.remote = { updatedAt: apiTs, customQuestions: clean };
+      CUSTOM_Q_PERSIST.remoteLoaded = true;
+      CUSTOM_Q_PERSIST.lastRemoteSig = `${apiTs}|${JSON.stringify(clean)}`;
+      return { updatedAt: apiTs, customQuestions: clean };
+    }
+
+    function pickNewestCustomQuestionsEnvelope(roomEnv, localEnv, remoteEnv){
+      const candidates = [
+        { source:"room", updatedAt:Number(roomEnv?.updatedAt || 0), customQuestions: normalizeCustomQuestionsMap(roomEnv?.customQuestions || {}) },
+        { source:"local", updatedAt:Number(localEnv?.updatedAt || 0), customQuestions: normalizeCustomQuestionsMap(localEnv?.customQuestions || {}) },
+        { source:"remote", updatedAt:Number(remoteEnv?.updatedAt || 0), customQuestions: normalizeCustomQuestionsMap(remoteEnv?.customQuestions || {}) }
+      ];
+      candidates.sort((a,b) => {
+        if(Number(b.updatedAt || 0) !== Number(a.updatedAt || 0)) return Number(b.updatedAt || 0) - Number(a.updatedAt || 0);
+        const weight = { remote:3, room:2, local:1 };
+        return (weight[b.source] || 0) - (weight[a.source] || 0);
+      });
+      return candidates[0] || { source:"room", updatedAt:0, customQuestions:{} };
+    }
+
+    async function pushCustomQuestionsToRoom(customQuestions, updatedAt){
+      if(role !== "host") return;
+      const clean = normalizeCustomQuestionsMap(customQuestions || {});
+      const ts = Number(updatedAt || Date.now()) || Date.now();
+      if(CUSTOM_Q_PERSIST.pushingRoom && CUSTOM_Q_PERSIST.lastRoomPushTs === ts) return;
+      if(CUSTOM_Q_PERSIST.lastRoomPushTs === ts){
+        const curTs = Number(LIVE.room?.customQuestionsUpdatedAt || 0);
+        if(curTs === ts) return;
+      }
+      CUSTOM_Q_PERSIST.pushingRoom = true;
+      CUSTOM_Q_PERSIST.lastRoomPushTs = ts;
+      try{
+        const updates = {};
+        updates[`rooms/${code}/customQuestions`] = clean;
+        updates[`rooms/${code}/customQuestionsUpdatedAt`] = ts;
+        await update(ref(db), updates);
+      }catch(e){}
+      CUSTOM_Q_PERSIST.pushingRoom = false;
+    }
+
     function getRoomWithPersistentCustomQuestions(room){
       const baseRoom = (room && typeof room === "object") ? room : {};
       const localEnv = loadPersistedCustomQuestionsEnvelope();
-      const roomTs = Number(baseRoom?.customQuestionsUpdatedAt || 0);
-      const localTs = Number(localEnv?.updatedAt || 0);
-      const roomMap = normalizeCustomQuestionsMap(baseRoom?.customQuestions || {});
-      const localMap = normalizeCustomQuestionsMap(localEnv?.customQuestions || {});
-      if(localTs > roomTs){
-        return {
-          ...baseRoom,
-          customQuestions: localMap,
-          customQuestionsUpdatedAt: localTs
-        };
-      }
+      const remoteEnv = getRemoteCustomQuestionsEnvelope();
+      const roomEnv = {
+        updatedAt: Number(baseRoom?.customQuestionsUpdatedAt || 0),
+        customQuestions: normalizeCustomQuestionsMap(baseRoom?.customQuestions || {})
+      };
+      const best = pickNewestCustomQuestionsEnvelope(roomEnv, localEnv, remoteEnv);
       return {
         ...baseRoom,
-        customQuestions: roomMap,
-        customQuestionsUpdatedAt: roomTs
+        customQuestions: best.customQuestions,
+        customQuestionsUpdatedAt: Number(best.updatedAt || 0)
       };
+    }
+
+    async function hydratePersistentCustomQuestionsFromApi(force=false){
+      if(role !== "host") return;
+      const now = Date.now();
+      if(CUSTOM_Q_PERSIST.remoteLoading) return;
+      if(CUSTOM_Q_PERSIST.remoteLoaded && !force) return;
+      if(!force && CUSTOM_Q_PERSIST.lastFetchFailAt && (now - CUSTOM_Q_PERSIST.lastFetchFailAt) < 4000) return;
+      CUSTOM_Q_PERSIST.remoteLoading = true;
+      try{
+        const remoteEnv = await fetchRemoteCustomQuestionsEnvelope();
+        CUSTOM_Q_PERSIST.remote = remoteEnv;
+        CUSTOM_Q_PERSIST.remoteLoaded = true;
+
+        const liveRoom = (LIVE.room && typeof LIVE.room === "object") ? LIVE.room : {};
+        const roomEnv = {
+          updatedAt: Number(liveRoom?.customQuestionsUpdatedAt || 0),
+          customQuestions: normalizeCustomQuestionsMap(liveRoom?.customQuestions || {})
+        };
+        const localEnv = loadPersistedCustomQuestionsEnvelope();
+        const best = pickNewestCustomQuestionsEnvelope(roomEnv, localEnv, remoteEnv);
+
+        savePersistedCustomQuestions(best.customQuestions, best.updatedAt);
+        CUSTOM_Q_PERSIST.lastLocalSig = `${Number(best.updatedAt || 0)}|${JSON.stringify(best.customQuestions || {})}`;
+
+        if(best.updatedAt > Number(remoteEnv?.updatedAt || 0) && best.source !== "remote"){
+          try{ await saveRemoteCustomQuestionsEnvelope(best.customQuestions, best.updatedAt); }catch(e){}
+        }
+
+        if(best.updatedAt > Number(roomEnv?.updatedAt || 0)){
+          await pushCustomQuestionsToRoom(best.customQuestions, best.updatedAt);
+        }
+
+        LIVE.room = normalizeLiveRoom({
+          ...(LIVE.room || {}),
+          customQuestions: best.customQuestions,
+          customQuestionsUpdatedAt: Number(best.updatedAt || 0)
+        });
+        scheduleRender();
+      }catch(e){
+        CUSTOM_Q_PERSIST.lastFetchFailAt = Date.now();
+      }finally{
+        CUSTOM_Q_PERSIST.remoteLoading = false;
+      }
     }
 
     async function syncPersistentCustomQuestions(room){
       if(role !== "host") return;
-      const liveRoom = (room && typeof room === "object") ? room : {};
-      const localEnv = loadPersistedCustomQuestionsEnvelope();
-      const localTs = Number(localEnv?.updatedAt || 0);
-      const roomTs = Number(liveRoom?.customQuestionsUpdatedAt || 0);
-      const roomMap = normalizeCustomQuestionsMap(liveRoom?.customQuestions || {});
-      const localMap = normalizeCustomQuestionsMap(localEnv?.customQuestions || {});
-      const roomSig = `${roomTs}|${JSON.stringify(roomMap)}`;
-      const localSig = `${localTs}|${JSON.stringify(localMap)}`;
 
-      CUSTOM_Q_PERSIST.lastRoomSig = roomSig;
-      CUSTOM_Q_PERSIST.lastLocalSig = localSig;
-
-      if(roomTs > 0 && roomTs >= localTs){
-        if(roomSig !== localSig){
-          savePersistedCustomQuestions(roomMap, roomTs);
-          CUSTOM_Q_PERSIST.lastLocalSig = `${roomTs}|${JSON.stringify(roomMap)}`;
-        }
-        return;
+      if(!CUSTOM_Q_PERSIST.remoteLoaded && !CUSTOM_Q_PERSIST.remoteLoading){
+        hydratePersistentCustomQuestionsFromApi(false);
       }
 
-      if(localTs > roomTs && localTs !== CUSTOM_Q_PERSIST.lastPushTs && !CUSTOM_Q_PERSIST.pushing){
+      const liveRoom = (room && typeof room === "object") ? room : {};
+      const localEnv = loadPersistedCustomQuestionsEnvelope();
+      const remoteEnv = getRemoteCustomQuestionsEnvelope();
+      const roomEnv = {
+        updatedAt: Number(liveRoom?.customQuestionsUpdatedAt || 0),
+        customQuestions: normalizeCustomQuestionsMap(liveRoom?.customQuestions || {})
+      };
+
+      const roomSig = `${roomEnv.updatedAt}|${JSON.stringify(roomEnv.customQuestions)}`;
+      const localSig = `${localEnv.updatedAt}|${JSON.stringify(localEnv.customQuestions)}`;
+      const remoteSig = `${remoteEnv.updatedAt}|${JSON.stringify(remoteEnv.customQuestions)}`;
+      CUSTOM_Q_PERSIST.lastRoomSig = roomSig;
+      CUSTOM_Q_PERSIST.lastLocalSig = localSig;
+      CUSTOM_Q_PERSIST.lastRemoteSig = remoteSig;
+
+      const best = pickNewestCustomQuestionsEnvelope(roomEnv, localEnv, remoteEnv);
+      const bestSig = `${Number(best.updatedAt || 0)}|${JSON.stringify(best.customQuestions || {})}`;
+
+      if(bestSig !== localSig){
+        savePersistedCustomQuestions(best.customQuestions, best.updatedAt);
+        CUSTOM_Q_PERSIST.lastLocalSig = bestSig;
+      }
+
+      if(bestSig !== roomSig && Number(best.updatedAt || 0) > Number(roomEnv.updatedAt || 0) && !CUSTOM_Q_PERSIST.pushingRoom){
+        pushCustomQuestionsToRoom(best.customQuestions, best.updatedAt);
+      }
+
+      if(CUSTOM_Q_PERSIST.remoteLoaded && bestSig !== remoteSig && Number(best.updatedAt || 0) > Number(remoteEnv.updatedAt || 0) && Number(best.updatedAt || 0) !== CUSTOM_Q_PERSIST.lastPushTs && !CUSTOM_Q_PERSIST.pushing){
         CUSTOM_Q_PERSIST.pushing = true;
-        CUSTOM_Q_PERSIST.lastPushTs = localTs;
+        CUSTOM_Q_PERSIST.lastPushTs = Number(best.updatedAt || 0);
         try{
-          const updates = {};
-          updates[`rooms/${code}/customQuestions`] = localMap;
-          updates[`rooms/${code}/customQuestionsUpdatedAt`] = localTs;
-          await update(ref(db), updates);
+          await saveRemoteCustomQuestionsEnvelope(best.customQuestions, best.updatedAt);
         }catch(e){}
         CUSTOM_Q_PERSIST.pushing = false;
       }
     }
 
     function autosizeTA(ta){
+
       if(!ta) return;
       ta.style.height = "auto";
       ta.style.height = Math.min(240, ta.scrollHeight) + "px";
@@ -3866,19 +4034,39 @@ if(homeBtn && role !== "host"){
 
         const saveTs = Date.now();
         savePersistedCustomQuestions(mergedQuestions, saveTs);
+        CUSTOM_Q_PERSIST.remote = { updatedAt: saveTs, customQuestions: mergedQuestions };
+        CUSTOM_Q_PERSIST.remoteLoaded = true;
         CUSTOM_Q_UI.roomLatest = {
           ...latestRoom,
           customQuestions: mergedQuestions,
           customQuestionsUpdatedAt: saveTs
         };
 
+        LIVE.room = normalizeLiveRoom({
+          ...(LIVE.room || {}),
+          customQuestions: mergedQuestions,
+          customQuestionsUpdatedAt: saveTs
+        });
+        scheduleRender();
+
+        let roomSaved = false;
+        let remoteSaved = false;
+
         try{
-          const updates = {};
-          updates[`rooms/${code}/customQuestions`] = mergedQuestions;
-          updates[`rooms/${code}/customQuestionsUpdatedAt`] = saveTs;
-          await update(ref(db), updates);
-          savedMsg.textContent = "تم الحفظ ✅";
-        }catch(e){
+          await pushCustomQuestionsToRoom(mergedQuestions, saveTs);
+          roomSaved = true;
+        }catch(e){}
+
+        try{
+          await saveRemoteCustomQuestionsEnvelope(mergedQuestions, saveTs);
+          remoteSaved = true;
+        }catch(e){}
+
+        if(remoteSaved){
+          savedMsg.textContent = "تم الحفظ دائمًا ✅";
+        }else if(roomSaved){
+          savedMsg.textContent = "تم الحفظ داخل الجلسة ✅";
+        }else{
           savedMsg.textContent = "تم الحفظ على هذا الجهاز ✅";
         }
         setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
@@ -3939,6 +4127,7 @@ if(homeBtn && role !== "host"){
     function openCustomQuestionsModal(room){
       ensureCustomQuestionsModal();
       CUSTOM_Q_UI.roomLatest = getRoomWithPersistentCustomQuestions(room || {});
+      try{ hydratePersistentCustomQuestionsFromApi(false); }catch(e){}
       const { backdrop, cqList } = CUSTOM_Q_UI.els;
       cqList.querySelectorAll(".cqItem[open]").forEach(d => d.removeAttribute("open"));
       backdrop.style.display = "flex";
@@ -4245,8 +4434,9 @@ if(homeBtn && role !== "host"){
       });
 
       document.getElementById("startBtn").addEventListener("click", async () => {
-        const board = buildBoardState(room, Date.now());
-        const targetWins = normalizeWinRounds(room?.settings?.winRounds || room?.round?.targetWins || 1);
+        const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+        const board = buildBoardState(latestRoomForStart, Date.now());
+        const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
         LAST_STABLE_BOARD = board;
         await update(roomRef, {
           status: "started",
@@ -4257,6 +4447,8 @@ if(homeBtn && role !== "host"){
           scores: { green:0, orange:0, a:0, b:0 },
           winEvent: null,
           winState: null,
+          customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
+          customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
           round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
           mapStates: { "0": {} },
           current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
