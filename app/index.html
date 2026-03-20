@@ -31,6 +31,8 @@
       --sectionTitle:#7b1f63;
       --sectionAccent:#18b9c8;
       --closeRed:#ea3d3d;
+      --themeOn:#1fbf63;
+      --themeOff:#e14b4b;
     }
 
     *{box-sizing:border-box}
@@ -135,6 +137,27 @@
       gap:10px;
     }
 
+    .control-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .control-card{
+      min-width:0;
+    }
+
+    .control-box{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:56px;
+      padding:8px 12px;
+      background:#fff;
+      border:2px solid var(--line);
+      border-radius:14px;
+    }
+
     .option-grid{
       display:grid;
       grid-template-columns:repeat(3, 1fr);
@@ -172,12 +195,13 @@
       align-items:center;
       justify-content:center;
       gap:18px;
-      padding:8px 12px;
-      background:#fff;
-      border:2px solid var(--line);
-      border-radius:14px;
+      padding:0;
+      background:transparent;
+      border:none;
+      border-radius:0;
       direction:ltr;
-      min-height:56px;
+      min-height:auto;
+      width:100%;
     }
 
     .players-btn{
@@ -211,6 +235,52 @@
       font-size:18px;
       line-height:1;
       font-weight:700;
+    }
+
+    .theme-box{
+      padding:6px 12px;
+    }
+
+    .theme-toggle{
+      width:92px;
+      height:40px;
+      border:none;
+      border-radius:999px;
+      cursor:pointer;
+      position:relative;
+      padding:0;
+      transition:background .18s ease, box-shadow .18s ease, transform .12s ease;
+      box-shadow:0 8px 18px rgba(0,0,0,.14);
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+    }
+
+    .theme-toggle:active{
+      transform:scale(.97);
+    }
+
+    .theme-toggle.on{
+      background:var(--themeOn);
+    }
+
+    .theme-toggle.off{
+      background:var(--themeOff);
+    }
+
+    .theme-toggle-dot{
+      width:30px;
+      height:30px;
+      border-radius:50%;
+      background:#fff;
+      display:block;
+      box-shadow:0 3px 8px rgba(0,0,0,.18);
+      transition:transform .18s ease;
+      transform:translateX(6px);
+    }
+
+    .theme-toggle.on .theme-toggle-dot{
+      transform:translateX(56px);
     }
 
     .colors-grid{
@@ -470,7 +540,8 @@
       .label{
         font-size:17px;
       }
-      .row-2{
+      .row-2,
+      .control-grid{
         gap:8px;
       }
       .colors-grid{
@@ -478,7 +549,6 @@
       }
       .players-box{
         gap:16px;
-        min-height:54px;
       }
       .players-btn{
         width:32px;
@@ -489,6 +559,18 @@
       .players-value{
         min-width:30px;
         font-size:17px;
+      }
+      .theme-toggle{
+        width:84px;
+        height:38px;
+      }
+      .theme-toggle-dot{
+        width:28px;
+        height:28px;
+        transform:translateX(5px);
+      }
+      .theme-toggle.on .theme-toggle-dot{
+        transform:translateX(51px);
       }
       .action-row{
         grid-template-columns:1fr 1fr;
@@ -539,11 +621,26 @@
       </div>
 
       <div class="section">
-        <div class="label">عدد اللاعبين</div>
-        <div class="players-box">
-          <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">&lt;</button>
-          <div class="players-value" id="playersValue">1</div>
-          <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">&gt;</button>
+        <div class="control-grid">
+          <div class="control-card">
+            <div class="label">عدد اللاعبين</div>
+            <div class="control-box">
+              <div class="players-box">
+                <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">&lt;</button>
+                <div class="players-value" id="playersValue">1</div>
+                <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">&gt;</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-card">
+            <div class="label">ثيم العيد</div>
+            <div class="control-box theme-box">
+              <button type="button" class="theme-toggle on" id="eidThemeToggle" aria-label="تشغيل أو إطفاء ثيم العيد" aria-pressed="true">
+                <span class="theme-toggle-dot" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -685,7 +782,8 @@
       rounds: 1,
       cellCount: 4,
       colorPairId: DEFAULT_COLOR_PAIR_ID,
-      players: 1
+      players: 1,
+      eidThemeEnabled: true
     };
 
     function random6(){
@@ -783,6 +881,27 @@
       updatePlayersView();
     }
 
+    function updateEidThemeToggle(){
+      const btn = document.getElementById("eidThemeToggle");
+      if(!btn) return;
+
+      btn.classList.toggle("on", !!state.eidThemeEnabled);
+      btn.classList.toggle("off", !state.eidThemeEnabled);
+      btn.setAttribute("aria-pressed", state.eidThemeEnabled ? "true" : "false");
+    }
+
+    function setupEidThemeToggle(){
+      const btn = document.getElementById("eidThemeToggle");
+      if(!btn) return;
+
+      btn.addEventListener("click", () => {
+        state.eidThemeEnabled = !state.eidThemeEnabled;
+        updateEidThemeToggle();
+      });
+
+      updateEidThemeToggle();
+    }
+
     function setupHelpModal(){
       const modal = document.getElementById("helpModal");
       const openBtn = document.getElementById("openHelpBtn");
@@ -868,6 +987,7 @@
         presenterKey: hostKey,
         status: "lobby",
         createdAt: Date.now(),
+        eidThemeEnabled: !!state.eidThemeEnabled,
 
         settings: {
           competitionName: name,
@@ -877,6 +997,7 @@
           cellCount: state.cellCount,
           gridType: state.cellCount === 4 ? "square" : state.cellCount === 5 ? "pentagon" : "hex",
           colorPairId: state.colorPairId,
+          eidThemeEnabled: !!state.eidThemeEnabled,
           colorPair: {
             a: pair.a,
             b: pair.b
@@ -984,6 +1105,7 @@
     renderColorPairs();
     setupOptionButtons();
     setupPlayersControl();
+    setupEidThemeToggle();
     setupHelpModal();
     document.getElementById("btn").addEventListener("click", createRoom);
   </script>
