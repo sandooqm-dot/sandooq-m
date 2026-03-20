@@ -2914,8 +2914,29 @@ function hideEidIntro(immediate){
       }, 950);
     }
 
+    function isEidThemeEnabled(room){
+      const direct = room?.eidThemeEnabled;
+      const settingsVal = room?.settings?.eidThemeEnabled;
+      if(direct === false || settingsVal === false) return false;
+      return true;
+    }
+
     function maybeShowEidIntro(room){
       if(!room || room.status !== "started") return;
+      if(!isEidThemeEnabled(room)){
+        EID_INTRO.shown = true;
+        EID_INTRO.hidden = true;
+        stopEidIntroAudio();
+        ensureEidIntroDom();
+        if(EID_INTRO.timer) clearTimeout(EID_INTRO.timer);
+        if(EID_INTRO.hideTimer) clearTimeout(EID_INTRO.hideTimer);
+        if(EID_INTRO.overlay){
+          EID_INTRO.overlay.classList.remove("show", "hide");
+          EID_INTRO.overlay.style.display = "none";
+          EID_INTRO.overlay.setAttribute("aria-hidden", "true");
+        }
+        return;
+      }
       ensureEidIntroDom();
       setEidIntroTitle(room?.name || room?.gameName || room?.title || "");
       const seenKey = `eid_intro_seen_${code}`;
