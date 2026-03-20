@@ -23,6 +23,7 @@
   <!-- ✅ (جديد) Preload للأصوات (لو ما كانت موجودة ما يضر) -->
   <link rel="preload" href="rong.mp3?v=2026-02-15-1" as="audio">
   <link rel="preload" href="vois.mp3?v=2026-02-15-1" as="audio">
+  <link rel="preload" href="ead.mp3?v=2026-03-20-4" as="audio">
 
   <style>
     @font-face{
@@ -2744,10 +2745,19 @@ if(homeBtn && role !== "host"){
 
 
     const EID_INTRO_DURATION = 18000;
+    const EID_INTRO_AUDIO_CANDIDATES = [
+      "ead.mp3?v=2026-03-20-4",
+      "ead.m4a?v=2026-03-20-4",
+      "ead.wav?v=2026-03-20-4",
+      "ead.ogg?v=2026-03-20-4",
+      "ead?v=2026-03-20-4"
+    ];
     const EID_INTRO = {
       overlay: null,
       title: null,
       stars: null,
+      audio: null,
+      audioIndex: 0,
       shown: false,
       hidden: false,
       timer: null,
@@ -2759,6 +2769,17 @@ if(homeBtn && role !== "host"){
       EID_INTRO.overlay = document.getElementById("eidIntroOverlay");
       EID_INTRO.title = document.getElementById("eidIntroTitle");
       EID_INTRO.stars = document.getElementById("eidStars");
+      if(EID_INTRO.overlay && !EID_INTRO.overlay.dataset.skipBound){
+        const skipIntroNow = (ev) => {
+          if(!EID_INTRO.overlay || EID_INTRO.hidden) return;
+          if(!EID_INTRO.overlay.classList.contains("show")) return;
+          try{ ev?.preventDefault?.(); }catch(e){}
+          hideEidIntro(true);
+        };
+        EID_INTRO.overlay.addEventListener("pointerdown", skipIntroNow, { passive:false });
+        EID_INTRO.overlay.addEventListener("click", skipIntroNow, { passive:false });
+        EID_INTRO.overlay.dataset.skipBound = "1";
+      }
       if(EID_INTRO.stars && !EID_INTRO.stars.dataset.ready){
         const count = window.innerWidth <= 700 ? 44 : 62;
         for(let i=0; i<count; i++) {
@@ -2793,12 +2814,62 @@ if(homeBtn && role !== "host"){
       EID_INTRO.title.textContent = s;
     }
 
-    function hideEidIntro(){
+    function ensureEidIntroAudio(){
+      if(EID_INTRO.audio) return EID_INTRO.audio;
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      audio.crossOrigin = "anonymous";
+      const tryCandidate = (idx) => {
+        if(idx < 0 || idx >= EID_INTRO_AUDIO_CANDIDATES.length) return;
+        EID_INTRO.audioIndex = idx;
+        audio.src = EID_INTRO_AUDIO_CANDIDATES[idx];
+        try{ audio.load(); }catch(e){}
+      };
+      audio.addEventListener("error", () => {
+        const next = EID_INTRO.audioIndex + 1;
+        if(next < EID_INTRO_AUDIO_CANDIDATES.length){
+          tryCandidate(next);
+        }
+      });
+      tryCandidate(0);
+      EID_INTRO.audio = audio;
+      return audio;
+    }
+
+    function playEidIntroAudio(){
+      const audio = ensureEidIntroAudio();
+      if(!audio) return;
+      try{ audio.pause(); }catch(e){}
+      try{ audio.currentTime = 0; }catch(e){}
+      try{
+        const p = audio.play();
+        if(p && typeof p.catch === "function") p.catch(() => {});
+      }catch(e){}
+    }
+
+    function stopEidIntroAudio(){
+      const audio = EID_INTRO.audio;
+      if(!audio) return;
+      try{ audio.pause(); }catch(e){}
+      try{ audio.currentTime = 0; }catch(e){}
+    }
+
+    function hideEidIntro(immediate){
       ensureEidIntroDom();
       if(!EID_INTRO.overlay || EID_INTRO.hidden) return;
       EID_INTRO.hidden = true;
-      EID_INTRO.overlay.classList.add("hide");
+      if(EID_INTRO.timer) clearTimeout(EID_INTRO.timer);
       if(EID_INTRO.hideTimer) clearTimeout(EID_INTRO.hideTimer);
+      stopEidIntroAudio();
+      if(immediate){
+        EID_INTRO.overlay.classList.remove("show", "hide");
+        EID_INTRO.overlay.style.display = "none";
+        EID_INTRO.overlay.setAttribute("aria-hidden", "true");
+        return;
+      }
+      EID_INTRO.overlay.classList.add("hide");
       EID_INTRO.hideTimer = setTimeout(() => {
         if(!EID_INTRO.overlay) return;
         EID_INTRO.overlay.classList.remove("show", "hide");
@@ -2823,8 +2894,9 @@ if(homeBtn && role !== "host"){
       EID_INTRO.overlay.classList.remove("hide");
       EID_INTRO.overlay.classList.add("show");
       EID_INTRO.overlay.setAttribute("aria-hidden", "false");
+      playEidIntroAudio();
       if(EID_INTRO.timer) clearTimeout(EID_INTRO.timer);
-      EID_INTRO.timer = setTimeout(hideEidIntro, EID_INTRO_DURATION);
+      EID_INTRO.timer = setTimeout(() => hideEidIntro(false), EID_INTRO_DURATION);
     }
 
     if(!role || !code){
