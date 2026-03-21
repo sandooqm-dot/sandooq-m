@@ -33,6 +33,14 @@
       --closeRed:#ea3d3d;
       --themeOn:#27c266;
       --themeOff:#e14b4b;
+      --updatesBtn:#59206d;
+      --updatesBtnText:#fff3a4;
+      --updatesBtnActive:#27c266;
+      --updatesBtnActiveBorder:#167c41;
+      --updatesDialogBg:#fff8cc;
+      --updatesDialogBorder:#2b1b17;
+      --updatesError:#d63939;
+      --updatesSuccess:#17954f;
     }
 
     *{box-sizing:border-box}
@@ -82,7 +90,7 @@
       width:92%;
       max-width:560px;
       margin:0 auto;
-      padding-bottom:28px;
+      padding-bottom:92px;
     }
 
     .card{
@@ -530,6 +538,145 @@
       font-weight:700;
     }
 
+    .updates-fab{
+      position:fixed;
+      right:14px;
+      bottom:14px;
+      z-index:1000;
+      display:flex;
+      justify-content:flex-end;
+      pointer-events:none;
+    }
+
+    .updates-btn{
+      pointer-events:auto;
+      min-width:154px;
+      padding:13px 16px;
+      border-radius:14px;
+      border:2px solid var(--yellow);
+      background:var(--updatesBtn);
+      color:var(--updatesBtnText);
+      font-size:16px;
+      cursor:pointer;
+      box-shadow:0 10px 20px rgba(0,0,0,.18);
+      font-weight:700;
+      transition:transform .12s ease, background .15s ease, color .15s ease, border-color .15s ease;
+    }
+
+    .updates-btn:active{
+      transform:scale(.98);
+    }
+
+    .updates-btn.active{
+      background:var(--updatesBtnActive);
+      border-color:var(--updatesBtnActiveBorder);
+      color:#fff;
+    }
+
+    .updates-modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px 14px;
+      z-index:10000;
+    }
+
+    .updates-modal.show{
+      display:flex;
+    }
+
+    .updates-dialog{
+      position:relative;
+      width:min(420px, 100%);
+      background:var(--updatesDialogBg);
+      border:5px solid var(--updatesDialogBorder);
+      border-radius:24px;
+      box-shadow:0 20px 40px rgba(0,0,0,.3);
+      padding:22px 16px 18px;
+      color:#161616;
+      text-align:center;
+    }
+
+    .updates-close{
+      position:absolute;
+      top:10px;
+      left:10px;
+      width:42px;
+      height:42px;
+      border:none;
+      border-radius:50%;
+      background:var(--closeRed);
+      color:#fff;
+      font-size:24px;
+      line-height:1;
+      cursor:pointer;
+      box-shadow:0 8px 18px rgba(0,0,0,.2);
+      font-family:Arial, sans-serif !important;
+      font-weight:700;
+    }
+
+    .updates-title{
+      margin:0 42px 10px;
+      color:#1b1b1b;
+      font-size:24px;
+      font-weight:700;
+    }
+
+    .updates-subtitle{
+      margin:0 0 14px;
+      color:#4d3147;
+      font-size:16px;
+      line-height:1.8;
+      font-weight:700;
+    }
+
+    .updates-input{
+      width:100%;
+      text-align:center;
+      letter-spacing:2px;
+    }
+
+    .updates-input::placeholder{
+      letter-spacing:0;
+    }
+
+    .updates-msg{
+      min-height:26px;
+      margin:10px 0 0;
+      font-size:15px;
+      font-weight:700;
+    }
+
+    .updates-msg.error{
+      color:var(--updatesError);
+    }
+
+    .updates-msg.success{
+      color:var(--updatesSuccess);
+    }
+
+    .updates-actions{
+      display:flex;
+      justify-content:center;
+      margin-top:10px;
+    }
+
+    .updates-submit{
+      min-width:150px;
+      padding:13px 16px;
+      border:none;
+      border-radius:14px;
+      background:var(--yellow);
+      color:#000;
+      font-size:18px;
+      cursor:pointer;
+      box-shadow:0 10px 20px rgba(0,0,0,.12);
+      font-weight:700;
+    }
+
     @media (max-width: 420px){
       .option-grid{
         grid-template-columns:repeat(3, 1fr);
@@ -596,6 +743,24 @@
       .help-section p,
       .help-list li{
         font-size:15px;
+      }
+      .updates-fab{
+        right:10px;
+        bottom:10px;
+      }
+      .updates-btn{
+        min-width:140px;
+        font-size:15px;
+        padding:12px 14px;
+      }
+      .updates-title{
+        font-size:22px;
+      }
+      .updates-subtitle{
+        font-size:15px;
+      }
+      .updates-submit{
+        font-size:17px;
       }
     }
   </style>
@@ -673,6 +838,31 @@
       <div class="action-row">
         <button id="btn" class="submit-btn">إنشاء اللعبة</button>
         <button type="button" id="openHelpBtn" class="help-open-btn">التعليمات</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="updates-fab">
+    <button type="button" id="updatesModeBtn" class="updates-btn" aria-pressed="false">خاص بالتحديثات</button>
+  </div>
+
+  <div class="updates-modal" id="updatesModal" aria-hidden="true">
+    <div class="updates-dialog" role="dialog" aria-modal="true" aria-labelledby="updatesTitle">
+      <button type="button" class="updates-close" id="closeUpdatesBtn" aria-label="إغلاق">×</button>
+      <h2 class="updates-title" id="updatesTitle">خاص بالتحديثات</h2>
+      <p class="updates-subtitle">أدخل الرمز لتفعيل نمط الإجابة المكتوبة</p>
+      <input
+        id="updatesCodeInput"
+        class="updates-input center-input"
+        type="password"
+        inputmode="numeric"
+        maxlength="4"
+        autocomplete="off"
+        placeholder="أدخل الرمز"
+      >
+      <div class="updates-msg" id="updatesMsg"></div>
+      <div class="updates-actions">
+        <button type="button" id="submitUpdatesCodeBtn" class="updates-submit">تفعيل</button>
       </div>
     </div>
   </div>
@@ -780,13 +970,15 @@
     ];
 
     const DEFAULT_COLOR_PAIR_ID = "green-orange";
+    const WRITTEN_MODE_CODE = "6635";
 
     const state = {
       rounds: 1,
       cellCount: 4,
       colorPairId: DEFAULT_COLOR_PAIR_ID,
       players: 1,
-      eidThemeEnabled: true
+      eidThemeEnabled: true,
+      writtenAnswerModeEnabled: false
     };
 
     function random6(){
@@ -905,6 +1097,85 @@
       updateEidThemeToggle();
     }
 
+    function updateWrittenModeButton(){
+      const btn = document.getElementById("updatesModeBtn");
+      if(!btn) return;
+      btn.classList.toggle("active", !!state.writtenAnswerModeEnabled);
+      btn.setAttribute("aria-pressed", state.writtenAnswerModeEnabled ? "true" : "false");
+    }
+
+    function setupWrittenModeControl(){
+      const modal = document.getElementById("updatesModal");
+      const openBtn = document.getElementById("updatesModeBtn");
+      const closeBtn = document.getElementById("closeUpdatesBtn");
+      const submitBtn = document.getElementById("submitUpdatesCodeBtn");
+      const input = document.getElementById("updatesCodeInput");
+      const msg = document.getElementById("updatesMsg");
+
+      function setMsg(text, type){
+        msg.textContent = text || "";
+        msg.className = "updates-msg" + (type ? ` ${type}` : "");
+      }
+
+      function openModal(){
+        modal.classList.add("show");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+        input.value = "";
+        if(state.writtenAnswerModeEnabled){
+          setMsg("تم تفعيل نمط الإجابة المكتوبة لهذه الغرفة", "success");
+        }else{
+          setMsg("", "");
+        }
+        setTimeout(() => input.focus(), 30);
+      }
+
+      function closeModal(){
+        modal.classList.remove("show");
+        modal.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+      }
+
+      function submitCode(){
+        const code = input.value.trim();
+
+        if(code === WRITTEN_MODE_CODE){
+          state.writtenAnswerModeEnabled = true;
+          updateWrittenModeButton();
+          setMsg("تم تفعيل نمط الإجابة المكتوبة", "success");
+          setTimeout(closeModal, 500);
+          return;
+        }
+
+        setMsg("الرمز غير صحيح", "error");
+        input.focus();
+        input.select();
+      }
+
+      openBtn.addEventListener("click", openModal);
+      closeBtn.addEventListener("click", closeModal);
+      submitBtn.addEventListener("click", submitCode);
+
+      input.addEventListener("keydown", (e) => {
+        if(e.key === "Enter"){
+          e.preventDefault();
+          submitCode();
+        }
+      });
+
+      modal.addEventListener("click", (e) => {
+        if(e.target === modal) closeModal();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if(e.key === "Escape" && modal.classList.contains("show")){
+          closeModal();
+        }
+      });
+
+      updateWrittenModeButton();
+    }
+
     function setupHelpModal(){
       const modal = document.getElementById("helpModal");
       const openBtn = document.getElementById("openHelpBtn");
@@ -991,6 +1262,11 @@
         status: "lobby",
         createdAt: Date.now(),
         eidThemeEnabled: !!state.eidThemeEnabled,
+        writtenAnswerModeEnabled: !!state.writtenAnswerModeEnabled,
+
+        modes: {
+          writtenAnswerModeEnabled: !!state.writtenAnswerModeEnabled
+        },
 
         settings: {
           competitionName: name,
@@ -1001,6 +1277,7 @@
           gridType: state.cellCount === 4 ? "square" : state.cellCount === 5 ? "pentagon" : "hex",
           colorPairId: state.colorPairId,
           eidThemeEnabled: !!state.eidThemeEnabled,
+          writtenAnswerModeEnabled: !!state.writtenAnswerModeEnabled,
           colorPair: {
             a: pair.a,
             b: pair.b
@@ -1109,6 +1386,7 @@
     setupOptionButtons();
     setupPlayersControl();
     setupEidThemeToggle();
+    setupWrittenModeControl();
     setupHelpModal();
     document.getElementById("btn").addEventListener("click", createRoom);
   </script>
