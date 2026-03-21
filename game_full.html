@@ -1039,6 +1039,142 @@
     }
     .timerMiniItem:active{ transform: translateY(1px); }
 
+
+    /* ✅ خاص بالتحديثات (زر + نافذة رمز في اللوبي فقط) */
+    .staffModeFab{
+      position:fixed;
+      right:18px;
+      bottom:calc(18px + env(safe-area-inset-bottom));
+      z-index:26000;
+      display:flex;
+      justify-content:flex-end;
+    }
+    .staffModeBtn{
+      min-width:164px;
+      height:58px;
+      padding:0 18px;
+      border-radius:18px;
+      border:4px solid #f4c400;
+      background:rgba(91,32,109,.92);
+      color:#fff4b0;
+      font-size:22px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 12px 24px rgba(0,0,0,.22);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      white-space:nowrap;
+    }
+    .staffModeBtn:active{ transform: translateY(1px); }
+    .staffModeBtn.active{
+      background:rgba(26,163,74,.96);
+      color:#fff;
+      border-color:rgba(255,255,255,.88);
+    }
+
+    .staffModeBackdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.50);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:32000;
+      padding:16px;
+    }
+    .staffModeModal{
+      position:relative;
+      width:min(92vw, 720px);
+      background:#fff8cc;
+      color:#111;
+      border-radius:26px;
+      border:8px solid rgba(0,0,0,.85);
+      box-shadow:0 24px 36px rgba(0,0,0,.30);
+      padding:24px 18px 20px;
+      text-align:center;
+    }
+    .staffModeClose{
+      position:absolute;
+      left:12px;
+      top:12px;
+      width:58px;
+      height:58px;
+      border:none;
+      border-radius:50%;
+      background:#ef4444;
+      color:#fff;
+      font-size:34px;
+      font-weight:900;
+      cursor:pointer;
+      line-height:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 12px 18px rgba(0,0,0,.18);
+      border:4px solid rgba(255,255,255,.15);
+      font-family:Arial, sans-serif;
+    }
+    .staffModeTitle{
+      margin:4px 56px 10px;
+      font-size:30px;
+      font-weight:900;
+      color:#111;
+    }
+    .staffModeSub{
+      margin:0 0 18px;
+      font-size:20px;
+      font-weight:900;
+      color:#4b2342;
+      line-height:1.55;
+    }
+    .staffModeInput{
+      width:100%;
+      height:74px;
+      border-radius:18px;
+      border:4px solid rgba(173,77,148,.75);
+      background:#fff;
+      color:#111;
+      font-size:28px;
+      font-weight:900;
+      text-align:center;
+      outline:none;
+      box-shadow:inset 0 0 0 2px rgba(255,255,255,.45), 0 8px 16px rgba(0,0,0,.08);
+      letter-spacing:4px;
+      direction:ltr;
+    }
+    .staffModeInput::placeholder{
+      letter-spacing:0;
+      color:rgba(0,0,0,.28);
+    }
+    .staffModeMsg{
+      min-height:28px;
+      margin:10px 0 4px;
+      font-size:16px;
+      font-weight:900;
+    }
+    .staffModeMsg.error{ color:#d62828; }
+    .staffModeMsg.success{ color:#15803d; }
+    .staffModeActions{
+      display:flex;
+      justify-content:center;
+      margin-top:10px;
+    }
+    .staffModeApply{
+      min-width:240px;
+      height:64px;
+      padding:0 18px;
+      border:none;
+      border-radius:18px;
+      background:#f4c400;
+      color:#111;
+      font-size:28px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 10px 18px rgba(0,0,0,.18);
+      border:4px solid rgba(255,255,255,.18);
+    }
+    .staffModeApply:active{ transform: translateY(1px); }
+
     .roundOverlay{
       position:fixed;
       inset:0;
@@ -1616,6 +1752,43 @@
       .gameName{ min-height:0; }
       .pillBtn{ height:72px; font-size:26px; }
       .qText{ font-size:28px; }
+      .staffModeFab{
+        right:12px;
+        bottom:calc(12px + env(safe-area-inset-bottom));
+      }
+      .staffModeBtn{
+        min-width:148px;
+        height:54px;
+        padding:0 14px;
+        font-size:19px;
+        border-radius:16px;
+      }
+      .staffModeModal{
+        padding:18px 14px 16px;
+        border-width:6px;
+      }
+      .staffModeClose{
+        width:50px;
+        height:50px;
+        font-size:30px;
+      }
+      .staffModeTitle{
+        margin:2px 46px 8px;
+        font-size:26px;
+      }
+      .staffModeSub{
+        font-size:18px;
+        margin-bottom:14px;
+      }
+      .staffModeInput{
+        height:68px;
+        font-size:26px;
+      }
+      .staffModeApply{
+        min-width:220px;
+        height:60px;
+        font-size:26px;
+      }
     }
   </style>
 </head>
@@ -4788,6 +4961,7 @@ function hideEidIntro(immediate){
       const greenText = getReadableTextColor(visualTeams.green.color);
       const orangeText = getReadableTextColor(visualTeams.orange.color);
       const tvBtnLabel = displayPlayer ? `جهاز العرض: ${escapeHtml(displayPlayer.name || "لاعب")}` : "عرض الشاشة";
+      const updatesEnabled = !!(room?.writtenAnswerModeEnabled || room?.modes?.writtenAnswerModeEnabled || room?.settings?.writtenAnswerModeEnabled);
 
       main.innerHTML = `
         <div class="lobbyCard">
@@ -4858,6 +5032,31 @@ function hideEidIntro(immediate){
               <div class="shareTitle">جهاز عرض الشاشة</div>
               <div class="shareSmall" style="color:#111;text-align:center">اختر لاعبًا واحدًا فقط ليعمل كجهاز عرض. إذا كان هناك لاعب مختار فسيظهر وحده هنا، واضغط عليه لإرجاعه مع اللاعبين.</div>
               <div class="tvPickList">${tvListHtml}</div>
+            </div>
+          </div>
+
+          <div class="staffModeFab">
+            <button id="staffModeBtn" class="staffModeBtn ${updatesEnabled ? 'active' : ''}" type="button">خاص بالتحديثات</button>
+          </div>
+
+          <div id="staffModeBackdrop" class="staffModeBackdrop">
+            <div class="staffModeModal">
+              <button id="staffModeClose" class="staffModeClose" aria-label="إغلاق">×</button>
+              <div class="staffModeTitle">خاص بالتحديثات</div>
+              <div class="staffModeSub">خاص بموظفين صندوق المسابقات</div>
+              <input
+                id="staffModeInput"
+                class="staffModeInput"
+                type="password"
+                inputmode="numeric"
+                maxlength="4"
+                autocomplete="off"
+                placeholder="أدخل الرمز"
+              >
+              <div id="staffModeMsg" class="staffModeMsg"></div>
+              <div class="staffModeActions">
+                <button id="staffModeApply" class="staffModeApply" type="button">تفعيل</button>
+              </div>
             </div>
           </div>
 
@@ -4974,6 +5173,77 @@ function hideEidIntro(immediate){
         });
       }
 
+
+      const staffModeBackdrop = document.getElementById("staffModeBackdrop");
+      const staffModeBtn = document.getElementById("staffModeBtn");
+      const staffModeClose = document.getElementById("staffModeClose");
+      const staffModeInput = document.getElementById("staffModeInput");
+      const staffModeMsg = document.getElementById("staffModeMsg");
+      const staffModeApply = document.getElementById("staffModeApply");
+      const STAFF_MODE_CODE = "6635";
+
+      function setStaffModeMsg(text, type){
+        if(!staffModeMsg) return;
+        staffModeMsg.textContent = text || "";
+        staffModeMsg.className = "staffModeMsg" + (type ? ` ${type}` : "");
+      }
+
+      function openStaffMode(){
+        if(!staffModeBackdrop) return;
+        staffModeBackdrop.style.display = "flex";
+        if(staffModeInput){
+          staffModeInput.value = "";
+          setTimeout(()=>{ try{ staffModeInput.focus(); }catch(e){} }, 20);
+        }
+        setStaffModeMsg(updatesEnabled ? "تم التفعيل" : "", updatesEnabled ? "success" : "");
+      }
+
+      function closeStaffMode(){
+        if(!staffModeBackdrop) return;
+        staffModeBackdrop.style.display = "none";
+        setStaffModeMsg("", "");
+      }
+
+      async function applyStaffModeCode(){
+        const codeValue = String(staffModeInput?.value || "").trim();
+        if(codeValue !== STAFF_MODE_CODE){
+          setStaffModeMsg("الرمز غير صحيح", "error");
+          try{ staffModeInput?.focus(); staffModeInput?.select(); }catch(e){}
+          return;
+        }
+
+        try{
+          const currentModes = (room?.modes && typeof room.modes === "object") ? room.modes : {};
+          const currentSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
+          await update(ref(db, `rooms/${code}`), {
+            writtenAnswerModeEnabled: true,
+            modes: { ...currentModes, writtenAnswerModeEnabled: true },
+            settings: { ...currentSettings, writtenAnswerModeEnabled: true }
+          });
+          setStaffModeMsg("تم التفعيل", "success");
+          if(staffModeBtn) staffModeBtn.classList.add("active");
+          setTimeout(closeStaffMode, 450);
+        }catch(e){
+          setStaffModeMsg("تعذر التفعيل حالياً", "error");
+        }
+      }
+
+      if(staffModeBtn) staffModeBtn.addEventListener("click", openStaffMode);
+      if(staffModeClose) staffModeClose.addEventListener("click", closeStaffMode);
+      if(staffModeBackdrop){
+        staffModeBackdrop.addEventListener("click", (e)=>{
+          if(e.target === staffModeBackdrop) closeStaffMode();
+        });
+      }
+      if(staffModeApply) staffModeApply.addEventListener("click", applyStaffModeCode);
+      if(staffModeInput){
+        staffModeInput.addEventListener("keydown", (e)=>{
+          if(e.key === "Enter"){
+            e.preventDefault();
+            applyStaffModeCode();
+          }
+        });
+      }
 
       // ✅ جهاز عرض الشاشة (TV) — اختيار لاعب ليكون جهاز العرض
       const tvBackdrop = document.getElementById("tvBackdrop");
