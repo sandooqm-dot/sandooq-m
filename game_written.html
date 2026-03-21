@@ -602,56 +602,6 @@
       border-color: rgba(255,255,255,.85);
       color:#fff;
     }
-    .firstPressBar.splitHostBar{
-      border-radius:28px;
-      padding:12px 14px;
-    }
-    .firstPressTop{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
-    }
-    .writtenPlayerName{
-      flex:1 1 auto;
-      min-width:0;
-      font-size:24px;
-      font-weight:900;
-      line-height:1.2;
-      text-align:center;
-    }
-    .writtenTeamBadge{
-      display:none;
-      align-items:center;
-      justify-content:center;
-      min-width:120px;
-      padding:8px 14px;
-      border-radius:999px;
-      border:3px solid rgba(0,0,0,.34);
-      box-shadow:0 10px 16px rgba(0,0,0,.14);
-      font-size:18px;
-      font-weight:900;
-      line-height:1;
-      white-space:nowrap;
-    }
-    .writtenAnswerHost{
-      margin-top:10px;
-      min-height:60px;
-      border-radius:18px;
-      padding:12px 14px;
-      background:rgba(255,255,255,.12);
-      border:3px solid rgba(255,255,255,.40);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      font-size:22px;
-      font-weight:900;
-      line-height:1.35;
-      word-break:break-word;
-      white-space:normal;
-    }
 
     /* ✅ صف أزرار (تجميد / مؤقت / تغيير سؤال) مثل الصورة */
     .controlsRow{
@@ -860,50 +810,6 @@
       box-shadow:0 16px 28px rgba(0,0,0,.25);
     }
     .disabled{opacity:.55;cursor:not-allowed}
-    .playerWrittenControls{
-      justify-content:flex-start;
-      gap:12px;
-      direction:ltr;
-    }
-    .playerWriteWrap{
-      flex:1 1 auto;
-      min-width:0;
-    }
-    .playerAnswerInput{
-      width:100%;
-      height:78px;
-      border-radius:24px;
-      border:5px solid rgba(255,255,255,.82);
-      background:#fff;
-      color:#111;
-      font-size:28px;
-      font-weight:900;
-      padding:0 18px;
-      text-align:right;
-      box-shadow:0 16px 24px rgba(0,0,0,.18);
-    }
-    .playerAnswerInput:focus{
-      outline:none;
-      border-color:#ffd54a;
-      box-shadow:0 0 0 4px rgba(255,213,74,.18), 0 16px 24px rgba(0,0,0,.18);
-    }
-    .playerAnswerInput:disabled{
-      opacity:.68;
-      color:#666;
-      background:rgba(255,255,255,.90);
-    }
-    .playerAnswerInput::placeholder{
-      color:#7b7b7b;
-    }
-    .timerPlayerInline{
-      flex:0 0 120px;
-      width:120px;
-      height:120px;
-      margin:0;
-    }
-    .playerBigBtn.sendMode{
-      background:#1aa34a;
-    }
 
     a{color:inherit}
 
@@ -1506,10 +1412,6 @@
       .mapToolsRow{ width:100%; }
       .scoreBoard{ width:100%; }
       .firstPressBar{ width:100%; font-size:22px; padding:14px 14px; }
-      .writtenPlayerName{ font-size:20px; }
-      .writtenTeamBadge{ min-width:96px; font-size:15px; padding:7px 12px; }
-      .writtenAnswerHost{ font-size:18px; min-height:52px; }
-      .playerAnswerInput{ height:68px; font-size:22px; border-width:4px; }
       .controlsRow{ width:100%; margin:10px auto 10px; }
       .questionCard{ width:100%; margin:10px auto 0; }
       .playerBigBtn{ width:100%; }
@@ -2434,16 +2336,9 @@ async function _action(patch){
 async function update(r, value){
   // Firebase: update(ref(db, "path"), {a:1}) OR update(ref(db), {"rooms/x/a":1, ...})
   const rawPath = String(r?.path || "");
-  const roomRootPath = `rooms/${code}`;
-  const roomBuzzerPath = `${roomRootPath}/buzzer`;
-  const roomWrittenAnswerPath = `${roomRootPath}/writtenAnswer`;
-
   if(!rawPath){
     // multi path update
-    const updates = { ...(value || {}) };
-    if(Object.prototype.hasOwnProperty.call(updates, roomBuzzerPath) && updates[roomBuzzerPath] === null && !Object.prototype.hasOwnProperty.call(updates, roomWrittenAnswerPath)){
-      updates[roomWrittenAnswerPath] = null;
-    }
+    const updates = value || {};
     const topPatch = {};
     for(const [k, v] of Object.entries(updates)){
       _mergeAtPath(SYNC.state, k, v);
@@ -2458,20 +2353,14 @@ async function update(r, value){
     return _action(topPatch);
   }else{
     // single node update
-    let nextValue = value;
-    if(rawPath === roomRootPath && nextValue && typeof nextValue === "object" && !Array.isArray(nextValue)){
-      if(Object.prototype.hasOwnProperty.call(nextValue, "buzzer") && nextValue.buzzer === null && !Object.prototype.hasOwnProperty.call(nextValue, "writtenAnswer")){
-        nextValue = { ...nextValue, writtenAnswer: null };
-      }
-    }
-    _mergeAtPath(SYNC.state, rawPath, nextValue);
+    _mergeAtPath(SYNC.state, rawPath, value);
     const rel = _stripRoomPrefix(rawPath);
     const tk = _topKey(rel);
     const patch = {};
     if(!tk){
       // root update: send only provided keys (merge semantics)
-      if(nextValue && typeof nextValue === "object" && !Array.isArray(nextValue)) Object.assign(patch, nextValue);
-      else patch._root = nextValue; // unlikely
+      if(value && typeof value === "object" && !Array.isArray(value)) Object.assign(patch, value);
+      else patch._root = value; // unlikely
     }else{
       patch[tk] = SYNC.state[tk];
     }
@@ -3653,7 +3542,6 @@ function hideEidIntro(immediate){
     const updates = {};
     // (أمر واحد) تحديث متعدد المسارات لتقليل الرسائل
     updates[`rooms/${code}/buzzer`] = null;
-    updates[`rooms/${code}/writtenAnswer`] = null;
     updates[`rooms/${code}/timer`] = {
       sel,
       dur: sel,
@@ -4034,60 +3922,6 @@ function hideEidIntro(immediate){
         finalSig,
         reason: (res && res.reason) || ""
       };
-    }
-
-    function normalizeWrittenAnswer(raw){
-      raw = (raw && typeof raw === "object") ? raw : null;
-      if(!raw) return null;
-      const text = String(raw.text || "").trim().slice(0, 60);
-      if(!text) return null;
-      return {
-        text,
-        pid: normalizePid(raw.pid || ""),
-        name: String(raw.name || "").trim().slice(0, 80),
-        team: String(raw.team || "").trim().slice(0, 30),
-        ts: toFiniteNumber(raw.ts, 0)
-      };
-    }
-
-    function getWrittenMyPid(){
-      return String(pid || localStorage.getItem(`sabaq_pid_${code}`) || "").trim();
-    }
-
-    function isWrittenOwner(room){
-      const buzzer = resolveStableBuzzer(room?.buzzer, room?.timer);
-      const myPid = getWrittenMyPid();
-      return !!(buzzer && myPid && String(buzzer.pid || "") === String(myPid));
-    }
-
-    async function submitWrittenAnswerFromInput(){
-      const room = LIVE.room || {};
-      const meNow = LIVE.me || {};
-      const myPid = getWrittenMyPid();
-      const buzzer = resolveStableBuzzer(room.buzzer, room.timer);
-      if(!(buzzer && myPid && String(buzzer.pid || "") === String(myPid))) return false;
-
-      const input = GAME_UI.els.playerAnswerInput;
-      if(!input) return false;
-
-      const text = String(input.value || "").trim().slice(0, 60);
-      if(!text){
-        try{ input.focus(); }catch(e){}
-        return false;
-      }
-
-      await _action({
-        writtenAnswer: {
-          text,
-          pid: myPid,
-          name: String(meNow.name || buzzer.name || "").trim().slice(0, 80),
-          team: String(meNow.team || buzzer.team || "").trim().slice(0, 30),
-          ts: Date.now()
-        }
-      }).catch(() => null);
-
-      await _pullOnce(true);
-      return true;
     }
 
     // ✅ (2) منع الزيادة عن 13 لاعب (قصّ الزائدين بأقدم joinedAt)
@@ -5596,45 +5430,21 @@ function hideEidIntro(immediate){
           </div>
 
           <div class="landLeft">
-            ${isHost ? `
-              <div id="firstPressBar" class="firstPressBar splitHostBar">
-                <div class="firstPressTop">
-                  <div id="writtenPlayerName" class="writtenPlayerName">اسم اللاعب الذي يضغط أولاً</div>
-                  <div id="writtenPlayerTeam" class="writtenTeamBadge"></div>
-                </div>
-                <div id="writtenAnswerHost" class="writtenAnswerHost">الجواب المكتوب يظهر هنا</div>
+            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+
+            <div class="controlsRow">
+              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
+
+              <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
+                <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
+                  <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+                  </svg>
+                  <span id="timerNumber" class="timerNumber">10</span>
+                </button>
               </div>
-            ` : `
-              <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
-            `}
 
-            <div class="controlsRow ${isHost ? "" : "playerWrittenControls"}">
-              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `
-                <div class="timerWrap timerPlayerView timerPlayerInline">
-                  <button id="timerClock" class="timerClockBtn" type="button" tabindex="-1" aria-hidden="true">
-                    <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
-                      <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
-                    </svg>
-                    <span id="timerNumber" class="timerNumber">10</span>
-                  </button>
-                </div>
-                <div class="playerWriteWrap">
-                  <input id="playerAnswerInput" class="playerAnswerInput" type="text" maxlength="60" autocomplete="off" placeholder="اضغط الجرس أولاً" disabled>
-                </div>
-              `}
-
-              ${isHost ? `
-                <div class="timerWrap">
-                  <button id="timerClock" class="timerClockBtn" type="button">
-                    <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
-                      <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
-                    </svg>
-                    <span id="timerNumber" class="timerNumber">10</span>
-                  </button>
-                </div>
-              ` : ``}
-
-              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : ``}
+              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
             </div>
 
             ${isHost ? `
@@ -5666,10 +5476,6 @@ function hideEidIntro(immediate){
       GAME_UI.els.teamGreenBtn = document.getElementById("teamGreenBtn");
       GAME_UI.els.teamOrangeBtn = document.getElementById("teamOrangeBtn");
       GAME_UI.els.firstPressBar = document.getElementById("firstPressBar");
-      GAME_UI.els.writtenPlayerName = document.getElementById("writtenPlayerName");
-      GAME_UI.els.writtenPlayerTeam = document.getElementById("writtenPlayerTeam");
-      GAME_UI.els.writtenAnswerHost = document.getElementById("writtenAnswerHost");
-      GAME_UI.els.playerAnswerInput = document.getElementById("playerAnswerInput");
       GAME_UI.els.freezeBtn = document.getElementById("freezeBtn");
       GAME_UI.els.nextQ = document.getElementById("nextQ");
       GAME_UI.els.clearBoardBtn = document.getElementById("clearBoardBtn");
@@ -5952,7 +5758,6 @@ function hideEidIntro(immediate){
 
           const updates = {};
           updates[`rooms/${code}/current`] = { ...cur, qIndex: pick.qIndex };
-          updates[`rooms/${code}/writtenAnswer`] = null;
           updates[`rooms/${code}/${pick.cursorField}/${cur.letter}`] = pick.nextCursor;
           await update(ref(db), updates);
         });
@@ -6062,28 +5867,12 @@ function hideEidIntro(immediate){
       // ✅ Player buzzer
       if(GAME_UI.els.buzzBtn){
         GAME_UI.els.buzzBtn.addEventListener("click", async () => {
-          const rr = LIVE.room || {};
+          const rr = LIVE.room;
           const mm = LIVE.me || me;
-          const buzzerNow = resolveStableBuzzer(rr.buzzer, rr.timer);
-          const myPid = getWrittenMyPid();
-          const canSendAnswer = !!(buzzerNow && myPid && String(buzzerNow.pid || "") === String(myPid));
-
-          if(canSendAnswer){
-            if(GAME_UI.__answerBusy) return;
-            GAME_UI.__answerBusy = true;
-            try{
-              await submitWrittenAnswerFromInput();
-            }catch(e){}
-            finally{
-              setTimeout(() => { GAME_UI.__answerBusy = false; }, 220);
-            }
-            return;
-          }
 
           if(rr.status !== "started") return;
           if(rr.freeze) return;
           if(!mm) return;
-          if(buzzerNow) return;
 
           if(GAME_UI.__buzzBusy) return;
           GAME_UI.__buzzBusy = true;
@@ -6098,34 +5887,11 @@ function hideEidIntro(immediate){
                 STABLE_BUZZER = v;
               }
               if(!playRong()) fallbackBeep();
-              setTimeout(() => {
-                try{ GAME_UI.els.playerAnswerInput?.focus(); }catch(e){}
-              }, 40);
             }
           }catch(e){}
           finally{
             setTimeout(() => { GAME_UI.__buzzBusy = false; }, 220);
           }
-        });
-      }
-
-      if(GAME_UI.els.playerAnswerInput && !GAME_UI.els.playerAnswerInput.__wired){
-        GAME_UI.els.playerAnswerInput.__wired = true;
-        GAME_UI.els.playerAnswerInput.addEventListener("input", () => {
-          const input = GAME_UI.els.playerAnswerInput;
-          if(!input) return;
-          const sliced = String(input.value || "").slice(0, 60);
-          if(input.value !== sliced) input.value = sliced;
-
-          if(GAME_UI.els.buzzBtn && isWrittenOwner(LIVE.room || {})){
-            GAME_UI.els.buzzBtn.classList.toggle("disabled", !String(input.value || "").trim());
-          }
-        });
-
-        GAME_UI.els.playerAnswerInput.addEventListener("keydown", async (e) => {
-          if(e.key !== "Enter") return;
-          e.preventDefault();
-          await submitWrittenAnswerFromInput();
         });
       }
     }
@@ -6381,59 +6147,24 @@ function hideEidIntro(immediate){
         GAME_UI.els.qModeBtn.title = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
       }
 
-      // First press bar + الجواب المكتوب
+      // First press bar
       const firstPressBar = GAME_UI.els.firstPressBar;
       const buzzer = resolveStableBuzzer(room.buzzer, room.timer);
-      const writtenAnswer = normalizeWrittenAnswer(room.writtenAnswer);
-      if(isHost && GAME_UI.els.writtenPlayerName){
+      if(buzzer && buzzer.name && firstPressBar){
+        firstPressBar.classList.add("filled");
         const visualTeamsForBuzz = getVisualTeams(room);
-        const isGreenBuzz = !!(buzzer && buzzer.team === "green");
-        const teamInfo = isGreenBuzz ? visualTeamsForBuzz.green : visualTeamsForBuzz.orange;
-        const teamColor = teamInfo.color;
-        const teamText = getReadableTextColor(teamColor);
-
-        if(firstPressBar){
-          firstPressBar.classList.toggle("filled", !!(buzzer && buzzer.name));
-          firstPressBar.style.background = "rgba(255,255,255,.16)";
-          firstPressBar.style.color = "#fff";
-          firstPressBar.style.textShadow = "0 10px 18px rgba(0,0,0,.25)";
-        }
-
-        GAME_UI.els.writtenPlayerName.textContent = (buzzer && buzzer.name) ? buzzer.name : "اسم اللاعب الذي يضغط أولاً";
-
-        if(GAME_UI.els.writtenPlayerTeam){
-          if(buzzer && buzzer.name){
-            GAME_UI.els.writtenPlayerTeam.style.display = "inline-flex";
-            GAME_UI.els.writtenPlayerTeam.textContent = teamInfo.name;
-            GAME_UI.els.writtenPlayerTeam.style.background = teamColor;
-            GAME_UI.els.writtenPlayerTeam.style.color = teamText;
-            GAME_UI.els.writtenPlayerTeam.style.textShadow = getReadableTextShadow(teamText);
-          }else{
-            GAME_UI.els.writtenPlayerTeam.style.display = "none";
-            GAME_UI.els.writtenPlayerTeam.textContent = "";
-          }
-        }
-
-        if(GAME_UI.els.writtenAnswerHost){
-          GAME_UI.els.writtenAnswerHost.textContent = writtenAnswer?.text || "الجواب المكتوب يظهر هنا";
-        }
+        const buzzBg = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
+        const buzzText = getReadableTextColor(buzzBg);
+        firstPressBar.style.background = buzzBg;
+        firstPressBar.style.color = buzzText;
+        firstPressBar.style.textShadow = getReadableTextShadow(buzzText);
+        firstPressBar.textContent = buzzer.name;
       }else if(firstPressBar){
-        if(buzzer && buzzer.name){
-          firstPressBar.classList.add("filled");
-          const visualTeamsForBuzz = getVisualTeams(room);
-          const buzzBg = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
-          const buzzText = getReadableTextColor(buzzBg);
-          firstPressBar.style.background = buzzBg;
-          firstPressBar.style.color = buzzText;
-          firstPressBar.style.textShadow = getReadableTextShadow(buzzText);
-          firstPressBar.textContent = buzzer.name;
-        }else{
-          firstPressBar.classList.remove("filled");
-          firstPressBar.style.background = "rgba(255,255,255,.16)";
-          firstPressBar.style.color = "#fff";
-          firstPressBar.style.textShadow = "0 10px 18px rgba(0,0,0,.25)";
-          firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
-        }
+        firstPressBar.classList.remove("filled");
+        firstPressBar.style.background = "rgba(255,255,255,.16)";
+        firstPressBar.style.color = "#fff";
+        firstPressBar.style.textShadow = "0 10px 18px rgba(0,0,0,.25)";
+        firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
       // ✅ (تعديل 1) تصفير/إخفاء اسم أول لاعب + تصفير المؤقت بضغطة على الشريط (للمقدم فقط)
@@ -6449,7 +6180,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       const updates = {};
       updates[`rooms/${code}/buzzer`] = null;
-      updates[`rooms/${code}/writtenAnswer`] = null;
 
       // تصفير المؤقت
       updates[`rooms/${code}/timer/running`] = false;
@@ -6618,34 +6348,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         }
       }
 
-      // Player button + answer input state (no re-render)
-      if(!isHost){
+      // Player button disabled state (no re-render)
+      if(!isHost && GAME_UI.els.buzzBtn){
         const me = LIVE.me;
-        const myPid = getWrittenMyPid();
-        const buzzerOwner = !!(buzzer && myPid && String(buzzer.pid || "") === String(myPid));
-        const playerInput = GAME_UI.els.playerAnswerInput;
-        const savedText = (writtenAnswer && String(writtenAnswer.pid || "") === String(myPid)) ? String(writtenAnswer.text || "") : "";
-
-        if(playerInput){
-          playerInput.disabled = !buzzerOwner;
-          playerInput.placeholder = buzzerOwner ? "اكتب الجواب هنا" : (buzzer ? "الكتابة متاحة لأول لاعب فقط" : "اضغط الجرس أولاً");
-          if(document.activeElement !== playerInput || !buzzerOwner){
-            playerInput.value = savedText;
-          }
-        }
-
-        if(GAME_UI.els.buzzBtn){
-          if(buzzerOwner){
-            GAME_UI.els.buzzBtn.textContent = "إرسال الجواب";
-            GAME_UI.els.buzzBtn.classList.add("sendMode");
-            GAME_UI.els.buzzBtn.classList.toggle("disabled", !String(playerInput?.value || "").trim());
-          }else{
-            const disabled = (!started) || room.freeze || !me || !me.name || !!buzzer;
-            GAME_UI.els.buzzBtn.textContent = "اضغط هنا للإجابة";
-            GAME_UI.els.buzzBtn.classList.remove("sendMode");
-            GAME_UI.els.buzzBtn.classList.toggle("disabled", !!disabled);
-          }
-        }
+        const disabled = (!started) || room.freeze || !me || !me.name;
+        GAME_UI.els.buzzBtn.classList.toggle("disabled", !!disabled);
       }
 
       // settings room latest
@@ -7017,5 +6724,456 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
   </script>
 
   <!-- VERSION: game_full.html — v2026-03-20-3 (eid intro overlay full-screen + custom questions API + restart resync fix) -->
+
+  <script>
+  (function(){
+    if (window.__writtenModePatchV2) return;
+    window.__writtenModePatchV2 = true;
+
+    try{ document.body.classList.add("writtenModePage"); }catch(e){}
+
+    const originalNormalizeLiveRoom = normalizeLiveRoom;
+    normalizeLiveRoom = function(room){
+      const normalized = originalNormalizeLiveRoom(room);
+      const raw = (room && typeof room === "object") ? room : {};
+      normalized.modes = (raw.modes && typeof raw.modes === "object") ? raw.modes : {};
+      normalized.writtenAnswerModeEnabled = !!(raw.writtenAnswerModeEnabled || normalized.modes.writtenAnswerModeEnabled || raw?.settings?.writtenAnswerModeEnabled);
+      normalized.writtenAnswer = (raw.writtenAnswer && typeof raw.writtenAnswer === "object") ? {
+        text: String(raw.writtenAnswer.text || "").trim(),
+        pid: String(raw.writtenAnswer.pid || "").trim(),
+        name: String(raw.writtenAnswer.name || "").trim(),
+        team: String(raw.writtenAnswer.team || "").trim(),
+        updatedAt: Number(raw.writtenAnswer.updatedAt || 0),
+        submitted: !!raw.writtenAnswer.submitted
+      } : null;
+      return normalized;
+    };
+
+    const style = document.createElement("style");
+    style.textContent = `
+      body.writtenModePage .staffModeBtn{ background:#27c266 !important; border-color:#14532d !important; color:#fff !important; }
+      body.writtenModePage .staffModeBtn.active{ background:#27c266 !important; border-color:#14532d !important; color:#fff !important; }
+
+      body.writtenModePage .firstPressBar.writtenSplit{
+        background:transparent !important;
+        border:none !important;
+        box-shadow:none !important;
+        text-shadow:none !important;
+        padding:0 !important;
+        min-height:auto !important;
+        display:flex !important;
+        align-items:stretch !important;
+        justify-content:stretch !important;
+        gap:10px !important;
+        overflow:visible !important;
+      }
+      body.writtenModePage .writtenBarName,
+      body.writtenModePage .writtenBarAnswer{
+        min-height:72px;
+        border-radius:28px;
+        border:4px solid rgba(255,255,255,.88);
+        box-shadow:0 12px 24px rgba(0,0,0,.18);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        text-align:center;
+        padding:0 16px;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        font-weight:900;
+      }
+      body.writtenModePage .writtenBarName{
+        flex:0 0 42%;
+        color:#fff;
+        text-shadow:0 10px 18px rgba(0,0,0,.24);
+        background:rgba(255,255,255,.16);
+      }
+      body.writtenModePage .writtenBarAnswer{
+        flex:1 1 auto;
+        color:#fff;
+        text-shadow:0 10px 18px rgba(0,0,0,.24);
+        background:rgba(255,255,255,.16);
+      }
+
+      body.writtenModePage .controlsRow.writtenPlayerControls{
+        direction:ltr !important;
+        justify-content:flex-start !important;
+        align-items:center !important;
+        gap:12px !important;
+      }
+      body.writtenModePage .controlsRow.writtenPlayerControls > span{ display:none !important; }
+      body.writtenModePage .controlsRow.writtenPlayerControls .timerWrap{
+        order:1;
+        width:92px !important;
+        height:92px !important;
+        flex:0 0 92px !important;
+      }
+      body.writtenModePage .controlsRow.writtenPlayerControls .timerClockBtn{
+        width:92px !important;
+        height:92px !important;
+        border-width:5px !important;
+      }
+      body.writtenModePage .controlsRow.writtenPlayerControls .timerNumber{ font-size:40px !important; }
+      body.writtenModePage .writtenAnswerWrap{
+        order:2;
+        flex:1 1 auto;
+        min-width:0;
+        display:flex;
+        align-items:center;
+        gap:10px;
+      }
+      body.writtenModePage .writtenAnswerInput{
+        flex:1 1 auto;
+        min-width:0;
+        height:78px;
+        border-radius:22px;
+        border:4px solid rgba(255,255,255,.80);
+        background:rgba(255,255,255,.96);
+        color:#111;
+        font-family:"AA-GALAXY", Arial, sans-serif;
+        font-size:25px;
+        font-weight:900;
+        text-align:center;
+        padding:0 16px;
+        outline:none;
+        box-shadow:0 16px 28px rgba(0,0,0,.20);
+      }
+      body.writtenModePage .writtenAnswerInput::placeholder{ color:#666; font-weight:800; }
+      body.writtenModePage .writtenAnswerInput:disabled{
+        opacity:.82;
+        background:rgba(255,255,255,.78);
+        color:#666;
+      }
+      body.writtenModePage .writtenSendBtn{
+        flex:0 0 148px;
+        height:78px;
+        border:none;
+        border-radius:22px;
+        background:#19c35d;
+        color:#fff;
+        font-family:"AA-GALAXY", Arial, sans-serif;
+        font-size:23px;
+        font-weight:900;
+        box-shadow:0 16px 28px rgba(0,0,0,.20);
+        cursor:pointer;
+      }
+      body.writtenModePage .writtenSendBtn:disabled{
+        opacity:.6;
+        cursor:not-allowed;
+        filter:grayscale(.12);
+      }
+      body.writtenModePage .writtenAnswerHint{
+        margin-top:8px;
+        color:#fff;
+        font-size:15px;
+        font-weight:800;
+        text-align:center;
+        line-height:1.5;
+        text-shadow:0 8px 14px rgba(0,0,0,.24);
+      }
+
+      @media (max-width: 900px){
+        body.writtenModePage .writtenBarName,
+        body.writtenModePage .writtenBarAnswer{ min-height:66px; font-size:18px; }
+        body.writtenModePage .controlsRow.writtenPlayerControls .timerWrap{ width:82px !important; height:82px !important; flex-basis:82px !important; }
+        body.writtenModePage .controlsRow.writtenPlayerControls .timerClockBtn{ width:82px !important; height:82px !important; }
+        body.writtenModePage .controlsRow.writtenPlayerControls .timerNumber{ font-size:34px !important; }
+        body.writtenModePage .writtenAnswerInput{ height:70px; font-size:21px; }
+        body.writtenModePage .writtenSendBtn{ height:70px; flex-basis:126px; font-size:20px; }
+      }
+    `;
+    document.head.appendChild(style);
+
+    const WRITTEN_MAX_LEN = 36;
+    let writtenTimerClearSent = false;
+    let writtenNoBuzzerClearSent = false;
+    let localWrittenDraft = "";
+    let localSubmittedKey = "";
+
+    function getRoomVisualTeamName(room, teamKey){
+      const vt = (typeof getVisualTeams === "function") ? getVisualTeams(room || {}) : null;
+      if(teamKey === "green") return (vt && vt.green && vt.green.name) ? vt.green.name : "الفريق الأخضر";
+      if(teamKey === "orange") return (vt && vt.orange && vt.orange.name) ? vt.orange.name : "الفريق البرتقالي";
+      return "";
+    }
+
+    function getMyPidSafe(){
+      try{
+        return String((LIVE && LIVE.me && (LIVE.me.__id || LIVE.me.id)) || (typeof pid !== "undefined" ? pid : "") || localStorage.getItem(`sabaq_pid_${code}`) || "").trim();
+      }catch(e){ return ""; }
+    }
+
+    function getCurrentBuzzer(room){
+      return (typeof resolveStableBuzzer === "function") ? resolveStableBuzzer(room && room.buzzer, room && room.timer) : (room && room.buzzer);
+    }
+
+    function getBuzzerTurnKey(room){
+      const b = getCurrentBuzzer(room);
+      if(!b || !String(b.pid || "")) return "";
+      return `${String(b.pid)}|${Number(b.seq || b.ts || 0)}`;
+    }
+
+    function getWrittenAnswerState(room){
+      const raw = room && typeof room === "object" ? room.writtenAnswer : null;
+      if(raw && typeof raw === "object"){
+        return {
+          text: String(raw.text || "").trim(),
+          pid: String(raw.pid || "").trim(),
+          name: String(raw.name || "").trim(),
+          team: String(raw.team || "").trim(),
+          updatedAt: Number(raw.updatedAt || 0),
+          submitted: !!raw.submitted
+        };
+      }
+      return { text:"", pid:"", name:"", team:"", updatedAt:0, submitted:false };
+    }
+
+    function canLocalPlayerWrite(room){
+      if (role === "host") return false;
+      const buzzer = getCurrentBuzzer(room);
+      const myPid = getMyPidSafe();
+      if(!myPid || !buzzer || !String(buzzer.pid || "")) return false;
+      if(String(buzzer.pid) !== String(myPid)) return false;
+      const ans = getWrittenAnswerState(room);
+      if(ans.submitted) return false;
+      return true;
+    }
+
+    async function setWrittenAnswerRemote(text, submitted){
+      if (role === "host") return;
+      const room = (typeof LIVE !== "undefined" && LIVE.room) ? LIVE.room : null;
+      if (!room) return;
+      const buzzer = getCurrentBuzzer(room);
+      const me = (typeof LIVE !== "undefined") ? LIVE.me : null;
+      if(!buzzer || String(buzzer.pid || "") !== getMyPidSafe()) return;
+      const clean = String(text || "").replace(/\s+/g, " ").trim().slice(0, WRITTEN_MAX_LEN);
+      if(!clean) return;
+      const payload = {
+        text: clean,
+        pid: getMyPidSafe(),
+        name: String((me && me.name) || (buzzer && buzzer.name) || "").trim().slice(0, 80),
+        team: String((me && me.team) || (buzzer && buzzer.team) || "").trim().slice(0, 30),
+        updatedAt: Date.now(),
+        submitted: !!submitted
+      };
+      try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: payload }); }catch(e){}
+    }
+
+    async function clearWrittenAnswerRemote(){
+      localWrittenDraft = "";
+      localSubmittedKey = "";
+      try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: null }); }catch(e){}
+    }
+
+    function ensureWrittenBar(room){
+      const bar = GAME_UI && GAME_UI.els ? GAME_UI.els.firstPressBar : null;
+      if(!bar) return;
+      bar.classList.add("writtenSplit");
+      bar.classList.remove("filled");
+      bar.style.background = "transparent";
+      bar.style.color = "#fff";
+      bar.style.textShadow = "none";
+
+      if(!bar.querySelector(".writtenBarName")){
+        bar.innerHTML = `
+          <div class="writtenBarName">اسم اللاعب الذي يضغط أولاً</div>
+          <div class="writtenBarAnswer">بانتظار إرسال الجواب</div>
+        `;
+      }
+
+      if(role === "host" && !bar.__writtenClearHooked){
+        bar.__writtenClearHooked = true;
+        bar.addEventListener("click", async () => {
+          try{ await clearWrittenAnswerRemote(); }catch(e){}
+        });
+      }
+
+      const buzzer = getCurrentBuzzer(room);
+      const answer = getWrittenAnswerState(room);
+      const nameEl = bar.querySelector(".writtenBarName");
+      const answerEl = bar.querySelector(".writtenBarAnswer");
+
+      if(nameEl){
+        if(buzzer && buzzer.name){
+          const teamColor = (buzzer.team === "green") ? (getVisualTeams(room).green.color) : (getVisualTeams(room).orange.color);
+          const teamText = getReadableTextColor(teamColor);
+          nameEl.style.background = teamColor;
+          nameEl.style.color = teamText;
+          nameEl.style.textShadow = getReadableTextShadow(teamText);
+          nameEl.textContent = String(buzzer.name || "");
+        }else{
+          nameEl.style.background = "rgba(255,255,255,.16)";
+          nameEl.style.color = "#fff";
+          nameEl.style.textShadow = "0 10px 18px rgba(0,0,0,.25)";
+          nameEl.textContent = "اسم اللاعب الذي يضغط أولاً";
+        }
+      }
+
+      if(answerEl){
+        answerEl.textContent = answer.text || (buzzer && buzzer.name ? "بانتظار إرسال الجواب" : "الجواب المكتوب");
+      }
+    }
+
+    function ensureWrittenPlayerInput(room){
+      if(role === "host") return;
+      const row = document.querySelector(".controlsRow");
+      if(!row) return;
+      row.classList.add("writtenPlayerControls");
+
+      let wrap = document.getElementById("writtenAnswerWrap");
+      if(!wrap){
+        wrap = document.createElement("div");
+        wrap.id = "writtenAnswerWrap";
+        wrap.className = "writtenAnswerWrap";
+        wrap.innerHTML = `
+          <input id="writtenAnswerInput" class="writtenAnswerInput" type="text" maxlength="${WRITTEN_MAX_LEN}" autocomplete="off" placeholder="اكتب الجواب هنا">
+          <button id="writtenAnswerSendBtn" class="writtenSendBtn" type="button">إرسال الجواب</button>
+        `;
+        row.appendChild(wrap);
+
+        const btnWrap = document.querySelector(".playerBtnWrap");
+        if(btnWrap && !document.getElementById("writtenAnswerHint")){
+          const hint = document.createElement("div");
+          hint.id = "writtenAnswerHint";
+          hint.className = "writtenAnswerHint";
+          hint.textContent = "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب ثم إرساله مرة واحدة";
+          btnWrap.insertBefore(hint, btnWrap.firstChild);
+        }
+
+        const input = wrap.querySelector("#writtenAnswerInput");
+        const sendBtn = wrap.querySelector("#writtenAnswerSendBtn");
+        if(input){
+          input.addEventListener("input", () => {
+            const clean = String(input.value || "").slice(0, WRITTEN_MAX_LEN);
+            if(clean !== input.value) input.value = clean;
+            localWrittenDraft = input.value;
+            if(sendBtn){
+              sendBtn.disabled = !String(localWrittenDraft || "").replace(/\s+/g, " ").trim();
+            }
+          });
+        }
+        if(sendBtn){
+          sendBtn.addEventListener("click", async () => {
+            const liveRoom = (typeof LIVE !== "undefined") ? LIVE.room : null;
+            if(!liveRoom || !canLocalPlayerWrite(liveRoom)) return;
+            const clean = String((input && input.value) || localWrittenDraft || "").replace(/\s+/g, " ").trim().slice(0, WRITTEN_MAX_LEN);
+            if(!clean) return;
+            await setWrittenAnswerRemote(clean, true);
+            localWrittenDraft = clean;
+            localSubmittedKey = getBuzzerTurnKey(liveRoom);
+            try{ syncWrittenModeUI(); }catch(e){}
+          });
+        }
+      }
+
+      const input = document.getElementById("writtenAnswerInput");
+      const sendBtn = document.getElementById("writtenAnswerSendBtn");
+      if(!input || !sendBtn) return;
+
+      const currentTurnKey = getBuzzerTurnKey(room);
+      if(!currentTurnKey){
+        localWrittenDraft = "";
+        localSubmittedKey = "";
+      }else if(localSubmittedKey && localSubmittedKey !== currentTurnKey){
+        localWrittenDraft = "";
+        localSubmittedKey = "";
+      }
+
+      const allowed = canLocalPlayerWrite(room);
+      const answer = getWrittenAnswerState(room);
+      const myPid = getMyPidSafe();
+      const submittedByMe = !!(answer.submitted && answer.pid && answer.pid === myPid);
+      const locked = submittedByMe || (!!localSubmittedKey && localSubmittedKey === currentTurnKey);
+
+      if(submittedByMe){
+        localSubmittedKey = currentTurnKey;
+        localWrittenDraft = answer.text || localWrittenDraft;
+      }
+
+      if(allowed && !locked){
+        input.disabled = false;
+        input.placeholder = "اكتب الجواب هنا";
+        if(document.activeElement !== input){
+          input.value = localWrittenDraft || "";
+        }
+      }else{
+        input.disabled = true;
+        input.placeholder = allowed ? "تم إرسال الجواب" : "الكتابة متاحة لأول لاعب يضغط الجرس";
+        if(submittedByMe){
+          input.value = answer.text || localWrittenDraft || "";
+        }else if(!allowed){
+          input.value = "";
+        }
+      }
+
+      sendBtn.disabled = !allowed || locked || !String(input.value || localWrittenDraft || "").replace(/\s+/g, " ").trim();
+      sendBtn.textContent = locked ? "تم الإرسال" : "إرسال الجواب";
+    }
+
+    function syncWrittenModeUI(){
+      const room = (typeof LIVE !== "undefined" && LIVE.room) ? LIVE.room : null;
+      if(!room || room.status !== "started") return;
+
+      try{
+        document.body.classList.toggle("writtenHostMode", role === "host");
+        document.body.classList.toggle("writtenPlayerMode", role !== "host");
+      }catch(e){}
+
+      ensureWrittenBar(room);
+      ensureWrittenPlayerInput(room);
+
+      const answer = getWrittenAnswerState(room);
+      if(role === "host"){
+        if(!room.buzzer && answer.text){
+          if(!writtenNoBuzzerClearSent){
+            writtenNoBuzzerClearSent = true;
+            clearWrittenAnswerRemote();
+          }
+        }else{
+          writtenNoBuzzerClearSent = false;
+        }
+      }
+    }
+
+    const originalRenderGame = renderGame;
+    renderGame = function(room, me){
+      originalRenderGame(room, me);
+      try{ syncWrittenModeUI(); }catch(e){}
+    };
+
+    const originalUpdateGameUI = updateGameUI;
+    updateGameUI = function(){
+      originalUpdateGameUI();
+      try{ syncWrittenModeUI(); }catch(e){}
+    };
+
+    const originalApplyTimerDom = applyTimerDom;
+    applyTimerDom = function(){
+      originalApplyTimerDom();
+      try{
+        if(role !== "host") return;
+        const t = (typeof normalizeTimer === "function") ? normalizeTimer(TIMER_UI.latestTimer || {}) : (TIMER_UI.latestTimer || {});
+        const view = (typeof computeTimerView === "function") ? computeTimerView(t) : { running:false, remaining:0, done:false };
+
+        if((!view.running && !view.done) || (view.running && view.remaining > 0)){
+          writtenTimerClearSent = false;
+        }
+
+        if(view.running && view.remaining === 0 && !writtenTimerClearSent){
+          writtenTimerClearSent = true;
+          clearWrittenAnswerRemote();
+        }
+      }catch(e){}
+    };
+
+    const originalRenderFromLive = renderFromLive;
+    renderFromLive = function(){
+      originalRenderFromLive();
+      try{ syncWrittenModeUI(); }catch(e){}
+    };
+  })();
+  </script>
+
 </body>
 </html>
