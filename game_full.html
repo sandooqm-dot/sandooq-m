@@ -2161,6 +2161,29 @@ const pid = (function(){
     return "p_" + Math.random().toString(36).slice(2,10);
   }
 })();
+const WRITTEN_GAME_FILE = "game_written.html";
+let WRITTEN_GAME_REDIRECTING = false;
+
+function isWrittenModeEnabled(room){
+  return !!(room?.writtenAnswerModeEnabled || room?.modes?.writtenAnswerModeEnabled || room?.settings?.writtenAnswerModeEnabled);
+}
+
+function buildWrittenGameUrl(){
+  const u = new URL(WRITTEN_GAME_FILE, location.href);
+  for(const [k, v] of params.entries()) u.searchParams.set(k, v);
+  return u.toString();
+}
+
+function redirectToWrittenGame(room){
+  if(WRITTEN_GAME_REDIRECTING) return;
+  if(!isWrittenModeEnabled(room)) return;
+  if(String(room?.status || "") !== "started") return;
+  const path = String(location.pathname || "");
+  if(path.endsWith(`/${WRITTEN_GAME_FILE}`) || path === WRITTEN_GAME_FILE) return;
+  WRITTEN_GAME_REDIRECTING = true;
+  location.href = buildWrittenGameUrl();
+}
+
 // ✅ Sync (Firebase removed): Cloudflare Worker + Durable Objects
 // Worker base (change only if you deploy a different worker)
 const SYNC_BASE = params.get("sync") || "https://sync.horof.sandooq-games.com";
@@ -6630,6 +6653,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       LIVE.me = (role === "host") ? null : getMeFromPlayers(players);
 
       // Views
+      if(isWrittenModeEnabled(room) && room.status === "started") {
+        redirectToWrittenGame(room);
+        return;
+      }
+
       if(role === "host"){
         if(room.status === "started"){
           if(VIEW.type !== "host_game"){
