@@ -212,6 +212,87 @@
       color:#fff;
       margin:10px auto 0;
     }
+    .modeSelectorWrap{display:flex;flex-direction:column;gap:14px}
+    .modeSelectorTitle{
+      font-size:38px;
+      font-weight:900;
+      margin:0;
+      color:#fff;
+      text-shadow:0 10px 18px rgba(0,0,0,.22);
+    }
+    .modeSelectorCards{display:flex;flex-direction:column;gap:14px}
+    .modeChoiceBtn{
+      width:100%;
+      border:none;
+      border-radius:24px;
+      padding:18px 16px;
+      cursor:pointer;
+      text-align:right;
+      box-shadow:0 12px 24px rgba(0,0,0,.18);
+      border:5px solid rgba(0,0,0,.72);
+      background:rgba(255,255,255,.90);
+      color:#111;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .modeChoiceBtn.single{background:#f7f1de;color:#5a1d58}
+    .modeChoiceBtn.separate{background:#eef5cf;color:#185f31}
+    .modeChoiceBtn:active{transform:translateY(1px)}
+    .modeChoiceTop{display:flex;align-items:center;gap:12px;justify-content:space-between}
+    .modeChoiceNum{
+      width:48px;height:48px;border-radius:50%;flex:0 0 auto;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.88);border:3px solid rgba(0,0,0,.22);
+      font-size:28px;font-weight:900;
+    }
+    .modeChoiceTitle{font-size:36px;font-weight:900;line-height:1.15;flex:1 1 auto}
+    .modeChoiceDesc{margin-top:8px;font-size:22px;font-weight:900;line-height:1.6}
+    .selectedModeBar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:12px 14px;border-radius:20px;background:rgba(255,255,255,.14);
+      border:4px solid rgba(255,255,255,.22);box-shadow:0 10px 18px rgba(0,0,0,.18);
+      margin-bottom:14px;
+    }
+    .selectedModeText{font-size:22px;font-weight:900;line-height:1.35;text-align:right;flex:1 1 auto}
+    .changeModeBtn{
+      flex:0 0 auto;padding:12px 16px;border:none;border-radius:16px;cursor:pointer;
+      background:#fff;color:#111;font-size:18px;font-weight:900;
+      border:4px solid rgba(0,0,0,.80);box-shadow:0 8px 0 rgba(0,0,0,.18);
+      -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+    }
+    .changeModeBtn:active{transform:translateY(1px)}
+    .hostLinksWrap{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+    .hostLinkCard{
+      border-radius:22px;padding:14px;border:5px solid rgba(0,0,0,.72);
+      box-shadow:0 12px 24px rgba(0,0,0,.18);
+      text-align:right;
+    }
+    .hostLinkCard.players{background:linear-gradient(180deg,#f7bc1f 0%, #f5d35f 100%);color:#111}
+    .hostLinkCard.display{background:linear-gradient(180deg,#1f8a52 0%, #8fcf9a 100%);color:#fff}
+    .hostLinkHead{display:flex;align-items:center;gap:14px}
+    .hostLinkBadge{
+      width:52px;height:52px;border-radius:50%;flex:0 0 auto;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.86);color:#111;font-size:30px;font-weight:900;
+      border:3px solid rgba(0,0,0,.18);
+    }
+    .hostLinkQr{
+      width:96px;height:96px;border-radius:16px;object-fit:cover;background:#fff;
+      border:4px solid rgba(255,255,255,.65);box-shadow:0 8px 16px rgba(0,0,0,.16);flex:0 0 auto;
+    }
+    .hostLinkBody{flex:1 1 auto;min-width:0}
+    .hostLinkTitle{font-size:32px;font-weight:900;line-height:1.15}
+    .hostLinkSub{margin-top:6px;font-size:20px;font-weight:900;line-height:1.45}
+    .hostLinkCopyRow{display:flex;justify-content:center;margin-top:12px}
+    .hostCopyBtn{min-width:240px;max-width:100%}
+    .hostWarning{
+      margin-top:-4px;font-size:18px;font-weight:900;line-height:1.5;color:#fff2b6;
+      text-shadow:0 8px 16px rgba(0,0,0,.20);
+    }
+    .hostLobbyActions{margin-top:18px}
+    .displayOnlyCard{text-align:center;padding:28px 18px;}
+    .displayOnlyTitle{font-size:38px;font-weight:900;line-height:1.2;margin:0 0 10px;color:#fff}
+    .displayOnlySub{font-size:22px;font-weight:900;line-height:1.6;color:rgba(255,255,255,.95);margin:0}
     .btn{
       padding:14px 18px;
       font-size:20px;
@@ -1744,6 +1825,21 @@
       .eidBurst span:nth-child(6){ width:10px; height:10px; left:34px; bottom:84px; }
       .eidIntroCenter{ padding:20px 16px 40px; }
       .eidIntroTitle{ max-width:92vw; }
+    }
+
+    @media (max-width:520px){
+      .modeSelectorTitle{font-size:32px}
+      .modeChoiceTitle{font-size:30px}
+      .modeChoiceDesc{font-size:20px}
+      .selectedModeBar{align-items:flex-start;flex-direction:column}
+      .selectedModeText{font-size:20px;width:100%}
+      .changeModeBtn{width:100%}
+      .hostLinkHead{align-items:flex-start}
+      .hostLinkQr{width:82px;height:82px}
+      .hostLinkTitle{font-size:27px}
+      .hostLinkSub{font-size:18px}
+      .displayOnlyTitle{font-size:32px}
+      .displayOnlySub{font-size:20px}
     }
 
     /* موبايل صغير */
@@ -3621,6 +3717,20 @@ function hideEidIntro(immediate){
       u.searchParams.set("code", roomCode);
       return u.toString();
     }
+    function buildDisplayUrl(roomCode){
+      const u = new URL(location.href);
+      u.search = "";
+      u.hash = "";
+      u.searchParams.set("role", "display");
+      u.searchParams.set("code", roomCode);
+      const syncParam = params.get("sync");
+      if(syncParam) u.searchParams.set("sync", syncParam);
+      return u.toString();
+    }
+    function getHostLobbyMode(room){
+      const mode = String(room?.settings?.hostLobbyMode || room?.hostLobbyMode || "").trim();
+      return (mode === "single" || mode === "separate") ? mode : "";
+    }
     function buildQrUrl(dataUrl){
       const size = "220x220";
       return `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(dataUrl)}`;
@@ -4962,240 +5072,213 @@ function hideEidIntro(immediate){
     function renderHostLobby(room){
       document.body.classList.remove("tvMode");
       main.classList.remove("inGame");
+      setGameName(room?.name);
+
       const players = room.players || {};
       const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
-      const selectedDisplayPid = (room.displayPid != null) ? String(room.displayPid) : "";
-      const displayPlayer = selectedDisplayPid && players[selectedDisplayPid]
-        ? ({ id: selectedDisplayPid, ...players[selectedDisplayPid] })
-        : null;
-
-      const tvListHtml = displayPlayer
-        ? `
-          <button class="btn tvPickBtn selectedTv" data-tv-pid="${escapeHtml(displayPlayer.id)}">${escapeHtml(displayPlayer.name || "لاعب")}</button>
-          <div class="tvCurrentNote">تم اختيار هذا اللاعب كجهاز عرض الشاشة. اضغط عليه لإرجاعه مع اللاعبين.</div>
-        `
-        : (list.length
-            ? list.map(p => `<button class="btn btnYellow tvPickBtn" data-tv-pid="${escapeHtml(p.id)}">${escapeHtml(p.name || "لاعب")}</button>`).join("")
-            : `<div class="smallNote" style="color:#111;text-align:center;margin-top:8px">لا يوجد لاعبين بعد</div>`);
-
-      const green = list.filter(p => p.team === "green" && String(p.id) !== selectedDisplayPid);
-      const orange = list.filter(p => p.team === "orange" && String(p.id) !== selectedDisplayPid);
+      const hostMode = getHostLobbyMode(room);
       const visualTeams = getVisualTeams(room);
       const greenText = getReadableTextColor(visualTeams.green.color);
       const orangeText = getReadableTextColor(visualTeams.orange.color);
-      const tvBtnLabel = displayPlayer ? `جهاز العرض: ${escapeHtml(displayPlayer.name || "لاعب")}` : "عرض الشاشة";
+      const green = list.filter(p => p.team === "green");
+      const orange = list.filter(p => p.team === "orange");
       const updatesEnabled = !!(room?.writtenAnswerModeEnabled || room?.modes?.writtenAnswerModeEnabled || room?.settings?.writtenAnswerModeEnabled);
+      const joinUrl = buildJoinUrl(room.code || code);
+      const joinQrUrl = buildQrUrl(joinUrl);
+      const displayUrl = buildDisplayUrl(room.code || code);
+      const displayQrUrl = buildQrUrl(displayUrl);
+      const currentSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
+      const modeLabel = hostMode === "separate" ? "مع شاشة عرض منفصلة" : "بدون شاشة عرض من جهاز آخر";
 
-      main.innerHTML = `
-        <div class="lobbyCard">
-          <div class="codeBox">رمز اللعبة</div>
-          <div class="codeNum">${escapeHtml(room.code || code)}</div>
-          <div class="smallNote">شارك الرمز مع اللاعبين للدخول</div>
+      const staffModeHtml = `
+        <div class="staffModeFab">
+          <button id="staffModeBtn" class="staffModeBtn ${updatesEnabled ? 'active' : ''}" type="button">خاص بالتحديثات</button>
+        </div>
 
-          <div style="height:12px"></div>
-
-          <div class="teams">
-            <div class="teamCol teamGreen" style="background:${escapeHtml(hexToRgba(visualTeams.green.color, 0.86))};color:${escapeHtml(greenText)};border-color:rgba(0,0,0,.70)">
-              <div class="teamTitle">${escapeHtml(visualTeams.green.name)}</div>
-              <div id="greenList"></div>
-            </div>
-            <div class="teamCol teamOrange" style="background:${escapeHtml(hexToRgba(visualTeams.orange.color, 0.86))};color:${escapeHtml(orangeText)};border-color:rgba(0,0,0,.70)">
-              <div class="teamTitle">${escapeHtml(visualTeams.orange.name)}</div>
-              <div id="orangeList"></div>
-            </div>
-          </div>
-
-          <div style="height:12px"></div>
-
-          <div class="row">
-            <button id="shareBtn" class="btn btnYellow">مشاركة اللعبة للاعبين</button>
-            <button id="startBtn" class="btn btnGreen">ابدأ اللعبة</button>
-            <button id="tvBtn" class="btn btnBlue">${tvBtnLabel}</button>
-          </div>
-
-          <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
-
-          <div id="shareBackdrop" class="shareBackdrop">
-            <div class="shareModal">
-              <button id="shareClose" class="shareClose" aria-label="إغلاق">×</button>
-              <div class="shareTitle">مشاركة اللعبة</div>
-
-              <div class="shareChoices">
-                <button id="shareQrBtn" class="btn btnOrange">باركود</button>
-                <button id="shareCodeBtn" class="btn btnGreen">رمز</button>
-                <button id="shareLinkBtn" class="btn btnYellow">رابط</button>
-              </div>
-
-              <div id="shareQrPanel" class="sharePanel">
-                <img id="qrImg" class="qrImg" alt="QR">
-                <div class="shareSmall" id="joinUrlTxt"></div>
-                <div class="row" style="justify-content:center;margin-top:10px">
-                  <button id="copyJoinBtn1" class="btn btnYellow">نسخ الرابط</button>
-                </div>
-                <div class="shareSmall">امسح الباركود أو افتح الرابط للانتقال لصفحة كتابة الاسم</div>
-              </div>
-
-              <div id="shareCodePanel" class="sharePanel">
-                <div class="codeBox" style="text-align:center">رمز الغرفة</div>
-                <div class="shareCodeBig">${escapeHtml(room.code || code)}</div>
-              </div>
-
-              <div id="shareLinkPanel" class="sharePanel">
-                <div class="codeBox" style="text-align:center">رابط الدخول</div>
-                <div class="shareSmall" id="joinUrlTxt2"></div>
-                <div class="row" style="justify-content:center;margin-top:10px">
-                  <button id="copyJoinBtn2" class="btn btnYellow">نسخ الرابط</button>
-                </div>
-              </div>
+        <div id="staffModeBackdrop" class="staffModeBackdrop">
+          <div class="staffModeModal">
+            <button id="staffModeClose" class="staffModeClose" aria-label="إغلاق">×</button>
+            <div class="staffModeTitle">خاص بالتحديثات</div>
+            <div class="staffModeSub">خاص بموظفين صندوق المسابقات</div>
+            <input
+              id="staffModeInput"
+              class="staffModeInput"
+              type="password"
+              inputmode="numeric"
+              maxlength="4"
+              autocomplete="off"
+              placeholder="أدخل الرمز"
+            >
+            <div id="staffModeMsg" class="staffModeMsg"></div>
+            <div class="staffModeActions">
+              <button id="staffModeApply" class="staffModeApply" type="button">تفعيل</button>
             </div>
           </div>
-          <div id="tvBackdrop" class="shareBackdrop">
-            <div class="shareModal">
-              <button id="tvClose" class="shareClose" aria-label="إغلاق">×</button>
-              <div class="shareTitle">جهاز عرض الشاشة</div>
-              <div class="shareSmall" style="color:#111;text-align:center">اختر لاعبًا واحدًا فقط ليعمل كجهاز عرض. إذا كان هناك لاعب مختار فسيظهر وحده هنا، واضغط عليه لإرجاعه مع اللاعبين.</div>
-              <div class="tvPickList">${tvListHtml}</div>
-            </div>
-          </div>
-
-          <div class="staffModeFab">
-            <button id="staffModeBtn" class="staffModeBtn ${updatesEnabled ? 'active' : ''}" type="button">خاص بالتحديثات</button>
-          </div>
-
-          <div id="staffModeBackdrop" class="staffModeBackdrop">
-            <div class="staffModeModal">
-              <button id="staffModeClose" class="staffModeClose" aria-label="إغلاق">×</button>
-              <div class="staffModeTitle">خاص بالتحديثات</div>
-              <div class="staffModeSub">خاص بموظفين صندوق المسابقات</div>
-              <input
-                id="staffModeInput"
-                class="staffModeInput"
-                type="password"
-                inputmode="numeric"
-                maxlength="4"
-                autocomplete="off"
-                placeholder="أدخل الرمز"
-              >
-              <div id="staffModeMsg" class="staffModeMsg"></div>
-              <div class="staffModeActions">
-                <button id="staffModeApply" class="staffModeApply" type="button">تفعيل</button>
-              </div>
-            </div>
-          </div>
-
         </div>
       `;
 
-      const greenList = document.getElementById("greenList");
-      const orangeList = document.getElementById("orangeList");
+      if(!hostMode){
+        main.innerHTML = `
+          <div class="lobbyCard">
+            <div class="modeSelectorWrap">
+              <div class="modeSelectorTitle">اختر طريقة اللعب</div>
 
-      function draw(colEl, arr, teamColor, textColor){
-        const borderColor = getReadableBorderColor(textColor);
-        colEl.innerHTML = arr.map(p => `<div class="playerItem" data-id="${escapeHtml(p.id)}" style="background:${escapeHtml(hexToRgba(teamColor, 0.96))};color:${escapeHtml(textColor)};border-color:${escapeHtml(borderColor)}">${escapeHtml(p.name)}</div>`).join("") || `<div class="smallNote" style="color:${escapeHtml(textColor)}">لا يوجد</div>`;
-      }
-      draw(greenList, green, visualTeams.green.color, greenText);
-      draw(orangeList, orange, visualTeams.orange.color, orangeText);
+              <div class="modeSelectorCards">
+                <button class="modeChoiceBtn single" type="button" data-host-mode="single">
+                  <div class="modeChoiceTop">
+                    <div class="modeChoiceNum">1</div>
+                    <div class="modeChoiceTitle">بدون شاشة عرض من جهاز آخر</div>
+                  </div>
+                  <div class="modeChoiceDesc">المقدم يعرض اللعبة من جهازه<br>واللاعبون يدخلون من جوالاتهم</div>
+                </button>
 
-      main.querySelectorAll(".playerItem").forEach(el => {
-        el.addEventListener("click", async () => {
-          const id = el.getAttribute("data-id");
-          const p = players[id];
-          if(!p) return;
-          const newTeam = (p.team === "green") ? "orange" : "green";
-          await update(ref(db, `rooms/${code}/players/${id}`), { team: newTeam });
+                <button class="modeChoiceBtn separate" type="button" data-host-mode="separate">
+                  <div class="modeChoiceTop">
+                    <div class="modeChoiceNum">2</div>
+                    <div class="modeChoiceTitle">مع شاشة عرض منفصلة</div>
+                  </div>
+                  <div class="modeChoiceDesc">المقدم يدير اللعبة من جهازه<br>اللاعبون يدخلون من جوالاتهم<br>مع جهاز آخر يُفتح برابط خاص ليتم عرضه على شاشة التلفاز</div>
+                </button>
+              </div>
+            </div>
+            ${staffModeHtml}
+          </div>
+        `;
+      }else{
+        main.innerHTML = `
+          <div class="lobbyCard">
+            <div class="selectedModeBar">
+              <div class="selectedModeText">النمط المختار: ${escapeHtml(modeLabel)}</div>
+              <button id="changeModeBtn" class="changeModeBtn" type="button">تغيير النمط</button>
+            </div>
+
+            <div class="teams">
+              <div class="teamCol teamGreen" style="background:${escapeHtml(hexToRgba(visualTeams.green.color, 0.86))};color:${escapeHtml(greenText)};border-color:rgba(0,0,0,.70)">
+                <div class="teamTitle">${escapeHtml(visualTeams.green.name)}</div>
+                <div id="greenList"></div>
+              </div>
+              <div class="teamCol teamOrange" style="background:${escapeHtml(hexToRgba(visualTeams.orange.color, 0.86))};color:${escapeHtml(orangeText)};border-color:rgba(0,0,0,.70)">
+                <div class="teamTitle">${escapeHtml(visualTeams.orange.name)}</div>
+                <div id="orangeList"></div>
+              </div>
+            </div>
+
+            <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
+
+            <div class="hostLinksWrap">
+              <div class="hostLinkCard players">
+                <div class="hostLinkHead">
+                  <div class="hostLinkBadge">1</div>
+                  <div class="hostLinkBody">
+                    <div class="hostLinkTitle">رابط دخول اللاعبين</div>
+                    <div class="hostLinkSub">هذا الرابط للاعبين فقط</div>
+                  </div>
+                  <img class="hostLinkQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين">
+                </div>
+                <div class="hostLinkCopyRow">
+                  <button id="copyJoinBtn" class="btn btnYellow hostCopyBtn" type="button">نسخ رابط اللاعبين</button>
+                </div>
+              </div>
+
+              ${hostMode === "separate" ? `
+              <div class="hostLinkCard display">
+                <div class="hostLinkHead">
+                  <div class="hostLinkBadge">2</div>
+                  <div class="hostLinkBody">
+                    <div class="hostLinkTitle">رابط شاشة العرض</div>
+                    <div class="hostLinkSub">هذا الرابط للشاشة فقط وليس للاعبين</div>
+                  </div>
+                  <img class="hostLinkQr" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض">
+                </div>
+                <div class="hostLinkCopyRow">
+                  <button id="copyDisplayBtn" class="btn btnBlue hostCopyBtn" type="button">نسخ رابط شاشة العرض</button>
+                </div>
+              </div>
+              <div class="hostWarning">تنبيه: شاشة العرض لا يدخل منها اللاعبون.</div>
+              ` : ``}
+            </div>
+
+            <div class="row hostLobbyActions">
+              <button id="startBtn" class="btn btnGreen" type="button">ابدأ اللعبة</button>
+            </div>
+
+            ${staffModeHtml}
+          </div>
+        `;
+
+        const greenList = document.getElementById("greenList");
+        const orangeList = document.getElementById("orangeList");
+
+        function draw(colEl, arr, teamColor, textColor){
+          const borderColor = getReadableBorderColor(textColor);
+          colEl.innerHTML = arr.map(p => `<div class="playerItem" data-id="${escapeHtml(p.id)}" style="background:${escapeHtml(hexToRgba(teamColor, 0.96))};color:${escapeHtml(textColor)};border-color:${escapeHtml(borderColor)}">${escapeHtml(p.name)}</div>`).join("") || `<div class="smallNote" style="color:${escapeHtml(textColor)}">لا يوجد</div>`;
+        }
+        draw(greenList, green, visualTeams.green.color, greenText);
+        draw(orangeList, orange, visualTeams.orange.color, orangeText);
+
+        main.querySelectorAll(".playerItem").forEach(el => {
+          el.addEventListener("click", async () => {
+            const id = el.getAttribute("data-id");
+            const p = players[id];
+            if(!p) return;
+            const newTeam = (p.team === "green") ? "orange" : "green";
+            await update(ref(db, `rooms/${code}/players/${id}`), { team: newTeam });
+          });
         });
-      });
 
-      document.getElementById("startBtn").addEventListener("click", async () => {
-        const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
-        const board = buildBoardState(latestRoomForStart, Date.now());
-        const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
-        LAST_STABLE_BOARD = board;
-        await update(roomRef, {
-          status: "started",
-          activeMap: 0,
-          board,
-          freeze: false,
-          buzzer: null,
-          scores: { green:0, orange:0, a:0, b:0 },
-          winEvent: null,
-          winState: null,
-          customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
-          customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
-          round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
-          mapStates: { "0": {} },
-          current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
-        });
-      });
+        const changeModeBtn = document.getElementById("changeModeBtn");
+        if(changeModeBtn){
+          changeModeBtn.addEventListener("click", async () => {
+            try{
+              await update(ref(db, `rooms/${code}`), {
+                displayPid: null,
+                settings: { ...currentSettings, hostLobbyMode: null }
+              });
+            }catch(e){}
+          });
+        }
 
-      const shareBackdrop = document.getElementById("shareBackdrop");
-      const shareBtn = document.getElementById("shareBtn");
-      const shareClose = document.getElementById("shareClose");
-      const shareQrBtn = document.getElementById("shareQrBtn");
-      const shareCodeBtn = document.getElementById("shareCodeBtn");
-      const shareLinkBtn = document.getElementById("shareLinkBtn");
-      const shareQrPanel = document.getElementById("shareQrPanel");
-      const shareCodePanel = document.getElementById("shareCodePanel");
-      const shareLinkPanel = document.getElementById("shareLinkPanel");
-      const qrImg = document.getElementById("qrImg");
-      const joinUrlTxt = document.getElementById("joinUrlTxt");
-      const joinUrlTxt2 = document.getElementById("joinUrlTxt2");
-      const copyJoinBtn1 = document.getElementById("copyJoinBtn1");
-      const copyJoinBtn2 = document.getElementById("copyJoinBtn2");
+        const copyJoinBtn = document.getElementById("copyJoinBtn");
+        if(copyJoinBtn){
+          copyJoinBtn.addEventListener("click", async () => {
+            const ok = await copyText(joinUrl);
+            copyJoinBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+            setTimeout(()=> copyJoinBtn.textContent = "نسخ رابط اللاعبين", 1200);
+          });
+        }
 
-      const joinUrl = buildJoinUrl(room.code || code);
-      const qrUrl = buildQrUrl(joinUrl);
+        const copyDisplayBtn = document.getElementById("copyDisplayBtn");
+        if(copyDisplayBtn){
+          copyDisplayBtn.addEventListener("click", async () => {
+            const ok = await copyText(displayUrl);
+            copyDisplayBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+            setTimeout(()=> copyDisplayBtn.textContent = "نسخ رابط شاشة العرض", 1200);
+          });
+        }
 
-      function showPanel(which){
-        shareQrPanel.style.display = (which === "qr") ? "block" : "none";
-        shareCodePanel.style.display = (which === "code") ? "block" : "none";
-        shareLinkPanel.style.display = (which === "link") ? "block" : "none";
-      }
-
-      function openShare(){
-        shareBackdrop.style.display = "flex";
-        showPanel("code");
-      }
-      function closeShare(){
-        shareBackdrop.style.display = "none";
-      }
-
-      shareBtn.addEventListener("click", openShare);
-      shareClose.addEventListener("click", closeShare);
-      shareBackdrop.addEventListener("click", (e) => {
-        if(e.target === shareBackdrop) closeShare();
-      });
-
-      shareQrBtn.addEventListener("click", () => {
-        showPanel("qr");
-        qrImg.src = qrUrl;
-        joinUrlTxt.textContent = joinUrl;
-      });
-
-      shareCodeBtn.addEventListener("click", () => {
-        showPanel("code");
-      });
-
-      shareLinkBtn.addEventListener("click", () => {
-        showPanel("link");
-        joinUrlTxt2.textContent = joinUrl;
-      });
-
-      if(copyJoinBtn1){
-        copyJoinBtn1.addEventListener("click", async () => {
-          const ok = await copyText(joinUrl);
-          copyJoinBtn1.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-          setTimeout(()=> copyJoinBtn1.textContent = "نسخ الرابط", 1200);
+        document.getElementById("startBtn").addEventListener("click", async () => {
+          const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+          const board = buildBoardState(latestRoomForStart, Date.now());
+          const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
+          LAST_STABLE_BOARD = board;
+          await update(roomRef, {
+            status: "started",
+            displayPid: null,
+            activeMap: 0,
+            board,
+            freeze: false,
+            buzzer: null,
+            scores: { green:0, orange:0, a:0, b:0 },
+            winEvent: null,
+            winState: null,
+            customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
+            customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
+            round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
+            mapStates: { "0": {} },
+            current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
+          });
         });
       }
-      if(copyJoinBtn2){
-        copyJoinBtn2.addEventListener("click", async () => {
-          const ok = await copyText(joinUrl);
-          copyJoinBtn2.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-          setTimeout(()=> copyJoinBtn2.textContent = "نسخ الرابط", 1200);
-        });
-      }
-
 
       const staffModeBackdrop = document.getElementById("staffModeBackdrop");
       const staffModeBtn = document.getElementById("staffModeBtn");
@@ -5237,11 +5320,11 @@ function hideEidIntro(immediate){
 
         try{
           const currentModes = (room?.modes && typeof room.modes === "object") ? room.modes : {};
-          const currentSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
+          const latestSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
           await update(ref(db, `rooms/${code}`), {
             writtenAnswerModeEnabled: true,
             modes: { ...currentModes, writtenAnswerModeEnabled: true },
-            settings: { ...currentSettings, writtenAnswerModeEnabled: true }
+            settings: { ...latestSettings, writtenAnswerModeEnabled: true }
           });
           setStaffModeMsg("تم التفعيل", "success");
           if(staffModeBtn) staffModeBtn.classList.add("active");
@@ -5268,33 +5351,16 @@ function hideEidIntro(immediate){
         });
       }
 
-      // ✅ جهاز عرض الشاشة (TV) — اختيار لاعب ليكون جهاز العرض
-      const tvBackdrop = document.getElementById("tvBackdrop");
-      const tvBtn = document.getElementById("tvBtn");
-      const tvClose = document.getElementById("tvClose");
-
-      function openTv(){
-        if(tvBackdrop) tvBackdrop.style.display = "flex";
-      }
-      function closeTv(){
-        if(tvBackdrop) tvBackdrop.style.display = "none";
-      }
-
-      if(tvBtn) tvBtn.addEventListener("click", openTv);
-      if(tvClose) tvClose.addEventListener("click", closeTv);
-      if(tvBackdrop){
-        tvBackdrop.addEventListener("click", (e)=>{ if(e.target === tvBackdrop) closeTv(); });
-      }
-
-      main.querySelectorAll("[data-tv-pid]").forEach(btn=>{
-        btn.addEventListener("click", async ()=>{
-          const sel = btn.getAttribute("data-tv-pid");
-          if(!sel) return;
+      main.querySelectorAll("[data-host-mode]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const nextMode = String(btn.getAttribute("data-host-mode") || "");
+          if(!nextMode) return;
           try{
-            const nextDisplayPid = (selectedDisplayPid && String(selectedDisplayPid) === String(sel)) ? null : sel;
-            await update(ref(db, `rooms/${code}`), { displayPid: nextDisplayPid });
+            await update(ref(db, `rooms/${code}`), {
+              displayPid: null,
+              settings: { ...currentSettings, hostLobbyMode: nextMode }
+            });
           }catch(e){}
-          closeTv();
         });
       });
     }
@@ -5308,6 +5374,19 @@ function hideEidIntro(immediate){
           <div class="buyNowWrap">
             <button class="buyNowBtn" data-store-link type="button">لشراء اللعبة اضغط هنا</button>
           </div>
+        </div>
+      `;
+    }
+
+    function renderDisplayOnlyWaiting(msgText){
+      document.body.classList.remove("tvMode");
+      main.classList.remove("inGame");
+      main.innerHTML = `
+        <div class="lobbyCard displayOnlyCard">
+          <div class="displayOnlyTitle">هذا الجهاز مخصص للعرض فقط</div>
+          <p class="displayOnlySub">لا يدخل منه اللاعبون</p>
+          <p class="displayOnlySub" style="margin-top:14px">${escapeHtml(msgText || "بانتظار بدء اللعبة من المقدم...")}</p>
+          <p class="displayOnlySub" style="margin-top:10px;font-size:18px;opacity:.92">إذا كنت لاعبًا استخدم رابط دخول اللاعبين</p>
         </div>
       `;
     }
@@ -6613,6 +6692,8 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           // أول ثانيتين ونص: نعرض "جاري الاتصال" بدل "الغرفة غير موجودة"
           if(role === "host"){
             renderHostWaiting("جاري إنشاء الغرفة… انتظر لحظة.");
+          }else if(role === "display"){
+            renderDisplayOnlyWaiting("جاري الاتصال بجهاز العرض...");
           }else{
             renderConnecting("جاري الاتصال بالغرفة…");
           }
@@ -6625,6 +6706,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         if(role === "host"){
           renderHostWaiting("تعذر العثور على بيانات الغرفة. جرّب إعادة المحاولة أو ارجع وأنشئ غرفة جديدة.");
           VIEW.type = "host_wait";
+          return;
+        }
+        if(role === "display"){
+          renderDisplayOnlyWaiting("تعذر العثور على بيانات الغرفة.");
+          VIEW.type = "display_wait";
           return;
         }
 
@@ -6650,11 +6736,31 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       try{ prunePlayersIfOverLimit(room); }catch(e){}
 
       // Player me
-      LIVE.me = (role === "host") ? null : getMeFromPlayers(players);
+      LIVE.me = (role === "host" || role === "display") ? null : getMeFromPlayers(players);
 
       // Views
-      if(isWrittenModeEnabled(room) && room.status === "started") {
+      if(role !== "display" && isWrittenModeEnabled(room) && room.status === "started") {
         redirectToWrittenGame(room);
+        return;
+      }
+
+      if(role === "display"){
+        if(room.status !== "started"){
+          if(VIEW.type !== "display_wait" || VIEW.waitingMsg !== "بانتظار بدء اللعبة من المقدم..."){
+            VIEW.waitingMsg = "بانتظار بدء اللعبة من المقدم...";
+            renderDisplayOnlyWaiting("بانتظار بدء اللعبة من المقدم...");
+            VIEW.type = "display_wait";
+          }
+          afterRender(room);
+          return;
+        }
+
+        if(VIEW.type !== "tv_game"){
+          renderTvDisplay(room, null);
+          VIEW.type = "tv_game";
+        }
+        updateGameUI();
+        afterRender(room);
         return;
       }
 
@@ -6669,7 +6775,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           afterRender(room);
           return;
         }else{
-          const sig = `${String(room.displayPid || "")}|` + Object.entries(players)
+          const sig = `${getHostLobbyMode(room)}|${JSON.stringify(room.teams || {})}|` + Object.entries(players)
             .map(([id,p]) => `${id}:${p?.team||""}:${p?.name||""}:${Number(p?.joinedAt||0)}`)
             .sort()
             .join("|");
@@ -6751,6 +6857,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-20-3 (eid intro overlay full-screen + custom questions API + restart resync fix) -->
+  <!-- VERSION: game_full.html — v2026-03-22-1 (host mode chooser + separate display link + display-only landing) -->
 </body>
 </html>
