@@ -1,7 +1,7 @@
 // functions/_middleware.js
 // حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v9: Fix أقوى لمشكلة اللاعبين: السماح للاعب بالوصول لـ /app و /game_full حتى لو اختفت query أو ما انرسلت cookies الخاصة بالدور
-//     نعتمد على: role=player أو flags (guest/player/view=player) أو (pid+code) أو Cookies (role/guest OR pid+room_code) أو Referer انتظار/انضمام
+// v10: السماح لشاشة العرض بالدخول المباشر بدون تسجيل دخول إذا كان الرابط خاص بالعرض
+//      مع الإبقاء على حماية المقدم، والسماح للاعب كما هو
 
 const ALLOW_GUEST_PLAYERS = true;
 
@@ -268,7 +268,90 @@ function isGuestPlayerRequest(request, url) {
       const fromWaiting = /\/(play|waiting|wait|lobby|join)\.html$/i.test(ru.pathname);
       const rpid = ru.searchParams.get("pid");
       const rcode = ru.searchParams.get("code") || ru.searchParams.get("room") || ru.searchParams.get("roomId");
-      if (fromWaiting && ( (rpid && rcode) || (rcode && (rGuest === "1" || rRole === "player" || rView === "player")) )) return true;
+      if (fromWaiting && ((rpid && rcode) || (rcode && (rGuest === "1" || rRole === "player" || rView === "player")))) return true;
+    } catch {}
+  }
+
+  return false;
+}
+
+// ✅ تحديد شاشة العرض: رابط عام لا يحتاج تسجيل دخول
+function isDisplayScreenRequest(request, url) {
+  const sp = url.searchParams;
+  const path = url.pathname.toLowerCase();
+
+  // 1) مسارات شائعة إذا وُجدت
+  if (
+    path.includes("/display") ||
+    path.includes("/screen") ||
+    path.includes("/tv") ||
+    path.endsWith("/display.html") ||
+    path.endsWith("/screen.html") ||
+    path.endsWith("/tv.html") ||
+    path.endsWith("/monitor.html")
+  ) {
+    return true;
+  }
+
+  // 2) بارامترات شائعة لشاشة العرض
+  const view = (sp.get("view") || "").toLowerCase();
+  const role = (sp.get("role") || "").toLowerCase();
+  const mode = (sp.get("mode") || "").toLowerCase();
+
+  if (["screen", "display", "tv", "monitor"].includes(view)) return true;
+  if (["screen", "display", "tv", "monitor"].includes(role)) return true;
+  if (["screen", "display", "tv", "monitor"].includes(mode)) return true;
+
+  const flagNames = ["screen", "display", "tv", "isScreen", "isDisplay", "isTv"];
+  for (const name of flagNames) {
+    const val = (sp.get(name) || "").toLowerCase();
+    if (val === "1" || val === "true" || val === "yes") return true;
+  }
+
+  // 3) كوكيز محتملة إن وجدت
+  const cRole = (getCookie(request, "sandooq_role") || "").toLowerCase();
+  if (["screen", "display", "tv", "monitor"].includes(cRole)) return true;
+
+  const cView = (getCookie(request, "sandooq_view") || "").toLowerCase();
+  if (["screen", "display", "tv", "monitor"].includes(cView)) return true;
+
+  const cScreen = (getCookie(request, "sandooq_display_screen") || "").toLowerCase();
+  if (cScreen === "1" || cScreen === "true" || cScreen === "yes") return true;
+
+  // 4) Referer إذا فُتح الرابط من صفحة اللوبي
+  const ref = request.headers.get("referer") || request.headers.get("Referer") || "";
+  if (ref) {
+    if (
+      ref.includes("view=screen") ||
+      ref.includes("view=display") ||
+      ref.includes("view=tv") ||
+      ref.includes("role=screen") ||
+      ref.includes("role=display") ||
+      ref.includes("mode=screen") ||
+      ref.includes("mode=display") ||
+      ref.includes("mode=tv") ||
+      ref.includes("screen=1") ||
+      ref.includes("display=1") ||
+      ref.includes("tv=1")
+    ) {
+      return true;
+    }
+
+    try {
+      const ru = new URL(ref);
+      const rv = (ru.searchParams.get("view") || "").toLowerCase();
+      const rr = (ru.searchParams.get("role") || "").toLowerCase();
+      const rm = (ru.searchParams.get("mode") || "").toLowerCase();
+      const rs = (ru.searchParams.get("screen") || "").toLowerCase();
+      const rd = (ru.searchParams.get("display") || "").toLowerCase();
+      const rt = (ru.searchParams.get("tv") || "").toLowerCase();
+
+      if (["screen", "display", "tv", "monitor"].includes(rv)) return true;
+      if (["screen", "display", "tv", "monitor"].includes(rr)) return true;
+      if (["screen", "display", "tv", "monitor"].includes(rm)) return true;
+      if (["1", "true", "yes"].includes(rs)) return true;
+      if (["1", "true", "yes"].includes(rd)) return true;
+      if (["1", "true", "yes"].includes(rt)) return true;
     } catch {}
   }
 
@@ -300,9 +383,16 @@ export async function onRequest(context) {
 
   const protectApp = path.startsWith("/app");
 
-  // ✅✅ أهم إصلاح: السماح للاعب (guest) بالدخول بدون تأمين للعبة
+  // ✅ السماح للاعب (guest) بالدخول بدون تأمين
   if (ALLOW_GUEST_PLAYERS) {
     if ((protectRootGameFull || protectApp) && isGuestPlayerRequest(request, url)) {
+      return next();
+    }
+  }
+
+  // ✅ السماح لشاشة العرض بالدخول المباشر بدون تسجيل دخول
+  if (protectRootGameFull || protectApp) {
+    if (isDisplayScreenRequest(request, url)) {
       return next();
     }
   }
@@ -343,5 +433,10 @@ export async function onRequest(context) {
 }
 
 /*
-_middleware.js – إصدار 9 (Fix: stronger guest player detection: flags + pid+code cookies + wider referer)
+_middleware.js – إصدار 10
+التعديل:
+- إضافة isDisplayScreenRequest
+- السماح لرابط شاشة العرض بالدخول المباشر بدون تسجيل دخول
+- الإبقاء على حماية المقدم كما هي
+- الإبقاء على السماح للاعب كما هو
 */
