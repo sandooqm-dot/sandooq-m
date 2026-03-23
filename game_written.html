@@ -5639,17 +5639,13 @@ function hideEidIntro(immediate){
             const input = GAME_UI.els.writtenAnswerInput;
             const clean = String((input && input.value) || GAME_UI.writtenDraft || "").replace(/\s+/g, " ").trim().slice(0, 36);
             if(!clean) return;
-            const meNow = LIVE.me || {};
-            await update(ref(db, `rooms/${code}`), {
-              writtenAnswer: {
-                text: clean,
-                pid: myPid,
-                name: String(meNow.name || liveBuzzer.name || "").trim().slice(0, 80),
-                team: String(meNow.team || liveBuzzer.team || "").trim().slice(0, 30),
-                updatedAt: Date.now(),
-                submitted: true
-              }
-            });
+            await setWrittenAnswerRemote(clean, true);
+            GAME_UI.writtenDraft = clean;
+            GAME_UI.writtenTurnKey = `${myPid}|${Number(liveBuzzer.seq || liveBuzzer.ts || 0)}`;
+            try{ await _pullOnce(true); }catch(e){}
+            try{ syncWrittenModeUI(); }catch(e){}
+          }catch(e){}
+        });
             GAME_UI.writtenDraft = clean;
             GAME_UI.writtenTurnKey = `${myPid}|${Number(liveBuzzer.seq || liveBuzzer.ts || 0)}`;
           }catch(e){}
@@ -7107,6 +7103,8 @@ function hideEidIntro(immediate){
     const WRITTEN_MAX_LEN = 36;
     let writtenTimerClearSent = false;
     let writtenNoBuzzerClearSent = false;
+    let writtenHostAnswerPullBusy = false;
+    let writtenHostLastForcePullAt = 0;
     let localWrittenDraft = "";
     let localSubmittedKey = "";
 
@@ -7134,7 +7132,10 @@ function hideEidIntro(immediate){
     }
 
     function getWrittenAnswerState(room){
-      const raw = room && typeof room === "object" ? room.writtenAnswer : null;
+      const raw =
+        ((room && typeof room === "object" && room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : null)
+        || ((typeof LIVE !== "undefined" && LIVE && LIVE.room && LIVE.room.writtenAnswer && typeof LIVE.room.writtenAnswer === "object") ? LIVE.room.writtenAnswer : null)
+        || ((typeof SYNC !== "undefined" && SYNC && SYNC.state && SYNC.state.writtenAnswer && typeof SYNC.state.writtenAnswer === "object") ? SYNC.state.writtenAnswer : null);
       if(raw && typeof raw === "object"){
         return {
           text: String(raw.text || "").trim(),
@@ -7176,13 +7177,64 @@ function hideEidIntro(immediate){
         updatedAt: Date.now(),
         submitted: !!submitted
       };
-      try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: payload }); }catch(e){}
+
+      let pushed = false;
+      try{
+        if(typeof _action === "function"){
+          const res = await _action({ writtenAnswer: payload });
+          pushed = !!(res && res.ok);
+        }
+      }catch(e){}
+
+      if(!pushed){
+        try{
+          const res2 = await update(ref(db, `rooms/${code}`), { writtenAnswer: payload });
+          pushed = !!(res2 && res2.ok !== false);
+        }catch(e){}
+      }
+
+      try{
+        if(typeof SYNC !== "undefined" && SYNC && typeof SYNC === "object"){
+          SYNC.state = (SYNC.state && typeof SYNC.state === "object") ? SYNC.state : {};
+          SYNC.state.writtenAnswer = payload;
+        }
+      }catch(e){}
+      try{
+        if(typeof LIVE !== "undefined" && LIVE && LIVE.room && typeof LIVE.room === "object"){
+          LIVE.room.writtenAnswer = payload;
+        }
+      }catch(e){}
+      try{ if(typeof _notifyWatchersNow === "function") _notifyWatchersNow(); }catch(e){}
+      try{ if(typeof scheduleRender === "function") scheduleRender(); }catch(e){}
+      try{ if(typeof syncWrittenModeUI === "function") syncWrittenModeUI(); }catch(e){}
+      try{ await _pullOnce(true); }catch(e){}
     }
 
     async function clearWrittenAnswerRemote(){
       localWrittenDraft = "";
       localSubmittedKey = "";
-      try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: null }); }catch(e){}
+      try{
+        if(typeof _action === "function"){
+          await _action({ writtenAnswer: null });
+        }else{
+          await update(ref(db, `rooms/${code}`), { writtenAnswer: null });
+        }
+      }catch(e){
+        try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: null }); }catch(_e){}
+      }
+      try{
+        if(typeof SYNC !== "undefined" && SYNC && typeof SYNC === "object"){
+          SYNC.state = (SYNC.state && typeof SYNC.state === "object") ? SYNC.state : {};
+          SYNC.state.writtenAnswer = null;
+        }
+      }catch(e){}
+      try{
+        if(typeof LIVE !== "undefined" && LIVE && LIVE.room && typeof LIVE.room === "object"){
+          LIVE.room.writtenAnswer = null;
+        }
+      }catch(e){}
+      try{ if(typeof _notifyWatchersNow === "function") _notifyWatchersNow(); }catch(e){}
+      try{ if(typeof scheduleRender === "function") scheduleRender(); }catch(e){}
     }
 
     function ensureWrittenBar(room){
@@ -7344,6 +7396,20 @@ function hideEidIntro(immediate){
 
       const answer = getWrittenAnswerState(room);
       if(role === "host"){
+        const buzzer = getCurrentBuzzer(room);
+
+        if(buzzer && !answer.text){
+          const now = Date.now();
+          if(!writtenHostAnswerPullBusy && (now - writtenHostLastForcePullAt > 350)){
+            writtenHostLastForcePullAt = now;
+            writtenHostAnswerPullBusy = true;
+            Promise.resolve()
+              .then(() => _pullOnce(true))
+              .catch(() => {})
+              .finally(() => { writtenHostAnswerPullBusy = false; });
+          }
+        }
+
         if(!room.buzzer && answer.text){
           if(!writtenNoBuzzerClearSent){
             writtenNoBuzzerClearSent = true;
