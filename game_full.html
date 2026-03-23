@@ -1246,7 +1246,7 @@
       direction:ltr;
       -webkit-text-security: disc;
       text-security: disc;
-      caret-color:#111;
+      caret-color:#4b2342;
     }
     .staffModeInput::placeholder{
       letter-spacing:0;
@@ -5133,7 +5133,6 @@ function hideEidIntro(immediate){
               maxlength="4"
               autocomplete="off"
               autocapitalize="off"
-              autocorrect="off"
               spellcheck="false"
               placeholder="أدخل الرمز"
             >
@@ -5326,12 +5325,9 @@ function hideEidIntro(immediate){
         });
 
         document.getElementById("startBtn").addEventListener("click", async () => {
-          const latestRoomForStart = getRoomWithPersistentCustomQuestions(LIVE.room || room || {});
+          const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
           const board = buildBoardState(latestRoomForStart, Date.now());
           const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
-          const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
-          const latestModesSafe = (latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {};
-          const latestSettingsSafe = (latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {};
           LAST_STABLE_BOARD = board;
           await update(roomRef, {
             status: "started",
@@ -5343,9 +5339,6 @@ function hideEidIntro(immediate){
             scores: { green:0, orange:0, a:0, b:0 },
             winEvent: null,
             winState: null,
-            writtenAnswerModeEnabled: writtenEnabled,
-            modes: { ...latestModesSafe, writtenAnswerModeEnabled: writtenEnabled },
-            settings: { ...latestSettingsSafe, writtenAnswerModeEnabled: writtenEnabled },
             customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
             customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
             round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
@@ -5371,13 +5364,12 @@ function hideEidIntro(immediate){
 
       function openStaffMode(){
         if(!staffModeBackdrop) return;
-        const enabledNow = isWrittenModeEnabled(LIVE.room || room || {});
         staffModeBackdrop.style.display = "flex";
         if(staffModeInput){
           staffModeInput.value = "";
           setTimeout(()=>{ try{ staffModeInput.focus(); }catch(e){} }, 20);
         }
-        setStaffModeMsg(enabledNow ? "تم التفعيل" : "", enabledNow ? "success" : "");
+        setStaffModeMsg(updatesEnabled ? "تم التفعيل" : "", updatesEnabled ? "success" : "");
       }
 
       function closeStaffMode(){
@@ -5387,7 +5379,7 @@ function hideEidIntro(immediate){
       }
 
       async function applyStaffModeCode(){
-        const codeValue = String(staffModeInput?.value || "").replace(/\D+/g, "").trim();
+        const codeValue = String(staffModeInput?.value || "").trim();
         if(codeValue !== STAFF_MODE_CODE){
           setStaffModeMsg("الرمز غير صحيح", "error");
           try{ staffModeInput?.focus(); staffModeInput?.select(); }catch(e){}
@@ -5395,22 +5387,13 @@ function hideEidIntro(immediate){
         }
 
         try{
-          const latestRoom = LIVE.room || room || {};
-          const currentModes = (latestRoom?.modes && typeof latestRoom.modes === "object") ? latestRoom.modes : {};
-          const latestSettings = (latestRoom?.settings && typeof latestRoom.settings === "object") ? latestRoom.settings : {};
+          const currentModes = (room?.modes && typeof room.modes === "object") ? room.modes : {};
+          const latestSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
           await update(ref(db, `rooms/${code}`), {
             writtenAnswerModeEnabled: true,
             modes: { ...currentModes, writtenAnswerModeEnabled: true },
             settings: { ...latestSettings, writtenAnswerModeEnabled: true }
           });
-          try{
-            LIVE.room = normalizeLiveRoom({
-              ...(LIVE.room || latestRoom || {}),
-              writtenAnswerModeEnabled: true,
-              modes: { ...(currentModes || {}), writtenAnswerModeEnabled: true },
-              settings: { ...(latestSettings || {}), writtenAnswerModeEnabled: true }
-            });
-          }catch(e){}
           setStaffModeMsg("تم التفعيل", "success");
           if(staffModeBtn) staffModeBtn.classList.add("active");
           setTimeout(closeStaffMode, 450);
@@ -5429,8 +5412,8 @@ function hideEidIntro(immediate){
       if(staffModeApply) staffModeApply.addEventListener("click", applyStaffModeCode);
       if(staffModeInput){
         staffModeInput.addEventListener("input", ()=>{
-          const clean = String(staffModeInput.value || "").replace(/\D+/g, "").slice(0, 4);
-          if(staffModeInput.value !== clean) staffModeInput.value = clean;
+          const clean = String(staffModeInput.value || "").replace(/\D+/g, "").slice(0,4);
+          if(clean !== staffModeInput.value) staffModeInput.value = clean;
         });
         staffModeInput.addEventListener("keydown", (e)=>{
           if(e.key === "Enter"){
@@ -5445,15 +5428,9 @@ function hideEidIntro(immediate){
           const nextMode = String(btn.getAttribute("data-host-mode") || "");
           if(!nextMode) return;
           try{
-            const latestRoom = LIVE.room || room || {};
-            const latestSettingsSafe = (latestRoom?.settings && typeof latestRoom.settings === "object") ? latestRoom.settings : {};
-            const latestModesSafe = (latestRoom?.modes && typeof latestRoom.modes === "object") ? latestRoom.modes : {};
-            const writtenEnabled = isWrittenModeEnabled(latestRoom);
             await update(ref(db, `rooms/${code}`), {
               displayPid: null,
-              writtenAnswerModeEnabled: writtenEnabled,
-              modes: { ...latestModesSafe, writtenAnswerModeEnabled: writtenEnabled },
-              settings: { ...latestSettingsSafe, hostLobbyMode: nextMode, writtenAnswerModeEnabled: writtenEnabled }
+              settings: { ...currentSettings, hostLobbyMode: nextMode }
             });
           }catch(e){}
         });
@@ -6698,6 +6675,8 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     function normalizeLiveRoom(room){
       room = (room && typeof room === "object") ? room : {};
       const activeMap = Number(room.activeMap || 0);
+      const rawModes = (room.modes && typeof room.modes === "object") ? room.modes : {};
+      const rawSettings = (room.settings && typeof room.settings === "object") ? room.settings : {};
       const normalized = {
         code,
         status: room.status ?? null,
@@ -6709,7 +6688,10 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         freeze: !!room.freeze,
         buzzer: room.buzzer ?? null,
         scores: (room.scores && typeof room.scores === "object") ? room.scores : { green:0, orange:0, a:0, b:0 },
-        settings: (room.settings && typeof room.settings === "object") ? room.settings : {},
+        settings: rawSettings,
+        modes: rawModes,
+        writtenAnswerModeEnabled: !!(room.writtenAnswerModeEnabled || rawModes.writtenAnswerModeEnabled || rawSettings.writtenAnswerModeEnabled),
+        writtenAnswer: (room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : null,
         teams: (room.teams && typeof room.teams === "object") ? room.teams : {},
         board: (room.board && typeof room.board === "object") ? room.board : null,
         restartTs: Number(room.restartTs || 0),
@@ -6723,27 +6705,8 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         customQuestions: (room.customQuestions && typeof room.customQuestions === "object") ? room.customQuestions : {},
         customQuestionsUpdatedAt: Number(room.customQuestionsUpdatedAt || 0),
         questionCursorDefault: (room.questionCursorDefault && typeof room.questionCursorDefault === "object") ? room.questionCursorDefault : {},
-        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {},
-        writtenAnswerModeEnabled: !!room.writtenAnswerModeEnabled,
-        modes: (room.modes && typeof room.modes === "object") ? room.modes : {}
+        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {}
       };
-
-      if(normalized.modes && normalized.modes.writtenAnswerModeEnabled && !normalized.writtenAnswerModeEnabled){
-        normalized.writtenAnswerModeEnabled = true;
-      }
-      if(normalized.settings && normalized.settings.writtenAnswerModeEnabled && !normalized.writtenAnswerModeEnabled){
-        normalized.writtenAnswerModeEnabled = true;
-      }
-      if(normalized.writtenAnswerModeEnabled){
-        normalized.modes = {
-          ...(normalized.modes || {}),
-          writtenAnswerModeEnabled: true
-        };
-        normalized.settings = {
-          ...(normalized.settings || {}),
-          writtenAnswerModeEnabled: true
-        };
-      }
 
       const expectedSeed = getExpectedBoardSeed(normalized);
       const roomBoard = normalizeBoardState(room?.board, normalized);
@@ -6971,6 +6934,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-23-2 (written mode persistence + hidden staff code fix) -->
+  <!-- VERSION: game_full.html — v2026-03-22-1 (host mode chooser + separate display link + display-only landing) -->
 </body>
 </html>
