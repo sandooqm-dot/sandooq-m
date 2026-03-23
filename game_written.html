@@ -1141,6 +1141,10 @@
       box-shadow:inset 0 0 0 2px rgba(255,255,255,.45), 0 8px 16px rgba(0,0,0,.08);
       letter-spacing:4px;
       direction:ltr;
+      -webkit-text-security: disc;
+      text-security: disc;
+      font-family: Arial, sans-serif;
+      caret-color:#111;
     }
     .staffModeInput::placeholder{
       letter-spacing:0;
@@ -5047,10 +5051,13 @@ function hideEidIntro(immediate){
               <input
                 id="staffModeInput"
                 class="staffModeInput"
-                type="password"
+                type="tel"
                 inputmode="numeric"
                 maxlength="4"
                 autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
                 placeholder="أدخل الرمز"
               >
               <div id="staffModeMsg" class="staffModeMsg"></div>
@@ -5087,9 +5094,15 @@ function hideEidIntro(immediate){
         const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
         const board = buildBoardState(latestRoomForStart, Date.now());
         const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
+        const currentModesForStart = (latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {};
+        const currentSettingsForStart = (latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {};
+        const writtenModeEnabledForStart = !!(latestRoomForStart?.writtenAnswerModeEnabled || currentModesForStart?.writtenAnswerModeEnabled || currentSettingsForStart?.writtenAnswerModeEnabled);
         LAST_STABLE_BOARD = board;
         await update(roomRef, {
           status: "started",
+          writtenAnswerModeEnabled: writtenModeEnabledForStart,
+          modes: { ...currentModesForStart, writtenAnswerModeEnabled: writtenModeEnabledForStart },
+          settings: { ...currentSettingsForStart, writtenAnswerModeEnabled: writtenModeEnabledForStart },
           activeMap: 0,
           board,
           freeze: false,
@@ -5181,6 +5194,29 @@ function hideEidIntro(immediate){
       const staffModeMsg = document.getElementById("staffModeMsg");
       const staffModeApply = document.getElementById("staffModeApply");
       const STAFF_MODE_CODE = "6635";
+      const STAFF_MODE_LS_KEY = `sabaq_written_mode_${code}`;
+
+      function isStaffModeEnabled(roomLike){
+        const rawRoom = (roomLike && typeof roomLike === "object") ? roomLike : (LIVE.room || {});
+        const rawModes = (rawRoom.modes && typeof rawRoom.modes === "object") ? rawRoom.modes : {};
+        const rawSettings = (rawRoom.settings && typeof rawRoom.settings === "object") ? rawRoom.settings : {};
+        let localEnabled = false;
+        try{ localEnabled = localStorage.getItem(STAFF_MODE_LS_KEY) === "1"; }catch(e){}
+        return !!(rawRoom.writtenAnswerModeEnabled || rawModes.writtenAnswerModeEnabled || rawSettings.writtenAnswerModeEnabled || localEnabled);
+      }
+
+      function rememberStaffModeEnabled(enabled){
+        try{
+          if(enabled) localStorage.setItem(STAFF_MODE_LS_KEY, "1");
+          else localStorage.removeItem(STAFF_MODE_LS_KEY);
+        }catch(e){}
+      }
+
+      function syncStaffModeButtonState(roomLike){
+        const enabled = isStaffModeEnabled(roomLike);
+        if(staffModeBtn) staffModeBtn.classList.toggle("active", enabled);
+        return enabled;
+      }
 
       function setStaffModeMsg(text, type){
         if(!staffModeMsg) return;
@@ -5190,12 +5226,13 @@ function hideEidIntro(immediate){
 
       function openStaffMode(){
         if(!staffModeBackdrop) return;
+        const enabled = syncStaffModeButtonState(room || LIVE.room || {});
         staffModeBackdrop.style.display = "flex";
         if(staffModeInput){
           staffModeInput.value = "";
           setTimeout(()=>{ try{ staffModeInput.focus(); }catch(e){} }, 20);
         }
-        setStaffModeMsg(updatesEnabled ? "تم التفعيل" : "", updatesEnabled ? "success" : "");
+        setStaffModeMsg(enabled ? "تم التفعيل" : "", enabled ? "success" : "");
       }
 
       function closeStaffMode(){
@@ -5220,8 +5257,14 @@ function hideEidIntro(immediate){
             modes: { ...currentModes, writtenAnswerModeEnabled: true },
             settings: { ...currentSettings, writtenAnswerModeEnabled: true }
           });
+          rememberStaffModeEnabled(true);
           setStaffModeMsg("تم التفعيل", "success");
-          if(staffModeBtn) staffModeBtn.classList.add("active");
+          syncStaffModeButtonState({
+            ...(room || LIVE.room || {}),
+            writtenAnswerModeEnabled: true,
+            modes: { ...currentModes, writtenAnswerModeEnabled: true },
+            settings: { ...currentSettings, writtenAnswerModeEnabled: true }
+          });
           setTimeout(closeStaffMode, 450);
         }catch(e){
           setStaffModeMsg("تعذر التفعيل حالياً", "error");
@@ -5244,6 +5287,7 @@ function hideEidIntro(immediate){
           }
         });
       }
+      syncStaffModeButtonState(room || LIVE.room || {});
 
       // ✅ جهاز عرض الشاشة (TV) — اختيار لاعب ليكون جهاز العرض
       const tvBackdrop = document.getElementById("tvBackdrop");
@@ -6723,7 +6767,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-20-3 (eid intro overlay full-screen + custom questions API + restart resync fix) -->
+  <!-- VERSION: game_written.html — v2026-03-23-1 (written mode persistence + hidden code input + robust written UI) -->
 
   <script>
   (function(){
@@ -6751,7 +6795,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
     const style = document.createElement("style");
     style.textContent = `
-      body.writtenModePage .staffModeBtn{ background:#27c266 !important; border-color:#14532d !important; color:#fff !important; }
+      body.writtenModePage .staffModeBtn{ background:rgba(91,32,109,.92) !important; border-color:#f4c400 !important; color:#fff4b0 !important; }
       body.writtenModePage .staffModeBtn.active{ background:#27c266 !important; border-color:#14532d !important; color:#fff !important; }
 
       body.writtenModePage .firstPressBar.writtenSplit{
@@ -6890,6 +6934,35 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     let writtenNoBuzzerClearSent = false;
     let localWrittenDraft = "";
     let localSubmittedKey = "";
+
+    function isWrittenModeEnabled(room){
+      const raw = (room && typeof room === "object") ? room : {};
+      const modes = (raw.modes && typeof raw.modes === "object") ? raw.modes : {};
+      const settings = (raw.settings && typeof raw.settings === "object") ? raw.settings : {};
+      let localEnabled = false;
+      try{ localEnabled = localStorage.getItem(`sabaq_written_mode_${code}`) === "1"; }catch(e){}
+      return !!(raw.writtenAnswerModeEnabled || modes.writtenAnswerModeEnabled || settings.writtenAnswerModeEnabled || localEnabled);
+    }
+
+    function cleanupWrittenBar(){
+      const bar = GAME_UI && GAME_UI.els ? GAME_UI.els.firstPressBar : null;
+      if(!bar) return;
+      bar.classList.remove("writtenSplit");
+    }
+
+    function cleanupWrittenPlayerInput(){
+      const row = document.querySelector(".controlsRow");
+      if(row) row.classList.remove("writtenPlayerControls");
+      const wrap = document.getElementById("writtenAnswerWrap");
+      if(wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      const hint = document.getElementById("writtenAnswerHint");
+      if(hint && hint.parentNode) hint.parentNode.removeChild(hint);
+    }
+
+    function clearWrittenUiArtifacts(){
+      cleanupWrittenBar();
+      cleanupWrittenPlayerInput();
+    }
 
     function getRoomVisualTeamName(room, teamKey){
       const vt = (typeof getVisualTeams === "function") ? getVisualTeams(room || {}) : null;
@@ -7113,12 +7186,23 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
     function syncWrittenModeUI(){
       const room = (typeof LIVE !== "undefined" && LIVE.room) ? LIVE.room : null;
-      if(!room || room.status !== "started") return;
+      const enabled = !!(room && isWrittenModeEnabled(room));
 
       try{
-        document.body.classList.toggle("writtenHostMode", role === "host");
-        document.body.classList.toggle("writtenPlayerMode", role !== "host");
+        document.body.classList.toggle("writtenHostMode", !!enabled && role === "host");
+        document.body.classList.toggle("writtenPlayerMode", !!enabled && role !== "host");
       }catch(e){}
+
+      if(room){
+        try{
+          if(enabled) localStorage.setItem(`sabaq_written_mode_${code}`, "1");
+        }catch(e){}
+      }
+
+      if(!room || room.status !== "started" || !enabled){
+        clearWrittenUiArtifacts();
+        return;
+      }
 
       ensureWrittenBar(room);
       ensureWrittenPlayerInput(room);
@@ -7170,6 +7254,14 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     const originalRenderFromLive = renderFromLive;
     renderFromLive = function(){
       originalRenderFromLive();
+      try{
+        const btn = document.getElementById("staffModeBtn");
+        if(btn){
+          const room = (typeof LIVE !== "undefined" && LIVE.room) ? LIVE.room : null;
+          const enabled = !!(room && isWrittenModeEnabled(room));
+          btn.classList.toggle("active", enabled);
+        }
+      }catch(e){}
       try{ syncWrittenModeUI(); }catch(e){}
     };
   })();
