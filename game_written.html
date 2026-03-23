@@ -808,118 +808,13 @@
       letter-spacing:.2px;
       border:6px solid rgba(0,0,0,.80);
       box-shadow:0 16px 28px rgba(0,0,0,.25);
+      transition:background .18s ease, filter .18s ease, opacity .18s ease;
     }
+    .playerBigBtn.submitMode{ background:#19c35d; }
+    .playerBigBtn.sentMode{ background:#15944a; }
     .disabled{opacity:.55;cursor:not-allowed}
 
     a{color:inherit}
-
-    /* ✅ وضع الإجابة المكتوبة — game_written.html */
-    #firstPressBar.writtenSplit{
-      background:transparent !important;
-      border:none !important;
-      box-shadow:none !important;
-      text-shadow:none !important;
-      padding:0 !important;
-      min-height:auto !important;
-      display:flex !important;
-      align-items:stretch !important;
-      justify-content:stretch !important;
-      gap:10px !important;
-      overflow:visible !important;
-    }
-    .writtenBarName,
-    .writtenBarAnswer{
-      min-height:72px;
-      border-radius:28px;
-      border:4px solid rgba(255,255,255,.88);
-      box-shadow:0 12px 24px rgba(0,0,0,.18);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      padding:0 16px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      font-weight:900;
-      color:#fff;
-      text-shadow:0 10px 18px rgba(0,0,0,.24);
-      background:rgba(255,255,255,.16);
-    }
-    .writtenBarName{ flex:0 0 42%; }
-    .writtenBarAnswer{ flex:1 1 auto; }
-
-    .controlsRow.writtenPlayerControls{
-      direction:ltr !important;
-      justify-content:flex-start !important;
-      align-items:center !important;
-      gap:12px !important;
-    }
-    .controlsRow.writtenPlayerControls > span{ display:none !important; }
-    .controlsRow.writtenPlayerControls .timerWrap{
-      order:1;
-      width:82px !important;
-      height:82px !important;
-      flex:0 0 82px !important;
-    }
-    .controlsRow.writtenPlayerControls .timerClockBtn{
-      width:82px !important;
-      height:82px !important;
-      border-width:5px !important;
-    }
-    .controlsRow.writtenPlayerControls .timerNumber{ font-size:34px !important; }
-    .writtenAnswerWrap{
-      order:2;
-      flex:1 1 auto;
-      min-width:0;
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-    .writtenAnswerInput{
-      flex:1 1 auto;
-      min-width:0;
-      height:78px;
-      border-radius:22px;
-      border:4px solid rgba(255,255,255,.80);
-      background:rgba(255,255,255,.96);
-      color:#111;
-      font-family:"AA-GALAXY", Arial, sans-serif;
-      font-size:25px;
-      font-weight:900;
-      text-align:center;
-      padding:0 16px;
-      outline:none;
-      box-shadow:0 16px 28px rgba(0,0,0,.20);
-    }
-    .writtenAnswerInput::placeholder{ color:#666; font-weight:800; }
-    .writtenAnswerInput:disabled{
-      opacity:.82;
-      background:rgba(255,255,255,.78);
-      color:#666;
-    }
-    .writtenSendBtn{
-      display:none !important;
-    }
-    .playerBigBtn.sendMode{
-      background:#19c35d !important;
-      color:#fff !important;
-      box-shadow:0 18px 32px rgba(0,0,0,.22);
-    }
-    .writtenSendBtn:disabled{
-      opacity:.6;
-      cursor:not-allowed;
-      filter:grayscale(.12);
-    }
-    .writtenAnswerHint{
-      margin-top:8px;
-      color:#fff;
-      font-size:15px;
-      font-weight:800;
-      text-align:center;
-      line-height:1.5;
-      text-shadow:0 8px 14px rgba(0,0,0,.24);
-    }
 
     /* ✅ مودالات المشاركة وأسئلة المقدم والإعدادات */
     .shareBackdrop,.cqBackdrop,.settingsBackdrop{
@@ -3999,9 +3894,11 @@ function hideEidIntro(immediate){
     }
 
     async function claimBuzzerSafely(mm){
-      // ✅ الجرس يُحسم من السيرفر. نقلل الطلبات الإضافية ونعتمد على رد /action نفسه.
-      const localRoom = (typeof LIVE !== "undefined" && LIVE.room) ? LIVE.room : null;
-      const latestBefore = (localRoom && localRoom.buzzer) ? resolveStableBuzzer(localRoom.buzzer, localRoom.timer) : null;
+      // ✅ الجرس الآن يُحسم رسميًا من السيرفر عبر type:"buzz"
+      // وليس من runTransaction المحلي، حتى لا يتبدل الفائز عند الضغطات المتقاربة.
+      await _pullOnce(true);
+
+      const latestBefore = _get(SYNC.state, `rooms/${code}/buzzer`);
       if(latestBefore && latestBefore.ts){
         return { committed:false, winner: latestBefore, reason:"LOCKED_BEFORE" };
       }
@@ -4015,26 +3912,9 @@ function hideEidIntro(immediate){
         ts: attemptTs
       }).catch(() => null);
 
-      const responseState = (res && res.state && typeof res.state === "object") ? res.state : null;
-      const finalWinner = (responseState && responseState.buzzer)
-        || (res && res.winner)
-        || ((typeof LIVE !== "undefined" && LIVE && LIVE.room && LIVE.room.buzzer) ? LIVE.room.buzzer : null)
-        || null;
-
-      if(responseState){
-        try{
-          if(typeof LIVE !== "undefined" && LIVE && typeof LIVE === "object"){
-            LIVE.room = (typeof normalizeLiveRoom === "function") ? normalizeLiveRoom(responseState) : responseState;
-          }
-        }catch(e){}
-      }else if(finalWinner){
-        try{
-          if(typeof LIVE !== "undefined" && LIVE && LIVE.room && typeof LIVE.room === "object"){
-            LIVE.room.buzzer = finalWinner;
-          }
-        }catch(e){}
-      }
-
+      // ✅ دائمًا نسحب آخر حالة بعد المحاولة، لأن السيرفر هو الحكم النهائي.
+      await _pullOnce(true);
+      const finalWinner = _get(SYNC.state, `rooms/${code}/buzzer`) || (res && res.winner) || null;
       const finalSig = getBuzzerSig(finalWinner);
       const mySig = `${String(pid||"")}|${Number(attemptTs)}`;
 
@@ -5553,13 +5433,10 @@ function hideEidIntro(immediate){
           </div>
 
           <div class="landLeft">
-            <div id="firstPressBar" class="firstPressBar writtenSplit">
-              <div class="writtenBarName">اسم اللاعب الذي يضغط أولاً</div>
-              <div class="writtenBarAnswer">الجواب المكتوب</div>
-            </div>
+            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
 
-            <div class="controlsRow ${isHost ? "" : "writtenPlayerControls"}">
-              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : ``}
+            <div class="controlsRow">
+              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
 
               <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
                 <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
@@ -5570,12 +5447,7 @@ function hideEidIntro(immediate){
                 </button>
               </div>
 
-              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `
-                <div id="writtenAnswerWrap" class="writtenAnswerWrap">
-                  <input id="writtenAnswerInput" class="writtenAnswerInput" type="text" maxlength="36" autocomplete="off" placeholder="اكتب الجواب هنا">
-                  <button id="writtenAnswerSendBtn" class="writtenSendBtn" type="button">إرسال الجواب</button>
-                </div>
-              `}
+              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
             </div>
 
             ${isHost ? `
@@ -5584,7 +5456,6 @@ function hideEidIntro(immediate){
                 <button id="ansBtn" class="answerBtn red" type="button">إظهار الإجابة</button>
               </div>
             ` : `
-              <div id="writtenAnswerHint" class="writtenAnswerHint">أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب، ثم يضغط نفس الزر لإرسال الجواب مرة واحدة</div>
               <div class="playerBtnWrap">
                 <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
                 ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
@@ -5617,43 +5488,6 @@ function hideEidIntro(immediate){
       GAME_UI.els.ansBtn = document.getElementById("ansBtn");
       GAME_UI.els.buzzBtn = document.getElementById("buzzBtn");
       GAME_UI.els.timerClock = document.getElementById("timerClock");
-      GAME_UI.els.writtenBarName = document.querySelector("#firstPressBar .writtenBarName");
-      GAME_UI.els.writtenBarAnswer = document.querySelector("#firstPressBar .writtenBarAnswer");
-      GAME_UI.els.writtenAnswerWrap = document.getElementById("writtenAnswerWrap");
-      GAME_UI.els.writtenAnswerInput = document.getElementById("writtenAnswerInput");
-      GAME_UI.els.writtenAnswerSendBtn = document.getElementById("writtenAnswerSendBtn");
-      GAME_UI.writtenDraft = GAME_UI.writtenDraft || "";
-      GAME_UI.writtenTurnKey = GAME_UI.writtenTurnKey || "";
-
-      if(!isHost && GAME_UI.els.writtenAnswerInput && !GAME_UI.els.writtenAnswerInput.__writtenHooked){
-        GAME_UI.els.writtenAnswerInput.__writtenHooked = true;
-        GAME_UI.els.writtenAnswerInput.addEventListener("input", () => {
-          const input = GAME_UI.els.writtenAnswerInput;
-          const clean = String(input.value || "").replace(/\s+/g, " ").slice(0, 36);
-          if(clean !== input.value) input.value = clean;
-          GAME_UI.writtenDraft = input.value;
-          try{ syncWrittenModeUI(); }catch(e){}
-        });
-        GAME_UI.els.writtenAnswerInput.addEventListener("keydown", (ev) => {
-          if(ev.key !== "Enter") return;
-          try{
-            const btn = GAME_UI.els.buzzBtn;
-            if(btn && btn.classList.contains("sendMode") && !btn.disabled){
-              ev.preventDefault();
-              btn.click();
-            }
-          }catch(e){}
-        });
-      }
-      if(!isHost && GAME_UI.els.writtenAnswerSendBtn && !GAME_UI.els.writtenAnswerSendBtn.__writtenHooked){
-        GAME_UI.els.writtenAnswerSendBtn.__writtenHooked = true;
-        GAME_UI.els.writtenAnswerSendBtn.addEventListener("click", async () => {
-          try{
-            const btn = GAME_UI.els.buzzBtn;
-            if(btn && !btn.disabled) btn.click();
-          }catch(e){}
-        });
-      }
 
       const overlay = GAME_UI.els.overlay;
       const mapScale = GAME_UI.els.mapScale;
@@ -6033,66 +5867,59 @@ function hideEidIntro(immediate){
         });
       }
 
-      // ✅ Player buzzer / written answer submit (same button)
+      // ✅ Player buzzer / submit answer
       if(GAME_UI.els.buzzBtn){
         GAME_UI.els.buzzBtn.addEventListener("click", async () => {
           const rr = LIVE.room;
           const mm = LIVE.me || me;
+
           if(!rr || rr.status !== "started") return;
           if(rr.freeze) return;
-          if(!mm || !mm.name) return;
+          if(!mm) return;
 
-          const liveBuzzer = resolveStableBuzzer(rr.buzzer, rr.timer);
-          const myPid = String((LIVE.me && (LIVE.me.__id || LIVE.me.id)) || pid || "").trim();
-          const answer = (rr.writtenAnswer && typeof rr.writtenAnswer === "object") ? rr.writtenAnswer : { text:"", pid:"", submitted:false };
-          const iAmWinner = !!(liveBuzzer && myPid && String(liveBuzzer.pid || "") === myPid);
-          const submittedByMe = !!(answer.submitted && answer.pid && String(answer.pid) === myPid);
+          const answer = getWrittenAnswerState(rr);
+          const currentTurnKey = getBuzzerTurnKey(rr);
+          const myPid = getMyPidSafe();
+          const submittedByMe = !!(answer.submitted && answer.pid && answer.pid === myPid);
+          const alreadyLocked = submittedByMe || (!!localSubmittedKey && localSubmittedKey === currentTurnKey);
 
-          if(iAmWinner && !submittedByMe){
-            if(GAME_UI.__answerBusy) return;
-            const input = GAME_UI.els.writtenAnswerInput;
-            const clean = String((input && input.value) || GAME_UI.writtenDraft || "").replace(/\s+/g, " ").trim().slice(0, 36);
+          if(canLocalPlayerWrite(rr) && !alreadyLocked){
+            const input = document.getElementById("writtenAnswerInput");
+            const clean = String((input && input.value) || localWrittenDraft || "").replace(/\s+/g, " ").trim().slice(0, WRITTEN_MAX_LEN);
             if(!clean) return;
-            GAME_UI.__answerBusy = true;
+            if(GAME_UI.__writtenSendBusy) return;
+            GAME_UI.__writtenSendBusy = true;
             try{
               await setWrittenAnswerRemote(clean, true);
-              GAME_UI.writtenDraft = clean;
-              GAME_UI.writtenTurnKey = `${myPid}|${Number(liveBuzzer.seq || liveBuzzer.ts || 0)}`;
+              localWrittenDraft = clean;
+              localSubmittedKey = currentTurnKey;
               try{ syncWrittenModeUI(); }catch(e){}
             }catch(e){}
             finally{
-              setTimeout(() => { GAME_UI.__answerBusy = false; }, 350);
+              setTimeout(() => { GAME_UI.__writtenSendBusy = false; }, 350);
             }
             return;
           }
 
-          if(liveBuzzer && liveBuzzer.pid){
-            try{ syncWrittenModeUI(); }catch(e){}
-            return;
-          }
-
+          if(getCurrentBuzzer(rr)) return;
           if(GAME_UI.__buzzBusy) return;
           GAME_UI.__buzzBusy = true;
 
           try{
             const res = await claimBuzzerSafely(mm);
-            const v = (res && res.winner) || null;
-            if(v && v.ts){
-              LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
-              STABLE_BUZZER = v;
-              try{
-                if(typeof LIVE !== "undefined" && LIVE && LIVE.room && typeof LIVE.room === "object"){
-                  LIVE.room.buzzer = v;
-                }
-              }catch(e){}
-            }
+
             if(res && res.committed){
+              const v = res.winner || null;
+              if(v && v.ts){
+                LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
+                STABLE_BUZZER = v;
+              }
               if(!playRong()) fallbackBeep();
+              try{ syncWrittenModeUI(); }catch(e){}
             }
-            try{ syncWrittenModeUI(); }catch(e){}
           }catch(e){}
           finally{
-            setTimeout(() => { GAME_UI.__buzzBusy = false; }, 450);
+            setTimeout(() => { GAME_UI.__buzzBusy = false; }, 350);
           }
         });
       }
@@ -6349,31 +6176,10 @@ function hideEidIntro(immediate){
         GAME_UI.els.qModeBtn.title = (qMode === "custom") ? "أسئلة خاصة" : "أسئلة عامة";
       }
 
-      // First press bar + answer display (وضع الإجابة المكتوبة)
+      // First press bar
       const firstPressBar = GAME_UI.els.firstPressBar;
       const buzzer = resolveStableBuzzer(room.buzzer, room.timer);
-      const writtenAnswerState = (room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : { text:"", pid:"", submitted:false };
-      const writtenNameEl = GAME_UI.els.writtenBarName || (firstPressBar ? firstPressBar.querySelector(".writtenBarName") : null);
-      const writtenAnswerEl = GAME_UI.els.writtenBarAnswer || (firstPressBar ? firstPressBar.querySelector(".writtenBarAnswer") : null);
-
-      if(firstPressBar && writtenNameEl && writtenAnswerEl){
-        firstPressBar.classList.add("writtenSplit");
-        const visualTeamsForBuzz = getVisualTeams(room);
-        if(buzzer && buzzer.name){
-          const buzzBg = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
-          const buzzText = getReadableTextColor(buzzBg);
-          writtenNameEl.style.background = buzzBg;
-          writtenNameEl.style.color = buzzText;
-          writtenNameEl.style.textShadow = getReadableTextShadow(buzzText);
-          writtenNameEl.textContent = String(buzzer.name || "");
-        }else{
-          writtenNameEl.style.background = "rgba(255,255,255,.16)";
-          writtenNameEl.style.color = "#fff";
-          writtenNameEl.style.textShadow = "0 10px 18px rgba(0,0,0,.25)";
-          writtenNameEl.textContent = "اسم اللاعب الذي يضغط أولاً";
-        }
-        writtenAnswerEl.textContent = String(writtenAnswerState.text || (buzzer && buzzer.name ? "بانتظار إرسال الجواب" : "الجواب المكتوب"));
-      }else if(buzzer && buzzer.name && firstPressBar){
+      if(buzzer && buzzer.name && firstPressBar){
         firstPressBar.classList.add("filled");
         const visualTeamsForBuzz = getVisualTeams(room);
         const buzzBg = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
@@ -6390,28 +6196,32 @@ function hideEidIntro(immediate){
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
-      // ✅ تصفير الاسم + الجواب + المؤقت عند الضغط على الشريط (للمقدم فقط)
-      if(isHost && firstPressBar && !firstPressBar.__clearHooked){
-        firstPressBar.__clearHooked = true;
-        firstPressBar.addEventListener("click", async () => {
-          try{
-            const t = normalizeTimer(LIVE.room?.timer || TIMER_UI.latestTimer || {});
-            const sel = Number(t.sel || 10);
-            TIMER_UI.__doneSent = false;
+      // ✅ (تعديل 1) تصفير/إخفاء اسم أول لاعب + تصفير المؤقت بضغطة على الشريط (للمقدم فقط)
+if(isHost && firstPressBar && !firstPressBar.__clearHooked){
+  firstPressBar.__clearHooked = true;
+  firstPressBar.addEventListener("click", async () => {
+    try{
+      const t = normalizeTimer(LIVE.room?.timer || TIMER_UI.latestTimer || {});
+      const sel = Number(t.sel || 10);
 
-            const updates = {};
-            updates[`rooms/${code}/buzzer`] = null;
-            updates[`rooms/${code}/writtenAnswer`] = null;
-            updates[`rooms/${code}/timer/running`] = false;
-            updates[`rooms/${code}/timer/done`] = false;
-            updates[`rooms/${code}/timer/startTs`] = 0;
-            updates[`rooms/${code}/timer/sel`] = sel;
-            updates[`rooms/${code}/timer/dur`] = sel;
+      // مهم: نخلي done يشتغل طبيعي بالجولة الجاية
+      TIMER_UI.__doneSent = false;
 
-            await update(ref(db), updates);
-          }catch(e){}
-        });
-      }
+      const updates = {};
+      updates[`rooms/${code}/buzzer`] = null;
+
+      // تصفير المؤقت
+      updates[`rooms/${code}/timer/running`] = false;
+      updates[`rooms/${code}/timer/done`] = false;
+      updates[`rooms/${code}/timer/startTs`] = 0;
+      updates[`rooms/${code}/timer/sel`] = sel;
+      updates[`rooms/${code}/timer/dur`] = sel;
+
+      await update(ref(db), updates);
+    }catch(e){}
+  });
+}
+
       // Board change (shape / count / letters)
       const activeMap = Number(room.activeMap || 0);
       const board = getBoard(room);
@@ -6567,11 +6377,43 @@ function hideEidIntro(immediate){
         }
       }
 
-      // Player written-mode state is synchronized centrally in syncWrittenModeUI()
+      // Player button state in written mode
       if(!isHost && GAME_UI.els.buzzBtn){
         const me = LIVE.me;
-        const disabled = (!started) || room.freeze || !me || !me.name;
-        GAME_UI.els.buzzBtn.classList.toggle("disabled", !!disabled);
+        const btn = GAME_UI.els.buzzBtn;
+        const buzzer = getCurrentBuzzer(room);
+        const answer = getWrittenAnswerState(room);
+        const myPid = getMyPidSafe();
+        const turnKey = getBuzzerTurnKey(room);
+        const submittedByMe = !!(answer.submitted && answer.pid && answer.pid === myPid);
+        const lockedByLocal = !!(localSubmittedKey && turnKey && localSubmittedKey === turnKey);
+        const canWriteNow = canLocalPlayerWrite(room) && !submittedByMe && !lockedByLocal;
+
+        let disabled = (!started) || room.freeze || !me || !me.name;
+        let label = "اضغط هنا للإجابة";
+        let submitMode = false;
+        let sentMode = false;
+
+        if(disabled){
+          label = "اضغط هنا للإجابة";
+        }else if(submittedByMe || lockedByLocal){
+          disabled = true;
+          sentMode = true;
+          label = "تم إرسال الجواب";
+        }else if(canWriteNow){
+          disabled = false;
+          submitMode = true;
+          label = "اضغط هنا لإرسال الجواب";
+        }else if(buzzer && String(buzzer.pid || "") !== String(myPid || "")){
+          disabled = true;
+          label = "تم حجز الجرس";
+        }
+
+        btn.textContent = label;
+        btn.disabled = !!disabled;
+        btn.classList.toggle("disabled", !!disabled);
+        btn.classList.toggle("submitMode", !!submitMode);
+        btn.classList.toggle("sentMode", !!sentMode);
       }
 
       // settings room latest
@@ -7024,16 +6866,16 @@ function hideEidIntro(immediate){
       body.writtenModePage .controlsRow.writtenPlayerControls > span{ display:none !important; }
       body.writtenModePage .controlsRow.writtenPlayerControls .timerWrap{
         order:1;
-        width:82px !important;
-        height:82px !important;
-        flex:0 0 82px !important;
+        width:92px !important;
+        height:92px !important;
+        flex:0 0 92px !important;
       }
       body.writtenModePage .controlsRow.writtenPlayerControls .timerClockBtn{
-        width:82px !important;
-        height:82px !important;
+        width:92px !important;
+        height:92px !important;
         border-width:5px !important;
       }
-      body.writtenModePage .controlsRow.writtenPlayerControls .timerNumber{ font-size:34px !important; }
+      body.writtenModePage .controlsRow.writtenPlayerControls .timerNumber{ font-size:40px !important; }
       body.writtenModePage .writtenAnswerWrap{
         order:2;
         flex:1 1 auto;
@@ -7065,12 +6907,17 @@ function hideEidIntro(immediate){
         color:#666;
       }
       body.writtenModePage .writtenSendBtn{
-        display:none !important;
-      }
-      body.writtenModePage .playerBigBtn.sendMode{
-        background:#19c35d !important;
-        color:#fff !important;
-        box-shadow:0 18px 32px rgba(0,0,0,.22);
+        flex:0 0 148px;
+        height:78px;
+        border:none;
+        border-radius:22px;
+        background:#19c35d;
+        color:#fff;
+        font-family:"AA-GALAXY", Arial, sans-serif;
+        font-size:23px;
+        font-weight:900;
+        box-shadow:0 16px 28px rgba(0,0,0,.20);
+        cursor:pointer;
       }
       body.writtenModePage .writtenSendBtn:disabled{
         opacity:.6;
@@ -7090,11 +6937,11 @@ function hideEidIntro(immediate){
       @media (max-width: 900px){
         body.writtenModePage .writtenBarName,
         body.writtenModePage .writtenBarAnswer{ min-height:66px; font-size:18px; }
-        body.writtenModePage .controlsRow.writtenPlayerControls .timerWrap{ width:82px !important; height:82px !important; flex-basis:82px !important; }
+        body.writtenModePage .controlsRow.writtenPlayerControls .timerWrap{ width:74px !important; height:74px !important; flex-basis:74px !important; }
         body.writtenModePage .controlsRow.writtenPlayerControls .timerClockBtn{ width:74px !important; height:74px !important; }
         body.writtenModePage .controlsRow.writtenPlayerControls .timerNumber{ font-size:30px !important; }
         body.writtenModePage .writtenAnswerInput{ height:70px; font-size:21px; }
-        body.writtenModePage .writtenSendBtn{ display:none !important; }
+        body.writtenModePage .writtenSendBtn{ height:70px; flex-basis:126px; font-size:20px; }
       }
     `;
     document.head.appendChild(style);
@@ -7102,8 +6949,6 @@ function hideEidIntro(immediate){
     const WRITTEN_MAX_LEN = 36;
     let writtenTimerClearSent = false;
     let writtenNoBuzzerClearSent = false;
-    let writtenHostAnswerPullBusy = false;
-    let writtenHostLastForcePullAt = 0;
     let localWrittenDraft = "";
     let localSubmittedKey = "";
 
@@ -7131,10 +6976,7 @@ function hideEidIntro(immediate){
     }
 
     function getWrittenAnswerState(room){
-      const raw =
-        ((room && typeof room === "object" && room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : null)
-        || ((typeof LIVE !== "undefined" && LIVE && LIVE.room && LIVE.room.writtenAnswer && typeof LIVE.room.writtenAnswer === "object") ? LIVE.room.writtenAnswer : null)
-        || ((typeof SYNC !== "undefined" && SYNC && SYNC.state && SYNC.state.writtenAnswer && typeof SYNC.state.writtenAnswer === "object") ? SYNC.state.writtenAnswer : null);
+      const raw = room && typeof room === "object" ? room.writtenAnswer : null;
       if(raw && typeof raw === "object"){
         return {
           text: String(raw.text || "").trim(),
@@ -7176,64 +7018,13 @@ function hideEidIntro(immediate){
         updatedAt: Date.now(),
         submitted: !!submitted
       };
-
-      let pushed = false;
-      try{
-        if(typeof _action === "function"){
-          const res = await _action({ writtenAnswer: payload });
-          pushed = !!(res && res.ok);
-        }
-      }catch(e){}
-
-      if(!pushed){
-        try{
-          const res2 = await update(ref(db, `rooms/${code}`), { writtenAnswer: payload });
-          pushed = !!(res2 && res2.ok !== false);
-        }catch(e){}
-      }
-
-      try{
-        if(typeof SYNC !== "undefined" && SYNC && typeof SYNC === "object"){
-          SYNC.state = (SYNC.state && typeof SYNC.state === "object") ? SYNC.state : {};
-          SYNC.state.writtenAnswer = payload;
-        }
-      }catch(e){}
-      try{
-        if(typeof LIVE !== "undefined" && LIVE && LIVE.room && typeof LIVE.room === "object"){
-          LIVE.room.writtenAnswer = payload;
-        }
-      }catch(e){}
-      try{ if(typeof _notifyWatchersNow === "function") _notifyWatchersNow(); }catch(e){}
-      try{ if(typeof scheduleRender === "function") scheduleRender(); }catch(e){}
-      try{ if(typeof syncWrittenModeUI === "function") syncWrittenModeUI(); }catch(e){}
-      try{ await _pullOnce(true); }catch(e){}
+      try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: payload }); }catch(e){}
     }
 
     async function clearWrittenAnswerRemote(){
       localWrittenDraft = "";
       localSubmittedKey = "";
-      try{
-        if(typeof _action === "function"){
-          await _action({ writtenAnswer: null });
-        }else{
-          await update(ref(db, `rooms/${code}`), { writtenAnswer: null });
-        }
-      }catch(e){
-        try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: null }); }catch(_e){}
-      }
-      try{
-        if(typeof SYNC !== "undefined" && SYNC && typeof SYNC === "object"){
-          SYNC.state = (SYNC.state && typeof SYNC.state === "object") ? SYNC.state : {};
-          SYNC.state.writtenAnswer = null;
-        }
-      }catch(e){}
-      try{
-        if(typeof LIVE !== "undefined" && LIVE && LIVE.room && typeof LIVE.room === "object"){
-          LIVE.room.writtenAnswer = null;
-        }
-      }catch(e){}
-      try{ if(typeof _notifyWatchersNow === "function") _notifyWatchersNow(); }catch(e){}
-      try{ if(typeof scheduleRender === "function") scheduleRender(); }catch(e){}
+      try{ await update(ref(db, `rooms/${code}`), { writtenAnswer: null }); }catch(e){}
     }
 
     function ensureWrittenBar(room){
@@ -7281,7 +7072,8 @@ function hideEidIntro(immediate){
       }
 
       if(answerEl){
-        answerEl.textContent = answer.text || (buzzer && buzzer.name ? "بانتظار إرسال الجواب" : "الجواب المكتوب");
+        const showSubmitted = !!(answer.submitted && answer.text);
+        answerEl.textContent = showSubmitted ? answer.text : (buzzer && buzzer.name ? "بانتظار إرسال الجواب" : "الجواب المكتوب");
       }
     }
 
@@ -7298,7 +7090,6 @@ function hideEidIntro(immediate){
         wrap.className = "writtenAnswerWrap";
         wrap.innerHTML = `
           <input id="writtenAnswerInput" class="writtenAnswerInput" type="text" maxlength="${WRITTEN_MAX_LEN}" autocomplete="off" placeholder="اكتب الجواب هنا">
-          <button id="writtenAnswerSendBtn" class="writtenSendBtn" type="button">إرسال الجواب</button>
         `;
         row.appendChild(wrap);
 
@@ -7307,12 +7098,11 @@ function hideEidIntro(immediate){
           const hint = document.createElement("div");
           hint.id = "writtenAnswerHint";
           hint.className = "writtenAnswerHint";
-          hint.textContent = "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب، ثم يضغط نفس الزر لإرسال الجواب مرة واحدة";
+          hint.textContent = "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب ثم يضغط الزر الأخضر لإرساله مرة واحدة";
           btnWrap.insertBefore(hint, btnWrap.firstChild);
         }
 
         const input = wrap.querySelector("#writtenAnswerInput");
-        const sendBtn = wrap.querySelector("#writtenAnswerSendBtn");
         if(input){
           input.addEventListener("input", () => {
             const clean = String(input.value || "").slice(0, WRITTEN_MAX_LEN);
@@ -7322,28 +7112,19 @@ function hideEidIntro(immediate){
           });
           input.addEventListener("keydown", (ev) => {
             if(ev.key !== "Enter") return;
-            try{
-              const btn = document.getElementById("buzzBtn");
-              if(btn && btn.classList.contains("sendMode") && !btn.disabled){
-                ev.preventDefault();
-                btn.click();
-              }
-            }catch(e){}
-          });
-        }
-        if(sendBtn){
-          sendBtn.addEventListener("click", async () => {
-            try{
-              const btn = document.getElementById("buzzBtn");
-              if(btn && !btn.disabled) btn.click();
-            }catch(e){}
+            const liveRoom = (typeof LIVE !== "undefined") ? LIVE.room : null;
+            if(!liveRoom || !canLocalPlayerWrite(liveRoom)) return;
+            ev.preventDefault();
+            const buzzBtn = GAME_UI && GAME_UI.els ? GAME_UI.els.buzzBtn : null;
+            if(buzzBtn && !buzzBtn.disabled){
+              try{ buzzBtn.click(); }catch(e){}
+            }
           });
         }
       }
 
       const input = document.getElementById("writtenAnswerInput");
-      const sendBtn = document.getElementById("writtenAnswerSendBtn");
-      if(!input || !sendBtn) return;
+      if(!input) return;
 
       const currentTurnKey = getBuzzerTurnKey(room);
       if(!currentTurnKey){
@@ -7380,9 +7161,6 @@ function hideEidIntro(immediate){
           input.value = "";
         }
       }
-
-      sendBtn.disabled = !allowed || locked || !String(input.value || localWrittenDraft || "").replace(/\s+/g, " ").trim();
-      sendBtn.textContent = locked ? "تم الإرسال" : "إرسال الجواب";
     }
 
     function syncWrittenModeUI(){
@@ -7399,20 +7177,6 @@ function hideEidIntro(immediate){
 
       const answer = getWrittenAnswerState(room);
       if(role === "host"){
-        const buzzer = getCurrentBuzzer(room);
-
-        if(buzzer && !answer.text){
-          const now = Date.now();
-          if(!writtenHostAnswerPullBusy && (now - writtenHostLastForcePullAt > 350)){
-            writtenHostLastForcePullAt = now;
-            writtenHostAnswerPullBusy = true;
-            Promise.resolve()
-              .then(() => _pullOnce(true))
-              .catch(() => {})
-              .finally(() => { writtenHostAnswerPullBusy = false; });
-          }
-        }
-
         if(!room.buzzer && answer.text){
           if(!writtenNoBuzzerClearSent){
             writtenNoBuzzerClearSent = true;
@@ -7420,73 +7184,6 @@ function hideEidIntro(immediate){
           }
         }else{
           writtenNoBuzzerClearSent = false;
-        }
-      }else{
-        const buzzer = getCurrentBuzzer(room);
-        const myPid = getMyPidSafe();
-        const input = document.getElementById("writtenAnswerInput");
-        const sendBtn = document.getElementById("writtenAnswerSendBtn");
-        const buzzBtn = document.getElementById("buzzBtn");
-        const hint = document.getElementById("writtenAnswerHint");
-        const submittedByMe = !!(answer.submitted && answer.pid && myPid && String(answer.pid) === String(myPid));
-        const iAmWinner = !!(buzzer && myPid && String(buzzer.pid || "") === String(myPid));
-        const draft = String((input && input.value) || localWrittenDraft || "").replace(/\s+/g, " ").trim();
-        const canSend = !!(iAmWinner && !submittedByMe);
-        const canBuzz = !!(room.status === "started" && !room.freeze && LIVE.me && LIVE.me.name && !buzzer && !GAME_UI.__buzzBusy);
-
-        if(input){
-          if(canSend && !GAME_UI.__answerBusy){
-            input.disabled = false;
-            input.placeholder = "اكتب الجواب هنا";
-            if(document.activeElement !== input) input.value = localWrittenDraft || "";
-          }else{
-            input.disabled = true;
-            if(submittedByMe){
-              input.placeholder = "تم إرسال الجواب";
-              input.value = answer.text || localWrittenDraft || "";
-            }else if(buzzer && !iAmWinner){
-              input.placeholder = "تم حجز الجرس للاعب آخر";
-              input.value = "";
-            }else{
-              input.placeholder = "الكتابة متاحة لأول لاعب يضغط الجرس";
-            }
-          }
-        }
-        if(sendBtn){
-          sendBtn.disabled = !canSend || !draft || GAME_UI.__answerBusy;
-          sendBtn.textContent = submittedByMe ? "تم الإرسال" : "إرسال الجواب";
-        }
-        if(hint){
-          hint.textContent = submittedByMe
-            ? "تم إرسال جوابك بنجاح"
-            : (canSend
-              ? "اكتب جوابك ثم اضغط الزر الأخضر لإرسال الجواب"
-              : (buzzer && !iAmWinner
-                ? "تم حسم الجرس للاعب آخر ولن تُرسل أي محاولة جديدة حتى التصفير"
-                : "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب، ثم يضغط نفس الزر لإرسال الجواب مرة واحدة"));
-        }
-        if(buzzBtn){
-          buzzBtn.classList.remove("sendMode");
-          let text = "اضغط هنا للإجابة";
-          let disabled = !canBuzz;
-          if(submittedByMe){
-            text = "تم إرسال الجواب";
-            disabled = true;
-            buzzBtn.classList.add("sendMode");
-          }else if(canSend){
-            text = "اضغط هنا لإرسال الجواب";
-            disabled = !draft || GAME_UI.__answerBusy;
-            buzzBtn.classList.add("sendMode");
-          }else if(buzzer && !iAmWinner){
-            text = "تم حسم الجرس";
-            disabled = true;
-          }else if(GAME_UI.__buzzBusy){
-            text = "جاري حسم الجرس...";
-            disabled = true;
-          }
-          buzzBtn.textContent = text;
-          buzzBtn.disabled = !!disabled;
-          buzzBtn.classList.toggle("disabled", !!disabled);
         }
       }
     }
