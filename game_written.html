@@ -5646,10 +5646,6 @@ function hideEidIntro(immediate){
             try{ syncWrittenModeUI(); }catch(e){}
           }catch(e){}
         });
-            GAME_UI.writtenDraft = clean;
-            GAME_UI.writtenTurnKey = `${myPid}|${Number(liveBuzzer.seq || liveBuzzer.ts || 0)}`;
-          }catch(e){}
-        });
       }
 
       const overlay = GAME_UI.els.overlay;
