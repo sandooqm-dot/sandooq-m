@@ -912,6 +912,42 @@
       border:6px solid rgba(0,0,0,.80);
       box-shadow:0 16px 28px rgba(0,0,0,.25);
     }
+    .playerWrittenRow{
+      direction:ltr;
+      justify-content:flex-start;
+      gap:14px;
+    }
+    .writtenAnswerWrap{
+      flex:1 1 auto;
+      min-width:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      direction:rtl;
+    }
+    .writtenAnswerInput{
+      width:100%;
+      height:78px;
+      border-radius:22px;
+      border:4px solid rgba(255,255,255,.85);
+      background:rgba(255,255,255,.96);
+      color:#111;
+      font-size:24px;
+      font-weight:900;
+      text-align:center;
+      outline:none;
+      box-shadow:0 18px 28px rgba(0,0,0,.18);
+      padding:0 18px;
+    }
+    .writtenAnswerInput::placeholder{
+      color:rgba(0,0,0,.36);
+    }
+    .writtenAnswerInput:disabled,
+    .writtenAnswerInput[readonly]{
+      background:rgba(255,255,255,.82);
+      color:rgba(0,0,0,.50);
+      cursor:not-allowed;
+    }
     .disabled{opacity:.55;cursor:not-allowed}
 
     a{color:inherit}
@@ -1236,7 +1272,8 @@
       border-radius:18px;
       border:4px solid rgba(173,77,148,.75);
       background:#fff;
-      color:#111;
+      color:transparent;
+      caret-color:#111;
       font-size:28px;
       font-weight:900;
       text-align:center;
@@ -1244,9 +1281,8 @@
       box-shadow:inset 0 0 0 2px rgba(255,255,255,.45), 0 8px 16px rgba(0,0,0,.08);
       letter-spacing:4px;
       direction:ltr;
-      -webkit-text-security: disc;
-      text-security: disc;
-      caret-color:#4b2342;
+      -webkit-text-security:disc;
+      text-security:disc;
     }
     .staffModeInput::placeholder{
       letter-spacing:0;
@@ -2289,6 +2325,22 @@ function isWrittenModeEnabled(room){
   return !!(room?.writtenAnswerModeEnabled || room?.modes?.writtenAnswerModeEnabled || room?.settings?.writtenAnswerModeEnabled);
 }
 
+const WRITTEN_MODE_LOCAL_KEY = `horof_written_mode_${code || "default"}`;
+function getLocalWrittenModeFlag(){
+  try{ return localStorage.getItem(WRITTEN_MODE_LOCAL_KEY) === "1"; }catch(e){ return false; }
+}
+function setLocalWrittenModeFlag(v){
+  try{
+    if(v) localStorage.setItem(WRITTEN_MODE_LOCAL_KEY, "1");
+    else localStorage.removeItem(WRITTEN_MODE_LOCAL_KEY);
+  }catch(e){}
+}
+function isWrittenModeVisualEnabled(room){
+  const enabled = isWrittenModeEnabled(room);
+  if(enabled) setLocalWrittenModeFlag(true);
+  return enabled || (role === "host" && getLocalWrittenModeFlag());
+}
+
 function buildWrittenGameUrl(){
   const u = new URL(WRITTEN_GAME_FILE, location.href);
   for(const [k, v] of params.entries()) u.searchParams.set(k, v);
@@ -3315,6 +3367,7 @@ function hideEidIntro(immediate){
       type: null,
       waitingMsg: "",
       lobbySig: "",
+      gameSig: "",
       raf: 0,
       scheduled: false
     };
@@ -4237,9 +4290,13 @@ function hideEidIntro(immediate){
       rememberBoard(board, baseRoom);
       const totalRounds = normalizeWinRounds(baseRoom?.settings?.winRounds || baseRoom?.round?.targetWins || 1);
       const timerSel = Number(baseRoom?.timer?.sel || 10);
+      const writtenEnabled = isWrittenModeEnabled(baseRoom);
       const nextRoom = normalizeLiveRoom({
         ...baseRoom,
         status: "started",
+        writtenAnswerModeEnabled: writtenEnabled,
+        modes: { ...((baseRoom?.modes && typeof baseRoom.modes === "object") ? baseRoom.modes : {}), writtenAnswerModeEnabled: writtenEnabled },
+        settings: { ...((baseRoom?.settings && typeof baseRoom.settings === "object") ? baseRoom.settings : {}), writtenAnswerModeEnabled: writtenEnabled },
         activeMap: 0,
         board,
         freeze: false,
@@ -4258,6 +4315,9 @@ function hideEidIntro(immediate){
       try{
         const updates = {};
         updates[`rooms/${code}/status`] = "started";
+        updates[`rooms/${code}/writtenAnswerModeEnabled`] = writtenEnabled;
+        updates[`rooms/${code}/modes/writtenAnswerModeEnabled`] = writtenEnabled;
+        updates[`rooms/${code}/settings/writtenAnswerModeEnabled`] = writtenEnabled;
         updates[`rooms/${code}/activeMap`] = 0;
         updates[`rooms/${code}/board`] = board;
         updates[`rooms/${code}/freeze`] = false;
@@ -5107,7 +5167,7 @@ function hideEidIntro(immediate){
       const orangeText = getReadableTextColor(visualTeams.orange.color);
       const green = list.filter(p => p.team === "green");
       const orange = list.filter(p => p.team === "orange");
-      const updatesEnabled = !!(room?.writtenAnswerModeEnabled || room?.modes?.writtenAnswerModeEnabled || room?.settings?.writtenAnswerModeEnabled);
+      const updatesEnabled = isWrittenModeVisualEnabled(room);
       const joinUrl = buildJoinUrl(room.code || code);
       const joinQrUrl = buildQrUrl(joinUrl);
       const displayUrl = buildDisplayUrl(room.code || code);
@@ -5128,12 +5188,10 @@ function hideEidIntro(immediate){
             <input
               id="staffModeInput"
               class="staffModeInput"
-              type="text"
+              type="password"
               inputmode="numeric"
               maxlength="4"
               autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
               placeholder="أدخل الرمز"
             >
             <div id="staffModeMsg" class="staffModeMsg"></div>
@@ -5329,6 +5387,7 @@ function hideEidIntro(immediate){
           const board = buildBoardState(latestRoomForStart, Date.now());
           const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
           LAST_STABLE_BOARD = board;
+          const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
           await update(roomRef, {
             status: "started",
             displayPid: null,
@@ -5339,6 +5398,9 @@ function hideEidIntro(immediate){
             scores: { green:0, orange:0, a:0, b:0 },
             winEvent: null,
             winState: null,
+            writtenAnswerModeEnabled: writtenEnabled,
+            modes: { ...((latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {}), writtenAnswerModeEnabled: writtenEnabled },
+            settings: { ...((latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {}), writtenAnswerModeEnabled: writtenEnabled },
             customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
             customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
             round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
@@ -5394,6 +5456,7 @@ function hideEidIntro(immediate){
             modes: { ...currentModes, writtenAnswerModeEnabled: true },
             settings: { ...latestSettings, writtenAnswerModeEnabled: true }
           });
+          setLocalWrittenModeFlag(true);
           setStaffModeMsg("تم التفعيل", "success");
           if(staffModeBtn) staffModeBtn.classList.add("active");
           setTimeout(closeStaffMode, 450);
@@ -5411,10 +5474,6 @@ function hideEidIntro(immediate){
       }
       if(staffModeApply) staffModeApply.addEventListener("click", applyStaffModeCode);
       if(staffModeInput){
-        staffModeInput.addEventListener("input", ()=>{
-          const clean = String(staffModeInput.value || "").replace(/\D+/g, "").slice(0,4);
-          if(clean !== staffModeInput.value) staffModeInput.value = clean;
-        });
         staffModeInput.addEventListener("keydown", (e)=>{
           if(e.key === "Enter"){
             e.preventDefault();
@@ -5518,6 +5577,7 @@ function hideEidIntro(immediate){
 
       const isHost = role === "host";
       const started = room.status === "started";
+      const writtenModeActive = isWrittenModeEnabled(room);
 
       initTimerDefaultsIfNeeded(room);
       initScoresIfNeeded(room);
@@ -5606,8 +5666,8 @@ function hideEidIntro(immediate){
           <div class="landLeft">
             <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
 
-            <div class="controlsRow">
-              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : `<span style="width:260px;max-width:42vw"></span>`}
+            <div class="controlsRow ${(!isHost && writtenModeActive) ? "playerWrittenRow" : ""}">
+              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : (!writtenModeActive ? `<span style="width:260px;max-width:42vw"></span>` : ``)}
 
               <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
                 <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
@@ -5618,7 +5678,21 @@ function hideEidIntro(immediate){
                 </button>
               </div>
 
-              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : `<span style="width:260px;max-width:42vw"></span>`}
+              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : (writtenModeActive ? `
+                <div id="writtenAnswerWrap" class="writtenAnswerWrap">
+                  <input
+                    id="writtenAnswerInput"
+                    class="writtenAnswerInput"
+                    type="text"
+                    maxlength="80"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    placeholder="اضغط الجرس أولًا ثم اكتب الإجابة"
+                  >
+                </div>
+              ` : `<span style="width:260px;max-width:42vw"></span>`)}
             </div>
 
             ${isHost ? `
@@ -5658,6 +5732,8 @@ function hideEidIntro(immediate){
       GAME_UI.els.qText = document.getElementById("qText");
       GAME_UI.els.ansBtn = document.getElementById("ansBtn");
       GAME_UI.els.buzzBtn = document.getElementById("buzzBtn");
+      GAME_UI.els.writtenAnswerWrap = document.getElementById("writtenAnswerWrap");
+      GAME_UI.els.writtenAnswerInput = document.getElementById("writtenAnswerInput");
       GAME_UI.els.timerClock = document.getElementById("timerClock");
 
       const overlay = GAME_UI.els.overlay;
@@ -6068,6 +6144,46 @@ function hideEidIntro(immediate){
           }
         });
       }
+
+      if(GAME_UI.els.writtenAnswerInput && !GAME_UI.els.writtenAnswerInput.__hooked){
+        const inputEl = GAME_UI.els.writtenAnswerInput;
+        inputEl.__hooked = true;
+
+        const pushWrittenAnswer = async () => {
+          const rr = LIVE.room || {};
+          if(!isWrittenModeEnabled(rr)) return;
+          const buzzerNow = resolveStableBuzzer(rr.buzzer, rr.timer);
+          if(!buzzerNow || !buzzerNow.ts) return;
+          if(String(buzzerNow.pid || "") !== String(pid || "")) return;
+
+          const nextAnswer = String(inputEl.value || "").replace(/\s+/g, " ").trim();
+          const currentAnswer = String(rr?.writtenAnswer?.text || "").trim();
+          if(nextAnswer === currentAnswer) return;
+
+          const payload = {
+            text: nextAnswer,
+            pid: String(buzzerNow.pid || pid || ""),
+            name: String(buzzerNow.name || LIVE.me?.name || "").trim(),
+            team: String(buzzerNow.team || LIVE.me?.team || "").trim(),
+            updatedAt: Date.now(),
+            submitted: !!nextAnswer
+          };
+
+          try{
+            await update(ref(db, `rooms/${code}`), { writtenAnswer: payload });
+            if(LIVE.room && typeof LIVE.room === "object") LIVE.room.writtenAnswer = payload;
+            scheduleRender();
+          }catch(e){}
+        };
+
+        inputEl.addEventListener("input", () => {
+          clearTimeout(inputEl.__pushTimer);
+          inputEl.__pushTimer = setTimeout(pushWrittenAnswer, 120);
+        });
+        inputEl.addEventListener("keydown", (e) => {
+          if(e.key === "Enter") e.preventDefault();
+        });
+      }
     }
 
     
@@ -6324,20 +6440,28 @@ function hideEidIntro(immediate){
       // First press bar
       const firstPressBar = GAME_UI.els.firstPressBar;
       const buzzer = resolveStableBuzzer(room.buzzer, room.timer);
+      const writtenModeLive = isWrittenModeEnabled(room);
       if(buzzer && buzzer.name && firstPressBar){
         firstPressBar.classList.add("filled");
         const visualTeamsForBuzz = getVisualTeams(room);
         const buzzBg = (buzzer.team === "green" ? visualTeamsForBuzz.green.color : visualTeamsForBuzz.orange.color);
         const buzzText = getReadableTextColor(buzzBg);
+        const liveAnswer = String(room?.writtenAnswer?.text || "").trim();
         firstPressBar.style.background = buzzBg;
         firstPressBar.style.color = buzzText;
         firstPressBar.style.textShadow = getReadableTextShadow(buzzText);
-        firstPressBar.textContent = buzzer.name;
+        firstPressBar.style.whiteSpace = (writtenModeLive && liveAnswer) ? "normal" : "nowrap";
+        firstPressBar.style.lineHeight = (writtenModeLive && liveAnswer) ? "1.3" : "1.1";
+        firstPressBar.style.fontSize = (writtenModeLive && liveAnswer) ? "20px" : "24px";
+        firstPressBar.textContent = (writtenModeLive && liveAnswer) ? `${buzzer.name} — ${liveAnswer}` : buzzer.name;
       }else if(firstPressBar){
         firstPressBar.classList.remove("filled");
         firstPressBar.style.background = "rgba(255,255,255,.16)";
         firstPressBar.style.color = "#fff";
         firstPressBar.style.textShadow = "0 10px 18px rgba(0,0,0,.25)";
+        firstPressBar.style.whiteSpace = "nowrap";
+        firstPressBar.style.lineHeight = "1.1";
+        firstPressBar.style.fontSize = "24px";
         firstPressBar.textContent = "اسم اللاعب الذي يضغط أولاً";
       }
 
@@ -6354,6 +6478,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       const updates = {};
       updates[`rooms/${code}/buzzer`] = null;
+      updates[`rooms/${code}/writtenAnswer`] = null;
 
       // تصفير المؤقت
       updates[`rooms/${code}/timer/running`] = false;
@@ -6525,8 +6650,42 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       // Player button disabled state (no re-render)
       if(!isHost && GAME_UI.els.buzzBtn){
         const me = LIVE.me;
-        const disabled = (!started) || room.freeze || !me || !me.name;
+        const activeBuzzer = resolveStableBuzzer(room.buzzer, room.timer);
+        const someoneBuzzed = !!(activeBuzzer && activeBuzzer.ts);
+        const iAmWinner = !!(me && activeBuzzer && String(activeBuzzer.pid || "") === String(pid || ""));
+        const disabled = (!started) || room.freeze || !me || !me.name || (someoneBuzzed && !iAmWinner);
         GAME_UI.els.buzzBtn.classList.toggle("disabled", !!disabled);
+      }
+
+      if(!isHost && GAME_UI.els.writtenAnswerInput){
+        const inputEl = GAME_UI.els.writtenAnswerInput;
+        const wrapEl = GAME_UI.els.writtenAnswerWrap;
+        const me = LIVE.me;
+        const activeBuzzer = resolveStableBuzzer(room.buzzer, room.timer);
+        const remoteAnswer = String(room?.writtenAnswer?.text || "").trim();
+        const iAmWinner = !!(started && me && activeBuzzer && String(activeBuzzer.pid || "") === String(pid || ""));
+        const inputEnabled = !!(writtenModeLive && iAmWinner && !room.freeze);
+
+        if(wrapEl) wrapEl.style.display = writtenModeLive ? "flex" : "none";
+
+        inputEl.disabled = !inputEnabled;
+        inputEl.readOnly = !inputEnabled;
+
+        if(!writtenModeLive){
+          if(inputEl.value) inputEl.value = "";
+          inputEl.placeholder = "اضغط الجرس أولًا ثم اكتب الإجابة";
+        }else if(!activeBuzzer || !activeBuzzer.ts){
+          if(document.activeElement !== inputEl && inputEl.value) inputEl.value = "";
+          inputEl.placeholder = "اضغط الجرس أولًا ثم اكتب الإجابة";
+        }else if(inputEnabled){
+          if(document.activeElement !== inputEl && inputEl.value !== remoteAnswer){
+            inputEl.value = remoteAnswer;
+          }
+          inputEl.placeholder = "اكتب الإجابة هنا";
+        }else{
+          if(document.activeElement !== inputEl && inputEl.value) inputEl.value = "";
+          inputEl.placeholder = "تم حجز الإجابة للاعب الأول";
+        }
       }
 
       // settings room latest
@@ -6633,6 +6792,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 updates[`rooms/${code}/mapStates/${currentMap}`] = null;
                 updates[`rooms/${code}/mapStates/${nextMap}`] = {};
                 updates[`rooms/${code}/buzzer`] = null;
+                updates[`rooms/${code}/writtenAnswer`] = null;
                 updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
                 updates[`rooms/${code}/winState`] = null;
                 updates[`rooms/${code}/winEvent`] = null;
@@ -6645,6 +6805,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                     activeMap: nextMap,
                     board: nextBoard,
                     buzzer: null,
+                    writtenAnswer: null,
                     current: { letter:null, qIndex:0, row:null, col:null, map:nextMap },
                     winState: {},
                     winEvent: null,
@@ -6675,8 +6836,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     function normalizeLiveRoom(room){
       room = (room && typeof room === "object") ? room : {};
       const activeMap = Number(room.activeMap || 0);
-      const rawModes = (room.modes && typeof room.modes === "object") ? room.modes : {};
-      const rawSettings = (room.settings && typeof room.settings === "object") ? room.settings : {};
       const normalized = {
         code,
         status: room.status ?? null,
@@ -6687,11 +6846,16 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         activeMap,
         freeze: !!room.freeze,
         buzzer: room.buzzer ?? null,
+        writtenAnswer: (room.writtenAnswer && typeof room.writtenAnswer === "object") ? {
+          text: String(room.writtenAnswer.text || "").trim(),
+          pid: String(room.writtenAnswer.pid || "").trim(),
+          name: String(room.writtenAnswer.name || "").trim(),
+          team: String(room.writtenAnswer.team || "").trim(),
+          updatedAt: Number(room.writtenAnswer.updatedAt || 0),
+          submitted: !!room.writtenAnswer.submitted
+        } : null,
         scores: (room.scores && typeof room.scores === "object") ? room.scores : { green:0, orange:0, a:0, b:0 },
-        settings: rawSettings,
-        modes: rawModes,
-        writtenAnswerModeEnabled: !!(room.writtenAnswerModeEnabled || rawModes.writtenAnswerModeEnabled || rawSettings.writtenAnswerModeEnabled),
-        writtenAnswer: (room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : null,
+        settings: (room.settings && typeof room.settings === "object") ? room.settings : {},
         teams: (room.teams && typeof room.teams === "object") ? room.teams : {},
         board: (room.board && typeof room.board === "object") ? room.board : null,
         restartTs: Number(room.restartTs || 0),
@@ -6816,10 +6980,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       LIVE.me = (role === "host" || role === "display") ? null : getMeFromPlayers(players);
 
       // Views
-      if(role !== "display" && isWrittenModeEnabled(room) && room.status === "started") {
-        redirectToWrittenGame(room);
-        return;
-      }
+      // وضع الإجابة المكتوبة صار يُدار داخل هذا الملف مباشرةً.
 
       if(role === "display"){
         if(room.status !== "started"){
@@ -6843,8 +7004,10 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       if(role === "host"){
         if(room.status === "started"){
-          if(VIEW.type !== "host_game"){
+          const hostGameSig = `wm:${isWrittenModeEnabled(room) ? 1 : 0}`;
+          if(VIEW.type !== "host_game" || VIEW.gameSig !== hostGameSig){
             // mount مرة واحدة فقط
+            VIEW.gameSig = hostGameSig;
             renderGame(room, null);
             VIEW.type = "host_game";
           }
@@ -6852,7 +7015,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           afterRender(room);
           return;
         }else{
-          const sig = `${getHostLobbyMode(room)}|${JSON.stringify(room.teams || {})}|` + Object.entries(players)
+          const sig = `${getHostLobbyMode(room)}|wm:${isWrittenModeVisualEnabled(room) ? 1 : 0}|${JSON.stringify(room.teams || {})}|` + Object.entries(players)
             .map(([id,p]) => `${id}:${p?.team||""}:${p?.name||""}:${Number(p?.joinedAt||0)}`)
             .sort()
             .join("|");
@@ -6913,7 +7076,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         return;
       }
 
-      if(VIEW.type !== "player_game"){
+      const playerGameSig = `wm:${isWrittenModeEnabled(room) ? 1 : 0}`;
+      if(VIEW.type !== "player_game" || VIEW.gameSig !== playerGameSig){
+        VIEW.gameSig = playerGameSig;
         renderGame(room, LIVE.me);
         VIEW.type = "player_game";
       }
@@ -6925,6 +7090,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     function startRoomListeners(){
       onValue(ref(db, `rooms/${code}`), (s) => {
         LIVE.room = normalizeLiveRoom(s.val() || {});
+        if(isWrittenModeEnabled(LIVE.room)) setLocalWrittenModeFlag(true);
         scheduleRender();
       });
     }
@@ -6934,6 +7100,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-22-1 (host mode chooser + separate display link + display-only landing) -->
+  <!-- VERSION: game_full.html — v2026-03-23-1 (written answer saved at room root + host display fix) -->
 </body>
 </html>
