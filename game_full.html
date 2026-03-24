@@ -2319,6 +2319,7 @@ const pid = (function(){
   }
 })();
 const WRITTEN_GAME_FILE = "game_written.html";
+const WRITTEN_QUERY_FLAG = "wm";
 let WRITTEN_GAME_REDIRECTING = false;
 
 function isWrittenModeEnabled(room){
@@ -2344,6 +2345,7 @@ function isWrittenModeVisualEnabled(room){
 function buildWrittenGameUrl(){
   const u = new URL(WRITTEN_GAME_FILE, location.href);
   for(const [k, v] of params.entries()) u.searchParams.set(k, v);
+  u.searchParams.set(WRITTEN_QUERY_FLAG, "1");
   return u.toString();
 }
 
@@ -2354,6 +2356,7 @@ function redirectToWrittenGame(room){
   const path = String(location.pathname || "");
   if(path.endsWith(`/${WRITTEN_GAME_FILE}`) || path === WRITTEN_GAME_FILE) return;
   WRITTEN_GAME_REDIRECTING = true;
+  setLocalWrittenModeFlag(true);
   location.href = buildWrittenGameUrl();
 }
 
@@ -7176,6 +7179,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-25-3 (streamer handoff: game_full routes written mode to game_written) -->
+  <!-- VERSION: game_full.html — v2026-03-25-4 (streamer handoff fix: force wm=1 flag + local written mode handoff) -->
 </body>
 </html>
