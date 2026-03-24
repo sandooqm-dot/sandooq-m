@@ -2318,9 +2318,6 @@ const pid = (function(){
     return "p_" + Math.random().toString(36).slice(2,10);
   }
 })();
-const WRITTEN_GAME_FILE = "game_written.html";
-let WRITTEN_GAME_REDIRECTING = false;
-
 function isWrittenModeEnabled(room){
   return !!(room?.writtenAnswerModeEnabled || room?.modes?.writtenAnswerModeEnabled || room?.settings?.writtenAnswerModeEnabled);
 }
@@ -2339,22 +2336,6 @@ function isWrittenModeVisualEnabled(room){
   const enabled = isWrittenModeEnabled(room);
   if(enabled) setLocalWrittenModeFlag(true);
   return enabled || (role === "host" && getLocalWrittenModeFlag());
-}
-
-function buildWrittenGameUrl(){
-  const u = new URL(WRITTEN_GAME_FILE, location.href);
-  for(const [k, v] of params.entries()) u.searchParams.set(k, v);
-  return u.toString();
-}
-
-function redirectToWrittenGame(room){
-  if(WRITTEN_GAME_REDIRECTING) return;
-  if(!isWrittenModeEnabled(room)) return;
-  if(String(room?.status || "") !== "started") return;
-  const path = String(location.pathname || "");
-  if(path.endsWith(`/${WRITTEN_GAME_FILE}`) || path === WRITTEN_GAME_FILE) return;
-  WRITTEN_GAME_REDIRECTING = true;
-  location.href = buildWrittenGameUrl();
 }
 
 // ✅ Sync (Firebase removed): Cloudflare Worker + Durable Objects
@@ -6209,7 +6190,7 @@ function hideEidIntro(immediate){
         const inputEl = GAME_UI.els.writtenAnswerInput;
         inputEl.__hooked = true;
 
-        const pushWrittenAnswer = async () => {
+        const submitWrittenAnswer = async () => {
           const rr = LIVE.room || {};
           if(!isWrittenModeEnabled(rr)) return;
           const buzzerNow = resolveStableBuzzer(rr.buzzer, rr.timer);
@@ -6236,13 +6217,15 @@ function hideEidIntro(immediate){
           }catch(e){}
         };
 
-        inputEl.addEventListener("input", () => {
-          clearTimeout(inputEl.__pushTimer);
-          inputEl.__pushTimer = setTimeout(pushWrittenAnswer, 120);
-        });
         inputEl.addEventListener("keydown", (e) => {
-          if(e.key === "Enter") e.preventDefault();
+          if(e.key === "Enter"){
+            e.preventDefault();
+            submitWrittenAnswer();
+            try{ inputEl.blur(); }catch(err){}
+          }
         });
+        inputEl.addEventListener("change", submitWrittenAnswer);
+        inputEl.addEventListener("blur", submitWrittenAnswer);
       }
     }
 
@@ -7160,6 +7143,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-23-1 (written answer saved at room root + host display fix) -->
+  <!-- VERSION: game_full.html — v2026-03-25-1 (streamer mode cleanup: no live typing + inline only) -->
 </body>
 </html>
