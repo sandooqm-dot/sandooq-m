@@ -912,6 +912,8 @@
       border:6px solid rgba(0,0,0,.80);
       box-shadow:0 16px 28px rgba(0,0,0,.25);
     }
+    .playerBigBtn.submitMode{ background:#1aa34a; }
+    .playerBigBtn.sentMode{ background:#6b7280; }
     .playerWrittenRow{
       direction:ltr;
       justify-content:flex-start;
@@ -2327,6 +2329,9 @@ function isWrittenModeEnabled(room){
 }
 
 const WRITTEN_MODE_LOCAL_KEY = `horof_written_mode_${code || "default"}`;
+const WRITTEN_HANDOFF_KEY = `horof_written_handoff_${code || "default"}`;
+let LOCAL_WRITTEN_DRAFT = "";
+let LOCAL_WRITTEN_TURN_KEY = "";
 function getLocalWrittenModeFlag(){
   try{ return localStorage.getItem(WRITTEN_MODE_LOCAL_KEY) === "1"; }catch(e){ return false; }
 }
@@ -2349,6 +2354,14 @@ function buildWrittenGameUrl(){
   return u.toString();
 }
 
+function storeWrittenHandoffRoom(room){
+  try{
+    if(!room || typeof room !== "object") return;
+    const payload = { ts: Date.now(), room };
+    sessionStorage.setItem(WRITTEN_HANDOFF_KEY, JSON.stringify(payload));
+  }catch(e){}
+}
+
 function redirectToWrittenGame(room){
   if(WRITTEN_GAME_REDIRECTING) return;
   if(String(role || "") !== "host") return;
@@ -2358,6 +2371,7 @@ function redirectToWrittenGame(room){
   if(path.endsWith(`/${WRITTEN_GAME_FILE}`) || path === WRITTEN_GAME_FILE) return;
   WRITTEN_GAME_REDIRECTING = true;
   setLocalWrittenModeFlag(true);
+  storeWrittenHandoffRoom(room);
   location.href = buildWrittenGameUrl();
 }
 
@@ -6191,15 +6205,46 @@ function hideEidIntro(immediate){
         });
       }
 
-      // ✅ Player buzzer
+      // ✅ Player buzzer / written answer submit
       if(GAME_UI.els.buzzBtn){
         GAME_UI.els.buzzBtn.addEventListener("click", async () => {
           const rr = LIVE.room;
           const mm = LIVE.me || me;
 
-          if(rr.status !== "started") return;
+          if(!rr || rr.status !== "started") return;
           if(rr.freeze) return;
           if(!mm) return;
+
+          if(isWrittenModeEnabled(rr)){
+            const buzzerNow = resolveStableBuzzer(rr.buzzer, rr.timer);
+            const iAmWinner = !!(buzzerNow && buzzerNow.ts && String(buzzerNow.pid || "") === String(pid || ""));
+            const submittedByMe = !!(rr?.writtenAnswer?.submitted && String(rr?.writtenAnswer?.pid || "") === String(pid || ""));
+            if(iAmWinner && !submittedByMe){
+              const inputEl = GAME_UI.els.writtenAnswerInput;
+              const nextAnswer = String((inputEl && inputEl.value) || LOCAL_WRITTEN_DRAFT || "").replace(/\s+/g, " ").trim().slice(0, 80);
+              if(!nextAnswer){
+                try{ inputEl && inputEl.focus(); }catch(e){}
+                return;
+              }
+              const payload = {
+                text: nextAnswer,
+                pid: String(buzzerNow.pid || pid || ""),
+                name: String(buzzerNow.name || LIVE.me?.name || "").trim(),
+                team: String(buzzerNow.team || LIVE.me?.team || "").trim(),
+                updatedAt: Date.now(),
+                submitted: true
+              };
+              try{
+                await update(ref(db, `rooms/${code}`), { writtenAnswer: payload });
+                if(LIVE.room && typeof LIVE.room === "object") LIVE.room.writtenAnswer = payload;
+                LOCAL_WRITTEN_DRAFT = nextAnswer;
+                const turnKey = `${String(buzzerNow.pid || "")}|${Number(buzzerNow.seq || buzzerNow.ts || 0)}`;
+                LOCAL_WRITTEN_TURN_KEY = turnKey;
+                scheduleRender();
+              }catch(e){}
+              return;
+            }
+          }
 
           if(GAME_UI.__buzzBusy) return;
           GAME_UI.__buzzBusy = true;
@@ -6212,6 +6257,8 @@ function hideEidIntro(immediate){
               if(v && v.ts){
                 LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
                 STABLE_BUZZER = v;
+                LOCAL_WRITTEN_DRAFT = "";
+                LOCAL_WRITTEN_TURN_KEY = `${String(v.pid||"")}|${Number(v.seq || v.ts || 0)}`;
               }
               if(!playRong()) fallbackBeep();
             }
@@ -6225,43 +6272,14 @@ function hideEidIntro(immediate){
       if(GAME_UI.els.writtenAnswerInput && !GAME_UI.els.writtenAnswerInput.__hooked){
         const inputEl = GAME_UI.els.writtenAnswerInput;
         inputEl.__hooked = true;
-
-        const submitWrittenAnswer = async () => {
-          const rr = LIVE.room || {};
-          if(!isWrittenModeEnabled(rr)) return;
-          const buzzerNow = resolveStableBuzzer(rr.buzzer, rr.timer);
-          if(!buzzerNow || !buzzerNow.ts) return;
-          if(String(buzzerNow.pid || "") !== String(pid || "")) return;
-
-          const nextAnswer = String(inputEl.value || "").replace(/\s+/g, " ").trim();
-          const currentAnswer = String(rr?.writtenAnswer?.text || "").trim();
-          if(nextAnswer === currentAnswer) return;
-
-          const payload = {
-            text: nextAnswer,
-            pid: String(buzzerNow.pid || pid || ""),
-            name: String(buzzerNow.name || LIVE.me?.name || "").trim(),
-            team: String(buzzerNow.team || LIVE.me?.team || "").trim(),
-            updatedAt: Date.now(),
-            submitted: !!nextAnswer
-          };
-
-          try{
-            await update(ref(db, `rooms/${code}`), { writtenAnswer: payload });
-            if(LIVE.room && typeof LIVE.room === "object") LIVE.room.writtenAnswer = payload;
-            scheduleRender();
-          }catch(e){}
-        };
-
-        inputEl.addEventListener("keydown", (e) => {
-          if(e.key === "Enter"){
-            e.preventDefault();
-            submitWrittenAnswer();
-            try{ inputEl.blur(); }catch(err){}
-          }
+        inputEl.addEventListener("input", () => {
+          const clean = String(inputEl.value || "").slice(0, 80);
+          if(clean !== inputEl.value) inputEl.value = clean;
+          LOCAL_WRITTEN_DRAFT = inputEl.value;
         });
-        inputEl.addEventListener("change", submitWrittenAnswer);
-        inputEl.addEventListener("blur", submitWrittenAnswer);
+        inputEl.addEventListener("keydown", (e) => {
+          if(e.key === "Enter") e.preventDefault();
+        });
       }
     }
 
@@ -6726,14 +6744,44 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         }
       }
 
-      // Player button disabled state (no re-render)
+      // Player button state in written mode / normal mode
       if(!isHost && GAME_UI.els.buzzBtn){
         const me = LIVE.me;
+        const btn = GAME_UI.els.buzzBtn;
         const activeBuzzer = resolveStableBuzzer(room.buzzer, room.timer);
         const someoneBuzzed = !!(activeBuzzer && activeBuzzer.ts);
-        const iAmWinner = !!(me && activeBuzzer && String(activeBuzzer.pid || "") === String(pid || ""));
-        const disabled = (!started) || room.freeze || !me || !me.name || (someoneBuzzed && !iAmWinner);
-        GAME_UI.els.buzzBtn.classList.toggle("disabled", !!disabled);
+        const iAmWinner = !!(started && me && activeBuzzer && String(activeBuzzer.pid || "") === String(pid || ""));
+        const answerState = (room && room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : null;
+        const submittedByMe = !!(answerState && answerState.submitted && String(answerState.pid || "") === String(pid || ""));
+
+        let disabled = (!started) || room.freeze || !me || !me.name;
+        let label = "اضغط هنا للإجابة";
+        let submitMode = false;
+        let sentMode = false;
+
+        if(!writtenModeLive){
+          disabled = disabled || (someoneBuzzed && !iAmWinner);
+          label = (!started) ? "اضغط هنا للإجابة" : (someoneBuzzed && !iAmWinner ? "تم حجز الجرس" : "اضغط هنا للإجابة");
+        }else if(disabled){
+          label = "اضغط هنا للإجابة";
+        }else if(submittedByMe){
+          disabled = true;
+          sentMode = true;
+          label = "تم إرسال الإجابة";
+        }else if(iAmWinner){
+          disabled = false;
+          submitMode = true;
+          label = "إرسال الإجابة";
+        }else if(someoneBuzzed){
+          disabled = true;
+          label = "تم حجز الإجابة";
+        }
+
+        btn.textContent = label;
+        btn.disabled = !!disabled;
+        btn.classList.toggle("disabled", !!disabled);
+        btn.classList.toggle("submitMode", !!submitMode);
+        btn.classList.toggle("sentMode", !!sentMode);
       }
 
       if(!isHost && GAME_UI.els.writtenAnswerInput){
@@ -6741,9 +6789,19 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         const wrapEl = GAME_UI.els.writtenAnswerWrap;
         const me = LIVE.me;
         const activeBuzzer = resolveStableBuzzer(room.buzzer, room.timer);
-        const remoteAnswer = String(room?.writtenAnswer?.text || "").trim();
+        const answerState = (room && room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : null;
+        const submittedByMe = !!(answerState && answerState.submitted && String(answerState.pid || "") === String(pid || ""));
+        const currentTurnKey = activeBuzzer && activeBuzzer.ts ? `${String(activeBuzzer.pid || "")}|${Number(activeBuzzer.seq || activeBuzzer.ts || 0)}` : "";
+        if(!currentTurnKey){
+          LOCAL_WRITTEN_DRAFT = "";
+          LOCAL_WRITTEN_TURN_KEY = "";
+        }else if(LOCAL_WRITTEN_TURN_KEY && LOCAL_WRITTEN_TURN_KEY !== currentTurnKey){
+          LOCAL_WRITTEN_DRAFT = "";
+          LOCAL_WRITTEN_TURN_KEY = "";
+        }
+        if(currentTurnKey && !LOCAL_WRITTEN_TURN_KEY) LOCAL_WRITTEN_TURN_KEY = currentTurnKey;
         const iAmWinner = !!(started && me && activeBuzzer && String(activeBuzzer.pid || "") === String(pid || ""));
-        const inputEnabled = !!(writtenModeLive && iAmWinner && !room.freeze);
+        const inputEnabled = !!(writtenModeLive && iAmWinner && !room.freeze && !submittedByMe);
 
         if(wrapEl) wrapEl.style.display = writtenModeLive ? "flex" : "none";
 
@@ -6757,10 +6815,13 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           if(document.activeElement !== inputEl && inputEl.value) inputEl.value = "";
           inputEl.placeholder = "اضغط الجرس أولًا ثم اكتب الإجابة";
         }else if(inputEnabled){
-          if(document.activeElement !== inputEl && inputEl.value !== remoteAnswer){
-            inputEl.value = remoteAnswer;
+          if(document.activeElement !== inputEl && inputEl.value !== LOCAL_WRITTEN_DRAFT){
+            inputEl.value = LOCAL_WRITTEN_DRAFT || "";
           }
           inputEl.placeholder = "اكتب الإجابة هنا";
+        }else if(submittedByMe){
+          if(document.activeElement !== inputEl) inputEl.value = String(answerState?.text || LOCAL_WRITTEN_DRAFT || "");
+          inputEl.placeholder = "تم إرسال الإجابة";
         }else{
           if(document.activeElement !== inputEl && inputEl.value) inputEl.value = "";
           inputEl.placeholder = "تم حجز الإجابة للاعب الأول";
