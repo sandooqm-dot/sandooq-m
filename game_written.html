@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>سباق الحروف</title>
+  <title>سباق الحروف — وضع الستريمر</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@700;800&display=swap" rel="stylesheet">
@@ -6791,7 +6791,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     if (window.__writtenModePatchV2) return;
     window.__writtenModePatchV2 = true;
 
-    try{ document.body.classList.add("writtenModePage"); }catch(e){}
+    try{ document.body.classList.add("writtenModePage"); document.body.classList.add("writtenDedicatedPage"); document.title = "سباق الحروف — وضع الستريمر"; }catch(e){}
 
     const originalNormalizeLiveRoom = normalizeLiveRoom;
     normalizeLiveRoom = function(room){
@@ -6814,6 +6814,13 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     style.textContent = `
       body.writtenModePage .staffModeBtn{ background:#27c266 !important; border-color:#14532d !important; color:#fff !important; }
       body.writtenModePage .staffModeBtn.active{ background:#27c266 !important; border-color:#14532d !important; color:#fff !important; }
+
+      body.writtenDedicatedPage .staffModeFab,
+      body.writtenDedicatedPage .staffModeBackdrop,
+      body.writtenDedicatedPage #staffModeBackdrop,
+      body.writtenDedicatedPage #staffModeBtn{
+        display:none !important;
+      }
 
       body.writtenModePage .firstPressBar.writtenSplit{
         background:transparent !important;
@@ -7098,7 +7105,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           const hint = document.createElement("div");
           hint.id = "writtenAnswerHint";
           hint.className = "writtenAnswerHint";
-          hint.textContent = "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب ثم يضغط الزر الأخضر لإرساله مرة واحدة";
+          hint.textContent = "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب، ثم يضغط الزر الأخضر لإرساله مرة واحدة";
           btnWrap.insertBefore(hint, btnWrap.firstChild);
         }
 
@@ -7226,6 +7233,10 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     };
 
     function kickWrittenModeUI(){
+      try{
+        const btn = document.getElementById("staffModeBtn");
+        if(btn) btn.classList.add("active");
+      }catch(e){}
       try{ syncWrittenModeUI(); }catch(e){}
     }
 
