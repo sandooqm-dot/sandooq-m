@@ -657,6 +657,20 @@
         let roomCache = {};
         let pusher = null;
         let pusherChannel = null;
+        let pusherConfigured = false;
+        let pusherLive = false;
+        let lastResyncAt = 0;
+        let resyncInFlight = null;
+        let fallbackTimer = null;
+        let cachedRev = -1;
+
+        const DISPLAY_ACTIVE_RESYNC_MS = 45000;
+        const DISPLAY_HIDDEN_RESYNC_MS = 90000;
+        const DISPLAY_NO_PUSHER_VISIBLE_MS = 4000;
+        const DISPLAY_NO_PUSHER_HIDDEN_MS = 8000;
+        const DISPLAY_MIN_RESYNC_GAP_MS = 1200;
+        const PUSHER_CFG_TTL_MS = 10 * 60 * 1000;
+        const PUSHER_CFG_KEY = `sandooq_tv_pusher_cfg_${SYNC_BASE}_${code}`;
 
         function renderRoom(room){
           if(!room || typeof room !== "object") return;
@@ -708,22 +722,95 @@
           };
         }
 
+        function readCachedPusherConfig(){
+          try{
+            const raw = sessionStorage.getItem(PUSHER_CFG_KEY) || localStorage.getItem(PUSHER_CFG_KEY) || "";
+            if(!raw) return null;
+            const parsed = JSON.parse(raw);
+            if(!parsed || !parsed.cfg) return null;
+            if((Date.now() - Number(parsed.ts || 0)) > PUSHER_CFG_TTL_MS) return null;
+            return parsed.cfg || null;
+          }catch(e){
+            return null;
+          }
+        }
+
+        function writeCachedPusherConfig(cfg){
+          try{
+            const payload = JSON.stringify({ ts: Date.now(), cfg: cfg || null });
+            sessionStorage.setItem(PUSHER_CFG_KEY, payload);
+            localStorage.setItem(PUSHER_CFG_KEY, payload);
+          }catch(e){}
+        }
+
         async function fetchPusherConfig(){
+          const cached = readCachedPusherConfig();
+          if(cached && cached.key && cached.cluster && cached.channel){
+            return cached;
+          }
+
           const url = `${SYNC_BASE}/pusher/config?room=${encodeURIComponent(code)}`;
           const r = await fetch(url, { cache:"no-store" });
           const j = await r.json().catch(()=>null);
           if(!j || !j.ok) throw new Error("PUSHER_CONFIG_FAIL");
-          return j.pusher || {};
+          const cfg = j.pusher || {};
+          if(cfg && cfg.key && cfg.cluster && cfg.channel){
+            writeCachedPusherConfig(cfg);
+          }
+          return cfg;
         }
 
-        async function resyncRoom(){
-          try{
-            const room = await fetchRoom();
-            renderRoom(room.state);
-          }catch(e){
-            tvMsg.textContent = "تعذر قراءة بيانات الغرفة.";
-            dbg("DO error: " + (e?.message || e));
+        async function resyncRoom(opts = {}){
+          const force = !!opts.force;
+          const now = Date.now();
+
+          if(!force && resyncInFlight) return resyncInFlight;
+          if(!force && (now - lastResyncAt) < DISPLAY_MIN_RESYNC_GAP_MS){
+            return roomCache;
           }
+
+          lastResyncAt = now;
+
+          resyncInFlight = (async () => {
+            try{
+              const room = await fetchRoom();
+              if(force || room.rev !== cachedRev){
+                cachedRev = room.rev;
+                renderRoom(room.state);
+              }
+              return room.state;
+            }catch(e){
+              tvMsg.textContent = "تعذر قراءة بيانات الغرفة.";
+              dbg("DO error: " + (e?.message || e));
+              throw e;
+            }finally{
+              resyncInFlight = null;
+            }
+          })();
+
+          return resyncInFlight;
+        }
+
+        function scheduleResync(delay, opts = {}){
+          if(!alive) return;
+          clearTimeout(fallbackTimer);
+          fallbackTimer = setTimeout(() => {
+            if(!alive) return;
+            resyncRoom(opts).catch(()=>{}).finally(() => {
+              scheduleFallbackLoop();
+            });
+          }, Math.max(0, Number(delay || 0)));
+        }
+
+        function currentFallbackDelay(){
+          if(pusherLive){
+            return document.hidden ? DISPLAY_HIDDEN_RESYNC_MS : DISPLAY_ACTIVE_RESYNC_MS;
+          }
+          return document.hidden ? DISPLAY_NO_PUSHER_HIDDEN_MS : DISPLAY_NO_PUSHER_VISIBLE_MS;
+        }
+
+        function scheduleFallbackLoop(){
+          scheduleResync(currentFallbackDelay(), { force:false });
         }
 
         async function initPusher(){
@@ -731,6 +818,8 @@
             const cfg = await fetchPusherConfig();
             if(!cfg || !cfg.enabled || !cfg.key || !cfg.cluster || !cfg.channel){
               dbg("Pusher disabled for TV");
+              pusherConfigured = false;
+              pusherLive = false;
               return false;
             }
 
@@ -741,6 +830,8 @@
               if(window.Pusher.logToConsole !== undefined) window.Pusher.logToConsole = false;
             }catch(e){}
 
+            pusherConfigured = true;
+
             pusher = new window.Pusher(cfg.key, {
               cluster: cfg.cluster,
               channelAuthorization: {
@@ -749,10 +840,37 @@
               }
             });
 
-            pusher.connection.bind("connected", () => dbg("TV pusher connected"));
-            pusher.connection.bind("error", (err) => dbg("TV pusher error: " + (err?.error?.data?.message || err?.message || "unknown")));
+            pusher.connection.bind("connected", () => {
+              pusherLive = true;
+              dbg("TV pusher connected");
+              scheduleFallbackLoop();
+            });
+
+            pusher.connection.bind("disconnected", () => {
+              pusherLive = false;
+              dbg("TV pusher disconnected");
+              scheduleResync(500, { force:true });
+            });
+
+            pusher.connection.bind("unavailable", () => {
+              pusherLive = false;
+              dbg("TV pusher unavailable");
+              scheduleResync(500, { force:true });
+            });
+
+            pusher.connection.bind("error", (err) => {
+              pusherLive = false;
+              dbg("TV pusher error: " + (err?.error?.data?.message || err?.message || "unknown"));
+              scheduleResync(800, { force:true });
+            });
 
             pusherChannel = pusher.subscribe(cfg.channel);
+
+            pusherChannel.bind("pusher:subscription_succeeded", () => {
+              pusherLive = true;
+              scheduleResync(300, { force:true });
+            });
+
             pusherChannel.bind("patch", (payload) => {
               try{
                 const patch = (payload && typeof payload.patch === "object") ? payload.patch : {};
@@ -763,6 +881,8 @@
 
             return true;
           }catch(e){
+            pusherConfigured = false;
+            pusherLive = false;
             dbg("initPusher failed: " + (e?.message || e));
             return false;
           }
@@ -771,28 +891,30 @@
         async function startDisplayMode(){
           tvMsg.textContent = "جاري الاتصال بالغرفة…";
 
-          await resyncRoom();
-          const pusherOk = await initPusher();
+          await resyncRoom({ force:true }).catch(()=>{});
+          await initPusher();
+          scheduleFallbackLoop();
 
-          // ✅ fallback / resync هادئ
-          (function loop(){
-            if(!alive) return;
-            const delay = pusherOk
-              ? (document.hidden ? 20000 : 10000)
-              : (document.hidden ? 3000 : 1500);
+          const softResync = () => scheduleResync(350, { force:false });
+          const hardResync = () => scheduleResync(250, { force:true });
 
-            setTimeout(async () => {
-              if(!alive) return;
-              await resyncRoom();
-              loop();
-            }, delay);
-          })();
+          window.addEventListener("online", hardResync);
+          window.addEventListener("pageshow", hardResync);
+          window.addEventListener("focus", softResync);
+          document.addEventListener("visibilitychange", () => {
+            if(document.hidden){
+              scheduleFallbackLoop();
+            }else{
+              hardResync();
+            }
+          });
         }
 
         startDisplayMode();
 
         window.addEventListener("beforeunload", ()=>{
           alive = false;
+          try{ clearTimeout(fallbackTimer); }catch(e){}
           try{
             if(pusherChannel){
               pusherChannel.unbind_all();
@@ -853,6 +975,6 @@
     })();
   </script>
 
-  <!-- VERSION: index.html — vFastOpen-4 + DisplayMode-PusherFirst -->
+  <!-- VERSION: index.html — cost-v1 + DisplayMode-PusherFirst-LowTraffic -->
 </body>
 </html>
