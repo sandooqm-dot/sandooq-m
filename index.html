@@ -664,10 +664,10 @@
         let fallbackTimer = null;
         let cachedRev = -1;
 
-        const DISPLAY_ACTIVE_RESYNC_MS = 45000;
-        const DISPLAY_HIDDEN_RESYNC_MS = 90000;
-        const DISPLAY_NO_PUSHER_VISIBLE_MS = 4000;
-        const DISPLAY_NO_PUSHER_HIDDEN_MS = 8000;
+        const DISPLAY_ACTIVE_RESYNC_MS = 2500;
+        const DISPLAY_HIDDEN_RESYNC_MS = 8000;
+        const DISPLAY_NO_PUSHER_VISIBLE_MS = 1200;
+        const DISPLAY_NO_PUSHER_HIDDEN_MS = 3000;
         const DISPLAY_MIN_RESYNC_GAP_MS = 1200;
         const PUSHER_CFG_TTL_MS = 10 * 60 * 1000;
         const PUSHER_CFG_KEY = `sandooq_tv_pusher_cfg_${SYNC_BASE}_${code}`;
@@ -871,8 +871,23 @@
               scheduleResync(300, { force:true });
             });
 
+            pusherChannel.bind("state", (payload) => {
+              try{
+                pusherLive = true;
+                if(payload && payload.state && typeof payload.state === "object") {
+                  roomCache = payload.state;
+                  renderRoom(roomCache);
+                  return;
+                }
+                const patch = (payload && typeof payload.patch === "object") ? payload.patch : {};
+                roomCache = { ...(roomCache || {}), ...patch };
+                renderRoom(roomCache);
+              }catch(e){}
+            });
+
             pusherChannel.bind("patch", (payload) => {
               try{
+                pusherLive = true;
                 const patch = (payload && typeof payload.patch === "object") ? payload.patch : {};
                 roomCache = { ...(roomCache || {}), ...patch };
                 renderRoom(roomCache);
