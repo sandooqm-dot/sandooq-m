@@ -4410,9 +4410,6 @@ function hideEidIntro(immediate){
         updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:0 };
         updates[`rooms/${code}/timer`] = { sel:timerSel, dur:timerSel, running:false, startTs:0, done:false };
         await update(ref(db), updates);
-        if(writtenEnabled){
-          redirectToWrittenGame(nextRoom);
-        }
         if(winBackdrop) winBackdrop.style.display = "none";
         clearConfetti();
         stopVois();
@@ -5366,8 +5363,10 @@ function hideEidIntro(immediate){
             </div>
 
             <div class="row hostLobbyActions">
-              <button id="startBtn" class="btn btnGreen" type="button">ابدأ اللعبة</button>
+              <button id="startBtn" class="btn btnGreen" type="button">${updatesEnabled ? "فتح وضع الستريمر" : "ابدأ اللعبة"}</button>
             </div>
+
+            ${updatesEnabled ? `<div class="smallNote" style="margin-top:8px">في وضع الستريمر يفتح المقدم الواجهة الخاصة أولًا، بينما يبقى اللاعبون على وضعهم المعتاد.</div>` : ``}
 
             <div id="qrZoomOverlay" class="qrZoomOverlay" aria-hidden="true">
               <div class="qrZoomCard">
@@ -5466,10 +5465,17 @@ function hideEidIntro(immediate){
 
         document.getElementById("startBtn").addEventListener("click", async () => {
           const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+          const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
+
+          if(writtenEnabled){
+            try{ setLocalWrittenModeFlag(true); }catch(e){}
+            location.href = buildWrittenGameUrl();
+            return;
+          }
+
           const board = buildBoardState(latestRoomForStart, Date.now());
           const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
           LAST_STABLE_BOARD = board;
-          const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
           await update(roomRef, {
             status: "started",
             displayPid: null,
@@ -5489,15 +5495,6 @@ function hideEidIntro(immediate){
             mapStates: { "0": {} },
             current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
           });
-          if(writtenEnabled){
-            redirectToWrittenGame(normalizeLiveRoom({
-              ...(latestRoomForStart || {}),
-              status: "started",
-              writtenAnswerModeEnabled: true,
-              modes: { ...((latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {}), writtenAnswerModeEnabled: true },
-              settings: { ...((latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {}), writtenAnswerModeEnabled: true }
-            }));
-          }
         });
       }
 
@@ -7231,7 +7228,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       onValue(ref(db, `rooms/${code}`), (s) => {
         LIVE.room = normalizeLiveRoom(s.val() || {});
         if(isWrittenModeEnabled(LIVE.room)) setLocalWrittenModeFlag(true);
-        redirectToWrittenGame(LIVE.room);
         scheduleRender();
       });
     }
@@ -7241,6 +7237,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-25-5 (streamer handoff host-only: players stay in game_full written mode) -->
+  <!-- VERSION: game_full.html — v2026-03-25-6 (streamer isolated: no post-start redirect; host opens streamer from lobby only) -->
 </body>
 </html>
