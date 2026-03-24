@@ -108,6 +108,14 @@ function clampMin(n, min) {
   return Number.isFinite(n) ? Math.max(min, n) : min;
 }
 
+function clampProbability(n, fallback = 1) {
+  n = Number(n);
+  if (!Number.isFinite(n)) return fallback;
+  if (n <= 0) return 0;
+  if (n >= 1) return 1;
+  return n;
+}
+
 function normalizeRoom(v) {
   const s = String(v || "").trim();
   return (s || "default").slice(0, 120);
@@ -409,8 +417,51 @@ function queueMonitorEvent(ctx, env, payload) {
   );
 }
 
+function monitorRequestSampleRate(evt, env) {
+  const data = (evt && typeof evt === "object") ? evt : {};
+  const pathKey = String(data.pathKey || roomMetricsPathKey(data.path || "")).trim();
+  const status = Number(data.status || 0);
+
+  if (!Number.isFinite(status) || status >= 400) return 1;
+  if (pathKey === "monitorUI" || pathKey === "monitorSummary" || pathKey === "monitorDetailsUI") return 1;
+
+  const envKey = {
+    state: "MONITOR_SAMPLE_STATE_OK",
+    action: "MONITOR_SAMPLE_ACTION_OK",
+    stats: "MONITOR_SAMPLE_STATS_OK",
+    health: "MONITOR_SAMPLE_HEALTH_OK",
+    pusherAuth: "MONITOR_SAMPLE_PUSHER_AUTH_OK",
+    pusherConfig: "MONITOR_SAMPLE_PUSHER_CONFIG_OK",
+    pusherTrigger: "MONITOR_SAMPLE_PUSHER_TRIGGER_OK",
+  }[pathKey];
+
+  if (envKey && env && Object.prototype.hasOwnProperty.call(env, envKey)) {
+    return clampProbability(env[envKey], 1);
+  }
+
+  switch (pathKey) {
+    case "state": return 0.05;
+    case "action": return 0.35;
+    case "stats": return 0.15;
+    case "health": return 0.10;
+    case "pusherAuth": return 0.25;
+    case "pusherConfig": return 0.15;
+    case "pusherTrigger": return 1;
+    default: return 1;
+  }
+}
+
+function shouldQueueMonitorRequest(evt, env) {
+  const rate = monitorRequestSampleRate(evt, env);
+  if (rate >= 1) return true;
+  if (rate <= 0) return false;
+  return Math.random() < rate;
+}
+
 function queueMonitorRequest(ctx, env, data) {
-  queueMonitorEvent(ctx, env, { type: "request", ...(data || {}) });
+  const payload = { type: "request", ...(data || {}) };
+  if (!shouldQueueMonitorRequest(payload, env)) return;
+  queueMonitorEvent(ctx, env, payload);
 }
 
 function parseDateMs(value, fallback = Date.now()) {
@@ -1528,10 +1579,6 @@ export default {
           try {
             const trig = await pusherTrigger(env, roomChannel(room), "patch", evt);
             if (trig?.ok) {
-              await stub.fetch("https://do/mark-pusher-sent", {
-                method: "POST",
-                headers: { "x-room-name": room },
-              });
               await monitorStub(env).fetch("https://do/monitor-event", {
                 method: "POST",
                 headers: {
@@ -1714,6 +1761,7 @@ export class RoomDO {
     this.IDLE_MS = clampMin(ms, 60 * 1000);
 
     this.roomName = null;
+    this.runtimeMetrics = null;
   }
 
   _setRoomFromReq(request) {
@@ -1730,19 +1778,28 @@ export class RoomDO {
     } catch {}
   }
 
-  async _loadMetrics(now = Date.now()) {
+  _loadMetrics(now = Date.now()) {
     const day = utcDayKey(now);
-    const m = (await this.state.storage.get("metrics")) || {
-      day,
-      actionsToday: 0,
-      pusherMsgsToday: 0,
-      peakClientsToday: 0,
-      seen: {},
-    };
-    if (m.day !== day) {
-      return { day, actionsToday: 0, pusherMsgsToday: 0, peakClientsToday: 0, seen: {} };
+    if (!this.runtimeMetrics || this.runtimeMetrics.day !== day) {
+      this.runtimeMetrics = {
+        day,
+        actionsToday: 0,
+        pusherMsgsToday: 0,
+        peakClientsToday: 0,
+        seen: {},
+      };
     }
-    if (!m.seen || typeof m.seen !== "object") m.seen = {};
+    this.runtimeMetrics.seen = this._gcSeen(this.runtimeMetrics.seen, now);
+    return this.runtimeMetrics;
+  }
+
+  _touchRuntimeSeen(pid, now = Date.now()) {
+    const safePid = normalizePid(pid || "");
+    const m = this._loadMetrics(now);
+    if (!safePid) return m;
+    m.seen[safePid] = now;
+    const clientsNow = this._clientsNow(m.seen, now);
+    m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
     return m;
   }
 
@@ -2446,13 +2503,7 @@ export class RoomDO {
 
       const pid = normalizePid(url.searchParams.get("pid") || "");
       if (pid) {
-        const now = Date.now();
-        const m = await this._loadMetrics(now);
-        m.seen = this._gcSeen(m.seen, now);
-        m.seen[pid] = now;
-        const clientsNow = this._clientsNow(m.seen, now);
-        m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
-        await this.state.storage.put("metrics", m);
+        this._touchRuntimeSeen(pid, Date.now());
       }
 
       return json({ ok: true, state: s, rev });
@@ -2460,11 +2511,9 @@ export class RoomDO {
 
     if (url.pathname === "/stats") {
       const now = Date.now();
-      const m = await this._loadMetrics(now);
-      m.seen = this._gcSeen(m.seen, now);
+      const m = this._loadMetrics(now);
       const clientsNow = this._clientsNow(m.seen, now);
       m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
-      await this.state.storage.put("metrics", m);
 
       const lastActiveAt = Number((await this.state.storage.get("lastActiveAt")) || 0);
       const rev = Number((await this.state.storage.get("rev")) || 0);
@@ -2480,15 +2529,15 @@ export class RoomDO {
         lastActiveAt,
         rev,
         pusherConfigured: pusherEnabled(this.env),
+        metricsMode: "runtime",
       });
     }
 
     if (url.pathname === "/mark-pusher-sent" && request.method === "POST") {
       const now = Date.now();
-      const m = await this._loadMetrics(now);
+      const m = this._loadMetrics(now);
       m.pusherMsgsToday = Number(m.pusherMsgsToday || 0) + 1;
-      await this.state.storage.put("metrics", m);
-      return json({ ok: true });
+      return json({ ok: true, mode: "runtime" });
     }
 
     if (url.pathname === "/action") {
@@ -2575,12 +2624,12 @@ export class RoomDO {
           console.log("setAlarm_failed", String(e?.message || e));
         }
 
-        const m = await this._loadMetrics(now);
+        const m = this._loadMetrics(now);
         m.actionsToday = Number(m.actionsToday || 0) + 1;
-        m.seen = this._gcSeen(m.seen, now);
+        const actionPid = normalizePid(body?.pid || "");
+        if (actionPid) this._touchRuntimeSeen(actionPid, now);
         const clientsNow = this._clientsNow(m.seen, now);
         m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
-        await this.state.storage.put("metrics", m);
 
         return json({
           ok: true,
@@ -2629,12 +2678,12 @@ export class RoomDO {
         console.log("setAlarm_failed", String(e?.message || e));
       }
 
-      const m = await this._loadMetrics(now);
+      const m = this._loadMetrics(now);
       m.actionsToday = Number(m.actionsToday || 0) + 1;
-      m.seen = this._gcSeen(m.seen, now);
+      const actionPid = normalizePid(body?.pid || patch?.pid || "");
+      if (actionPid) this._touchRuntimeSeen(actionPid, now);
       const clientsNow = this._clientsNow(m.seen, now);
       m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
-      await this.state.storage.put("metrics", m);
 
       return json({
         ok: true,
