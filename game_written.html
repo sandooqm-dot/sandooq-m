@@ -3156,6 +3156,26 @@ function hideEidIntro(immediate){
 
     // ✅✅✅ (جديد) حالة حيّة (بدون إعادة بناء الواجهة كل مرة)
     const __WRITTEN_HANDOFF_ROOM__ = __getEarlyWrittenHandoffRoom__();
+    const __WRITTEN_HANDOFF_GRACE_UNTIL__ = __WRITTEN_HANDOFF_ROOM__ ? (Date.now() + 5000) : 0;
+
+    function __roomLooksMeaningful__(room){
+      try{
+        if(!room || typeof room !== "object") return false;
+        const players = room.players && typeof room.players === "object" ? room.players : {};
+        return !!(
+          room.status !== null && room.status !== undefined ||
+          room.hostKey !== null && room.hostKey !== undefined ||
+          room.name ||
+          Object.keys(players).length > 0 ||
+          room.currentLetter ||
+          room.currentQuestion ||
+          room.board ||
+          room.timer != null ||
+          room.firstBuzz
+        );
+      }catch(e){ return false; }
+    }
+
     const LIVE = {
       room: __WRITTEN_HANDOFF_ROOM__ && typeof __WRITTEN_HANDOFF_ROOM__ === "object" ? __WRITTEN_HANDOFF_ROOM__ : {
         code,
@@ -6797,8 +6817,19 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     // ✅ Root room listener only
     function startRoomListeners(){
       onValue(ref(db, `rooms/${code}`), (s) => {
-        LIVE.room = normalizeLiveRoom(s.val() || {});
-        if(LIVE.room && LIVE.room.status === "started") __clearEarlyWrittenHandoffRoom__();
+        const incomingRaw = s.val() || {};
+        const incomingMeaningful = __roomLooksMeaningful__(incomingRaw);
+        const currentMeaningful = __roomLooksMeaningful__(LIVE.room);
+        const withinHandoffGrace = Date.now() < __WRITTEN_HANDOFF_GRACE_UNTIL__;
+
+        // إذا جتنا قراءة فارغة مباشرة بعد التحويل، لا نمسح لقطة الستريمر الجاهزة
+        if(!incomingMeaningful && currentMeaningful && withinHandoffGrace){
+          scheduleRender();
+          return;
+        }
+
+        LIVE.room = normalizeLiveRoom(incomingRaw);
+        if(__roomLooksMeaningful__(LIVE.room) && LIVE.room && LIVE.room.status === "started") __clearEarlyWrittenHandoffRoom__();
         scheduleRender();
       });
     }
@@ -7436,6 +7467,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
   })();
   </script>
 
-<!-- VERSION: game_written.html — v2026-03-25-8 (host-only streamer page; players bounce back to game_full) -->
+<!-- VERSION: game_written.html — v2026-03-25-9 (fix handoff flicker by ignoring empty first snapshot during host transition) -->
 </body>
 </html>
