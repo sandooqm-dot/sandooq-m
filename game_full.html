@@ -2318,6 +2318,9 @@ const pid = (function(){
     return "p_" + Math.random().toString(36).slice(2,10);
   }
 })();
+const WRITTEN_GAME_FILE = "game_written.html";
+let WRITTEN_GAME_REDIRECTING = false;
+
 function isWrittenModeEnabled(room){
   return !!(room?.writtenAnswerModeEnabled || room?.modes?.writtenAnswerModeEnabled || room?.settings?.writtenAnswerModeEnabled);
 }
@@ -2337,6 +2340,23 @@ function isWrittenModeVisualEnabled(room){
   if(enabled) setLocalWrittenModeFlag(true);
   return enabled || (role === "host" && getLocalWrittenModeFlag());
 }
+
+function buildWrittenGameUrl(){
+  const u = new URL(WRITTEN_GAME_FILE, location.href);
+  for(const [k, v] of params.entries()) u.searchParams.set(k, v);
+  return u.toString();
+}
+
+function redirectToWrittenGame(room){
+  if(WRITTEN_GAME_REDIRECTING) return;
+  if(!isWrittenModeEnabled(room)) return;
+  if(String(room?.status || "") !== "started") return;
+  const path = String(location.pathname || "");
+  if(path.endsWith(`/${WRITTEN_GAME_FILE}`) || path === WRITTEN_GAME_FILE) return;
+  WRITTEN_GAME_REDIRECTING = true;
+  location.href = buildWrittenGameUrl();
+}
+
 
 // ✅ Sync (Firebase removed): Cloudflare Worker + Durable Objects
 // Worker base (change only if you deploy a different worker)
@@ -4372,6 +4392,9 @@ function hideEidIntro(immediate){
         updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:0 };
         updates[`rooms/${code}/timer`] = { sel:timerSel, dur:timerSel, running:false, startTs:0, done:false };
         await update(ref(db), updates);
+        if(writtenEnabled){
+          redirectToWrittenGame(nextRoom);
+        }
         if(winBackdrop) winBackdrop.style.display = "none";
         clearConfetti();
         stopVois();
@@ -5448,6 +5471,15 @@ function hideEidIntro(immediate){
             mapStates: { "0": {} },
             current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
           });
+          if(writtenEnabled){
+            redirectToWrittenGame(normalizeLiveRoom({
+              ...(latestRoomForStart || {}),
+              status: "started",
+              writtenAnswerModeEnabled: true,
+              modes: { ...((latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {}), writtenAnswerModeEnabled: true },
+              settings: { ...((latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {}), writtenAnswerModeEnabled: true }
+            }));
+          }
         });
       }
 
@@ -7134,6 +7166,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       onValue(ref(db, `rooms/${code}`), (s) => {
         LIVE.room = normalizeLiveRoom(s.val() || {});
         if(isWrittenModeEnabled(LIVE.room)) setLocalWrittenModeFlag(true);
+        redirectToWrittenGame(LIVE.room);
         scheduleRender();
       });
     }
@@ -7143,6 +7176,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-25-1 (streamer mode cleanup: no live typing + inline only) -->
+  <!-- VERSION: game_full.html — v2026-03-25-3 (streamer handoff: game_full routes written mode to game_written) -->
 </body>
 </html>
