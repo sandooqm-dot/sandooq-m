@@ -3810,7 +3810,10 @@ function hideEidIntro(immediate){
 
     const updates = {};
     // (أمر واحد) تحديث متعدد المسارات لتقليل الرسائل
+    // ✅ مهم: بعد انتهاء المؤقت نرجّع وضع الستريمر للجولة الطبيعية
+    // لذلك نصفر الجرس + نمسح الإجابة المرسلة + نصفر المؤقت
     updates[`rooms/${code}/buzzer`] = null;
+    updates[`rooms/${code}/writtenAnswer`] = null;
     updates[`rooms/${code}/timer`] = {
       sel,
       dur: sel,
