@@ -7303,6 +7303,84 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
   })();
   </script>
 
-<!-- VERSION: game_written.html — v2026-03-25-6 (dedicated streamer fix: wm flag + send button + force written UI) -->
+
+  <script>
+  (()=>{
+    if (window.__writtenDedicatedHardFixV3) return;
+    window.__writtenDedicatedHardFixV3 = true;
+
+    function forceDedicatedRoomShape(roomLike){
+      const raw = (roomLike && typeof roomLike === 'object') ? roomLike : {};
+      if (typeof getDedicatedWrittenFlag === 'function' && !getDedicatedWrittenFlag()) return raw;
+      const patched = {
+        ...raw,
+        writtenAnswerModeEnabled: true,
+        modes: { ...((raw.modes && typeof raw.modes === 'object') ? raw.modes : {}), writtenAnswerModeEnabled: true },
+        settings: { ...((raw.settings && typeof raw.settings === 'object') ? raw.settings : {}), writtenAnswerModeEnabled: true }
+      };
+      try{
+        return (typeof normalizeLiveRoom === 'function') ? normalizeLiveRoom(patched) : patched;
+      }catch(e){
+        return patched;
+      }
+    }
+
+    function hardKickWrittenMode(){
+      try{ if (typeof setDedicatedWrittenFlag === 'function') setDedicatedWrittenFlag(true); }catch(e){}
+      try{
+        if (typeof LIVE !== 'undefined' && LIVE && LIVE.room) {
+          LIVE.room = forceDedicatedRoomShape(LIVE.room);
+        }
+      }catch(e){}
+      try{ if (typeof syncWrittenModeUI === 'function') syncWrittenModeUI(); }catch(e){}
+    }
+
+    const __origRenderFromLiveV3 = renderFromLive;
+    renderFromLive = function(){
+      try{
+        if (typeof LIVE !== 'undefined' && LIVE && LIVE.room) {
+          LIVE.room = forceDedicatedRoomShape(LIVE.room);
+        }
+      }catch(e){}
+      __origRenderFromLiveV3();
+      hardKickWrittenMode();
+    };
+
+    const __origRenderGameV3 = renderGame;
+    renderGame = function(room, me){
+      const forcedRoom = forceDedicatedRoomShape(room || ((typeof LIVE !== 'undefined' && LIVE) ? LIVE.room : null));
+      try{
+        if (typeof LIVE !== 'undefined' && LIVE) LIVE.room = forcedRoom;
+      }catch(e){}
+      __origRenderGameV3(forcedRoom, me);
+      hardKickWrittenMode();
+    };
+
+    const __origUpdateGameUIV3 = updateGameUI;
+    updateGameUI = function(){
+      try{
+        if (typeof LIVE !== 'undefined' && LIVE && LIVE.room) {
+          LIVE.room = forceDedicatedRoomShape(LIVE.room);
+        }
+      }catch(e){}
+      __origUpdateGameUIV3();
+      hardKickWrittenMode();
+    };
+
+    try{
+      const mo = new MutationObserver(() => {
+        hardKickWrittenMode();
+      });
+      mo.observe(document.body || document.documentElement, { childList:true, subtree:true });
+    }catch(e){}
+
+    try{ requestAnimationFrame(hardKickWrittenMode); }catch(e){}
+    try{ setTimeout(hardKickWrittenMode, 0); }catch(e){}
+    try{ setTimeout(hardKickWrittenMode, 120); }catch(e){}
+    try{ setTimeout(hardKickWrittenMode, 500); }catch(e){}
+  })();
+  </script>
+
+<!-- VERSION: game_written.html — v2026-03-25-7 (dedicated streamer hard-fix: force room written mode before/after render) -->
 </body>
 </html>
