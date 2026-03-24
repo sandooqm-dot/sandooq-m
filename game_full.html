@@ -2371,7 +2371,8 @@ const SYNC = {
 
 // ✅ تخفيف السحب: سريع فقط إلى أن يثبت Pusher، وبعدها fallback هادئ جدًا
 const __FAST_POLL_MS = Math.max(350, Number(SYNC.pollMs || 350));
-const __PUSHER_READY_POLL_MS = 30000;
+const __PUSHER_READY_POLL_MS = 2500;
+const __PUSHER_STALE_MS = 4500;
 const __SOFT_RESYNC_GAP_MS = 2500;
 let __lastRealtimeAt = 0;
 let __lastSoftResyncAt = 0;
@@ -2619,6 +2620,9 @@ function _applyTopPatch(topPatch){
 // ✅ Polling manager (عند تفعيل Pusher يتحول إلى fallback هادئ فقط)
 let __POLL_T = null;
 const __ORIG_POLL_MS = Number(__FAST_POLL_MS || SYNC.pollMs || 900);
+const __FALLBACK_VISIBLE_POLL_MS = Math.max(1200, __ORIG_POLL_MS);
+const __FALLBACK_HIDDEN_POLL_MS = 3000;
+const __READY_HIDDEN_POLL_MS = 8000;
 
 function _startPolling(){
   try{ if(__POLL_T) clearInterval(__POLL_T); }catch(e){}
@@ -2634,15 +2638,21 @@ function _setPollMs(ms){
 function _markRealtimeAlive(){
   __lastRealtimeAt = Date.now();
 }
+function _readyPollMs(){
+  return document.hidden ? __READY_HIDDEN_POLL_MS : __PUSHER_READY_POLL_MS;
+}
+function _fallbackPollMs(){
+  return document.hidden ? __FALLBACK_HIDDEN_POLL_MS : __FALLBACK_VISIBLE_POLL_MS;
+}
 function _setPusherReadyMode(){
   __pusherReady = true;
   _markRealtimeAlive();
-  _setPollMs(__PUSHER_READY_POLL_MS);
+  _setPollMs(_readyPollMs());
   _dbgRender();
 }
 function _setPusherFallbackMode(){
   __pusherReady = false;
-  _setPollMs(__ORIG_POLL_MS);
+  _setPollMs(_fallbackPollMs());
   _dbgRender();
 }
 function _softResync(reason=""){
@@ -2840,8 +2850,21 @@ window.addEventListener("pageshow", () => {
 document.addEventListener("visibilitychange", () => {
   if(document.visibilityState === "visible"){
     _softResync("visible");
+    if(__pusherReady) _setPollMs(_readyPollMs());
+    else _setPollMs(_fallbackPollMs());
+  } else {
+    if(__pusherReady) _setPollMs(_readyPollMs());
+    else _setPollMs(_fallbackPollMs());
   }
 }, { passive:true });
+
+setInterval(() => {
+  if(!__PUSHER_ENABLED || !__pusherReady) return;
+  const idleFor = Date.now() - Number(__lastRealtimeAt || 0);
+  if(idleFor < __PUSHER_STALE_MS) return;
+  _setPollMs(_fallbackPollMs());
+  _softResync("realtime_stale");
+}, 2000);
 
 // ✅ Debug badge (يظهر فقط عند ?debug=1) — ما يغيّر أي شيء للمستخدمين العاديين
 let __dbgEl = null;
