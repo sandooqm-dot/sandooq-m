@@ -169,6 +169,8 @@
     const err = document.getElementById("err");
     const hintText = document.getElementById("hintText");
 
+    let joinBusy = false;
+
     const lastName = localStorage.getItem("sandooq_last_player_name");
     if(lastName && !nameEl.value) nameEl.value = lastName;
 
@@ -196,6 +198,24 @@
 
     function cleanCode(s){
       return normalizeDigits(s).replace(/\D/g, "").slice(0,6);
+    }
+
+    function sleep(ms){
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function withTimeout(promise, ms){
+      let timer = null;
+      try{
+        return await Promise.race([
+          promise,
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error("TIMEOUT")), ms);
+          })
+        ]);
+      }finally{
+        if(timer) clearTimeout(timer);
+      }
     }
 
     const roomCode = cleanCode(codeFromLink);
@@ -272,11 +292,13 @@
 
     async function warmPusherConfig(){
       try{
+        const cacheKey = `horof_pusher_config_${roomCode}`;
+        if (sessionStorage.getItem(cacheKey)) return;
         const url = `${baseUrl()}/pusher/config?room=${encodeURIComponent(roomCode)}`;
         const r = await fetch(url, { cache:"no-store" });
         const j = await r.json().catch(()=>null);
         if(j && j.ok){
-          sessionStorage.setItem(`horof_pusher_config_${roomCode}`, JSON.stringify(j.pusher || {}));
+          sessionStorage.setItem(cacheKey, JSON.stringify(j.pusher || {}));
         }
       }catch(e){}
     }
@@ -303,7 +325,40 @@
       return out;
     }
 
+    function readPlayers(room){
+      return (room && room.players && typeof room.players === "object") ? room.players : {};
+    }
+
+    function readStatus(room){
+      const statusRaw = (room && room.status != null) ? String(room.status) : "";
+      const status = (statusRaw === "started" || statusRaw === "lobby") ? statusRaw : (statusRaw ? statusRaw : "lobby");
+      return { statusRaw, status };
+    }
+
+    function buildJoinPatch(room, pid, name, joinedAt){
+      const { statusRaw, status } = readStatus(room);
+      if(statusRaw && status !== "lobby" && status !== "started"){
+        throw new Error("ROOM_NOT_READY");
+      }
+
+      const players = { ...readPlayers(room) };
+      if(players[pid]){
+        return { alreadyJoined: true, status, players };
+      }
+
+      const ids = Object.keys(players);
+      if(ids.length >= 13){
+        throw new Error("ROOM_FULL");
+      }
+
+      const { g, o } = countTeams(players);
+      const team = (g <= o) ? "green" : "orange";
+      players[pid] = { name, team, joinedAt };
+      return { alreadyJoined: false, status, players };
+    }
+
     async function join(){
+      if(joinBusy) return;
       clearError();
 
       const name = (nameEl.value || "").trim();
@@ -316,56 +371,41 @@
         return;
       }
 
+      joinBusy = true;
       btn.classList.add("loading");
       btn.textContent = "جاري الدخول...";
 
       const MAX_PLAYERS = 13;
       const pid = genPid();
+      const joinedAt = Date.now();
 
       try{
         localStorage.setItem("sandooq_last_player_name", name);
 
+        let room = await fetchState(pid);
         let finalRoom = null;
 
-        for(let attempt=0; attempt<4; attempt++){
-          const room = await fetchState(pid);
-          const statusRaw = (room && room.status != null) ? String(room.status) : "";
-          const status = (statusRaw === "started" || statusRaw === "lobby") ? statusRaw : (statusRaw ? statusRaw : "lobby");
-
-          if(statusRaw && status !== "lobby" && status !== "started"){
-            showError("الغرفة غير جاهزة حالياً");
-            return;
-          }
-
-          const players0 = (room.players && typeof room.players === "object") ? room.players : {};
-          const players = { ...players0 };
-
-          if(players[pid]){
+        for(let attempt = 0; attempt < 2; attempt++){
+          const patch = buildJoinPatch(room, pid, name, joinedAt);
+          if(patch.alreadyJoined){
             finalRoom = room;
             break;
           }
 
-          const ids0 = Object.keys(players);
-          if(ids0.length >= MAX_PLAYERS){
-            showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
-            return;
-          }
-
-          const { g, o } = countTeams(players);
-          const team = (g <= o) ? "green" : "orange";
-
-          players[pid] = { name, team, joinedAt: Date.now() };
-
-          await postAction({ status, players });
-
-          const room2 = await fetchState(pid);
-          const p2 = (room2.players && typeof room2.players === "object") ? room2.players : {};
-          if(p2 && p2[pid]){
-            finalRoom = room2;
+          const afterAction = await postAction({ status: patch.status, players: patch.players });
+          if(afterAction && readPlayers(afterAction)[pid]){
+            finalRoom = afterAction;
             break;
           }
 
-          await new Promise(r => setTimeout(r, 120 + attempt*80));
+          if(attempt === 0){
+            await sleep(140);
+            room = await fetchState(pid);
+            if(readPlayers(room)[pid]){
+              finalRoom = room;
+              break;
+            }
+          }
         }
 
         if(!finalRoom){
@@ -373,14 +413,16 @@
           return;
         }
 
-        const pFinal = (finalRoom.players && typeof finalRoom.players === "object") ? finalRoom.players : {};
+        const pFinal = readPlayers(finalRoom);
         const idsF = Object.keys(pFinal);
 
         if(idsF.length > MAX_PLAYERS){
           const trimmed = enforceLimit(pFinal, MAX_PLAYERS);
           const kept = !!trimmed[pid];
 
-          await postAction({ players: trimmed });
+          if(kept){
+            finalRoom = (await postAction({ players: trimmed })) || finalRoom;
+          }
 
           if(!kept){
             showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
@@ -388,7 +430,7 @@
           }
         }
 
-        await warmPusherConfig();
+        await withTimeout(warmPusherConfig(), 900).catch(() => {});
         markAsGuestPlayer(roomCode, pid);
 
         const u = new URL("game_full.html", location.href);
@@ -402,8 +444,15 @@
         location.href = u.toString();
 
       }catch(e){
-        showError("صار خطأ، حاول مرة ثانية");
+        if(e?.message === "ROOM_FULL"){
+          showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
+        }else if(e?.message === "ROOM_NOT_READY"){
+          showError("الغرفة غير جاهزة حالياً");
+        }else{
+          showError("صار خطأ، حاول مرة ثانية");
+        }
       }finally{
+        joinBusy = false;
         btn.classList.remove("loading");
         btn.textContent = "دخول";
       }
@@ -413,6 +462,6 @@
     nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — vDO-Join-3-PusherReady -->
+  <!-- VERSION: join.html — cost-v1 -->
 </body>
 </html>
