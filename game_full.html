@@ -2351,6 +2351,7 @@ function buildWrittenGameUrl(){
 
 function redirectToWrittenGame(room){
   if(WRITTEN_GAME_REDIRECTING) return;
+  if(String(role || "") !== "host") return;
   if(!isWrittenModeEnabled(room)) return;
   if(String(room?.status || "") !== "started") return;
   const path = String(location.pathname || "");
@@ -7179,6 +7180,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-25-4 (streamer handoff fix: force wm=1 flag + local written mode handoff) -->
+  <!-- VERSION: game_full.html — v2026-03-25-5 (streamer handoff host-only: players stay in game_full written mode) -->
 </body>
 </html>
