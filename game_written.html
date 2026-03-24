@@ -6793,12 +6793,34 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
     try{ document.body.classList.add("writtenModePage"); document.body.classList.add("writtenDedicatedPage"); document.title = "سباق الحروف — وضع الستريمر"; }catch(e){}
 
+    const WRITTEN_QUERY_FLAG = "wm";
+    const WRITTEN_MODE_LOCAL_KEY = `horof_written_mode_${(typeof code !== "undefined" && code) ? code : "default"}`;
+
+    function getDedicatedWrittenFlag(){
+      try{
+        const q = new URLSearchParams(location.search || "");
+        if(String(q.get(WRITTEN_QUERY_FLAG) || "") === "1") return true;
+      }catch(e){}
+      try{
+        return localStorage.getItem(WRITTEN_MODE_LOCAL_KEY) === "1";
+      }catch(e){ return false; }
+    }
+
+    function setDedicatedWrittenFlag(v){
+      try{
+        if(v) localStorage.setItem(WRITTEN_MODE_LOCAL_KEY, "1");
+        else localStorage.removeItem(WRITTEN_MODE_LOCAL_KEY);
+      }catch(e){}
+    }
+
+    setDedicatedWrittenFlag(true);
+
     const originalNormalizeLiveRoom = normalizeLiveRoom;
     normalizeLiveRoom = function(room){
       const normalized = originalNormalizeLiveRoom(room);
       const raw = (room && typeof room === "object") ? room : {};
       normalized.modes = (raw.modes && typeof raw.modes === "object") ? raw.modes : {};
-      normalized.writtenAnswerModeEnabled = !!(raw.writtenAnswerModeEnabled || normalized.modes.writtenAnswerModeEnabled || raw?.settings?.writtenAnswerModeEnabled);
+      normalized.writtenAnswerModeEnabled = !!(raw.writtenAnswerModeEnabled || normalized.modes.writtenAnswerModeEnabled || raw?.settings?.writtenAnswerModeEnabled || getDedicatedWrittenFlag());
       normalized.writtenAnswer = (raw.writtenAnswer && typeof raw.writtenAnswer === "object") ? {
         text: String(raw.writtenAnswer.text || "").trim(),
         pid: String(raw.writtenAnswer.pid || "").trim(),
@@ -7097,6 +7119,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         wrap.className = "writtenAnswerWrap";
         wrap.innerHTML = `
           <input id="writtenAnswerInput" class="writtenAnswerInput" type="text" maxlength="${WRITTEN_MAX_LEN}" autocomplete="off" placeholder="اكتب الجواب هنا">
+          <button id="writtenSendBtn" class="writtenSendBtn" type="button">إرسال</button>
         `;
         row.appendChild(wrap);
 
@@ -7105,11 +7128,25 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           const hint = document.createElement("div");
           hint.id = "writtenAnswerHint";
           hint.className = "writtenAnswerHint";
-          hint.textContent = "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب، ثم يضغط الزر الأخضر لإرساله مرة واحدة";
+          hint.textContent = "أول لاعب يضغط الجرس فقط يستطيع كتابة الجواب، ثم يرسل الجواب مرة واحدة.";
           btnWrap.insertBefore(hint, btnWrap.firstChild);
         }
 
         const input = wrap.querySelector("#writtenAnswerInput");
+        const sendBtn = wrap.querySelector("#writtenSendBtn");
+
+        async function submitCurrentAnswer(){
+          const liveRoom = (typeof LIVE !== "undefined") ? LIVE.room : null;
+          if(!liveRoom || !canLocalPlayerWrite(liveRoom)) return;
+          const clean = String(((input && input.value) || localWrittenDraft || "")).replace(/\s+/g, " ").trim().slice(0, WRITTEN_MAX_LEN);
+          if(!clean) return;
+          localWrittenDraft = clean;
+          try{ await setWrittenAnswerRemote(clean, true); }catch(e){}
+          const turnKey = getBuzzerTurnKey(liveRoom);
+          if(turnKey) localSubmittedKey = turnKey;
+          try{ syncWrittenModeUI(); }catch(e){}
+        }
+
         if(input){
           input.addEventListener("input", () => {
             const clean = String(input.value || "").slice(0, WRITTEN_MAX_LEN);
@@ -7117,20 +7154,24 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
             localWrittenDraft = input.value;
             try{ syncWrittenModeUI(); }catch(e){}
           });
-          input.addEventListener("keydown", (ev) => {
+          input.addEventListener("keydown", async (ev) => {
             if(ev.key !== "Enter") return;
             const liveRoom = (typeof LIVE !== "undefined") ? LIVE.room : null;
             if(!liveRoom || !canLocalPlayerWrite(liveRoom)) return;
             ev.preventDefault();
-            const buzzBtn = GAME_UI && GAME_UI.els ? GAME_UI.els.buzzBtn : null;
-            if(buzzBtn && !buzzBtn.disabled){
-              try{ buzzBtn.click(); }catch(e){}
-            }
+            await submitCurrentAnswer();
+          });
+        }
+
+        if(sendBtn){
+          sendBtn.addEventListener("click", async () => {
+            await submitCurrentAnswer();
           });
         }
       }
 
       const input = document.getElementById("writtenAnswerInput");
+      const sendBtn = document.getElementById("writtenSendBtn");
       if(!input) return;
 
       const currentTurnKey = getBuzzerTurnKey(room);
@@ -7161,18 +7202,28 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         }
       }else{
         input.disabled = true;
-        input.placeholder = allowed ? "تم إرسال الجواب" : "الكتابة متاحة لأول لاعب يضغط الجرس";
+        input.placeholder = submittedByMe ? "تم إرسال الجواب" : "الكتابة متاحة لأول لاعب يضغط الجرس";
         if(submittedByMe){
           input.value = answer.text || localWrittenDraft || "";
         }else if(!allowed){
           input.value = "";
         }
       }
+
+      if(sendBtn){
+        const canSend = !!(allowed && !locked && String((input.value || localWrittenDraft || "")).replace(/\s+/g, " ").trim());
+        sendBtn.disabled = !canSend;
+        sendBtn.textContent = submittedByMe ? "تم الإرسال" : "إرسال";
+      }
     }
 
     function syncWrittenModeUI(){
       const room = (typeof LIVE !== "undefined" && LIVE.room) ? LIVE.room : null;
-      if(!room || room.status !== "started") return;
+      if(!room) return;
+      const dedicatedActive = !!(getDedicatedWrittenFlag() || room.writtenAnswerModeEnabled);
+      if(!dedicatedActive) return;
+      setDedicatedWrittenFlag(true);
+      if(room.status !== "started") return;
 
       try{
         document.body.classList.toggle("writtenHostMode", role === "host");
@@ -7252,5 +7303,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
   })();
   </script>
 
+<!-- VERSION: game_written.html — v2026-03-25-6 (dedicated streamer fix: wm flag + send button + force written UI) -->
 </body>
 </html>
