@@ -5466,17 +5466,13 @@ function hideEidIntro(immediate){
         document.getElementById("startBtn").addEventListener("click", async () => {
           const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
           const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
-
-          if(writtenEnabled){
-            try{ setLocalWrittenModeFlag(true); }catch(e){}
-            location.href = buildWrittenGameUrl();
-            return;
-          }
-
           const board = buildBoardState(latestRoomForStart, Date.now());
           const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
+          const timerSel = Number(latestRoomForStart?.timer?.sel || 10);
           LAST_STABLE_BOARD = board;
-          await update(roomRef, {
+
+          const nextStartedRoom = normalizeLiveRoom({
+            ...(latestRoomForStart || {}),
             status: "started",
             displayPid: null,
             activeMap: 0,
@@ -5486,6 +5482,7 @@ function hideEidIntro(immediate){
             scores: { green:0, orange:0, a:0, b:0 },
             winEvent: null,
             winState: null,
+            writtenAnswer: null,
             writtenAnswerModeEnabled: writtenEnabled,
             modes: { ...((latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {}), writtenAnswerModeEnabled: writtenEnabled },
             settings: { ...((latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {}), writtenAnswerModeEnabled: writtenEnabled },
@@ -5493,8 +5490,43 @@ function hideEidIntro(immediate){
             customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
             round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
             mapStates: { "0": {} },
-            current: { letter: null, qIndex: 0, row: null, col: null, map: 0 }
+            current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
+            timer: { sel: timerSel, dur: timerSel, running:false, startTs:0, done:false }
           });
+
+          LIVE.room = nextStartedRoom;
+          scheduleRender();
+
+          try{
+            await update(roomRef, {
+              status: "started",
+              displayPid: null,
+              activeMap: 0,
+              board,
+              freeze: false,
+              buzzer: null,
+              scores: { green:0, orange:0, a:0, b:0 },
+              winEvent: null,
+              winState: null,
+              writtenAnswer: null,
+              writtenAnswerModeEnabled: writtenEnabled,
+              modes: { ...((latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {}), writtenAnswerModeEnabled: writtenEnabled },
+              settings: { ...((latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {}), writtenAnswerModeEnabled: writtenEnabled },
+              customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
+              customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
+              round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
+              mapStates: { "0": {} },
+              current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
+              timer: { sel: timerSel, dur: timerSel, running:false, startTs:0, done:false }
+            });
+          }catch(e){}
+
+          if(writtenEnabled){
+            try{ setLocalWrittenModeFlag(true); }catch(e){}
+            try{ storeWrittenHandoffRoom(nextStartedRoom); }catch(e){}
+            location.href = buildWrittenGameUrl();
+            return;
+          }
         });
       }
 
@@ -7237,6 +7269,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-25-6 (streamer isolated: no post-start redirect; host opens streamer from lobby only) -->
+  <!-- VERSION: game_full.html — v2026-03-25-7 (streamer isolated start fix: host starts room first, stores handoff, then opens streamer page) -->
 </body>
 </html>
