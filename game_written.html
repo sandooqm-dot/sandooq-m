@@ -7381,6 +7381,20 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
   })();
   </script>
 
-<!-- VERSION: game_written.html — v2026-03-25-7 (dedicated streamer hard-fix: force room written mode before/after render) -->
+
+  <script>
+  (()=>{
+    if (String(typeof role !== "undefined" ? role : "") === "host") return;
+    try{
+      const q = new URLSearchParams(location.search || "");
+      q.set("wm", "1");
+      const u = new URL("game_full.html", location.href);
+      for (const [k,v] of q.entries()) u.searchParams.set(k, v);
+      location.replace(u.toString());
+    }catch(e){}
+  })();
+  </script>
+
+<!-- VERSION: game_written.html — v2026-03-25-8 (host-only streamer page; players bounce back to game_full) -->
 </body>
 </html>
