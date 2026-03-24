@@ -2369,6 +2369,13 @@ const SYNC = {
   pollMs: 350
 };
 
+// ✅ تخفيف السحب: سريع فقط إلى أن يثبت Pusher، وبعدها fallback هادئ جدًا
+const __FAST_POLL_MS = Math.max(350, Number(SYNC.pollMs || 350));
+const __PUSHER_READY_POLL_MS = 30000;
+const __SOFT_RESYNC_GAP_MS = 2500;
+let __lastRealtimeAt = 0;
+let __lastSoftResyncAt = 0;
+
 function _stripRoomPrefix(path){
   // Firebase paths in this file look like: rooms/${code}/...
   if(!path) return "";
@@ -2609,9 +2616,9 @@ function _applyTopPatch(topPatch){
   _notifyWatchersNow();
 }
 
-// ✅ Polling manager (عند تفعيل Pusher نقلل السحب من /state)
+// ✅ Polling manager (عند تفعيل Pusher يتحول إلى fallback هادئ فقط)
 let __POLL_T = null;
-const __ORIG_POLL_MS = Number(SYNC.pollMs || 900);
+const __ORIG_POLL_MS = Number(__FAST_POLL_MS || SYNC.pollMs || 900);
 
 function _startPolling(){
   try{ if(__POLL_T) clearInterval(__POLL_T); }catch(e){}
@@ -2623,6 +2630,27 @@ function _setPollMs(ms){
   if(Number(SYNC.pollMs) === n && __POLL_T) return;
   SYNC.pollMs = n;
   _startPolling();
+}
+function _markRealtimeAlive(){
+  __lastRealtimeAt = Date.now();
+}
+function _setPusherReadyMode(){
+  __pusherReady = true;
+  _markRealtimeAlive();
+  _setPollMs(__PUSHER_READY_POLL_MS);
+  _dbgRender();
+}
+function _setPusherFallbackMode(){
+  __pusherReady = false;
+  _setPollMs(__ORIG_POLL_MS);
+  _dbgRender();
+}
+function _softResync(reason=""){
+  const now = Date.now();
+  if(now - __lastSoftResyncAt < __SOFT_RESYNC_GAP_MS) return;
+  __lastSoftResyncAt = now;
+  if(__DEBUG_SYNC) console.log("[SYNC] soft resync", reason || "manual");
+  _pullOnce(true);
 }
 
 // ✅ Pusher: الإعداد يؤخذ من الـ Worker أولاً، مع بقاء دعم بارامترات الرابط كـ fallback
@@ -2698,15 +2726,13 @@ function _initPusherIfConfigured(){
       // مهم: لا نبطئ polling هنا، لأن الاتصال بالسوكت وحده لا يعني أن الاشتراك بالقناة نجح.
       // نبقي polling سريعًا إلى أن نحصل على subscription_succeeded أو أول patch فعلي.
       if(__DEBUG_SYNC) console.log("[SYNC] Pusher socket connected ⏳ waiting for channel subscription", { ch: __PUSHER_CHANNEL });
-      _pullOnce(true); // sync once
+      _softResync("socket_connected");
       _dbgRender();
     });
 
     __pusher.connection.bind("disconnected", () => {
-      __pusherReady = false;
-      _setPollMs(__ORIG_POLL_MS);
+      _setPusherFallbackMode();
       if(__DEBUG_SYNC) console.log("[SYNC] Pusher disconnected ⚠️ | Poll ->", __ORIG_POLL_MS);
-      _dbgRender();
     });
 
     __pusher.connection.bind("error", (err) => {
@@ -2716,6 +2742,7 @@ function _initPusherIfConfigured(){
     __pusherCh = __pusher.subscribe(__PUSHER_CHANNEL);
 
     const onIncoming = (payload) => {
+      _markRealtimeAlive();
       // نتوقع { patch:{...}, rev, ts } أو { state:{...} }
       if(payload && payload.state && typeof payload.state === "object"){
         _applyFullState(payload.state);
@@ -2726,33 +2753,28 @@ function _initPusherIfConfigured(){
         return;
       }
       // fallback
-      _pullOnce(true);
+      _softResync("incoming_fallback");
     };
 
     __pusherCh.bind("pusher:subscription_succeeded", () => {
-      __pusherReady = true;
-      _setPollMs(1200);
-      if(__DEBUG_SYNC) console.log("[SYNC] subscription_succeeded ✅ | Poll -> 1200ms", { ch: __PUSHER_CHANNEL });
-      _dbgRender();
-      _pullOnce(true);
+      _setPusherReadyMode();
+      if(__DEBUG_SYNC) console.log("[SYNC] subscription_succeeded ✅ | Poll ->", __PUSHER_READY_POLL_MS, { ch: __PUSHER_CHANNEL });
+      _softResync("subscription_succeeded");
     });
 
     __pusherCh.bind("state", (payload) => {
-      __pusherReady = true;
-      _setPollMs(1200);
+      _setPusherReadyMode();
       onIncoming(payload);
     });
     __pusherCh.bind("patch", (payload) => {
-      __pusherReady = true;
-      _setPollMs(1200);
+      _setPusherReadyMode();
       onIncoming(payload);
     });
 
     // لو فشل الاشتراك (اختلاف اسم القناة)، جرّب fallback مرة واحدة
     let __triedFallback = false;
     __pusherCh.bind("pusher:subscription_error", (status) => {
-      __pusherReady = false;
-      _setPollMs(__ORIG_POLL_MS);
+      _setPusherFallbackMode();
       if(__triedFallback) return;
       __triedFallback = true;
       if(__DEBUG_SYNC) console.log("[SYNC] subscription_error", status, "-> trying fallback", __PUSHER_CHANNEL_FALLBACK);
@@ -2760,20 +2782,16 @@ function _initPusherIfConfigured(){
       try{
         __pusherCh = __pusher.subscribe(__PUSHER_CHANNEL_FALLBACK);
         __pusherCh.bind("pusher:subscription_succeeded", () => {
-          __pusherReady = true;
-          _setPollMs(1200);
-          if(__DEBUG_SYNC) console.log("[SYNC] fallback subscription_succeeded ✅ | Poll -> 1200ms", { ch: __PUSHER_CHANNEL_FALLBACK });
-          _dbgRender();
-          _pullOnce(true);
+          _setPusherReadyMode();
+          if(__DEBUG_SYNC) console.log("[SYNC] fallback subscription_succeeded ✅ | Poll ->", __PUSHER_READY_POLL_MS, { ch: __PUSHER_CHANNEL_FALLBACK });
+          _softResync("fallback_subscription_succeeded");
         });
         __pusherCh.bind("state", (payload) => {
-          __pusherReady = true;
-          _setPollMs(1200);
+          _setPusherReadyMode();
           onIncoming(payload);
         });
         __pusherCh.bind("patch", (payload) => {
-          __pusherReady = true;
-          _setPollMs(1200);
+          _setPusherReadyMode();
           onIncoming(payload);
         });
         _dbgRender();
@@ -2812,6 +2830,18 @@ function _initPusherIfConfigured(){
     console.log("[SYNC] realtime source =", cfg.source);
   }
 })();
+
+window.addEventListener("online", () => {
+  _softResync("online");
+}, { passive:true });
+window.addEventListener("pageshow", () => {
+  _softResync("pageshow");
+}, { passive:true });
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible"){
+    _softResync("visible");
+  }
+}, { passive:true });
 
 // ✅ Debug badge (يظهر فقط عند ?debug=1) — ما يغيّر أي شيء للمستخدمين العاديين
 let __dbgEl = null;
@@ -4104,7 +4134,12 @@ function hideEidIntro(immediate){
     async function claimBuzzerSafely(mm){
       // ✅ الجرس الآن يُحسم رسميًا من السيرفر عبر type:"buzz"
       // وليس من runTransaction المحلي، حتى لا يتبدل الفائز عند الضغطات المتقاربة.
-      await _pullOnce(true);
+      const now = Date.now();
+      const lastFreshAt = Math.max(Number(SYNC.lastPullAt || 0), Number(__lastRealtimeAt || 0));
+      const shouldSyncBeforeBuzz = (!__pusherReady) && (now - lastFreshAt > 1200);
+      if(shouldSyncBeforeBuzz){
+        await _pullOnce(true);
+      }
 
       const latestBefore = _get(SYNC.state, `rooms/${code}/buzzer`);
       if(latestBefore && latestBefore.ts){
@@ -4120,8 +4155,10 @@ function hideEidIntro(immediate){
         ts: attemptTs
       }).catch(() => null);
 
-      // ✅ دائمًا نسحب آخر حالة بعد المحاولة، لأن السيرفر هو الحكم النهائي.
-      await _pullOnce(true);
+      if(!(res && res.ok)){
+        await _pullOnce(true);
+      }
+
       const finalWinner = _get(SYNC.state, `rooms/${code}/buzzer`) || (res && res.winner) || null;
       const finalSig = getBuzzerSig(finalWinner);
       const mySig = `${String(pid||"")}|${Number(attemptTs)}`;
