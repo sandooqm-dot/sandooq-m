@@ -3138,10 +3138,26 @@ function hideEidIntro(immediate){
     }
 
     const roomRef = ref(db, `rooms/${code}`);
+    const __EARLY_WRITTEN_HANDOFF_KEY__ = `horof_written_handoff_${code || "default"}`;
+    function __getEarlyWrittenHandoffRoom__(){
+      try{
+        const raw = sessionStorage.getItem(__EARLY_WRITTEN_HANDOFF_KEY__);
+        if(!raw) return null;
+        const parsed = JSON.parse(raw);
+        if(!parsed || typeof parsed !== "object") return null;
+        const ts = Number(parsed.ts || 0);
+        if(ts && (Date.now() - ts) > 15000) return null;
+        return (parsed.room && typeof parsed.room === "object") ? parsed.room : null;
+      }catch(e){ return null; }
+    }
+    function __clearEarlyWrittenHandoffRoom__(){
+      try{ sessionStorage.removeItem(__EARLY_WRITTEN_HANDOFF_KEY__); }catch(e){}
+    }
 
     // ✅✅✅ (جديد) حالة حيّة (بدون إعادة بناء الواجهة كل مرة)
+    const __WRITTEN_HANDOFF_ROOM__ = __getEarlyWrittenHandoffRoom__();
     const LIVE = {
-      room: {
+      room: __WRITTEN_HANDOFF_ROOM__ && typeof __WRITTEN_HANDOFF_ROOM__ === "object" ? __WRITTEN_HANDOFF_ROOM__ : {
         code,
         status: null,
         hostKey: null,
@@ -6611,6 +6627,13 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       return normalized;
     }
 
+    try{
+      if(__WRITTEN_HANDOFF_ROOM__ && typeof __WRITTEN_HANDOFF_ROOM__ === "object"){
+        LIVE.room = normalizeLiveRoom(__WRITTEN_HANDOFF_ROOM__);
+        VIEW.missingSince = 0;
+      }
+    }catch(e){}
+
     function getMeFromPlayers(players){
       if(!players) return null;
 
@@ -6775,6 +6798,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     function startRoomListeners(){
       onValue(ref(db, `rooms/${code}`), (s) => {
         LIVE.room = normalizeLiveRoom(s.val() || {});
+        if(LIVE.room && LIVE.room.status === "started") __clearEarlyWrittenHandoffRoom__();
         scheduleRender();
       });
     }
@@ -6794,6 +6818,23 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     try{ document.body.classList.add("writtenModePage"); document.body.classList.add("writtenDedicatedPage"); document.title = "سباق الحروف — وضع الستريمر"; }catch(e){}
 
     const WRITTEN_QUERY_FLAG = "wm";
+    const WRITTEN_HANDOFF_KEY = `horof_written_handoff_${code || "default"}`;
+
+    function getWrittenHandoffRoom(){
+      try{
+        const raw = sessionStorage.getItem(WRITTEN_HANDOFF_KEY);
+        if(!raw) return null;
+        const parsed = JSON.parse(raw);
+        if(!parsed || typeof parsed !== "object") return null;
+        const ts = Number(parsed.ts || 0);
+        if(ts && (Date.now() - ts) > 15000) return null;
+        return (parsed.room && typeof parsed.room === "object") ? parsed.room : null;
+      }catch(e){ return null; }
+    }
+
+    function clearWrittenHandoffRoom(){
+      try{ sessionStorage.removeItem(WRITTEN_HANDOFF_KEY); }catch(e){}
+    }
     const WRITTEN_MODE_LOCAL_KEY = `horof_written_mode_${(typeof code !== "undefined" && code) ? code : "default"}`;
 
     function getDedicatedWrittenFlag(){
