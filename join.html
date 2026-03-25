@@ -303,28 +303,6 @@
       }catch(e){}
     }
 
-    function countTeams(players){
-      let g=0,o=0;
-      for(const id of Object.keys(players || {})){
-        if(players[id]?.team === "orange") o++;
-        else if(players[id]?.team === "green") g++;
-      }
-      return { g, o };
-    }
-
-    function enforceLimit(players, max=13){
-      const list = Object.entries(players || {}).map(([id, p]) => ({
-        id,
-        joinedAt: Number(p?.joinedAt || 0),
-        p
-      }));
-      list.sort((a,b) => a.joinedAt - b.joinedAt);
-      const keep = list.slice(0, max);
-      const out = {};
-      for(const it of keep) out[it.id] = it.p;
-      return out;
-    }
-
     function readPlayers(room){
       return (room && room.players && typeof room.players === "object") ? room.players : {};
     }
@@ -335,26 +313,21 @@
       return { statusRaw, status };
     }
 
-    function buildJoinPatch(room, pid, name, joinedAt){
-      const { statusRaw, status } = readStatus(room);
-      if(statusRaw && status !== "lobby" && status !== "started"){
-        throw new Error("ROOM_NOT_READY");
-      }
-
-      const players = { ...readPlayers(room) };
-      if(players[pid]){
-        return { alreadyJoined: true, status, players };
-      }
-
-      const ids = Object.keys(players);
-      if(ids.length >= 13){
-        throw new Error("ROOM_FULL");
-      }
-
-      const { g, o } = countTeams(players);
-      const team = (g <= o) ? "green" : "orange";
-      players[pid] = { name, team, joinedAt };
-      return { alreadyJoined: false, status, players };
+    async function postJoin(pid, name){
+      const url = `${baseUrl()}/action?room=${encodeURIComponent(roomCode)}`;
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "content-type":"application/json" },
+        body: JSON.stringify({
+          type: "join",
+          pid,
+          name,
+          player: { pid, name }
+        })
+      });
+      const j = await r.json().catch(()=>null);
+      if(!j || j.ok !== true) throw new Error("JOIN_FAIL");
+      return j;
     }
 
     async function join(){
@@ -375,59 +348,32 @@
       btn.classList.add("loading");
       btn.textContent = "جاري الدخول...";
 
-      const MAX_PLAYERS = 13;
       const pid = genPid();
-      const joinedAt = Date.now();
 
       try{
         localStorage.setItem("sandooq_last_player_name", name);
 
-        let room = await fetchState(pid);
-        let finalRoom = null;
+        const room = await fetchState(pid);
+        const { statusRaw, status } = readStatus(room);
+        const playersNow = readPlayers(room);
 
-        for(let attempt = 0; attempt < 2; attempt++){
-          const patch = buildJoinPatch(room, pid, name, joinedAt);
-          if(patch.alreadyJoined){
-            finalRoom = room;
-            break;
-          }
-
-          const afterAction = await postAction({ status: patch.status, players: patch.players });
-          if(afterAction && readPlayers(afterAction)[pid]){
-            finalRoom = afterAction;
-            break;
-          }
-
-          if(attempt === 0){
-            await sleep(140);
-            room = await fetchState(pid);
-            if(readPlayers(room)[pid]){
-              finalRoom = room;
-              break;
-            }
-          }
+        if(!statusRaw && !Object.keys(playersNow).length){
+          showError("الغرفة غير موجودة أو لم يتم تجهيزها بعد");
+          return;
         }
-
-        if(!finalRoom){
-          showError("صار خطأ أثناء الانضمام، حاول مرة ثانية");
+        if(statusRaw && status !== "lobby" && status !== "started"){
+          showError("الغرفة غير جاهزة حالياً");
           return;
         }
 
-        const pFinal = readPlayers(finalRoom);
-        const idsF = Object.keys(pFinal);
-
-        if(idsF.length > MAX_PLAYERS){
-          const trimmed = enforceLimit(pFinal, MAX_PLAYERS);
-          const kept = !!trimmed[pid];
-
-          if(kept){
-            finalRoom = (await postAction({ players: trimmed })) || finalRoom;
-          }
-
-          if(!kept){
+        const joinRes = await postJoin(pid, name);
+        if(!joinRes.accepted){
+          if(joinRes.reason === "ROOM_FULL"){
             showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
-            return;
+          }else{
+            showError("تعذر الانضمام الآن، حاول مرة ثانية");
           }
+          return;
         }
 
         await withTimeout(warmPusherConfig(), 900).catch(() => {});
@@ -444,10 +390,8 @@
         location.href = u.toString();
 
       }catch(e){
-        if(e?.message === "ROOM_FULL"){
-          showError("الغرفة ممتلئة (الحد الأقصى 13 لاعب)");
-        }else if(e?.message === "ROOM_NOT_READY"){
-          showError("الغرفة غير جاهزة حالياً");
+        if(e?.message === "TIMEOUT"){
+          showError("تأخر الاتصال، حاول مرة ثانية");
         }else{
           showError("صار خطأ، حاول مرة ثانية");
         }
@@ -462,6 +406,6 @@
     nameEl.addEventListener("keydown", (e) => { if(e.key === "Enter") join(); });
   </script>
 
-  <!-- VERSION: join.html — cost-v1 -->
+  <!-- VERSION: join.html — join-atomic-v1 -->
 </body>
 </html>
