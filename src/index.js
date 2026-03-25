@@ -2555,6 +2555,103 @@ export class RoomDO {
       let accepted = true;
       const actionType = String(body?.type || "");
 
+      if (actionType === "join") {
+        const maxPlayers = clampMin(this.env?.MAX_ROOM_PLAYERS || 13, 1);
+        const players = (current?.players && typeof current.players === "object") ? { ...current.players } : {};
+        const incomingPlayer = (body?.player && typeof body.player === "object") ? body.player : body;
+        const joinPid = normalizePid(incomingPlayer?.pid || body?.pid || "");
+        const joinName = String(incomingPlayer?.name || body?.name || "").trim().slice(0, 80);
+        let joinTeam = String(incomingPlayer?.team || body?.team || "").trim();
+
+        if (!joinPid || !joinName) {
+          return json({
+            ok: false,
+            accepted: false,
+            reason: "BAD_JOIN_PAYLOAD",
+            state: current,
+            rev: currentRev,
+            ts: now
+          }, 400);
+        }
+
+        if (joinTeam !== "green" && joinTeam !== "orange") {
+          let g = 0;
+          let o = 0;
+          for (const player of Object.values(players)) {
+            if (player?.team === "orange") o += 1;
+            else if (player?.team === "green") g += 1;
+          }
+          joinTeam = g <= o ? "green" : "orange";
+        }
+
+        const existingPlayer = (players[joinPid] && typeof players[joinPid] === "object") ? players[joinPid] : null;
+        if (!existingPlayer && Object.keys(players).length >= maxPlayers) {
+          return json({
+            ok: true,
+            accepted: false,
+            action: "join",
+            reason: "ROOM_FULL",
+            maxPlayers,
+            currentCount: Object.keys(players).length,
+            state: current,
+            rev: currentRev,
+            ts: now
+          });
+        }
+
+        const mergedPlayer = {
+          name: joinName || String(existingPlayer?.name || "").trim().slice(0, 80),
+          team: joinTeam || String(existingPlayer?.team || "").trim(),
+          joinedAt: toFiniteNumber(existingPlayer?.joinedAt, now) || now,
+        };
+        players[joinPid] = mergedPlayer;
+
+        next = {
+          ...current,
+          players,
+        };
+
+        patch = {
+          action: "join",
+          pid: joinPid,
+          player: mergedPlayer,
+          currentCount: Object.keys(players).length,
+          maxPlayers,
+        };
+
+        nextRev = currentRev + 1;
+
+        await this.state.storage.put("state", next);
+        await this.state.storage.put("rev", nextRev);
+        await this.state.storage.put("lastActiveAt", now);
+
+        try {
+          await this.state.storage.setAlarm(now + this.IDLE_MS);
+        } catch (e) {
+          console.log("setAlarm_failed", String(e?.message || e));
+        }
+
+        const m = this._loadMetrics(now);
+        m.actionsToday = Number(m.actionsToday || 0) + 1;
+        if (joinPid) this._touchRuntimeSeen(joinPid, now);
+        const clientsNow = this._clientsNow(m.seen, now);
+        m.peakClientsToday = Math.max(Number(m.peakClientsToday || 0), clientsNow);
+
+        return json({
+          ok: true,
+          accepted: true,
+          action: "join",
+          alreadyJoined: Boolean(existingPlayer),
+          player: mergedPlayer,
+          currentCount: Object.keys(players).length,
+          maxPlayers,
+          state: next,
+          rev: nextRev,
+          patch,
+          ts: now
+        });
+      }
+
       if (actionType === "buzz") {
         const existingBuzzer = current?.buzzer ?? null;
 
