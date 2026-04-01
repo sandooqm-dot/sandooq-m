@@ -3225,9 +3225,7 @@ if(homeBtn && role !== "host"){
     }
     function playRongOrFallback(roomLike){
       if(shouldBlockBellFx(roomLike)) return false;
-      const ok = playRong(roomLike);
-      if(!ok) fallbackBeep();
-      return ok;
+      return playRong(roomLike);
     }
     function stopRong(){
       try{
@@ -3242,6 +3240,11 @@ if(homeBtn && role !== "host"){
     }
 
     try{ SOUND.init(); }catch(e){}
+    try{
+      SOUND.music && SOUND.music.addEventListener("play", () => {
+        try{ SOUND.stopBell(); }catch(e){}
+      });
+    }catch(e){}
 
     // ✅ (5) تشغيل vois لمدة 5 ثواني فقط
     let VOIS_STOP_T = null;
@@ -4440,6 +4443,8 @@ function hideEidIntro(immediate){
     let WIN_HIDE_T = null;
     const CELEBRATION_MS = 5000;
     let LAST_WIN_SOUND_TS = 0;
+    let LAST_WIN_SHOW_TS = 0;
+    let LAST_WIN_AUDIO_TS = 0;
     function clearConfetti(){
       try{ confettiRain.innerHTML = ""; }catch(e){}
     }
@@ -4546,6 +4551,8 @@ function hideEidIntro(immediate){
         stopVois();
         hideRoundOverlay();
         LAST_WIN_TS = 0;
+        LAST_WIN_SHOW_TS = 0;
+        LAST_WIN_AUDIO_TS = 0;
         LAST_WIN_RESET_TS = 0;
       }catch(e){}
     }
@@ -4624,6 +4631,16 @@ function hideEidIntro(immediate){
     function showWin(team, room, winEvent){
       if(!team) return;
 
+      const winTs = Number(winEvent?.ts || 0);
+      const sameWinStillVisible = !!winTs && winTs === LAST_WIN_SHOW_TS && (
+        FINAL_OVERLAY_ACTIVE ||
+        (roundOverlay && roundOverlay.classList.contains("show")) ||
+        (winBackdrop && winBackdrop.style.display === "flex") ||
+        Date.now() < Number(AUDIO_FLOW.celebrationUntil || 0)
+      );
+      if(sameWinStillVisible) return;
+      if(winTs) LAST_WIN_SHOW_TS = winTs;
+
       if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
       WIN_HIDE_T = null;
       stopRong();
@@ -4645,11 +4662,11 @@ function hideEidIntro(immediate){
       showRoundResultOverlay(room || LIVE.room || {}, winEvent || {});
       startConfetti(CELEBRATION_MS);
 
-      const winTs = Number(winEvent?.ts || 0);
       if(winTs && winTs !== LAST_WIN_SOUND_TS){
         LAST_WIN_SOUND_TS = winTs;
       }
-      if(winTs){
+      if(winTs && winTs !== LAST_WIN_AUDIO_TS){
+        LAST_WIN_AUDIO_TS = winTs;
         playVoisFor(CELEBRATION_MS, winTs);
       }
 
