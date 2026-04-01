@@ -3120,6 +3120,10 @@ if(homeBtn && role !== "host"){
               }).catch(() => {
                 if(!stillMine()) return;
                 this.unlocked = false;
+
+                // صوت الاحتفالية لا نعيد محاولته تلقائيًا حتى لا يتكرر مرتين وراء بعض.
+                if(kind === "music") return;
+
                 if(this[retryFlag]) return;
                 this[retryFlag] = true;
                 this.prime();
@@ -3240,15 +3244,11 @@ if(homeBtn && role !== "host"){
     }
 
     try{ SOUND.init(); }catch(e){}
-    try{
-      SOUND.music && SOUND.music.addEventListener("play", () => {
-        try{ SOUND.stopBell(); }catch(e){}
-      });
-    }catch(e){}
 
     // ✅ (5) تشغيل vois لمدة 5 ثواني فقط
     let VOIS_STOP_T = null;
     let ACTIVE_VOIS_WIN_TS = 0;
+    let LAST_VOIS_PLAY_AT = 0;
     function stopVois(opts){
       const keepLock = !!(opts && opts.keepLock);
       const keepActiveWin = !!(opts && opts.keepActiveWin);
@@ -3263,13 +3263,25 @@ if(homeBtn && role !== "host"){
     function playVoisFor(ms, winTs){
       SOUND.init();
       const normalizedWinTs = Number(winTs || 0);
+      const now = Date.now();
       const lockUntil = Number(AUDIO_FLOW.celebrationUntil || 0);
-      if(normalizedWinTs && ACTIVE_VOIS_WIN_TS === normalizedWinTs && Date.now() < lockUntil){
+
+      // منع إعادة تشغيل نفس الاحتفالية إذا وصل نفس الحدث مرة ثانية أو حدث rerender سريع.
+      if(normalizedWinTs && ACTIVE_VOIS_WIN_TS === normalizedWinTs && now < lockUntil){
         return true;
       }
+
+      // حماية إضافية: حتى لو لم يصل winTs بشكل متطابق، لا نعيد تشغيل voix مباشرة مرتين وراء بعض.
+      if((now - Number(LAST_VOIS_PLAY_AT || 0)) < 1200 && isVoisPlaying()){
+        if(normalizedWinTs) ACTIVE_VOIS_WIN_TS = normalizedWinTs;
+        markCelebrationAudio(normalizedWinTs, ms);
+        return true;
+      }
+
       stopRong();
       stopVois({ keepLock:true, keepActiveWin:true });
       ACTIVE_VOIS_WIN_TS = normalizedWinTs || ACTIVE_VOIS_WIN_TS || 0;
+      LAST_VOIS_PLAY_AT = now;
       markCelebrationAudio(normalizedWinTs, ms);
       const ok = playVois();
       if(!ok) return false;
@@ -4443,8 +4455,6 @@ function hideEidIntro(immediate){
     let WIN_HIDE_T = null;
     const CELEBRATION_MS = 5000;
     let LAST_WIN_SOUND_TS = 0;
-    let LAST_WIN_SHOW_TS = 0;
-    let LAST_WIN_AUDIO_TS = 0;
     function clearConfetti(){
       try{ confettiRain.innerHTML = ""; }catch(e){}
     }
@@ -4551,8 +4561,6 @@ function hideEidIntro(immediate){
         stopVois();
         hideRoundOverlay();
         LAST_WIN_TS = 0;
-        LAST_WIN_SHOW_TS = 0;
-        LAST_WIN_AUDIO_TS = 0;
         LAST_WIN_RESET_TS = 0;
       }catch(e){}
     }
@@ -4631,16 +4639,6 @@ function hideEidIntro(immediate){
     function showWin(team, room, winEvent){
       if(!team) return;
 
-      const winTs = Number(winEvent?.ts || 0);
-      const sameWinStillVisible = !!winTs && winTs === LAST_WIN_SHOW_TS && (
-        FINAL_OVERLAY_ACTIVE ||
-        (roundOverlay && roundOverlay.classList.contains("show")) ||
-        (winBackdrop && winBackdrop.style.display === "flex") ||
-        Date.now() < Number(AUDIO_FLOW.celebrationUntil || 0)
-      );
-      if(sameWinStillVisible) return;
-      if(winTs) LAST_WIN_SHOW_TS = winTs;
-
       if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
       WIN_HIDE_T = null;
       stopRong();
@@ -4662,11 +4660,11 @@ function hideEidIntro(immediate){
       showRoundResultOverlay(room || LIVE.room || {}, winEvent || {});
       startConfetti(CELEBRATION_MS);
 
+      const winTs = Number(winEvent?.ts || 0);
       if(winTs && winTs !== LAST_WIN_SOUND_TS){
         LAST_WIN_SOUND_TS = winTs;
       }
-      if(winTs && winTs !== LAST_WIN_AUDIO_TS){
-        LAST_WIN_AUDIO_TS = winTs;
+      if(winTs){
         playVoisFor(CELEBRATION_MS, winTs);
       }
 
@@ -6443,9 +6441,8 @@ function hideEidIntro(immediate){
                 LOCAL_WRITTEN_DRAFT = "";
                 LOCAL_WRITTEN_TURN_KEY = `${String(v.pid||"")}|${Number(v.seq || v.ts || 0)}`;
               }
-              if(!LIVE.room?.winEvent?.ts && !FINAL_OVERLAY_ACTIVE){
-                playRongOrFallback(LIVE.room || {});
-              }
+              // تشغيل الجرس يُحسم فقط من المستمع العام بعد وصول حالة الغرفة الرسمية.
+              // هذا يمنع تكرار الصوت أو تشغيله بالتزامن مع الاحتفالية بسبب وصول patch لاحق.
             }
           }catch(e){}
           finally{
@@ -7094,7 +7091,12 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
             if(role !== "host"){
               const myPid = pid || localStorage.getItem(`sabaq_pid_${code}`) || "";
               if(myPid && String(b.pid||"") === String(myPid)){
-                playRongOrFallback(room || LIVE.room || {});
+                const latestRoomForAudio = room || LIVE.room || {};
+                if(!shouldBlockBellFx(latestRoomForAudio)){
+                  playRongOrFallback(latestRoomForAudio);
+                }else{
+                  stopRong();
+                }
               }
             }
           }
