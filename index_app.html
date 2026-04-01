@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>لعبة سباق الحروف</title>
+  <style>
+    @font-face{
+      font-family:"AA-GALAXY";
+      src:url("../AA-GALAXY.otf") format("opentype");
+      font-weight:400;
+      font-style:normal;
+      font-display:swap;
+    }
+
+    :root{
+      --bgSolid:#7b1f63;
+      --yellow:#f4c400;
+      --card:#f7eef5;
+      --text:#111;
+      --muted:#6b6b6b;
+      --line:#e6d1e0;
+      --soft:#f2e8ef;
+      --active:#7b1f63;
+      --activeText:#fff4b0;
+      --shadow:0 12px 34px rgba(0,0,0,.18);
+      --helpBtn:#47d8c2;
+      --helpBtnText:#143b38;
+      --linkBg:#efe0ff;
+      --linkText:#5a1d7a;
+      --sectionTitle:#7b1f63;
+      --sectionAccent:#18b9c8;
+      --closeRed:#ea3d3d;
+      --themeOn:#27c266;
+      --themeOff:#e14b4b;
+    }
+
+    *{box-sizing:border-box}
+
+    html{
+      scroll-behavior:smooth;
+    }
+
+    body{
+      margin:0;
+      min-height:100vh;
+      color:#fff;
+      text-align:center;
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      background:var(--bgSolid);
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+
+    button, input{
+      font-family:"AA-GALAXY", Arial, sans-serif;
+    }
+
+    header{
+      position:relative;
+      padding:26px 16px 0;
+    }
+
+    .logo{
+      position:absolute;
+      left:14px;
+      top:14px;
+      width:86px;
+      height:86px;
+      object-fit:contain;
+      pointer-events:none;
+    }
+
+    h1{
+      margin:18px 0 16px;
+      color:var(--yellow);
+      font-size:28px;
+      line-height:1.35;
+    }
+
+    .wrap{
+      width:92%;
+      max-width:560px;
+      margin:0 auto;
+      padding-bottom:28px;
+    }
+
+    .card{
+      background:var(--card);
+      color:var(--text);
+      border-radius:18px;
+      padding:16px 14px 18px;
+      box-shadow:var(--shadow);
+      text-align:right;
+    }
+
+    .section{
+      margin-bottom:18px;
+    }
+
+    .label{
+      display:block;
+      font-size:18px;
+      color:#401436;
+      margin:0 0 10px;
+      text-align:center;
+      font-weight:700;
+    }
+
+    input{
+      width:100%;
+      padding:14px 14px;
+      font-size:16px;
+      border-radius:12px;
+      border:2px solid var(--line);
+      background:#fff;
+      outline:none;
+      transition:border-color .15s ease, box-shadow .15s ease;
+    }
+
+    input:focus{
+      border-color:#a94789;
+      box-shadow:0 0 0 3px rgba(169,71,137,.12);
+    }
+
+    .center-input{
+      text-align:center;
+    }
+
+    .center-input::placeholder{
+      text-align:center;
+    }
+
+    .row-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .control-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .control-card{
+      min-width:0;
+    }
+
+    .control-box{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:56px;
+      padding:8px 12px;
+      background:#fff;
+      border:2px solid var(--line);
+      border-radius:14px;
+    }
+
+    .option-grid{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:10px;
+    }
+
+    .opt-btn{
+      width:100%;
+      min-height:48px;
+      padding:12px 8px;
+      border:none;
+      border-radius:12px;
+      cursor:pointer;
+      background:var(--soft);
+      color:#4e2944;
+      font-size:16px;
+      border:2px solid transparent;
+      transition:transform .12s ease, border-color .12s ease, background .12s ease, color .12s ease;
+      font-weight:700;
+    }
+
+    .opt-btn:active{
+      transform:scale(.98);
+    }
+
+    .opt-btn.active{
+      background:var(--active);
+      color:var(--activeText);
+      border-color:#f4c400;
+      box-shadow:0 8px 18px rgba(123,31,99,.22);
+    }
+
+    .players-box{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:18px;
+      padding:0;
+      background:transparent;
+      border:none;
+      border-radius:0;
+      direction:ltr;
+      min-height:auto;
+      width:100%;
+    }
+
+    .players-btn{
+      width:34px;
+      height:34px;
+      border:none;
+      border-radius:10px;
+      background:var(--active);
+      color:var(--activeText);
+      font-size:18px;
+      line-height:1;
+      cursor:pointer;
+      box-shadow:0 6px 14px rgba(123,31,99,.16);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 34px;
+      padding:0;
+      font-family:Arial, sans-serif;
+      font-weight:700;
+    }
+
+    .players-btn:active{
+      transform:scale(.97);
+    }
+
+    .players-value{
+      min-width:34px;
+      text-align:center;
+      color:#401436;
+      font-size:18px;
+      line-height:1;
+      font-weight:700;
+    }
+
+    .theme-box{
+      padding:6px 12px;
+    }
+
+    .theme-toggle{
+      position:relative;
+      width:96px;
+      height:42px;
+      border:none;
+      border-radius:999px;
+      cursor:pointer;
+      padding:0;
+      display:block;
+      overflow:hidden;
+      box-shadow:0 8px 18px rgba(0,0,0,.14);
+      transition:background .18s ease, transform .12s ease;
+      background:var(--themeOff);
+    }
+
+    .theme-toggle:active{
+      transform:scale(.97);
+    }
+
+    .theme-toggle.on{
+      background:var(--themeOn);
+    }
+
+    .theme-toggle.off{
+      background:var(--themeOff);
+    }
+
+    .theme-toggle-dot{
+      position:absolute;
+      top:5px;
+      right:5px;
+      width:32px;
+      height:32px;
+      border-radius:50%;
+      background:#fff;
+      box-shadow:0 4px 10px rgba(0,0,0,.18);
+      transition:transform .18s ease;
+      transform:translateX(0);
+    }
+
+    .theme-toggle.on .theme-toggle-dot{
+      transform:translateX(-54px);
+    }
+
+    .colors-grid{
+      display:grid;
+      grid-template-columns:repeat(4, 1fr);
+      gap:10px;
+    }
+
+    .color-pair{
+      position:relative;
+      width:100%;
+      min-height:76px;
+      border:none;
+      border-radius:16px;
+      cursor:pointer;
+      overflow:hidden;
+      padding:0;
+      background:#f2f2f2;
+      border:3px solid transparent;
+      transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+      box-shadow:0 6px 14px rgba(0,0,0,.08);
+    }
+
+    .color-pair:active{
+      transform:scale(.98);
+    }
+
+    .color-pair.active{
+      border-color:#23d7e8;
+      box-shadow:0 0 0 2px rgba(35,215,232,.18), 0 10px 22px rgba(0,0,0,.15);
+    }
+
+    .pair-icon-wrap{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px 6px;
+      background:#f5f5f5;
+    }
+
+    .pair-icon{
+      position:relative;
+      width:74px;
+      height:50px;
+    }
+
+    .pair-cell{
+      position:absolute;
+      width:34px;
+      height:34px;
+      top:8px;
+      clip-path:polygon(25% 6%, 75% 6%, 94% 50%, 75% 94%, 25% 94%, 6% 50%);
+      border:2px solid rgba(61,33,95,.68);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+    }
+
+    .pair-cell.left{ left:10px; }
+    .pair-cell.right{ right:10px; }
+
+    .pair-name{
+      display:none;
+    }
+
+    .action-row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:8px;
+    }
+
+    .submit-btn,
+    .help-open-btn{
+      width:100%;
+      padding:16px;
+      font-size:20px;
+      border:none;
+      border-radius:14px;
+      cursor:pointer;
+      box-shadow:0 10px 20px rgba(0,0,0,.12);
+      font-weight:700;
+    }
+
+    .submit-btn{
+      background:var(--yellow);
+      color:#000;
+    }
+
+    .help-open-btn{
+      background:var(--helpBtn);
+      color:var(--helpBtnText);
+    }
+
+    .submit-btn[disabled]{
+      opacity:.75;
+      cursor:not-allowed;
+    }
+
+    .help-modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px 14px;
+      z-index:9999;
+    }
+
+    .help-modal.show{
+      display:flex;
+    }
+
+    .help-dialog{
+      position:relative;
+      width:min(520px, 100%);
+      max-height:86vh;
+      background:#fff8cc;
+      border:5px solid #2b1b17;
+      border-radius:24px;
+      box-shadow:0 20px 40px rgba(0,0,0,.3);
+      overflow:hidden;
+      font-family:"Noto Naskh Arabic","Amiri","Geeza Pro","Traditional Arabic",Tahoma,Arial,sans-serif;
+    }
+
+    .help-dialog *{
+      font-family:"Noto Naskh Arabic","Amiri","Geeza Pro","Traditional Arabic",Tahoma,Arial,sans-serif;
+    }
+
+    .help-close{
+      position:absolute;
+      top:10px;
+      left:10px;
+      width:42px;
+      height:42px;
+      border:none;
+      border-radius:50%;
+      background:var(--closeRed);
+      color:#fff;
+      font-size:24px;
+      line-height:1;
+      cursor:pointer;
+      z-index:3;
+      box-shadow:0 8px 18px rgba(0,0,0,.2);
+      font-family:Arial, sans-serif !important;
+      font-weight:700;
+    }
+
+    .help-body{
+      max-height:86vh;
+      overflow:auto;
+      padding:18px 16px 18px;
+      color:#121212;
+      text-align:right;
+    }
+
+    .help-title{
+      margin:8px 42px 8px 42px;
+      font-size:28px;
+      color:#1b1b1b;
+      text-align:center;
+      font-weight:700;
+    }
+
+    .help-subtitle{
+      margin:0 0 16px;
+      text-align:center;
+      color:#4d3147;
+      font-size:17px;
+      line-height:1.7;
+      font-weight:700;
+    }
+
+    .help-links{
+      display:grid;
+      gap:8px;
+      margin:0 0 18px;
+    }
+
+    .help-jump{
+      width:100%;
+      text-align:right;
+      border:none;
+      border-radius:14px;
+      padding:12px 14px;
+      background:var(--linkBg);
+      color:var(--linkText);
+      font-size:18px;
+      cursor:pointer;
+      border:2px solid #d8b4ff;
+      font-weight:700;
+    }
+
+    .help-jump .num{
+      color:#18a9b7;
+      margin-left:6px;
+    }
+
+    .help-section{
+      background:#fff;
+      border:2px solid #eadfba;
+      border-radius:18px;
+      padding:14px 14px 12px;
+      margin:0 0 14px;
+      scroll-margin-top:18px;
+    }
+
+    .help-section h3{
+      margin:0 0 10px;
+      color:var(--sectionTitle);
+      font-size:22px;
+      text-align:center;
+      font-weight:700;
+    }
+
+    .help-section p{
+      margin:0 0 10px;
+      color:#1d1d1d;
+      font-size:16px;
+      line-height:1.9;
+      font-weight:700;
+    }
+
+    .help-list{
+      margin:0;
+      padding:0 18px 0 0;
+    }
+
+    .help-list li{
+      margin:0 0 8px;
+      color:#1d1d1d;
+      font-size:16px;
+      line-height:1.9;
+      font-weight:700;
+    }
+
+    .mini-head{
+      color:var(--sectionAccent);
+      font-weight:700;
+    }
+
+    .icon-line{
+      color:#7b1f63;
+      font-weight:700;
+    }
+
+    @media (max-width: 420px){
+      .option-grid{
+        grid-template-columns:repeat(3, 1fr);
+        gap:8px;
+      }
+      .opt-btn{
+        font-size:15px;
+        min-height:46px;
+      }
+      .label{
+        font-size:17px;
+      }
+      .row-2,
+      .control-grid{
+        gap:8px;
+      }
+      .colors-grid{
+        grid-template-columns:repeat(2, 1fr);
+      }
+      .players-box{
+        gap:16px;
+      }
+      .players-btn{
+        width:32px;
+        height:32px;
+        flex-basis:32px;
+        font-size:16px;
+      }
+      .players-value{
+        min-width:30px;
+        font-size:17px;
+      }
+      .theme-toggle{
+        width:88px;
+        height:40px;
+      }
+      .theme-toggle-dot{
+        width:30px;
+        height:30px;
+        top:5px;
+        right:5px;
+      }
+      .theme-toggle.on .theme-toggle-dot{
+        transform:translateX(-48px);
+      }
+      .action-row{
+        grid-template-columns:1fr 1fr;
+        gap:8px;
+      }
+      .submit-btn,
+      .help-open-btn{
+        font-size:18px;
+        padding:15px 10px;
+      }
+      .help-title{
+        font-size:24px;
+      }
+      .help-jump{
+        font-size:16px;
+      }
+      .help-section h3{
+        font-size:20px;
+      }
+      .help-section p,
+      .help-list li{
+        font-size:15px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <img class="logo" src="../logo.png" alt="شعار صندوق المسابقات">
+    <h1>لعبة سباق الحروف</h1>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+
+      <div class="section">
+        <label class="label" for="name">اسم المسابقة</label>
+        <input id="name" class="center-input" placeholder="اكتب اسم المسابقة">
+      </div>
+
+      <div class="section">
+        <div class="label">أسماء الفريقين</div>
+        <div class="row-2">
+          <input id="team1" class="center-input" placeholder="اسم الفريق الأول">
+          <input id="team2" class="center-input" placeholder="اسم الفريق الثاني">
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="control-grid">
+          <div class="control-card">
+            <div class="label">عدد اللاعبين</div>
+            <div class="control-box">
+              <div class="players-box">
+                <button type="button" class="players-btn" id="playersPlus" aria-label="زيادة عدد اللاعبين">&lt;</button>
+                <div class="players-value" id="playersValue">1</div>
+                <button type="button" class="players-btn" id="playersMinus" aria-label="تقليل عدد اللاعبين">&gt;</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-card">
+            <div class="label">ثيم العيد</div>
+            <div class="control-box theme-box">
+              <button type="button" class="theme-toggle off" id="eidThemeToggle" aria-label="تشغيل أو إطفاء ثيم العيد" aria-pressed="false">
+                <span class="theme-toggle-dot" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">عدد جولات الفوز</div>
+        <div class="option-grid" id="roundsOptions">
+          <button type="button" class="opt-btn active" data-group="rounds" data-value="1">جولة</button>
+          <button type="button" class="opt-btn" data-group="rounds" data-value="3">ثلاث جولات</button>
+          <button type="button" class="opt-btn" data-group="rounds" data-value="5">خمس جولات</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">نوع الخلايا</div>
+        <div class="option-grid" id="cellCountOptions">
+          <button type="button" class="opt-btn active" data-group="cellCount" data-value="4">رباعية</button>
+          <button type="button" class="opt-btn" data-group="cellCount" data-value="5">خماسية</button>
+          <button type="button" class="opt-btn" data-group="cellCount" data-value="6">سداسية</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">لون الخلايا</div>
+        <div class="colors-grid" id="colorPairs"></div>
+      </div>
+
+      <div class="action-row">
+        <button id="btn" class="submit-btn">إنشاء اللعبة</button>
+        <button type="button" id="openHelpBtn" class="help-open-btn">التعليمات</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="help-modal" id="helpModal" aria-hidden="true">
+    <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <button type="button" class="help-close" id="closeHelpBtn" aria-label="إغلاق">×</button>
+
+      <div class="help-body" id="helpBody">
+        <h2 class="help-title" id="helpTitle">التعليمات والشرح</h2>
+        <p class="help-subtitle">اضغط لتتعرف أكثر عن:</p>
+
+        <div class="help-links">
+          <button type="button" class="help-jump" data-target="sec1"><span class="num">1-</span> طريقة اللعبة</button>
+          <button type="button" class="help-jump" data-target="sec2"><span class="num">2-</span> طريقة مشاركة اللاعبين</button>
+          <button type="button" class="help-jump" data-target="sec3"><span class="num">3-</span> شرح الأزرار الموجودة في اللعبة</button>
+          <button type="button" class="help-jump" data-target="sec4"><span class="num">4-</span> شرح آلية عمل اللعبة</button>
+        </div>
+
+        <section class="help-section" id="sec1">
+          <h3>1- طريقة اللعبة</h3>
+          <p>
+            لعبة سباق الحروف هي لعبة جماعية بين فريقين، تعتمد على السرعة والتركيز وسرعة الإجابة.
+          </p>
+          <p>
+            يقوم المقدم باختيار حرف من الخريطة بالضغط على الحرف ، ثم يظهر السؤال المرتبط بهذا الحرف وتكون إجابته تبدأ بنفس الحرف في الخلية .
+            بعد ذلك يتسابق اللاعبون بالضغط على زر الجرس من أجهزتهم، وأول لاعب يضغط يظهر اسمه مباشرة داخل اللعبة عند الجميع ، ومن ثم يبدأ المؤقت تلقائيًا.
+          </p>
+          <p>
+            بعد انتهاء الإجابة، يستمر المقدم في إدارة الجولة حتى يتم احتساب التقدم بين الفريقين ومتابعة اللعب حتى نهاية عدد الجولات المحدد.
+          </p>
+        </section>
+
+        <section class="help-section" id="sec2">
+          <h3>2- طريقة مشاركة اللاعبين</h3>
+          <p>
+            بعد إنشاء اللعبة والدخول إلى صفحة المقدم، اضغط على <span class="mini-head">زر مشاركة اللعبة للاعبين</span>.
+          </p>
+          <p>
+            سيظهر لك رابط الدخول أو الباركود الخاص بالغرفة.
+          </p>
+          <ul class="help-list">
+            <li>فتح الرابط من جهازه او مسح الباركود</li>
+            <li>كتابة اسمه</li>
+            <li>الدخول إلى الغرفة</li>
+            <li>وانتظار بدء اللعبة من المقدم</li>
+          </ul>
+        </section>
+
+        <section class="help-section" id="sec3">
+          <h3>3- شرح الأزرار الموجودة في اللعبة</h3>
+          <ul class="help-list">
+            <li><span class="icon-line">⚙️ الإعدادات:</span> يفتح لك القائمة الرئيسية، ومنها: التعليمات، تعديل المؤقت، إضافة الأسئلة، ألعابنا الأخرى، الرئيسية.</li>
+
+            <li><span class="icon-line">⧉ تبديل نوع الأسئلة:</span> يستخدم للتبديل بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
+
+            <li><span class="mini-head">إضافة أسئلتك الخاصة:</span> ادخل إلى: ⚙️ الإعدادات ← إضافة الأسئلة، ثم بعد الحفظ يمكنك التبديل إليها من خلال زر: ⧉ تبديل نوع الأسئلة.</li>
+
+            <li><span class="icon-line">✕ تفريغ الخريطة:</span> يعيد الخريطة إلى وضعها الافتراضي، ويمسح اي لون موجود في الخلايا الحالية.</li>
+
+            <li><span class="icon-line">شريط التكبير والتصغير:</span> يستخدم لتكبير الخريطة أو تصغيرها حسب الرغبة.</li>
+
+            <li><span class="icon-line">تجميد الأزرار:</span> يوقف استقبال ضغطات اللاعبين مؤقتًا، ويُستخدم عند الحاجة لإيقاف اللعب أو تنظيم الجولة واذا اردت تشغيله قم بالضغط عليه مره اخرى.</li>
+
+            <li><span class="icon-line">تغيير السؤال:</span> يبدل السؤال الحالي إلى سؤال آخر لنفس الحرف.</li>
+
+            <li><span class="icon-line">المؤقت:</span> يعرض وقت الإجابة، ويبدأ تلقائيًا عند ضغط أول لاعب على الجرس.</li>
+
+            <li><span class="mini-head">تعديل المؤقت:</span> إذا كنت ترغب بزيادة المؤقت او إنقاصه، ادخل إلى: ⚙️ الإعدادات ← تعديل المؤقت.</li>
+          </ul>
+        </section>
+
+        <section class="help-section" id="sec4">
+          <h3>4- شرح آلية عمل اللعبة</h3>
+          <ol class="help-list">
+            <li>يختار المقدم حرفًا من الخريطة</li>
+            <li>يظهر السؤال المرتبط بالحرف</li>
+            <li>يضغط اللاعبون الجرس من أجهزتهم</li>
+            <li>يظهر اسم أول لاعب ضغط</li>
+            <li>يبدأ المؤقت تلقائيًا</li>
+            <li>يجيب اللاعب</li>
+            <li>يضغط المقدم على اسم الفريق لتلوين الخليه بلون فريقه</li>
+          </ol>
+          <p>
+            وتستمر اللعبة بنفس الطريقة حتى نهاية عدد الجولات المحدد في البداية.
+          </p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const SYNC_BASE = (params.get("sync") || "https://sync.horof.sandooq-games.com").replace(/\/$/,"");
+
+    const COLOR_PAIRS = [
+      { id:"cream-rose",     name:"كريمي + وردي",      a:"#edd39a", b:"#f58b96" },
+      { id:"purple-mint",    name:"بنفسجي + نعناعي",   a:"#7a1fc3", b:"#49f0b8" },
+      { id:"blue-pink",      name:"أزرق + وردي",       a:"#0f58ad", b:"#ff3ca6" },
+      { id:"green-orange",   name:"أخضر + برتقالي",    a:"#31b80f", b:"#ff8a3d" },
+      { id:"navy-rose",      name:"كحلي + وردي",       a:"#132f67", b:"#de5f95" },
+      { id:"salmon-teal",    name:"برتقالي + تركواز",  a:"#ff815d", b:"#12a9b0" },
+      { id:"yellow-sky",     name:"أصفر + سماوي",      a:"#ffe87a", b:"#9ad3ff" },
+      { id:"red-green",      name:"أخضر + أحمر",      a:"#27c266", b:"#e14b4b" }
+    ];
+
+    const DEFAULT_COLOR_PAIR_ID = "green-orange";
+
+    const state = {
+      rounds: 1,
+      cellCount: 4,
+      colorPairId: DEFAULT_COLOR_PAIR_ID,
+      players: 1,
+      eidThemeEnabled: false
+    };
+
+    function random6(){
+      return String(Math.floor(100000 + Math.random()*900000));
+    }
+
+    function randomKey(){
+      try{
+        if (crypto?.randomUUID) return crypto.randomUUID();
+      }catch(e){}
+      return (
+        Math.random().toString(36).slice(2) +
+        Math.random().toString(36).slice(2) +
+        Date.now().toString(36)
+      );
+    }
+
+    async function fetchJSON(url, opts){
+      const r = await fetch(url, opts);
+      const j = await r.json().catch(()=>null);
+      return { ok:r.ok, status:r.status, json:j };
+    }
+
+    async function roomExists(code){
+      const url = `${SYNC_BASE}/state?room=${encodeURIComponent(code)}`;
+      const { json } = await fetchJSON(url, { cache:"no-store" });
+      const st = (json && json.ok && json.state && typeof json.state === "object") ? json.state : {};
+      return !!(st.createdAt || st.status || st.hostKey || st.presenterKey);
+    }
+
+    function getColorPair(id){
+      return COLOR_PAIRS.find(p => p.id === id) || COLOR_PAIRS.find(p => p.id === DEFAULT_COLOR_PAIR_ID) || COLOR_PAIRS[0];
+    }
+
+    function renderColorPairs(){
+      const root = document.getElementById("colorPairs");
+      root.innerHTML = "";
+
+      COLOR_PAIRS.forEach(pair => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "color-pair" + (state.colorPairId === pair.id ? " active" : "");
+        btn.setAttribute("data-pair-id", pair.id);
+        btn.innerHTML = `
+          <div class="pair-icon-wrap">
+            <div class="pair-icon" aria-hidden="true">
+              <span class="pair-cell left" style="background:${pair.a}"></span>
+              <span class="pair-cell right" style="background:${pair.b}"></span>
+            </div>
+          </div>
+          <span class="pair-name">${pair.name}</span>
+        `;
+        btn.addEventListener("click", () => {
+          state.colorPairId = pair.id;
+          renderColorPairs();
+        });
+        root.appendChild(btn);
+      });
+    }
+
+    function setupOptionButtons(){
+      document.querySelectorAll(".opt-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const group = btn.dataset.group;
+          const value = btn.dataset.value;
+
+          document.querySelectorAll(`.opt-btn[data-group="${group}"]`).forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          if (group === "rounds") state.rounds = Number(value);
+          if (group === "cellCount") state.cellCount = Number(value);
+        });
+      });
+    }
+
+    function updatePlayersView(){
+      const el = document.getElementById("playersValue");
+      if(el) el.textContent = String(state.players);
+    }
+
+    function setupPlayersControl(){
+      const plus = document.getElementById("playersPlus");
+      const minus = document.getElementById("playersMinus");
+
+      plus.addEventListener("click", () => {
+        state.players = Math.min(13, state.players + 1);
+        updatePlayersView();
+      });
+
+      minus.addEventListener("click", () => {
+        state.players = Math.max(1, state.players - 1);
+        updatePlayersView();
+      });
+
+      updatePlayersView();
+    }
+
+    function updateEidThemeToggle(){
+      const btn = document.getElementById("eidThemeToggle");
+      if(!btn) return;
+
+      btn.classList.toggle("on", !!state.eidThemeEnabled);
+      btn.classList.toggle("off", !state.eidThemeEnabled);
+      btn.setAttribute("aria-pressed", state.eidThemeEnabled ? "true" : "false");
+    }
+
+    function setupEidThemeToggle(){
+      const btn = document.getElementById("eidThemeToggle");
+      if(!btn) return;
+
+      btn.addEventListener("click", () => {
+        state.eidThemeEnabled = !state.eidThemeEnabled;
+        updateEidThemeToggle();
+      });
+
+      updateEidThemeToggle();
+    }
+
+    function setupHelpModal(){
+      const modal = document.getElementById("helpModal");
+      const openBtn = document.getElementById("openHelpBtn");
+      const closeBtn = document.getElementById("closeHelpBtn");
+      const helpBody = document.getElementById("helpBody");
+
+      function openHelp(){
+        modal.classList.add("show");
+        modal.setAttribute("aria-hidden", "false");
+        helpBody.scrollTop = 0;
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeHelp(){
+        modal.classList.remove("show");
+        modal.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+      }
+
+      openBtn.addEventListener("click", openHelp);
+      closeBtn.addEventListener("click", closeHelp);
+
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeHelp();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal.classList.contains("show")) closeHelp();
+      });
+
+      document.querySelectorAll(".help-jump").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.target;
+          const target = document.getElementById(id);
+          if(target){
+            target.scrollIntoView({ behavior:"smooth", block:"start" });
+          }
+        });
+      });
+    }
+
+    async function createRoom(){
+      const name = document.getElementById("name").value.trim();
+      const team1 = document.getElementById("team1").value.trim() || "الفريق الأول";
+      const team2 = document.getElementById("team2").value.trim() || "الفريق الثاني";
+      const players = state.players;
+      const pair = getColorPair(state.colorPairId);
+
+      if(!name){
+        alert("اكتب اسم المسابقة");
+        return;
+      }
+
+      const btn = document.getElementById("btn");
+      btn.disabled = true;
+
+      let code = "";
+      for(let i=0;i<12;i++){
+        const c = random6();
+        try{
+          const exists = await roomExists(c);
+          if(!exists){
+            code = c;
+            break;
+          }
+        }catch(e){}
+      }
+
+      if(!code){
+        btn.disabled = false;
+        alert("حاول مرة ثانية");
+        return;
+      }
+
+      const hostKey = randomKey();
+
+      const room = {
+        code,
+        name,
+        competitionName: name,
+        maxPlayers: players,
+        hostKey,
+        presenterKey: hostKey,
+        status: "lobby",
+        createdAt: Date.now(),
+        eidThemeEnabled: !!state.eidThemeEnabled,
+
+        settings: {
+          competitionName: name,
+          team1Name: team1,
+          team2Name: team2,
+          winRounds: state.rounds,
+          cellCount: state.cellCount,
+          gridType: state.cellCount === 4 ? "square" : state.cellCount === 5 ? "pentagon" : "hex",
+          colorPairId: state.colorPairId,
+          eidThemeEnabled: !!state.eidThemeEnabled,
+          colorPair: {
+            a: pair.a,
+            b: pair.b
+          }
+        },
+
+        teams: {
+          a: {
+            key: "a",
+            name: team1,
+            color: pair.a,
+            score: 0
+          },
+          b: {
+            key: "b",
+            name: team2,
+            color: pair.b,
+            score: 0
+          }
+        },
+
+        scores: {
+          a: 0,
+          b: 0,
+          green: 0,
+          orange: 0
+        },
+
+        round: {
+          current: 1,
+          targetWins: state.rounds,
+          winner: null
+        },
+
+        grid: {
+          type: state.cellCount === 4 ? "square" : state.cellCount === 5 ? "pentagon" : "hex",
+          size: state.cellCount,
+          colorPairId: state.colorPairId,
+          colorA: pair.a,
+          colorB: pair.b,
+          selectedCellId: null,
+          selectedTeamKey: null,
+          cells: [],
+          version: 1
+        },
+
+        displayPid: null,
+        activeMap: 0,
+        freeze: false,
+        buzzer: null,
+
+        current: {
+          letter: null,
+          qIndex: 0,
+          row: null,
+          col: null,
+          map: 0
+        },
+
+        timer: {
+          sel: 10,
+          dur: 10,
+          running: false,
+          startTs: 0,
+          done: false
+        },
+
+        questionMode: "default",
+        customQuestions: {},
+        customQuestionsUpdatedAt: 0,
+
+        winEvent: null,
+        winState: {},
+        mapStates: {},
+        players: {},
+        tvLock: null
+      };
+
+      try{
+        const url = `${SYNC_BASE}/action?room=${encodeURIComponent(code)}`;
+        const { json } = await fetchJSON(url, {
+          method:"POST",
+          headers:{ "content-type":"application/json" },
+          body: JSON.stringify(room)
+        });
+
+        if(!json || !json.ok){
+          btn.disabled = false;
+          alert("صار خطأ أثناء إنشاء الغرفة، حاول مرة ثانية");
+          return;
+        }
+
+        const u = new URL("../game_full.html", location.href);
+        u.searchParams.set("role", "host");
+        u.searchParams.set("code", code);
+        u.searchParams.set("key", hostKey);
+        location.href = u.toString();
+
+      }catch(e){
+        btn.disabled = false;
+        alert("صار خطأ، حاول مرة ثانية");
+      }
+    }
+
+    renderColorPairs();
+    setupOptionButtons();
+    setupPlayersControl();
+    setupEidThemeToggle();
+    setupHelpModal();
+    document.getElementById("btn").addEventListener("click", createRoom);
+  </script>
+</body>
+</html>
