@@ -3121,20 +3121,8 @@ if(homeBtn && role !== "host"){
       return api;
     })();
 
-    function stopRong(){
-      try{
-        const a = SOUND.bell;
-        if(!a) return;
-        a.pause();
-        a.currentTime = 0;
-      }catch(e){}
-    }
     function playRong(){
-      try{
-        if(Date.now() < Number(window.__HOROF_CELEBRATION_SOUND_UNTIL || 0)) return false;
-        stopVois();
-        return SOUND.playBell();
-      }catch(e){ return false; }
+      try{ return SOUND.playBell(); }catch(e){ return false; }
     }
     function playVois(){
       try{ return SOUND.playMusic(); }catch(e){ return false; }
@@ -3142,7 +3130,6 @@ if(homeBtn && role !== "host"){
 
     // ✅ (5) تشغيل vois لمدة 5 ثواني فقط
     let VOIS_STOP_T = null;
-    let WIN_EVENT_CLEAR_T = null;
     function stopVois(){
       try{
         const a = SOUND.music;
@@ -3152,22 +3139,14 @@ if(homeBtn && role !== "host"){
       }catch(e){}
       if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
       VOIS_STOP_T = null;
-      window.__HOROF_CELEBRATION_SOUND_UNTIL = 0;
     }
     function playVoisFor(ms){
       SOUND.init();
-      stopRong();
-      stopVois();
-      const until = Date.now() + Math.max(0, Number(ms)||0);
-      window.__HOROF_CELEBRATION_SOUND_UNTIL = until;
       const ok = playVois();
       if(!ok) return false;
       if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
       VOIS_STOP_T = setTimeout(() => { stopVois(); }, Math.max(0, Number(ms)||0));
       return true;
-    }
-    function isCelebrationSoundActive(){
-      return Date.now() < Number(window.__HOROF_CELEBRATION_SOUND_UNTIL || 0);
     }
 
     // ✅ fallback قديم (Oscillator) لو ما توفرت الملفات
@@ -4152,7 +4131,7 @@ function hideEidIntro(immediate){
     let LAST_WIN_TS = 0;
     let LAST_WIN_RESET_TS = 0;
     let LAST_RESTART_TS = 0;
-    let LAST_HOST_WIN_ENSURE_SIG = "";
+    let LAST_BOARD_SYNC_KEY = "";
 
     // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
@@ -4521,7 +4500,6 @@ function hideEidIntro(immediate){
 
       if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
       WIN_HIDE_T = null;
-      stopRong();
       stopVois();
 
       if(winBackdrop){
@@ -6909,6 +6887,16 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         }
       }catch(e){}
 
+      try{
+        if(role !== "host" && room?.status === "started"){
+          const boardSyncKey = `${Number(room?.activeMap || 0)}|${Number(room?.round?.boardSeed || room?.board?.seed || 0) || 0}|${Number(room?.restartTs || 0) || 0}`;
+          if(boardSyncKey !== LAST_BOARD_SYNC_KEY){
+            LAST_BOARD_SYNC_KEY = boardSyncKey;
+            setTimeout(() => { try{ _pullOnce(true); }catch(e){} }, 90);
+          }
+        }
+      }catch(e){}
+
       // ✅ (2) قصّ اللاعبين إذا تجاوزوا 13
       try{ prunePlayersIfOverLimit(room); }catch(e){}
 
@@ -6947,7 +6935,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           if(sig && sig !== LAST_BUZZER_SIG){
             LAST_BUZZER_SIG = sig;
 
-            if(role !== "host" && !(room?.winEvent?.ts) && !isCelebrationSoundActive()){
+            if(role !== "host"){
               const myPid = pid || localStorage.getItem(`sabaq_pid_${code}`) || "";
               if(myPid && String(b.pid||"") === String(myPid)){
                 if(!playRong()) fallbackBeep();
@@ -6957,55 +6945,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         }else{
           LAST_BUZZER_SIG = "";
           STABLE_BUZZER = null;
-        }
-      }catch(e){}
-
-      try{
-        if(role === "host" && room?.status === "started" && !room?.winEvent?.ts){
-          const activeMapNow = Number(room.activeMap || 0);
-          const boardNow = getBoard(room);
-          const mapStatesNow = (room.mapStates && room.mapStates[String(activeMapNow)]) ? room.mapStates[String(activeMapNow)] : {};
-          const prevWinNow = (room.winState && room.winState[String(activeMapNow)]) ? room.winState[String(activeMapNow)] : { greenWin:false, orangeWin:false };
-          const winnersNow = computeWinners(mapStatesNow, boardNow);
-          const ensureTeam = winnersNow.greenWin ? "green" : (winnersNow.orangeWin ? "orange" : "");
-          const ensureSig = `${activeMapNow}|${Number(room?.round?.current || 1)}|${ensureTeam}|${Number(room?.scores?.green ?? room?.scores?.a ?? 0)}|${Number(room?.scores?.orange ?? room?.scores?.b ?? 0)}`;
-          if(!ensureTeam){
-            LAST_HOST_WIN_ENSURE_SIG = "";
-          }else if(!prevWinNow.greenWin && !prevWinNow.orangeWin && ensureSig !== LAST_HOST_WIN_ENSURE_SIG){
-            LAST_HOST_WIN_ENSURE_SIG = ensureSig;
-            const scoresNow = (room.scores && typeof room.scores === "object") ? room.scores : { green:0, orange:0 };
-            let nextGreenScore = Number(scoresNow.green ?? scoresNow.a ?? 0) || 0;
-            let nextOrangeScore = Number(scoresNow.orange ?? scoresNow.b ?? 0) || 0;
-            if(ensureTeam === "green") nextGreenScore += 1;
-            else nextOrangeScore += 1;
-            const totalRounds = normalizeWinRounds(room?.round?.targetWins || room?.settings?.winRounds || 1);
-            const endedRound = Math.max(1, Number(room?.round?.current || 1));
-            const isFinal = endedRound >= totalRounds;
-            const finalTeam = isFinal ? ((nextGreenScore > nextOrangeScore) ? "green" : ((nextOrangeScore > nextGreenScore) ? "orange" : ensureTeam)) : ensureTeam;
-            const ensuredEvent = {
-              team: finalTeam,
-              roundWinner: ensureTeam,
-              ts: Date.now(),
-              map: activeMapNow,
-              greenScore: nextGreenScore,
-              orangeScore: nextOrangeScore,
-              targetWins: totalRounds,
-              totalRounds,
-              endedRound,
-              isFinal,
-              nextRound: Math.min(totalRounds, endedRound + 1)
-            };
-            const updates = {};
-            updates[`rooms/${code}/winState/${activeMapNow}`] = { greenWin: !!winnersNow.greenWin, orangeWin: !!winnersNow.orangeWin };
-            updates[`rooms/${code}/winEvent`] = ensuredEvent;
-            updates[`rooms/${code}/scores/green`] = nextGreenScore;
-            updates[`rooms/${code}/scores/orange`] = nextOrangeScore;
-            updates[`rooms/${code}/scores/a`] = nextGreenScore;
-            updates[`rooms/${code}/scores/b`] = nextOrangeScore;
-            updates[`rooms/${code}/round/current`] = Math.max(1, Number(isFinal ? ensuredEvent.endedRound : ensuredEvent.nextRound));
-            updates[`rooms/${code}/round/winner`] = isFinal ? ensuredEvent.team : null;
-            update(ref(db), updates);
-          }
         }
       }catch(e){}
 
@@ -7039,6 +6978,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 updates[`rooms/${code}/writtenAnswer`] = null;
                 updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
                 updates[`rooms/${code}/winState`] = null;
+                updates[`rooms/${code}/winEvent`] = null;
                 updates[`rooms/${code}/timer`] = { sel:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), dur:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), running:false, startTs:0, done:false };
                 updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
                 updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || 0;
@@ -7064,14 +7004,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                   scheduleRender();
                 }catch(e){}
                 await update(ref(db), updates);
-                if(WIN_EVENT_CLEAR_T) clearTimeout(WIN_EVENT_CLEAR_T);
-                WIN_EVENT_CLEAR_T = setTimeout(async () => {
-                  try{
-                    const latestWinTs2 = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
-                    if(latestWinTs2 && latestWinTs2 !== Number(we.ts)) return;
-                    await update(ref(db), { [`rooms/${code}/winEvent`]: null });
-                  }catch(e){}
-                }, 5600);
               }catch(e){}
             }, 80);
           }
@@ -7142,6 +7074,14 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       }
 
       return normalized;
+    }
+
+    function getMountedGameSig(room){
+      const boardSeed = Number(room?.round?.boardSeed || room?.board?.seed || 0) || 0;
+      const activeMap = Number(room?.activeMap || 0) || 0;
+      const restartTs = Number(room?.restartTs || 0) || 0;
+      const modeFlag = isWrittenModeEnabled(room) ? 1 : 0;
+      return `wm:${modeFlag}|m:${activeMap}|bs:${boardSeed}|r:${restartTs}`;
     }
 
     function getMeFromPlayers(players){
@@ -7244,7 +7184,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           return;
         }
 
-        if(VIEW.type !== "tv_game"){
+        const tvGameSig = getMountedGameSig(room);
+        if(VIEW.type !== "tv_game" || VIEW.gameSig !== tvGameSig){
+          VIEW.gameSig = tvGameSig;
           renderTvDisplay(room, null);
           VIEW.type = "tv_game";
         }
@@ -7255,7 +7197,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       if(role === "host"){
         if(room.status === "started"){
-          const hostGameSig = `wm:${isWrittenModeEnabled(room) ? 1 : 0}`;
+          const hostGameSig = getMountedGameSig(room);
           if(VIEW.type !== "host_game" || VIEW.gameSig !== hostGameSig){
             // mount مرة واحدة فقط
             VIEW.gameSig = hostGameSig;
@@ -7327,7 +7269,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         return;
       }
 
-      const playerGameSig = `wm:${isWrittenModeEnabled(room) ? 1 : 0}`;
+      const playerGameSig = getMountedGameSig(room);
       if(VIEW.type !== "player_game" || VIEW.gameSig !== playerGameSig){
         VIEW.gameSig = playerGameSig;
         renderGame(room, LIVE.me);
@@ -7351,6 +7293,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-04-01-4 (win celebration reliability + sound gating + delayed winEvent clear) -->
+  <!-- VERSION: game_full.html — v2026-03-25-7 (streamer isolated start fix: host starts room first, stores handoff, then opens streamer page) -->
 </body>
 </html>
