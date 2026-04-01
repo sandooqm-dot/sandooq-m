@@ -3124,9 +3124,6 @@ if(homeBtn && role !== "host"){
     function playRong(){
       try{ return SOUND.playBell(); }catch(e){ return false; }
     }
-    function playVois(){
-      try{ return SOUND.playMusic(); }catch(e){ return false; }
-    }
     function stopRong(){
       try{
         const a = SOUND.bell;
@@ -3135,11 +3132,11 @@ if(homeBtn && role !== "host"){
         a.currentTime = 0;
       }catch(e){}
     }
-
-    const CELEBRATION_DURATION_MS = 5000;
-    function hasActiveWinEvent(roomLike){
-      return !!(roomLike && roomLike.winEvent && Number(roomLike.winEvent.ts || 0) > 0);
+    function playVois(){
+      try{ return SOUND.playMusic(); }catch(e){ return false; }
     }
+
+    try{ SOUND.init(); }catch(e){}
 
     // ✅ (5) تشغيل vois لمدة 5 ثواني فقط
     let VOIS_STOP_T = null;
@@ -4325,6 +4322,8 @@ function hideEidIntro(immediate){
 
     // ✅ (5) قصاصات
     let WIN_HIDE_T = null;
+    const CELEBRATION_MS = 5000;
+    let LAST_WIN_SOUND_TS = 0;
     function clearConfetti(){
       try{ confettiRain.innerHTML = ""; }catch(e){}
     }
@@ -4501,10 +4500,9 @@ function hideEidIntro(immediate){
       WIN_HIDE_T = null;
       if(winBackdrop) winBackdrop.style.display = "none";
       clearConfetti();
+      stopRong();
       stopVois();
       hideRoundOverlay();
-      LAST_WIN_TS = 0;
-      LAST_WIN_RESET_TS = 0;
     }
 
     function showWin(team, room, winEvent){
@@ -4529,25 +4527,29 @@ function hideEidIntro(immediate){
       winWinner.textContent = (winEvent && winEvent.isFinal) ? `${winnerName} هو بطل السباق` : `فاز ${winnerName} بالجولة`;
 
       showRoundResultOverlay(room || LIVE.room || {}, winEvent || {});
-      startConfetti(CELEBRATION_DURATION_MS);
+      startConfetti(CELEBRATION_MS);
 
-      if(!playVoisFor(CELEBRATION_DURATION_MS)){
-        fallbackBeep();
+      const winTs = Number(winEvent?.ts || 0);
+      if(winTs && winTs !== LAST_WIN_SOUND_TS){
+        LAST_WIN_SOUND_TS = winTs;
+        playVoisFor(CELEBRATION_MS);
       }
 
       if(winEvent && winEvent.isFinal){
         WIN_HIDE_T = setTimeout(()=> {
           if(winBackdrop) winBackdrop.style.display = "none";
           clearConfetti();
+          stopRong();
           stopVois();
-        }, CELEBRATION_DURATION_MS);
+        }, CELEBRATION_MS);
       }else{
         WIN_HIDE_T = setTimeout(()=> {
           if(winBackdrop) winBackdrop.style.display = "none";
           hideRoundOverlay();
           clearConfetti();
+          stopRong();
           stopVois();
-        }, CELEBRATION_DURATION_MS);
+        }, CELEBRATION_MS);
       }
     }
 
@@ -4557,6 +4559,7 @@ function hideEidIntro(immediate){
         if(winBackdrop) winBackdrop.style.display = "none";
         hideRoundOverlay();
         clearConfetti();
+        stopRong();
         stopVois();
         if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
         WIN_HIDE_T = null;
@@ -6258,7 +6261,6 @@ function hideEidIntro(immediate){
 
           if(!rr || rr.status !== "started") return;
           if(rr.freeze) return;
-          if(hasActiveWinEvent(rr)) return;
           if(!mm) return;
 
           if(isWrittenModeEnabled(rr)){
@@ -6306,7 +6308,9 @@ function hideEidIntro(immediate){
                 LOCAL_WRITTEN_DRAFT = "";
                 LOCAL_WRITTEN_TURN_KEY = `${String(v.pid||"")}|${Number(v.seq || v.ts || 0)}`;
               }
-              if(!playRong()) fallbackBeep();
+              if(!LIVE.room?.winEvent?.ts && !FINAL_OVERLAY_ACTIVE){
+                if(!playRong()) fallbackBeep();
+              }
             }
           }catch(e){}
           finally{
@@ -6800,19 +6804,16 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         const answerState = (room && room.writtenAnswer && typeof room.writtenAnswer === "object") ? room.writtenAnswer : null;
         const submittedByMe = !!(answerState && answerState.submitted && String(answerState.pid || "") === String(pid || ""));
 
-        const celebrationActive = hasActiveWinEvent(room);
-        let disabled = (!started) || room.freeze || !me || !me.name || celebrationActive;
+        let disabled = (!started) || room.freeze || !me || !me.name;
         let label = "اضغط هنا للإجابة";
         let submitMode = false;
         let sentMode = false;
 
         if(!writtenModeLive){
           disabled = disabled || (someoneBuzzed && !iAmWinner);
-          label = (!started)
-            ? "اضغط هنا للإجابة"
-            : (celebrationActive ? "جاري الاحتفال" : (someoneBuzzed && !iAmWinner ? "تم حجز الجرس" : "اضغط هنا للإجابة"));
+          label = (!started) ? "اضغط هنا للإجابة" : (someoneBuzzed && !iAmWinner ? "تم حجز الجرس" : "اضغط هنا للإجابة");
         }else if(disabled){
-          label = celebrationActive ? "جاري الاحتفال" : "اضغط هنا للإجابة";
+          label = "اضغط هنا للإجابة";
         }else if(submittedByMe){
           disabled = true;
           sentMode = true;
@@ -6919,56 +6920,52 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       // ✅ (3) تشغيل المؤقت تلقائياً عند اعتماد أول لاعب يضغط الجرس
       try{
         if(role === "host"){
-          if(hasActiveWinEvent(room)){
-            LAST_AUTO_TIMER_SIG = "";
-          }else{
-            const b = resolveStableBuzzer(room.buzzer, room.timer);
-            const t = normalizeTimer(room.timer || {});
-            if(b && b.ts){
-              const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
-              if(sig && sig !== LAST_AUTO_TIMER_SIG){
-                LAST_AUTO_TIMER_SIG = sig;
+          const b = resolveStableBuzzer(room.buzzer, room.timer);
+          const t = normalizeTimer(room.timer || {});
+          if(b && b.ts){
+            const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
+            if(sig && sig !== LAST_AUTO_TIMER_SIG){
+              LAST_AUTO_TIMER_SIG = sig;
 
-                if(!t.running && !t.done){
-                  const sel = Number(t.sel || 10);
-                  update(ref(db, `rooms/${code}/timer`), {
-                    sel,
-                    dur: sel,
-                    running: true,
-                    done: false,
-                    startTs: Date.now()
-                  });
-                }
+              if(!t.running && !t.done){
+                const sel = Number(t.sel || 10);
+                update(ref(db, `rooms/${code}/timer`), {
+                  sel,
+                  dur: sel,
+                  running: true,
+                  done: false,
+                  startTs: Date.now()
+                });
               }
-            }else{
-              LAST_AUTO_TIMER_SIG = "";
             }
+          }else{
+            LAST_AUTO_TIMER_SIG = "";
           }
         }
       }catch(e){}
 
       // ✅ (تعديل 2) تشغيل rong فقط عند جهاز اللاعب الذي ضغط أولاً
       try{
-        if(hasActiveWinEvent(room)){
-          stopRong();
-        }else{
-          const b = resolveStableBuzzer(room.buzzer, room.timer);
-          if(b && b.ts){
-            const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
-            if(sig && sig !== LAST_BUZZER_SIG){
-              LAST_BUZZER_SIG = sig;
+        const b = resolveStableBuzzer(room.buzzer, room.timer);
+        const celebrationActive = !!(room?.winEvent?.ts) || FINAL_OVERLAY_ACTIVE;
+        if(b && b.ts){
+          const sig = `${String(b.pid||"")}|${Number(b.ts)}`;
+          if(celebrationActive){
+            LAST_BUZZER_SIG = sig;
+            stopRong();
+          }else if(sig && sig !== LAST_BUZZER_SIG){
+            LAST_BUZZER_SIG = sig;
 
-              if(role !== "host"){
-                const myPid = pid || localStorage.getItem(`sabaq_pid_${code}`) || "";
-                if(myPid && String(b.pid||"") === String(myPid)){
-                  if(!playRong()) fallbackBeep();
-                }
+            if(role !== "host"){
+              const myPid = pid || localStorage.getItem(`sabaq_pid_${code}`) || "";
+              if(myPid && String(b.pid||"") === String(myPid)){
+                if(!playRong()) fallbackBeep();
               }
             }
-          }else{
-            LAST_BUZZER_SIG = "";
-            STABLE_BUZZER = null;
           }
+        }else{
+          LAST_BUZZER_SIG = "";
+          STABLE_BUZZER = null;
         }
       }catch(e){}
 
@@ -6981,6 +6978,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
         if(we && we.ts && Number(we.ts) !== LAST_WIN_TS){
           LAST_WIN_TS = Number(we.ts);
+          stopRong();
           showWin(we.team, room, we);
 
           if(role === "host" && Number(we.ts) !== LAST_WIN_RESET_TS && !we.isFinal){
@@ -7028,7 +7026,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 }catch(e){}
                 await update(ref(db), updates);
               }catch(e){}
-            }, CELEBRATION_DURATION_MS);
+            }, CELEBRATION_MS);
           }
         }
       }catch(e){}
