@@ -5882,8 +5882,8 @@ function hideEidIntro(immediate){
 
       const svgNS = "http://www.w3.org/2000/svg";
       const size = Math.max(1, Number(board.size || 5));
-      for(let row=0; row<size; row++){
-        for(let col=0; col<size; col++){
+      for(let row=0; row<liveSize; row++){
+        for(let col=0; col<liveSize; col++){
           const g = document.createElementNS(svgNS, "g");
           const poly = document.createElementNS(svgNS, "polygon");
           poly.classList.add("cell", "state0");
@@ -5945,6 +5945,9 @@ function hideEidIntro(immediate){
       }
 
       function placeHexes(){
+        const liveBoard = GAME_UI.board || getBoard(LIVE.room || room);
+        const liveSize = Math.max(1, Number(liveBoard?.size || size || 5));
+        const liveShape = normalizeCellShape(liveBoard?.shape || board?.shape || "hex");
         const W = mapScale.clientWidth || 720;
         const H = document.getElementById("mapBox")?.clientHeight || W;
         if(!W || !H) return;
@@ -5952,7 +5955,7 @@ function hideEidIntro(immediate){
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
         overlay.setAttribute("preserveAspectRatio", "none");
 
-        const shape = board.shape;
+        const shape = liveShape;
         const marginX = W * 0.08;
         const marginY = H * 0.05;
         const usableW = W - marginX*2;
@@ -5960,26 +5963,26 @@ function hideEidIntro(immediate){
 
         let cellW, cellH, stepX, stepY;
         if(shape === "square"){
-          cellW = usableW / size;
-          cellH = usableH / size;
+          cellW = usableW / liveSize;
+          cellH = usableH / liveSize;
           stepX = cellW;
           stepY = cellH;
         }else if(shape === "pentagon"){
-          cellW = usableW / (size + 0.35);
-          cellH = usableH / (size + 0.15);
+          cellW = usableW / (liveSize + 0.35);
+          cellH = usableH / (liveSize + 0.15);
           stepX = cellW * 0.95;
           stepY = cellH * 0.96;
         }else{
-          cellW = usableW / (size + 0.5);
-          cellH = usableH / (size * 0.84 + 0.25);
+          cellW = usableW / (liveSize + 0.5);
+          cellH = usableH / (liveSize * 0.84 + 0.25);
           stepX = cellW;
           stepY = cellH * 0.76;
         }
 
         const cellsMeta = [];
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for(let row=0; row<size; row++){
-          for(let col=0; col<size; col++){
+        for(let row=0; row<liveSize; row++){
+          for(let col=0; col<liveSize; col++){
             let x = marginX + (col * stepX);
             let y = marginY + (row * stepY);
             if(shape !== "square") x += (row % 2) * (cellW / 2);
@@ -6011,7 +6014,7 @@ function hideEidIntro(immediate){
           txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
           txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
 
-          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
+          txt.textContent = getDisplayedCellValue(liveBoard, meta.row, meta.col);
           i++;
         }
 
@@ -6444,13 +6447,16 @@ function hideEidIntro(immediate){
       }
 
       function placeHexes(){
+        const liveBoard = GAME_UI.board || getBoard(LIVE.room || room);
+        const liveShape = normalizeCellShape(liveBoard?.shape || board?.shape || "hex");
+        const liveSize = Math.max(1, Number(liveBoard?.size || board?.size || 5));
         const W = mapScale.clientWidth || 720;
         const H = mapBox.clientHeight || W;
         if(!W || !H) return;
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
         overlay.setAttribute("preserveAspectRatio", "none");
-        const shape = board.shape;
-        const size = board.size;
+        const shape = liveShape;
+        const size = liveSize;
         const marginX = W * 0.08;
         const marginY = H * 0.05;
         const usableW = W - marginX*2;
@@ -6496,7 +6502,7 @@ function hideEidIntro(immediate){
           txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
           txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
 
-          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
+          txt.textContent = getDisplayedCellValue(liveBoard, meta.row, meta.col);
           i++;
         }
         applyZoomFix();
@@ -7307,6 +7313,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-04-01-1 (boardSyncTs round transition fix: force authoritative board refresh on non-hosts only when board patch is stale) -->
+  <!-- VERSION: game_full.html — v2026-04-01-2 (fix stale board closure: map redraw now always reads GAME_UI.board current state on players/tv after round transitions) -->
 </body>
 </html>
