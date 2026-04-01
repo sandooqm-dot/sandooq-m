@@ -4131,6 +4131,7 @@ function hideEidIntro(immediate){
     let LAST_WIN_TS = 0;
     let LAST_WIN_RESET_TS = 0;
     let LAST_RESTART_TS = 0;
+    let LAST_BOARD_SYNC_KEY = "";
 
     // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
@@ -6886,6 +6887,16 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         }
       }catch(e){}
 
+      try{
+        if(role !== "host" && room?.status === "started"){
+          const boardSyncKey = `${Number(room?.activeMap || 0)}|${Number(room?.round?.boardSeed || room?.board?.seed || 0) || 0}|${Number(room?.restartTs || 0) || 0}`;
+          if(boardSyncKey !== LAST_BOARD_SYNC_KEY){
+            LAST_BOARD_SYNC_KEY = boardSyncKey;
+            setTimeout(() => { try{ _pullOnce(true); }catch(e){} }, 90);
+          }
+        }
+      }catch(e){}
+
       // ✅ (2) قصّ اللاعبين إذا تجاوزوا 13
       try{ prunePlayersIfOverLimit(room); }catch(e){}
 
@@ -7065,6 +7076,14 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       return normalized;
     }
 
+    function getMountedGameSig(room){
+      const boardSeed = Number(room?.round?.boardSeed || room?.board?.seed || 0) || 0;
+      const activeMap = Number(room?.activeMap || 0) || 0;
+      const restartTs = Number(room?.restartTs || 0) || 0;
+      const modeFlag = isWrittenModeEnabled(room) ? 1 : 0;
+      return `wm:${modeFlag}|m:${activeMap}|bs:${boardSeed}|r:${restartTs}`;
+    }
+
     function getMeFromPlayers(players){
       if(!players) return null;
 
@@ -7165,7 +7184,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           return;
         }
 
-        if(VIEW.type !== "tv_game"){
+        const tvGameSig = getMountedGameSig(room);
+        if(VIEW.type !== "tv_game" || VIEW.gameSig !== tvGameSig){
+          VIEW.gameSig = tvGameSig;
           renderTvDisplay(room, null);
           VIEW.type = "tv_game";
         }
@@ -7176,7 +7197,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       if(role === "host"){
         if(room.status === "started"){
-          const hostGameSig = `wm:${isWrittenModeEnabled(room) ? 1 : 0}`;
+          const hostGameSig = getMountedGameSig(room);
           if(VIEW.type !== "host_game" || VIEW.gameSig !== hostGameSig){
             // mount مرة واحدة فقط
             VIEW.gameSig = hostGameSig;
@@ -7248,7 +7269,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         return;
       }
 
-      const playerGameSig = `wm:${isWrittenModeEnabled(room) ? 1 : 0}`;
+      const playerGameSig = getMountedGameSig(room);
       if(VIEW.type !== "player_game" || VIEW.gameSig !== playerGameSig){
         VIEW.gameSig = playerGameSig;
         renderGame(room, LIVE.me);
