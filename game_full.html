@@ -6436,13 +6436,14 @@ function hideEidIntro(immediate){
             if(res && res.committed){
               const v = res.winner || null;
               if(v && v.ts){
-                LAST_BUZZER_SIG = `${String(v.pid||"")}|${Number(v.ts)}`;
+                // مهم: لا نحدّث LAST_BUZZER_SIG هنا، لأن هذا المتغير هو بوابة تشغيل الصوت
+                // في المستمع العام. لو حدّثناه هنا سيتخطى المستمع تشغيل الجرس بالكامل.
                 STABLE_BUZZER = v;
                 LOCAL_WRITTEN_DRAFT = "";
                 LOCAL_WRITTEN_TURN_KEY = `${String(v.pid||"")}|${Number(v.seq || v.ts || 0)}`;
               }
               // تشغيل الجرس يُحسم فقط من المستمع العام بعد وصول حالة الغرفة الرسمية.
-              // هذا يمنع تكرار الصوت أو تشغيله بالتزامن مع الاحتفالية بسبب وصول patch لاحق.
+              // هذا يمنع التكرار، ويضمن أن الصوت يظهر مرة واحدة عند اللاعب الفائز فقط.
             }
           }catch(e){}
           finally{
