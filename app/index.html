@@ -639,7 +639,7 @@
           <div class="control-card">
             <div class="label">ثيم العيد</div>
             <div class="control-box theme-box">
-              <button type="button" class="theme-toggle on" id="eidThemeToggle" aria-label="تشغيل أو إطفاء ثيم العيد" aria-pressed="true">
+              <button type="button" class="theme-toggle off" id="eidThemeToggle" aria-label="تشغيل أو إطفاء ثيم العيد" aria-pressed="false">
                 <span class="theme-toggle-dot" aria-hidden="true"></span>
               </button>
             </div>
@@ -776,7 +776,7 @@
       { id:"navy-rose",      name:"كحلي + وردي",       a:"#132f67", b:"#de5f95" },
       { id:"salmon-teal",    name:"برتقالي + تركواز",  a:"#ff815d", b:"#12a9b0" },
       { id:"yellow-sky",     name:"أصفر + سماوي",      a:"#ffe87a", b:"#9ad3ff" },
-      { id:"sand-sage",      name:"رملي + زيتي",       a:"#efc06b", b:"#8fb691" }
+      { id:"sand-sage",      name:"أحمر + أخضر",       a:"#e53935", b:"#27c266" }
     ];
 
     const DEFAULT_COLOR_PAIR_ID = "green-orange";
@@ -786,7 +786,7 @@
       cellCount: 4,
       colorPairId: DEFAULT_COLOR_PAIR_ID,
       players: 1,
-      eidThemeEnabled: true
+      eidThemeEnabled: false
     };
 
     function random6(){
