@@ -3420,7 +3420,6 @@ function hideEidIntro(immediate){
         settings: {},
         teams: {},
         board: buildBoardState({}, Date.now()),
-        boardSyncTs: 0,
         round: { current:1, targetWins:1, winner:null, boardSeed: 0 },
         winEvent: null,
         winState: {},
@@ -4132,7 +4131,6 @@ function hideEidIntro(immediate){
     let LAST_WIN_TS = 0;
     let LAST_WIN_RESET_TS = 0;
     let LAST_RESTART_TS = 0;
-    let LAST_BOARD_SYNC_TS = 0;
 
     // ✅✅✅ (جديد) تتبع آخر جرس تم تسجيله
     let LAST_BUZZER_SIG = "";
@@ -4371,7 +4369,6 @@ function hideEidIntro(immediate){
       const baseRoom = LIVE.room || {};
       const restartTs = Date.now();
       const board = buildBoardState(baseRoom, restartTs);
-      const boardSyncTs = Number(board.seed || 0) || restartTs;
       rememberBoard(board, baseRoom);
       const totalRounds = normalizeWinRounds(baseRoom?.settings?.winRounds || baseRoom?.round?.targetWins || 1);
       const timerSel = Number(baseRoom?.timer?.sel || 10);
@@ -4384,7 +4381,6 @@ function hideEidIntro(immediate){
         settings: { ...((baseRoom?.settings && typeof baseRoom.settings === "object") ? baseRoom.settings : {}), writtenAnswerModeEnabled: writtenEnabled },
         activeMap: 0,
         board,
-        boardSyncTs,
         freeze: false,
         buzzer: null,
         scores: { green:0, orange:0, a:0, b:0 },
@@ -4406,7 +4402,6 @@ function hideEidIntro(immediate){
         updates[`rooms/${code}/settings/writtenAnswerModeEnabled`] = writtenEnabled;
         updates[`rooms/${code}/activeMap`] = 0;
         updates[`rooms/${code}/board`] = board;
-        updates[`rooms/${code}/boardSyncTs`] = boardSyncTs;
         updates[`rooms/${code}/freeze`] = false;
         updates[`rooms/${code}/buzzer`] = null;
         updates[`rooms/${code}/scores`] = { green:0, orange:0, a:0, b:0 };
@@ -5475,7 +5470,6 @@ function hideEidIntro(immediate){
           const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
           const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
           const board = buildBoardState(latestRoomForStart, Date.now());
-          const boardSyncTs = Number(board.seed || 0) || Date.now();
           const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
           const timerSel = Number(latestRoomForStart?.timer?.sel || 10);
           LAST_STABLE_BOARD = board;
@@ -5486,7 +5480,6 @@ function hideEidIntro(immediate){
             displayPid: null,
             activeMap: 0,
             board,
-            boardSyncTs,
             freeze: false,
             buzzer: null,
             scores: { green:0, orange:0, a:0, b:0 },
@@ -5513,7 +5506,6 @@ function hideEidIntro(immediate){
               displayPid: null,
               activeMap: 0,
               board,
-              boardSyncTs,
               freeze: false,
               buzzer: null,
               scores: { green:0, orange:0, a:0, b:0 },
@@ -5882,8 +5874,8 @@ function hideEidIntro(immediate){
 
       const svgNS = "http://www.w3.org/2000/svg";
       const size = Math.max(1, Number(board.size || 5));
-      for(let row=0; row<liveSize; row++){
-        for(let col=0; col<liveSize; col++){
+      for(let row=0; row<size; row++){
+        for(let col=0; col<size; col++){
           const g = document.createElementNS(svgNS, "g");
           const poly = document.createElementNS(svgNS, "polygon");
           poly.classList.add("cell", "state0");
@@ -5945,9 +5937,6 @@ function hideEidIntro(immediate){
       }
 
       function placeHexes(){
-        const liveBoard = GAME_UI.board || getBoard(LIVE.room || room);
-        const liveSize = Math.max(1, Number(liveBoard?.size || size || 5));
-        const liveShape = normalizeCellShape(liveBoard?.shape || board?.shape || "hex");
         const W = mapScale.clientWidth || 720;
         const H = document.getElementById("mapBox")?.clientHeight || W;
         if(!W || !H) return;
@@ -5955,7 +5944,7 @@ function hideEidIntro(immediate){
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
         overlay.setAttribute("preserveAspectRatio", "none");
 
-        const shape = liveShape;
+        const shape = board.shape;
         const marginX = W * 0.08;
         const marginY = H * 0.05;
         const usableW = W - marginX*2;
@@ -5963,26 +5952,26 @@ function hideEidIntro(immediate){
 
         let cellW, cellH, stepX, stepY;
         if(shape === "square"){
-          cellW = usableW / liveSize;
-          cellH = usableH / liveSize;
+          cellW = usableW / size;
+          cellH = usableH / size;
           stepX = cellW;
           stepY = cellH;
         }else if(shape === "pentagon"){
-          cellW = usableW / (liveSize + 0.35);
-          cellH = usableH / (liveSize + 0.15);
+          cellW = usableW / (size + 0.35);
+          cellH = usableH / (size + 0.15);
           stepX = cellW * 0.95;
           stepY = cellH * 0.96;
         }else{
-          cellW = usableW / (liveSize + 0.5);
-          cellH = usableH / (liveSize * 0.84 + 0.25);
+          cellW = usableW / (size + 0.5);
+          cellH = usableH / (size * 0.84 + 0.25);
           stepX = cellW;
           stepY = cellH * 0.76;
         }
 
         const cellsMeta = [];
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for(let row=0; row<liveSize; row++){
-          for(let col=0; col<liveSize; col++){
+        for(let row=0; row<size; row++){
+          for(let col=0; col<size; col++){
             let x = marginX + (col * stepX);
             let y = marginY + (row * stepY);
             if(shape !== "square") x += (row % 2) * (cellW / 2);
@@ -6014,7 +6003,7 @@ function hideEidIntro(immediate){
           txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
           txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
 
-          txt.textContent = getDisplayedCellValue(liveBoard, meta.row, meta.col);
+          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
 
@@ -6447,16 +6436,13 @@ function hideEidIntro(immediate){
       }
 
       function placeHexes(){
-        const liveBoard = GAME_UI.board || getBoard(LIVE.room || room);
-        const liveShape = normalizeCellShape(liveBoard?.shape || board?.shape || "hex");
-        const liveSize = Math.max(1, Number(liveBoard?.size || board?.size || 5));
         const W = mapScale.clientWidth || 720;
         const H = mapBox.clientHeight || W;
         if(!W || !H) return;
         overlay.setAttribute("viewBox", `0 0 ${W} ${H}`);
         overlay.setAttribute("preserveAspectRatio", "none");
-        const shape = liveShape;
-        const size = liveSize;
+        const shape = board.shape;
+        const size = board.size;
         const marginX = W * 0.08;
         const marginY = H * 0.05;
         const usableW = W - marginX*2;
@@ -6502,7 +6488,7 @@ function hideEidIntro(immediate){
           txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
           txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
 
-          txt.textContent = getDisplayedCellValue(liveBoard, meta.row, meta.col);
+          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
         applyZoomFix();
@@ -6641,7 +6627,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       const boardSig = JSON.stringify({
         activeMap,
         restartTs: Number(room?.restartTs || 0),
-        boardSyncTs: Number(room?.boardSyncTs || 0),
         size: board.size,
         shape: board.shape,
         seed: board.seed,
@@ -6901,28 +6886,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         }
       }catch(e){}
 
-      try{
-        const boardSyncTs = Number(room?.boardSyncTs || 0);
-        if(boardSyncTs && boardSyncTs !== LAST_BOARD_SYNC_TS){
-          LAST_BOARD_SYNC_TS = boardSyncTs;
-          if(role !== "host"){
-            const rawBoardSeed = Number(room?.board?.seed || 0);
-            if(rawBoardSeed !== boardSyncTs){
-              setTimeout(() => {
-                try{
-                  const latestRoom = LIVE.room || {};
-                  const latestBoardSyncTs = Number(latestRoom?.boardSyncTs || 0);
-                  const latestBoardSeed = Number(latestRoom?.board?.seed || 0);
-                  if(latestBoardSyncTs === boardSyncTs && latestBoardSeed !== boardSyncTs){
-                    _pullOnce(true);
-                  }
-                }catch(e){}
-              }, 40);
-            }
-          }
-        }
-      }catch(e){}
-
       // ✅ (2) قصّ اللاعبين إذا تجاوزوا 13
       try{ prunePlayersIfOverLimit(room); }catch(e){}
 
@@ -6994,12 +6957,10 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 const latestWinTs = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
                 if(latestWinTs !== Number(we.ts)) return;
                 const nextBoard = buildBoardState(LIVE.room || room, Date.now());
-                const boardSyncTs = Number(nextBoard.seed || 0) || Date.now();
                 LAST_STABLE_BOARD = nextBoard;
                 const updates = {};
                 updates[`rooms/${code}/activeMap`] = nextMap;
                 updates[`rooms/${code}/board`] = nextBoard;
-                updates[`rooms/${code}/boardSyncTs`] = boardSyncTs;
                 updates[`rooms/${code}/mapStates/${currentMap}`] = null;
                 updates[`rooms/${code}/mapStates/${nextMap}`] = {};
                 updates[`rooms/${code}/buzzer`] = null;
@@ -7015,7 +6976,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                     ...(LIVE.room || room || {}),
                     activeMap: nextMap,
                     board: nextBoard,
-                    boardSyncTs,
                     buzzer: null,
                     writtenAnswer: null,
                     current: { letter:null, qIndex:0, row:null, col:null, map:nextMap },
@@ -7070,7 +7030,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         settings: (room.settings && typeof room.settings === "object") ? room.settings : {},
         teams: (room.teams && typeof room.teams === "object") ? room.teams : {},
         board: (room.board && typeof room.board === "object") ? room.board : null,
-        boardSyncTs: Number(room.boardSyncTs || room.restartTs || 0),
         restartTs: Number(room.restartTs || 0),
         round: (room.round && typeof room.round === "object") ? room.round : { current:1, targetWins: normalizeWinRounds(room?.settings?.winRounds || 1), winner:null, boardSeed: Number(room?.board?.seed || 0) || 0 },
         winEvent: room.winEvent ?? null,
@@ -7313,6 +7272,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-04-01-2 (fix stale board closure: map redraw now always reads GAME_UI.board current state on players/tv after round transitions) -->
+  <!-- VERSION: game_full.html — v2026-03-25-7 (streamer isolated start fix: host starts room first, stores handoff, then opens streamer page) -->
 </body>
 </html>
