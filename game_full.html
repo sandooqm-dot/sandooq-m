@@ -3196,6 +3196,14 @@ if(homeBtn && role !== "host"){
       AUDIO_FLOW.celebrationTs = 0;
     }
 
+    function isSameCelebrationStillPlaying(winTs){
+      const ts = Number(winTs || 0);
+      if(!ts) return false;
+      if(Number(AUDIO_FLOW.celebrationTs || 0) !== ts) return false;
+      if(Date.now() < Number(AUDIO_FLOW.celebrationUntil || 0)) return true;
+      return isVoisPlaying();
+    }
+
     function isCelebrationAudioLocked(roomLike){
       const room = roomLike || LIVE.room || {};
       if(FINAL_OVERLAY_ACTIVE) return true;
@@ -3213,21 +3221,12 @@ if(homeBtn && role !== "host"){
       }
     }
 
-    function shouldBlockBellFx(roomLike){
-      return isCelebrationAudioLocked(roomLike) || isVoisPlaying();
-    }
-
-    function playRong(roomLike){
+    function playRong(){
       try{
-        if(shouldBlockBellFx(roomLike)) return false;
+        if(isCelebrationAudioLocked()) return false;
+        if(isVoisPlaying()) return false;
         return SOUND.playBell();
       }catch(e){ return false; }
-    }
-    function playRongOrFallback(roomLike){
-      if(shouldBlockBellFx(roomLike)) return false;
-      const ok = playRong(roomLike);
-      if(!ok) fallbackBeep();
-      return ok;
     }
     function stopRong(){
       try{
@@ -3245,33 +3244,29 @@ if(homeBtn && role !== "host"){
 
     // ✅ (5) تشغيل vois لمدة 5 ثواني فقط
     let VOIS_STOP_T = null;
-    let ACTIVE_VOIS_WIN_TS = 0;
     function stopVois(opts){
       const keepLock = !!(opts && opts.keepLock);
-      const keepActiveWin = !!(opts && opts.keepActiveWin);
       try{
         SOUND.stopMusic();
       }catch(e){}
       if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
       VOIS_STOP_T = null;
-      if(!keepActiveWin) ACTIVE_VOIS_WIN_TS = 0;
       if(!keepLock) clearCelebrationAudioLock();
     }
     function playVoisFor(ms, winTs){
       SOUND.init();
-      const normalizedWinTs = Number(winTs || 0);
-      const lockUntil = Number(AUDIO_FLOW.celebrationUntil || 0);
-      if(normalizedWinTs && ACTIVE_VOIS_WIN_TS === normalizedWinTs && Date.now() < lockUntil){
+      const dur = Math.max(0, Number(ms)||0);
+      const ts = Number(winTs || 0);
+      if(isSameCelebrationStillPlaying(ts)){
         return true;
       }
       stopRong();
-      stopVois({ keepLock:true, keepActiveWin:true });
-      ACTIVE_VOIS_WIN_TS = normalizedWinTs || ACTIVE_VOIS_WIN_TS || 0;
-      markCelebrationAudio(normalizedWinTs, ms);
+      if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
+      VOIS_STOP_T = null;
+      markCelebrationAudio(ts, dur);
       const ok = playVois();
       if(!ok) return false;
-      if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
-      VOIS_STOP_T = setTimeout(() => { stopVois(); }, Math.max(0, Number(ms)||0));
+      VOIS_STOP_T = setTimeout(() => { stopVois(); }, dur);
       return true;
     }
 
@@ -4624,10 +4619,15 @@ function hideEidIntro(immediate){
     function showWin(team, room, winEvent){
       if(!team) return;
 
+      const winTs = Number(winEvent?.ts || 0);
+      const replayingSameCelebration = isSameCelebrationStillPlaying(winTs);
+
       if(WIN_HIDE_T) clearTimeout(WIN_HIDE_T);
       WIN_HIDE_T = null;
       stopRong();
-      stopVois();
+      if(!replayingSameCelebration){
+        stopVois({ keepLock:true });
+      }
 
       if(winBackdrop){
         winBackdrop.style.display = "flex";
@@ -4645,7 +4645,6 @@ function hideEidIntro(immediate){
       showRoundResultOverlay(room || LIVE.room || {}, winEvent || {});
       startConfetti(CELEBRATION_MS);
 
-      const winTs = Number(winEvent?.ts || 0);
       if(winTs && winTs !== LAST_WIN_SOUND_TS){
         LAST_WIN_SOUND_TS = winTs;
       }
@@ -6427,7 +6426,7 @@ function hideEidIntro(immediate){
                 LOCAL_WRITTEN_TURN_KEY = `${String(v.pid||"")}|${Number(v.seq || v.ts || 0)}`;
               }
               if(!LIVE.room?.winEvent?.ts && !FINAL_OVERLAY_ACTIVE){
-                playRongOrFallback(LIVE.room || {});
+                playRong();
               }
             }
           }catch(e){}
@@ -7077,7 +7076,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
             if(role !== "host"){
               const myPid = pid || localStorage.getItem(`sabaq_pid_${code}`) || "";
               if(myPid && String(b.pid||"") === String(myPid)){
-                playRongOrFallback(room || LIVE.room || {});
+                playRong();
               }
             }
           }
