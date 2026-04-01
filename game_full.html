@@ -4369,8 +4369,7 @@ function hideEidIntro(immediate){
       if(role !== "host") return;
       const baseRoom = LIVE.room || {};
       const restartTs = Date.now();
-      const board = buildBoardState(baseRoom, restartTs);
-      rememberBoard(board, baseRoom);
+      const board = rememberBoard(buildBoardState(baseRoom, restartTs), baseRoom) || buildBoardState(baseRoom, restartTs);
       const totalRounds = normalizeWinRounds(baseRoom?.settings?.winRounds || baseRoom?.round?.targetWins || 1);
       const timerSel = Number(baseRoom?.timer?.sel || 10);
       const writtenEnabled = isWrittenModeEnabled(baseRoom);
@@ -5470,10 +5469,9 @@ function hideEidIntro(immediate){
         document.getElementById("startBtn").addEventListener("click", async () => {
           const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
           const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
-          const board = buildBoardState(latestRoomForStart, Date.now());
+          const board = rememberBoard(buildBoardState(latestRoomForStart, Date.now()), latestRoomForStart) || buildBoardState(latestRoomForStart, Date.now());
           const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
           const timerSel = Number(latestRoomForStart?.timer?.sel || 10);
-          LAST_STABLE_BOARD = board;
 
           const nextStartedRoom = normalizeLiveRoom({
             ...(latestRoomForStart || {}),
@@ -6961,26 +6959,25 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
           if(role === "host" && Number(we.ts) !== LAST_WIN_RESET_TS && !we.isFinal){
             LAST_WIN_RESET_TS = Number(we.ts);
-            const currentMap = Number(room.activeMap || 0);
-            const nextMap = currentMap + 1;
+            const nextMap = 0;
             setTimeout(async () => {
               try{
                 const latestWinTs = Number((LIVE.room && LIVE.room.winEvent && LIVE.room.winEvent.ts) || 0);
                 if(latestWinTs !== Number(we.ts)) return;
-                const nextBoard = buildBoardState(LIVE.room || room, Date.now());
-                LAST_STABLE_BOARD = nextBoard;
+                const nextBoard = rememberBoard(buildBoardState(LIVE.room || room, Date.now()), LIVE.room || room) || buildBoardState(LIVE.room || room, Date.now());
+                const nextRoundCurrent = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
+                const nextTimerSel = Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10);
                 const updates = {};
                 updates[`rooms/${code}/activeMap`] = nextMap;
                 updates[`rooms/${code}/board`] = nextBoard;
-                updates[`rooms/${code}/mapStates/${currentMap}`] = null;
-                updates[`rooms/${code}/mapStates/${nextMap}`] = {};
+                updates[`rooms/${code}/mapStates`] = { "0": {} };
                 updates[`rooms/${code}/buzzer`] = null;
                 updates[`rooms/${code}/writtenAnswer`] = null;
                 updates[`rooms/${code}/current`] = { letter:null, qIndex:0, row:null, col:null, map:nextMap };
-                updates[`rooms/${code}/winState`] = null;
+                updates[`rooms/${code}/winState`] = {};
                 updates[`rooms/${code}/winEvent`] = null;
-                updates[`rooms/${code}/timer`] = { sel:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), dur:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), running:false, startTs:0, done:false };
-                updates[`rooms/${code}/round/current`] = Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1)));
+                updates[`rooms/${code}/timer`] = { sel:nextTimerSel, dur:nextTimerSel, running:false, startTs:0, done:false };
+                updates[`rooms/${code}/round/current`] = nextRoundCurrent;
                 updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || 0;
                 try{
                   LIVE.room = normalizeLiveRoom({
@@ -6992,14 +6989,14 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                     current: { letter:null, qIndex:0, row:null, col:null, map:nextMap },
                     winState: {},
                     winEvent: null,
-                    timer: { sel:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), dur:Number(LIVE.room?.timer?.sel || room?.timer?.sel || 10), running:false, startTs:0, done:false },
+                    timer: { sel:nextTimerSel, dur:nextTimerSel, running:false, startTs:0, done:false },
                     round: {
                       ...((LIVE.room && LIVE.room.round) || (room && room.round) || {}),
-                      current: Math.max(1, Number(we.nextRound || ((Number(we.greenScore||0)+Number(we.orangeScore||0))+1))),
+                      current: nextRoundCurrent,
                       winner: null,
                       boardSeed: Number(nextBoard.seed || 0) || 0
                     },
-                    mapStates: { ...(LIVE.room?.mapStates || room?.mapStates || {}), [String(currentMap)]: {}, [String(nextMap)]: {} }
+                    mapStates: { "0": {} }
                   });
                   scheduleRender();
                 }catch(e){}
