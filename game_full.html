@@ -5680,9 +5680,9 @@ function hideEidIntro(immediate){
         `;
       }
 
-      if(showPlayerLinks){
-        const greenList = document.getElementById("greenList");
-        const orangeList = document.getElementById("orangeList");
+      const greenList = document.getElementById("greenList");
+      const orangeList = document.getElementById("orangeList");
+      if(showPlayerLinks && greenList && orangeList){
         greenList.innerHTML = green.length
           ? green.map(p => `<div class="playerItem" data-id="${p.id}">${escapeHtml(p.name || "لاعب")}${p.isTv ? `<span class="playerTvBadge">عرض</span>` : ""}</div>`).join("")
           : `<div class="playerItem" style="opacity:.8">لا يوجد لاعبين</div>`;
