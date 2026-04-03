@@ -301,57 +301,137 @@
     .eduInfoTitle{font-size:34px;font-weight:900;line-height:1.2;margin:0 0 10px}
     .eduInfoSub{font-size:21px;font-weight:900;line-height:1.75;margin:0;color:#6b2d5f}
 
-    .modeTabs{
+    .pickerHeaderSection{
       display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-bottom:14px;
+      flex-direction:column;
+      gap:14px;
+      margin-bottom:16px;
     }
-    .modeTabBtn{
-      flex:1 1 170px;
-      min-height:58px;
-      border-radius:18px;
-      border:4px solid rgba(0,0,0,.78);
-      background:rgba(255,255,255,.85);
-      color:#3f2353;
+    .pickerField{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .pickerFieldLabel{
+      margin:0;
+      color:#fff;
       font-size:22px;
       font-weight:900;
+      text-align:right;
+      text-shadow:none;
+    }
+    .pickerOptionGrid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:12px;
+    }
+    .pickerOptionBtn{
+      min-height:68px;
+      border-radius:20px;
+      border:4px solid rgba(48,22,58,.88);
+      background:linear-gradient(180deg,#fbf7ef 0%, #f2ecdf 100%);
+      color:#5b2260;
+      font-size:25px;
+      font-weight:900;
       cursor:pointer;
-      box-shadow:0 10px 18px rgba(0,0,0,.16);
+      padding:12px 14px;
+      box-shadow:0 10px 18px rgba(0,0,0,.14);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
-      padding:10px 12px;
+      text-shadow:none;
     }
-    .modeTabBtn.activeTab{
-      background:#fff0b7;
-      color:#111;
-      box-shadow:0 0 0 4px rgba(255,255,255,.22), 0 12px 22px rgba(0,0,0,.20);
+    .pickerOptionBtn.typeEducation{
+      background:linear-gradient(180deg,#edf7ff 0%, #dfefff 100%);
+      color:#0b4f77;
     }
-    .modeTabBtn.singleTab.activeTab{ background:#f7f1de; color:#5a1d58; }
-    .modeTabBtn.separateTab.activeTab{ background:#eef5cf; color:#185f31; }
-    .modeTabBtn.educationTab.activeTab{ background:#dff3ff; color:#0b4f77; }
-    .modePickerPanel{
-      border-radius:24px;
-      padding:16px 14px;
+    .pickerOptionBtn.modeSingle{
+      background:linear-gradient(180deg,#fff6df 0%, #f8eecb 100%);
+      color:#7a4d00;
+    }
+    .pickerOptionBtn.modeMulti{
+      background:linear-gradient(180deg,#eef7ff 0%, #dfefff 100%);
+      color:#0f4f85;
+    }
+    .pickerOptionBtn.activeChoice{
+      transform:translateY(-1px);
+      box-shadow:0 0 0 4px rgba(255,255,255,.18), 0 12px 22px rgba(0,0,0,.18);
+    }
+    .pickerMainPanel{
+      border-radius:28px;
+      padding:18px 14px;
       border:4px solid rgba(255,255,255,.18);
       background:rgba(255,255,255,.08);
       box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
     }
-    .pickerHeroCard{
-      border-radius:24px;
-      padding:18px 16px;
-      border:5px solid rgba(0,0,0,.74);
-      box-shadow:0 12px 22px rgba(0,0,0,.18);
-      text-align:right;
+    .pickerSummaryCard{
+      border-radius:26px;
+      padding:20px 18px;
+      border:5px solid rgba(48,22,58,.88);
+      background:linear-gradient(180deg,#fff9ed 0%, #f4eedf 100%);
+      color:#5a1d58;
+      text-align:center;
+      box-shadow:0 14px 24px rgba(0,0,0,.16);
+      text-shadow:none;
     }
-    .pickerHeroCard.single{ background:#f7f1de; color:#5a1d58; }
-    .pickerHeroCard.separate{ background:#eef5cf; color:#185f31; }
-    .pickerHeroTitle{ font-size:38px; font-weight:900; line-height:1.15; margin:0 0 10px; }
-    .pickerHeroDesc{ font-size:24px; font-weight:900; line-height:1.7; }
-    .pickerHeroNote{ margin-top:10px; font-size:17px; line-height:1.65; font-weight:900; opacity:.88; }
-    .pickerActionRow{ display:flex; justify-content:center; margin-top:16px; }
+    .pickerSummaryCard.education{
+      background:linear-gradient(180deg,#eef7ff 0%, #ddefff 100%);
+      color:#0b4f77;
+    }
+    .pickerSummaryCard.singlePlay{
+      color:#7a4d00;
+    }
+    .pickerSummaryTitle{
+      font-size:38px;
+      line-height:1.15;
+      font-weight:900;
+      margin:0 0 10px;
+      text-shadow:none;
+    }
+    .pickerSummaryDesc{
+      font-size:24px;
+      line-height:1.7;
+      font-weight:900;
+      text-shadow:none;
+    }
+    .pickerLinksWrap{
+      margin-top:16px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .pickerInlineToggleWrap{
+      margin-top:14px;
+      display:flex;
+      justify-content:flex-end;
+    }
+    .pickerInlineToggle{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 14px;
+      border-radius:999px;
+      background:rgba(255,255,255,.86);
+      border:3px dashed rgba(48,22,58,.18);
+      color:#0f172a;
+      font-size:16px;
+      font-weight:900;
+      cursor:pointer;
+      text-shadow:none;
+    }
+    .pickerInlineToggle input{
+      width:18px;
+      height:18px;
+      accent-color:#16a34a;
+      cursor:pointer;
+      flex:0 0 auto;
+    }
+    .pickerApplyArea{
+      display:flex;
+      justify-content:center;
+      margin-top:18px;
+    }
     .pickerApplyBtn{
-      min-width:240px;
+      min-width:250px;
       max-width:100%;
       padding:14px 18px;
       border:none;
@@ -361,100 +441,13 @@
       color:#111;
       font-size:24px;
       font-weight:900;
-      border:4px solid rgba(0,0,0,.80);
-      box-shadow:0 8px 0 rgba(0,0,0,.18);
+      border:4px solid rgba(48,22,58,.88);
+      box-shadow:0 8px 0 rgba(48,22,58,.20);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
+      text-shadow:none;
     }
     .pickerApplyBtn:active{ transform:translateY(1px); }
-    .eduSubCards{ display:flex; flex-direction:column; gap:12px; }
-    .eduSubCard{
-      width:100%;
-      border:none;
-      border-radius:24px;
-      padding:18px 16px;
-      text-align:right;
-      border:5px solid rgba(0,0,0,.74);
-      box-shadow:0 12px 22px rgba(0,0,0,.16);
-      background:#fff;
-      cursor:pointer;
-      -webkit-tap-highlight-color:transparent;
-      touch-action:manipulation;
-      position:relative;
-      overflow:hidden;
-    }
-    .eduSubCard.single{ background:#fff7df; color:#7a4d00; }
-    .eduSubCard.multi{ background:#eef7ff; color:#104a85; }
-    .eduSubCard.activeChoice{ box-shadow:0 0 0 4px rgba(255,255,255,.22), 0 14px 24px rgba(0,0,0,.20); }
-    .eduSubCard.single.activeChoice{ background:#ffeec0; }
-    .eduSubCard.multi.activeChoice{ background:#dff0ff; }
-    .eduSubTop{ display:flex; align-items:center; gap:12px; justify-content:space-between; }
-    .eduSubNum{
-      width:46px; height:46px; border-radius:50%; flex:0 0 auto;
-      display:flex; align-items:center; justify-content:center;
-      background:rgba(255,255,255,.88); border:3px solid rgba(0,0,0,.18);
-      font-size:28px; font-weight:900;
-    }
-    .eduSubTitle{ font-size:34px; font-weight:900; line-height:1.15; flex:1 1 auto; }
-    .eduSubDesc{ margin-top:8px; font-size:22px; font-weight:900; line-height:1.65; }
-    .eduCompactToggle{
-      margin-top:12px;
-      display:inline-flex;
-      align-items:center;
-      gap:10px;
-      padding:8px 12px;
-      border-radius:999px;
-      background:rgba(255,255,255,.72);
-      border:3px dashed rgba(0,0,0,.16);
-      color:#123;
-      font-size:16px;
-      font-weight:900;
-      cursor:pointer;
-    }
-    .eduCompactToggle input{
-      width:18px;
-      height:18px;
-      accent-color:#16a34a;
-      cursor:pointer;
-      flex:0 0 auto;
-    }
-    .eduDisplayShare{
-      margin-top:12px;
-      border-radius:22px;
-      padding:14px;
-      background:rgba(255,255,255,.80);
-      border:4px solid rgba(16,74,133,.20);
-      color:#104a85;
-      text-align:right;
-    }
-    .eduDisplayShareTitle{ font-size:24px; font-weight:900; line-height:1.2; }
-    .eduDisplayShareSub{ margin-top:6px; font-size:16px; line-height:1.6; font-weight:900; color:#36506a; }
-    .eduDisplayShareRow{
-      margin-top:12px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
-    }
-    .pickerQrSmall{
-      width:96px;
-      height:96px;
-      border-radius:16px;
-      background:#fff;
-      border:4px solid rgba(255,255,255,.72);
-      box-shadow:0 8px 16px rgba(0,0,0,.12);
-      object-fit:cover;
-    }
-    .pickerCopyBtn{ min-width:220px; max-width:100%; }
-    .pickerMiniNote{
-      margin-top:12px;
-      font-size:16px;
-      line-height:1.6;
-      font-weight:900;
-      color:rgba(255,255,255,.92);
-      text-align:center;
-    }
     .modeChoiceTop{display:flex;align-items:center;gap:12px;justify-content:space-between}
     .modeChoiceNum{
       width:48px;height:48px;border-radius:50%;flex:0 0 auto;
@@ -3795,9 +3788,9 @@ function hideEidIntro(immediate){
 
     const MODE_PICKER = {
       inited: false,
-      activeTab: "single",
-      eduPlayType: "single",
-      eduDisplayOnly: false
+      gameType: "normal",
+      playMode: "multi",
+      displayOnly: false
     };
 
     const VIEW = {
@@ -4252,6 +4245,10 @@ function hideEidIntro(immediate){
     function getHostLobbyExperience(room){
       const mode = String(room?.settings?.hostLobbyExperience || "").trim();
       return (mode === "normal" || mode === "education") ? mode : "";
+    }
+    function getNormalPlayType(room){
+      const mode = String(room?.settings?.normalPlayType || "").trim();
+      return (mode === "single" || mode === "multi") ? mode : "";
     }
     function getEducationPlayType(room){
       const mode = String(room?.settings?.educationPlayType || "").trim();
@@ -5644,20 +5641,22 @@ function hideEidIntro(immediate){
       const displayUrl = buildDisplayUrl(room.code || code);
       const displayQrUrl = buildQrUrl(displayUrl);
       const currentSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
-      const showEducationSelector = isEducation && !eduPlayType;
-      const showModeChooser = !hostExperience && !hostMode;
-      const showEducationSingle = isEducation && eduPlayType === "single";
-      const showPlayerLinks = !isEducation || eduPlayType === "multi";
-      const showDisplayLink = showPlayerLinks && ((!isEducation && hostMode === "separate") || (isEducation && eduPlayType === "multi" && eduDisplayOnly));
-      const normalModeLabel = hostMode === "separate" ? "مع شاشة عرض منفصلة" : "بدون شاشة عرض من جهاز آخر";
-      const modeLabel = isEducation
-        ? (eduPlayType === "single"
-            ? "للأنشطة التعليمية — جهاز واحد"
-            : (eduDisplayOnly ? "للأنشطة التعليمية — أجهزة متعددة + جهاز مخصص للعرض" : "للأنشطة التعليمية — أجهزة متعددة"))
-        : normalModeLabel;
-      const startBtnLabel = showEducationSingle
-        ? "ابدأ اللعب المباشر"
-        : (updatesEnabled ? "فتح وضع الستريمر" : "ابدأ اللعبة");
+      const normalPlayType = getNormalPlayType(room);
+      const currentGameType = isEducation ? "education" : ((hostExperience === "normal" || (!hostExperience && hostMode)) ? "normal" : "");
+      const currentPlayType = isEducation
+        ? (eduPlayType || "single")
+        : ((hostExperience === "normal" && normalPlayType) ? normalPlayType : ((hostMode === "single" || hostMode === "separate") ? "multi" : ""));
+      const currentDisplayOnly = currentPlayType === "multi" && hostMode === "separate";
+      const showModeChooser = !currentGameType && !currentPlayType;
+      const showDirectSingle = currentPlayType === "single";
+      const showPlayerLinks = currentPlayType === "multi";
+      const showDisplayLink = showPlayerLinks && currentDisplayOnly;
+      const modeLabel = currentGameType === "education"
+        ? (showPlayerLinks ? (showDisplayLink ? "لعبة تعليمية — أجهزة متعددة + شاشة عرض مستقلة" : "لعبة تعليمية — أجهزة متعددة") : "لعبة تعليمية — جهاز واحد")
+        : (showPlayerLinks ? (showDisplayLink ? "لعبة عادية — أجهزة متعددة + شاشة عرض مستقلة" : "لعبة عادية — أجهزة متعددة") : "لعبة عادية — جهاز واحد");
+      const startBtnLabel = (updatesEnabled && showPlayerLinks)
+        ? "فتح وضع الستريمر"
+        : "ابدأ اللعبة";
 
       const staffModeHtml = `
         <div class="staffModeFab">
@@ -5686,96 +5685,106 @@ function hideEidIntro(immediate){
         </div>
       `;
 
-      const showUnifiedPicker = showModeChooser || showEducationSelector;
+      const showUnifiedPicker = showModeChooser;
       if(showUnifiedPicker){
         if(!MODE_PICKER.inited){
-          MODE_PICKER.activeTab = isEducation ? "education" : (hostMode === "separate" ? "separate" : "single");
-          MODE_PICKER.eduPlayType = (isEducation && eduPlayType) ? eduPlayType : "single";
-          MODE_PICKER.eduDisplayOnly = isEducation ? eduDisplayOnly : false;
+          MODE_PICKER.gameType = currentGameType || "normal";
+          MODE_PICKER.playMode = currentPlayType || "multi";
+          MODE_PICKER.displayOnly = !!currentDisplayOnly;
           MODE_PICKER.inited = true;
         }
 
-        const pickerTab = MODE_PICKER.activeTab || "single";
-        const pickerEduPlay = MODE_PICKER.eduPlayType || "single";
-        const pickerEduDisplayOnly = !!MODE_PICKER.eduDisplayOnly;
+        const pickerGameType = MODE_PICKER.gameType || "normal";
+        const pickerPlayMode = MODE_PICKER.playMode || "multi";
+        const pickerDisplayOnly = !!MODE_PICKER.displayOnly;
+        const pickerIsEducation = pickerGameType === "education";
+        const pickerSummaryClass = `${pickerIsEducation ? "education" : "normal"} ${pickerPlayMode === "single" ? "singlePlay" : "multiPlay"}`;
+        const pickerSummaryTitle = pickerIsEducation
+          ? (pickerPlayMode === "multi" ? "لعبة تعليمية" : "لعبة تعليمية")
+          : (pickerPlayMode === "multi" ? "لعبة عادية" : "لعبة عادية");
+        const pickerSummaryDesc = pickerPlayMode === "multi"
+          ? (pickerIsEducation
+              ? "الطلاب يشاركون من أجهزتهم، ويمكنك إضافة شاشة عرض مستقلة عند الحاجة"
+              : "المقدم يدير اللعبة من جهازه، واللاعبون يشاركون من جوالاتهم")
+          : (pickerIsEducation
+              ? "المعلم يشغّل اللعبة من جهازه مباشرة ويعرضها على البروجكتر أو الشاشة"
+              : "تشغّل اللعبة مباشرة من جهاز واحد بدون روابط أو باركود");
 
-        const pickerDisplayShareHtml = (pickerTab === "education" && pickerEduPlay === "multi" && pickerEduDisplayOnly) ? `
-          <div class="eduDisplayShare">
-            <div class="eduDisplayShareTitle">رابط شاشة العرض</div>
-            <div class="eduDisplayShareSub">فعّل هذا الخيار إذا كان عندك جهاز منفصل مخصص لعرض اللعبة على الشاشة أو البروجكتر.</div>
-            <div class="eduDisplayShareRow">
-              <img class="hostLinkQr pickerQrSmall" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض" data-qr-label="باركود شاشة العرض">
-              <button id="copyPickerDisplayBtn" class="btn btnBlue pickerCopyBtn" type="button">نسخ رابط شاشة العرض</button>
+        const pickerDisplayCardHtml = (pickerPlayMode === "multi" && pickerDisplayOnly) ? `
+          <div class="hostLinkCard display">
+            <div class="hostLinkHead">
+              <div class="hostLinkBadge">2</div>
+              <div class="hostLinkBody">
+                <div class="hostLinkTitle">رابط شاشة العرض</div>
+                <div class="hostLinkSub">هذا الرابط للشاشة فقط وليس للاعبين</div>
+              </div>
+              <img class="hostLinkQr" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض" data-qr-label="باركود شاشة العرض">
+            </div>
+            <div class="hostLinkCopyRow">
+              <button id="copyPickerDisplayBtn" class="btn btnBlue hostCopyBtn" type="button">نسخ رابط شاشة العرض</button>
             </div>
           </div>
         ` : ``;
 
-        let pickerContentHtml = ``;
-        if(pickerTab === "single"){
-          pickerContentHtml = `
-            <div class="pickerHeroCard single">
-              <div class="pickerHeroTitle">مشاركة الجوالات</div>
-              <div class="pickerHeroDesc">المقدم يدير اللعبة من جهازه<br>واللاعبون يشاركون من جوالاتهم</div>
-              <div class="pickerHeroNote">هذا الخيار مناسب إذا كنت تريد اللعب مباشرة بدون جهاز إضافي مخصص للعرض.</div>
-            </div>
-            <div class="pickerActionRow">
-              <button id="applySingleModeBtn" class="pickerApplyBtn" type="button">اعتماد هذا النمط</button>
-            </div>
-          `;
-        }else if(pickerTab === "separate"){
-          pickerContentHtml = `
-            <div class="pickerHeroCard separate">
-              <div class="pickerHeroTitle">شاشة عرض منفصلة</div>
-              <div class="pickerHeroDesc">المقدم يدير اللعبة من جهازه<br>وشاشة أخرى تعرض اللعبة بشكل مستقل</div>
-              <div class="pickerHeroNote">هذا الخيار يحتاج جهازًا إضافيًا مخصصًا لعرض اللعبة على التلفزيون أو البروجكتر.</div>
-            </div>
-            <div class="pickerActionRow">
-              <button id="applySeparateModeBtn" class="pickerApplyBtn" type="button">اعتماد هذا النمط</button>
-            </div>
-          `;
-        }else{
-          pickerContentHtml = `
-            <div class="eduSubCards">
-              <button class="eduSubCard single ${pickerEduPlay === "single" ? "activeChoice" : ""}" type="button" data-edu-preview="single">
-                <div class="eduSubTop">
-                  <div class="eduSubNum">1</div>
-                  <div class="eduSubTitle">جهاز واحد — لعب مباشر</div>
+        const pickerLinksHtml = pickerPlayMode === "multi" ? `
+          <div class="pickerLinksWrap">
+            <div class="hostLinkCard players">
+              <div class="hostLinkHead">
+                <div class="hostLinkBadge">1</div>
+                <div class="hostLinkBody">
+                  <div class="hostLinkTitle">رابط دخول اللاعبين</div>
+                  <div class="hostLinkSub">هذا الرابط للاعبين فقط</div>
                 </div>
-                <div class="eduSubDesc">المعلم يشغّل اللعبة من جهازه مباشرة<br>ويعرضها على البروجكتر أو الشاشة</div>
-              </button>
+                <img class="hostLinkQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين" data-qr-label="باركود دخول اللاعبين">
+              </div>
+              <div class="hostLinkCopyRow">
+                <button id="copyPickerJoinBtn" class="btn btnYellow hostCopyBtn" type="button">نسخ رابط اللاعبين</button>
+              </div>
+            </div>
 
-              <button class="eduSubCard multi ${pickerEduPlay === "multi" ? "activeChoice" : ""}" type="button" data-edu-preview="multi">
-                <div class="eduSubTop">
-                  <div class="eduSubNum">2</div>
-                  <div class="eduSubTitle">أجهزة متعددة</div>
-                </div>
-                <div class="eduSubDesc">الطلاب يشاركون من أجهزتهم<br>وممكن إضافة جهاز مخصص للعرض عند الحاجة</div>
-                <label class="eduCompactToggle" for="pickerEduDisplayOnlyToggle">
-                  <input id="pickerEduDisplayOnlyToggle" type="checkbox" ${pickerEduDisplayOnly ? "checked" : ""}>
-                  <span>جهاز مخصص للعرض فقط</span>
-                </label>
-                ${pickerDisplayShareHtml}
-              </button>
+            <div class="pickerInlineToggleWrap">
+              <label class="pickerInlineToggle" for="pickerDisplayOnlyToggle">
+                <input id="pickerDisplayOnlyToggle" type="checkbox" ${pickerDisplayOnly ? "checked" : ""}>
+                <span>إضافة شاشة عرض مستقلة</span>
+              </label>
             </div>
-            <div class="pickerActionRow">
-              <button id="applyEducationModeBtn" class="pickerApplyBtn" type="button">اعتماد هذا النمط</button>
-            </div>
-          `;
-        }
+
+            ${pickerDisplayCardHtml}
+          </div>
+        ` : ``;
 
         main.innerHTML = `
           <div class="lobbyCard">
-            <div class="modeTabs">
-              <button class="modeTabBtn singleTab ${pickerTab === "single" ? "activeTab" : ""}" type="button" data-picker-tab="single">مشاركة الجوالات</button>
-              <button class="modeTabBtn separateTab ${pickerTab === "separate" ? "activeTab" : ""}" type="button" data-picker-tab="separate">شاشة عرض منفصلة</button>
-              <button class="modeTabBtn educationTab ${pickerTab === "education" ? "activeTab" : ""}" type="button" data-picker-tab="education">للأنشطة التعليمية</button>
+            <div class="pickerHeaderSection">
+              <div class="pickerField">
+                <div class="pickerFieldLabel">نوع اللعبة</div>
+                <div class="pickerOptionGrid">
+                  <button class="pickerOptionBtn typeNormal ${pickerGameType === "normal" ? "activeChoice" : ""}" type="button" data-picker-game-type="normal">لعبة عادية</button>
+                  <button class="pickerOptionBtn typeEducation ${pickerGameType === "education" ? "activeChoice" : ""}" type="button" data-picker-game-type="education">لعبة تعليمية</button>
+                </div>
+              </div>
+
+              <div class="pickerField">
+                <div class="pickerFieldLabel">طريقة التشغيل</div>
+                <div class="pickerOptionGrid">
+                  <button class="pickerOptionBtn modeMulti ${pickerPlayMode === "multi" ? "activeChoice" : ""}" type="button" data-picker-play-mode="multi">اللعب من أجهزة متعددة</button>
+                  <button class="pickerOptionBtn modeSingle ${pickerPlayMode === "single" ? "activeChoice" : ""}" type="button" data-picker-play-mode="single">اللعب من جهاز واحد</button>
+                </div>
+              </div>
             </div>
 
-            <div class="modePickerPanel">
-              ${pickerContentHtml}
-            </div>
+            <div class="pickerMainPanel">
+              <div class="pickerSummaryCard ${pickerSummaryClass}">
+                <div class="pickerSummaryTitle">${pickerSummaryTitle}</div>
+                <div class="pickerSummaryDesc">${pickerSummaryDesc}</div>
+              </div>
 
-            <div class="pickerMiniNote">تبديل النمط يتم من نفس الصفحة، والمحتوى يتغير مباشرة حسب اختيارك.</div>
+              ${pickerLinksHtml}
+
+              <div class="pickerApplyArea">
+                <button id="applyUnifiedModeBtn" class="pickerApplyBtn" type="button">اعتماد الاختيارات</button>
+              </div>
+            </div>
 
             <div id="qrZoomOverlay" class="qrZoomOverlay" aria-hidden="true">
               <div class="qrZoomCard">
@@ -5787,7 +5796,7 @@ function hideEidIntro(immediate){
 
             ${staffModeHtml}
           </div>
-        `;
+                `;
       }else{
         main.innerHTML = `
           <div class="lobbyCard">
@@ -5844,8 +5853,8 @@ function hideEidIntro(immediate){
             </div>
             ` : `
             <div class="eduInfoCard">
-              <div class="eduInfoTitle">جهاز واحد — لعب مباشر</div>
-              <p class="eduInfoSub">هذا الوضع مخصص للمعلم فقط.<br>شغّل اللعبة من جهازك، ثم اعرض الشاشة مباشرة على البروجكتر أو التلفاز عبر انعكاس الشاشة أو HDMI.</p>
+              <div class="eduInfoTitle">${currentGameType === "education" ? "لعبة تعليمية — جهاز واحد" : "لعبة عادية — جهاز واحد"}</div>
+              <p class="eduInfoSub">شغّل اللعبة مباشرة من جهازك، ثم ابدأ اللعب فورًا. ويمكنك عرض الشاشة على التلفاز أو البروجكتر عبر انعكاس الشاشة أو HDMI عند الحاجة.</p>
             </div>
             `}
 
@@ -5895,17 +5904,14 @@ function hideEidIntro(immediate){
       if(changeModeBtn){
         changeModeBtn.addEventListener("click", async () => {
           MODE_PICKER.inited = false;
-          MODE_PICKER.activeTab = "single";
-          MODE_PICKER.eduPlayType = "single";
-          MODE_PICKER.eduDisplayOnly = false;
-          MODE_PICKER.inited = false;
-          MODE_PICKER.activeTab = "single";
-          MODE_PICKER.eduPlayType = "single";
-          MODE_PICKER.eduDisplayOnly = false;
+          MODE_PICKER.gameType = "normal";
+          MODE_PICKER.playMode = "multi";
+          MODE_PICKER.displayOnly = false;
           const nextSettings = {
             ...currentSettings,
             hostLobbyMode: null,
             hostLobbyExperience: null,
+            normalPlayType: null,
             educationPlayType: null,
             educationDisplayOnly: false
           };
@@ -5933,6 +5939,7 @@ function hideEidIntro(immediate){
             ...currentSettings,
             hostLobbyMode: null,
             hostLobbyExperience: null,
+            normalPlayType: null,
             educationPlayType: null,
             educationDisplayOnly: false
           };
@@ -6168,75 +6175,59 @@ function hideEidIntro(immediate){
         });
       }
 
+      const copyPickerJoinBtn = document.getElementById("copyPickerJoinBtn");
+      if(copyPickerJoinBtn){
+        copyPickerJoinBtn.addEventListener("click", async () => {
+          const ok = await copyText(joinUrl);
+          copyPickerJoinBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyPickerJoinBtn.textContent = "نسخ رابط اللاعبين", 1200);
+        });
+      }
+
       function rerenderPickerOnly(){
         const latest = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
         renderHostLobby(latest);
       }
 
-      main.querySelectorAll("[data-picker-tab]").forEach(btn => {
+      main.querySelectorAll("[data-picker-game-type]").forEach(btn => {
         btn.addEventListener("click", () => {
-          const nextTab = String(btn.getAttribute("data-picker-tab") || "single");
-          MODE_PICKER.activeTab = nextTab;
-          if(nextTab !== "education"){
-            MODE_PICKER.eduPlayType = "single";
-            MODE_PICKER.eduDisplayOnly = false;
-          }
+          MODE_PICKER.gameType = String(btn.getAttribute("data-picker-game-type") || "normal");
           MODE_PICKER.inited = true;
           rerenderPickerOnly();
         });
       });
 
-      main.querySelectorAll("[data-edu-preview]").forEach(btn => {
-        btn.addEventListener("click", (ev) => {
-          if(ev.target && ev.target.closest && ev.target.closest("label")) return;
-          const playType = String(btn.getAttribute("data-edu-preview") || "single");
-          MODE_PICKER.activeTab = "education";
-          MODE_PICKER.eduPlayType = playType;
-          if(playType !== "multi") MODE_PICKER.eduDisplayOnly = false;
+      main.querySelectorAll("[data-picker-play-mode]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          MODE_PICKER.playMode = String(btn.getAttribute("data-picker-play-mode") || "multi");
+          if(MODE_PICKER.playMode !== "multi") MODE_PICKER.displayOnly = false;
           MODE_PICKER.inited = true;
           rerenderPickerOnly();
         });
       });
 
-      const pickerEduDisplayOnlyToggle = document.getElementById("pickerEduDisplayOnlyToggle");
-      if(pickerEduDisplayOnlyToggle){
-        pickerEduDisplayOnlyToggle.addEventListener("change", () => {
-          MODE_PICKER.activeTab = "education";
-          MODE_PICKER.eduPlayType = "multi";
-          MODE_PICKER.eduDisplayOnly = !!pickerEduDisplayOnlyToggle.checked;
+      const pickerDisplayOnlyToggle = document.getElementById("pickerDisplayOnlyToggle");
+      if(pickerDisplayOnlyToggle){
+        pickerDisplayOnlyToggle.addEventListener("change", () => {
+          MODE_PICKER.playMode = "multi";
+          MODE_PICKER.displayOnly = !!pickerDisplayOnlyToggle.checked;
           MODE_PICKER.inited = true;
           rerenderPickerOnly();
         });
       }
 
       async function applyUnifiedModeSelection(){
-        let nextSettings = null;
-        if(MODE_PICKER.activeTab === "single"){
-          nextSettings = {
-            ...currentSettings,
-            hostLobbyMode: "single",
-            hostLobbyExperience: null,
-            educationPlayType: null,
-            educationDisplayOnly: false
-          };
-        }else if(MODE_PICKER.activeTab === "separate"){
-          nextSettings = {
-            ...currentSettings,
-            hostLobbyMode: "separate",
-            hostLobbyExperience: null,
-            educationPlayType: null,
-            educationDisplayOnly: false
-          };
-        }else{
-          const displayOnly = MODE_PICKER.eduPlayType === "multi" ? !!MODE_PICKER.eduDisplayOnly : false;
-          nextSettings = {
-            ...currentSettings,
-            hostLobbyMode: (MODE_PICKER.eduPlayType === "multi" && displayOnly) ? "separate" : "single",
-            hostLobbyExperience: "education",
-            educationPlayType: MODE_PICKER.eduPlayType || "single",
-            educationDisplayOnly: displayOnly
-          };
-        }
+        const nextGameType = MODE_PICKER.gameType || "normal";
+        const nextPlayMode = MODE_PICKER.playMode || "multi";
+        const nextDisplayOnly = nextPlayMode === "multi" ? !!MODE_PICKER.displayOnly : false;
+        const nextSettings = {
+          ...currentSettings,
+          hostLobbyMode: nextPlayMode === "multi" && nextDisplayOnly ? "separate" : "single",
+          hostLobbyExperience: nextGameType,
+          normalPlayType: nextGameType === "normal" ? nextPlayMode : null,
+          educationPlayType: nextGameType === "education" ? nextPlayMode : null,
+          educationDisplayOnly: nextGameType === "education" ? nextDisplayOnly : false
+        };
         applyHostLobbySettingsLocal(nextSettings);
         try{
           await update(ref(db, `rooms/${code}`), {
@@ -6246,9 +6237,7 @@ function hideEidIntro(immediate){
         }catch(e){}
       }
 
-      document.getElementById("applySingleModeBtn")?.addEventListener("click", applyUnifiedModeSelection);
-      document.getElementById("applySeparateModeBtn")?.addEventListener("click", applyUnifiedModeSelection);
-      document.getElementById("applyEducationModeBtn")?.addEventListener("click", applyUnifiedModeSelection);
+      document.getElementById("applyUnifiedModeBtn")?.addEventListener("click", applyUnifiedModeSelection);
     }
 
     function renderWaiting(msg){
