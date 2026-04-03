@@ -5490,8 +5490,8 @@ function hideEidIntro(immediate){
       const normalModeLabel = hostMode === "separate" ? "مع شاشة عرض منفصلة" : "بدون شاشة عرض من جهاز آخر";
       const modeLabel = isEducation
         ? (eduPlayType === "single"
-            ? "فعاليات تعليمية — جهاز واحد"
-            : (eduDisplayOnly ? "فعاليات تعليمية — أجهزة متعددة + جهاز مخصص للعرض" : "فعاليات تعليمية — أجهزة متعددة"))
+            ? "للأنشطة التعليمية — جهاز واحد"
+            : (eduDisplayOnly ? "للأنشطة التعليمية — أجهزة متعددة + جهاز مخصص للعرض" : "للأنشطة التعليمية — أجهزة متعددة"))
         : normalModeLabel;
       const startBtnLabel = showEducationSingle
         ? "ابدأ اللعب المباشر"
@@ -5550,9 +5550,9 @@ function hideEidIntro(immediate){
                 <button class="modeChoiceBtn education" type="button" data-lobby-experience="education">
                   <div class="modeChoiceTop">
                     <div class="modeChoiceNum">3</div>
-                    <div class="modeChoiceTitle">فعاليات تعليمية</div>
+                    <div class="modeChoiceTitle">للأنشطة التعليمية</div>
                   </div>
-                  <div class="modeChoiceDesc">مسار مبسط للمعلمين<br>وفيه جهاز واحد أو أجهزة متعددة</div>
+                  <div class="modeChoiceDesc">مناسب للحصص والفعاليات المدرسية<br>بخيارات مرنة وسهلة الاستخدام</div>
                 </button>
               </div>
             </div>
@@ -5563,7 +5563,7 @@ function hideEidIntro(immediate){
         main.innerHTML = `
           <div class="lobbyCard">
             <div class="selectedModeBar">
-              <div class="selectedModeText">النمط المختار: فعاليات تعليمية</div>
+              <div class="selectedModeText">النمط المختار: للأنشطة التعليمية</div>
               <button id="changeModeBtn" class="changeModeBtn" type="button">تغيير النمط</button>
             </div>
 
@@ -5704,16 +5704,25 @@ function hideEidIntro(immediate){
       const changeModeBtn = document.getElementById("changeModeBtn");
       if(changeModeBtn){
         changeModeBtn.addEventListener("click", async () => {
+          const nextSettings = {
+            ...currentSettings,
+            hostLobbyMode: null,
+            hostLobbyExperience: null,
+            educationPlayType: null,
+            educationDisplayOnly: false
+          };
+          const baseRoom = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+          const merged = normalizeLiveRoom({
+            ...baseRoom,
+            displayPid: null,
+            settings: nextSettings
+          });
+          LIVE.room = merged;
+          renderHostLobby(merged);
           try{
             await update(ref(db, `rooms/${code}`), {
               displayPid: null,
-              settings: {
-                ...currentSettings,
-                hostLobbyMode: null,
-                hostLobbyExperience: null,
-                educationPlayType: null,
-                educationDisplayOnly: false
-              }
+              settings: nextSettings
             });
           }catch(e){}
         });
@@ -5722,16 +5731,25 @@ function hideEidIntro(immediate){
       const eduBackBtn = document.getElementById("eduBackBtn");
       if(eduBackBtn){
         eduBackBtn.addEventListener("click", async () => {
+          const nextSettings = {
+            ...currentSettings,
+            hostLobbyMode: null,
+            hostLobbyExperience: null,
+            educationPlayType: null,
+            educationDisplayOnly: false
+          };
+          const baseRoom = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+          const merged = normalizeLiveRoom({
+            ...baseRoom,
+            displayPid: null,
+            settings: nextSettings
+          });
+          LIVE.room = merged;
+          renderHostLobby(merged);
           try{
             await update(ref(db, `rooms/${code}`), {
               displayPid: null,
-              settings: {
-                ...currentSettings,
-                hostLobbyMode: null,
-                hostLobbyExperience: null,
-                educationPlayType: null,
-                educationDisplayOnly: false
-              }
+              settings: nextSettings
             });
           }catch(e){}
         });
@@ -5929,20 +5947,36 @@ function hideEidIntro(immediate){
         });
       }
 
+      function applyHostLobbySettingsLocal(nextSettings){
+        const baseRoom = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+        const merged = normalizeLiveRoom({
+          ...baseRoom,
+          displayPid: null,
+          settings: {
+            ...((baseRoom?.settings && typeof baseRoom.settings === "object") ? baseRoom.settings : {}),
+            ...nextSettings
+          }
+        });
+        LIVE.room = merged;
+        renderHostLobby(merged);
+      }
+
       main.querySelectorAll("[data-host-mode]").forEach(btn => {
         btn.addEventListener("click", async () => {
           const nextMode = String(btn.getAttribute("data-host-mode") || "");
           if(!nextMode) return;
+          const nextSettings = {
+            ...currentSettings,
+            hostLobbyMode: nextMode,
+            hostLobbyExperience: null,
+            educationPlayType: null,
+            educationDisplayOnly: false
+          };
+          applyHostLobbySettingsLocal(nextSettings);
           try{
             await update(ref(db, `rooms/${code}`), {
               displayPid: null,
-              settings: {
-                ...currentSettings,
-                hostLobbyMode: nextMode,
-                hostLobbyExperience: "normal",
-                educationPlayType: null,
-                educationDisplayOnly: false
-              }
+              settings: nextSettings
             });
           }catch(e){}
         });
@@ -5952,16 +5986,18 @@ function hideEidIntro(immediate){
         btn.addEventListener("click", async () => {
           const nextExperience = String(btn.getAttribute("data-lobby-experience") || "");
           if(nextExperience !== "education") return;
+          const nextSettings = {
+            ...currentSettings,
+            hostLobbyMode: null,
+            hostLobbyExperience: "education",
+            educationPlayType: null,
+            educationDisplayOnly: false
+          };
+          applyHostLobbySettingsLocal(nextSettings);
           try{
             await update(ref(db, `rooms/${code}`), {
               displayPid: null,
-              settings: {
-                ...currentSettings,
-                hostLobbyMode: null,
-                hostLobbyExperience: "education",
-                educationPlayType: null,
-                educationDisplayOnly: false
-              }
+              settings: nextSettings
             });
           }catch(e){}
         });
@@ -5974,16 +6010,18 @@ function hideEidIntro(immediate){
           if(ev.target && ev.target.closest && ev.target.closest("label")) return;
           const displayOnly = playType === "multi" ? !!eduDisplayOnlyToggle?.checked : false;
           const nextHostMode = playType === "multi" && displayOnly ? "separate" : "single";
+          const nextSettings = {
+            ...currentSettings,
+            hostLobbyMode: nextHostMode,
+            hostLobbyExperience: "education",
+            educationPlayType: playType,
+            educationDisplayOnly: displayOnly
+          };
+          applyHostLobbySettingsLocal(nextSettings);
           try{
             await update(ref(db, `rooms/${code}`), {
               displayPid: null,
-              settings: {
-                ...currentSettings,
-                hostLobbyMode: nextHostMode,
-                hostLobbyExperience: "education",
-                educationPlayType: playType,
-                educationDisplayOnly: displayOnly
-              }
+              settings: nextSettings
             });
           }catch(e){}
         });
