@@ -305,21 +305,21 @@
       background:#f4e9f1;
       border:none;
       border-radius:30px;
-      padding:20px 18px 18px;
-      box-shadow:0 18px 34px rgba(72,20,66,.18);
+      padding:18px 16px 18px;
+      box-shadow:0 18px 34px rgba(72,20,66,.10);
       color:#4b1243;
     }
     .pickerLobbyCard *{ text-shadow:none !important; }
     .pickerHeaderSection{
       display:flex;
       flex-direction:column;
-      gap:16px;
-      margin-bottom:16px;
+      gap:14px;
+      margin-bottom:14px;
     }
     .pickerField{
       display:flex;
       flex-direction:column;
-      gap:10px;
+      gap:8px;
     }
     .pickerFieldLabel{
       margin:0;
@@ -334,7 +334,7 @@
       gap:12px;
     }
     .pickerOptionBtn{
-      min-height:72px;
+      min-height:68px;
       border-radius:22px;
       border:4px solid #d9cad7;
       background:#fffdfd;
@@ -343,54 +343,61 @@
       font-weight:900;
       cursor:pointer;
       padding:12px 14px;
-      box-shadow:0 6px 14px rgba(75,18,67,.06);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
+      box-shadow:none;
     }
     .pickerOptionBtn.activeChoice{
       background:#8b1f78;
       color:#ffd44f;
       border-color:#ffd44f;
-      box-shadow:0 10px 18px rgba(139,31,120,.18);
+      box-shadow:none;
       transform:none;
     }
     .pickerMainPanel{
-      border-radius:26px;
-      padding:18px 14px;
+      border-radius:24px;
+      padding:14px;
       border:3px solid #e1d0dc;
       background:#fbf7fa;
       box-shadow:none;
     }
-    .pickerSummaryCard{
-      border-radius:24px;
-      padding:18px 16px;
-      border:4px solid #dcc9d8;
+    .pickerModeMini{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:120px;
+      padding:8px 14px;
+      border-radius:999px;
+      background:#8b1f78;
+      color:#ffd44f;
+      font-size:18px;
+      font-weight:900;
+      line-height:1;
+      margin:0 auto 10px;
+    }
+    .pickerSingleInfo{
+      border-radius:22px;
+      border:3px solid #dcc9d8;
       background:#fffdfd;
-      color:#4b1243;
+      padding:16px 14px;
       text-align:center;
-      box-shadow:none;
-    }
-    .pickerSummaryCard.education,
-    .pickerSummaryCard.singlePlay,
-    .pickerSummaryCard.multiPlay{
       color:#4b1243;
-      background:#fffdfd;
     }
-    .pickerSummaryTitle{
-      font-size:34px;
+    .pickerSingleInfoTitle{
+      font-size:30px;
       line-height:1.15;
       font-weight:900;
-      margin:0 0 10px;
+      margin:0 0 8px;
       color:#4b1243;
     }
-    .pickerSummaryDesc{
-      font-size:22px;
+    .pickerSingleInfoDesc{
+      font-size:20px;
       line-height:1.65;
       font-weight:900;
       color:#4b1243;
+      margin:0;
     }
     .pickerLinksWrap{
-      margin-top:16px;
       display:flex;
       flex-direction:column;
       gap:14px;
@@ -402,25 +409,43 @@
       box-shadow:none;
       text-align:right;
       color:#4b1243;
+      background:#fffdfd;
     }
-    .pickerLobbyCard .hostLinkCard.players{ background:#fff5cf; }
-    .pickerLobbyCard .hostLinkCard.display{ background:#e9f8f2; }
+    .pickerLobbyCard .hostLinkCard.players{ background:#fff7de; }
+    .pickerLobbyCard .hostLinkCard.display{ background:#eef8f2; }
     .pickerLobbyCard .hostLinkBadge{
       background:#ffffff;
       color:#4b1243;
       border:3px solid #d7cad5;
     }
+    .pickerCardModeRow{
+      display:flex;
+      justify-content:flex-start;
+      margin-bottom:8px;
+    }
+    .pickerCardModeTag{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px 14px;
+      border-radius:999px;
+      background:#8b1f78;
+      color:#ffd44f;
+      font-size:18px;
+      font-weight:900;
+      line-height:1;
+    }
     .pickerLobbyCard .hostLinkTitle{
-      font-size:30px;
+      font-size:28px;
       font-weight:900;
       line-height:1.15;
       color:#4b1243;
     }
     .pickerLobbyCard .hostLinkSub{
       margin-top:6px;
-      font-size:19px;
+      font-size:18px;
       font-weight:900;
-      line-height:1.45;
+      line-height:1.55;
       color:#4b1243;
     }
     .pickerLobbyCard .hostLinkQr{
@@ -428,16 +453,16 @@
       box-shadow:none;
     }
     .pickerInlineToggleWrap{
-      margin-top:14px;
       display:flex;
       justify-content:flex-start;
+      margin-top:2px;
     }
     .pickerInlineToggle{
       display:inline-flex;
       align-items:center;
       gap:10px;
       padding:8px 12px;
-      border-radius:16px;
+      border-radius:14px;
       background:#ffffff;
       border:3px solid #dfd1dc;
       color:#4b1243;
@@ -455,7 +480,7 @@
     .pickerApplyArea{
       display:flex;
       justify-content:center;
-      margin-top:18px;
+      margin-top:16px;
     }
     .pickerApplyBtn{
       min-width:250px;
@@ -483,17 +508,30 @@
     }
     .pickerLobbyCard .hostWarning{
       margin-top:-2px;
-      font-size:18px;
+      font-size:16px;
       font-weight:900;
       line-height:1.5;
       color:#4b1243;
       text-shadow:none;
+      text-align:center;
     }
     .pickerLobbyCard .qrZoomHint,
     .pickerLobbyCard .qrZoomTitle{ color:#4b1243; }
     .pickerLobbyCard .smallNote{ color:#6a4b64; }
+    body.mode-picker header,
+    body.mode-picker #eidIntroOverlay,
+    body.mode-picker .rights,
+    body.mode-picker .footerBtn,
+    body.mode-picker .staffModeFab{
+      display:none !important;
+    }
+    body.mode-picker .wrap{
+      width:min(95%, 920px);
+      max-width:920px;
+      margin:18px auto 0;
+    }
 
-    .pickerHeaderSection{
+
     .modeChoiceTop{display:flex;align-items:center;gap:12px;justify-content:space-between}
     .modeChoiceNum{
       width:48px;height:48px;border-radius:50%;flex:0 0 auto;
@@ -5732,6 +5770,7 @@ function hideEidIntro(immediate){
       `;
 
       const showUnifiedPicker = showModeChooser;
+      document.body.classList.toggle("mode-picker", !!showUnifiedPicker);
       if(showUnifiedPicker){
         if(!MODE_PICKER.inited){
           MODE_PICKER.gameType = currentGameType || "normal";
@@ -5744,25 +5783,20 @@ function hideEidIntro(immediate){
         const pickerPlayMode = MODE_PICKER.playMode || "multi";
         const pickerDisplayOnly = !!MODE_PICKER.displayOnly;
         const pickerIsEducation = pickerGameType === "education";
-        const pickerSummaryClass = `${pickerIsEducation ? "education" : "normal"} ${pickerPlayMode === "single" ? "singlePlay" : "multiPlay"}`;
-        const pickerSummaryTitle = pickerIsEducation
-          ? (pickerPlayMode === "multi" ? "لعبة تعليمية" : "لعبة تعليمية")
-          : (pickerPlayMode === "multi" ? "لعبة عادية" : "لعبة عادية");
-        const pickerSummaryDesc = pickerPlayMode === "multi"
-          ? (pickerIsEducation
-              ? "الطلاب يشاركون من أجهزتهم، ويمكنك إضافة شاشة عرض مستقلة عند الحاجة"
-              : "المقدم يدير اللعبة من جهازه، واللاعبون يشاركون من جوالاتهم")
-          : (pickerIsEducation
-              ? "المعلم يشغّل اللعبة من جهازه مباشرة ويعرضها على البروجكتر أو الشاشة"
-              : "تشغّل اللعبة مباشرة من جهاز واحد بدون روابط أو باركود");
+        const pickerModeTag = pickerIsEducation ? "لعبة تعليمية" : "لعبة عادية";
+        const pickerSingleTitle = pickerIsEducation ? "تشغيل مباشر للحصة" : "تشغيل مباشر";
+        const pickerSingleDesc = pickerIsEducation
+          ? "شغّل اللعبة من نفس جهازك مباشرة، ثم اعرضها على الشاشة أو البروجكتر بدون روابط أو باركود."
+          : "شغّل اللعبة من جهاز واحد مباشرة بدون روابط أو باركود أو خطوات إضافية.";
 
         const pickerDisplayCardHtml = (pickerPlayMode === "multi" && pickerDisplayOnly) ? `
           <div class="hostLinkCard display">
+            <div class="pickerCardModeRow"><span class="pickerCardModeTag">${pickerModeTag}</span></div>
             <div class="hostLinkHead">
               <div class="hostLinkBadge">2</div>
               <div class="hostLinkBody">
                 <div class="hostLinkTitle">رابط شاشة العرض</div>
-                <div class="hostLinkSub">هذا الرابط للشاشة فقط وليس للاعبين</div>
+                <div class="hostLinkSub">استخدمه فقط إذا كان عندك جهاز منفصل لعرض اللعبة على التلفزيون أو البروجكتر.</div>
               </div>
               <img class="hostLinkQr" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض" data-qr-label="باركود شاشة العرض">
             </div>
@@ -5772,14 +5806,15 @@ function hideEidIntro(immediate){
           </div>
         ` : ``;
 
-        const pickerLinksHtml = pickerPlayMode === "multi" ? `
+        const pickerContentHtml = pickerPlayMode === "multi" ? `
           <div class="pickerLinksWrap">
             <div class="hostLinkCard players">
+              <div class="pickerCardModeRow"><span class="pickerCardModeTag">${pickerModeTag}</span></div>
               <div class="hostLinkHead">
                 <div class="hostLinkBadge">1</div>
                 <div class="hostLinkBody">
                   <div class="hostLinkTitle">رابط دخول اللاعبين</div>
-                  <div class="hostLinkSub">هذا الرابط للاعبين فقط</div>
+                  <div class="hostLinkSub">المقدم يدير اللعبة من جهازه، واللاعبون يشاركون من جوالاتهم.</div>
                 </div>
                 <img class="hostLinkQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين" data-qr-label="باركود دخول اللاعبين">
               </div>
@@ -5796,8 +5831,15 @@ function hideEidIntro(immediate){
             </div>
 
             ${pickerDisplayCardHtml}
+            ${pickerDisplayOnly ? `<div class="hostWarning">تنبيه: رابط شاشة العرض مخصص للشاشة فقط وليس للاعبين.</div>` : ``}
           </div>
-        ` : ``;
+        ` : `
+          <div class="pickerSingleInfo">
+            <div class="pickerModeMini">${pickerModeTag}</div>
+            <div class="pickerSingleInfoTitle">${pickerSingleTitle}</div>
+            <p class="pickerSingleInfoDesc">${pickerSingleDesc}</p>
+          </div>
+        `;
 
         main.innerHTML = `
           <div class="lobbyCard pickerLobbyCard">
@@ -5820,12 +5862,7 @@ function hideEidIntro(immediate){
             </div>
 
             <div class="pickerMainPanel">
-              <div class="pickerSummaryCard ${pickerSummaryClass}">
-                <div class="pickerSummaryTitle">${pickerSummaryTitle}</div>
-                <div class="pickerSummaryDesc">${pickerSummaryDesc}</div>
-              </div>
-
-              ${pickerLinksHtml}
+              ${pickerContentHtml}
 
               <div class="pickerApplyArea">
                 <button id="applyUnifiedModeBtn" class="pickerApplyBtn" type="button">اعتماد الاختيارات</button>
