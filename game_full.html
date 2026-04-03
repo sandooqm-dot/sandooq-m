@@ -237,7 +237,69 @@
     }
     .modeChoiceBtn.single{background:#f7f1de;color:#5a1d58}
     .modeChoiceBtn.separate{background:#eef5cf;color:#185f31}
+    .modeChoiceBtn.education{background:#dff3ff;color:#0b4f77}
+    .modeChoiceBtn.eduSingle{background:#fff7df;color:#7a4d00}
+    .modeChoiceBtn.eduMulti{background:#eef7ff;color:#104a85}
     .modeChoiceBtn:active{transform:translateY(1px)}
+    .eduModeBackWrap{display:flex;justify-content:center;margin-top:4px}
+    .eduModeBackBtn{
+      min-width:220px;
+      max-width:100%;
+      padding:12px 16px;
+      border:none;
+      border-radius:16px;
+      cursor:pointer;
+      background:#fff;
+      color:#111;
+      font-size:20px;
+      font-weight:900;
+      border:4px solid rgba(0,0,0,.80);
+      box-shadow:0 8px 0 rgba(0,0,0,.18);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .eduModeBackBtn:active{transform:translateY(1px)}
+    .eduOptionHint{
+      margin-top:10px;
+      font-size:18px;
+      line-height:1.6;
+      font-weight:900;
+      color:rgba(255,255,255,.92);
+      text-align:center;
+    }
+    .eduDisplayToggleWrap{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:18px;
+      background:rgba(255,255,255,.72);
+      border:4px dashed rgba(0,0,0,.18);
+      color:#123;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      cursor:pointer;
+    }
+    .eduDisplayToggleText{flex:1 1 auto;font-size:19px;font-weight:900;line-height:1.45}
+    .eduDisplayToggleInput{
+      width:26px;
+      height:26px;
+      accent-color:#16a34a;
+      flex:0 0 auto;
+      cursor:pointer;
+    }
+    .eduInfoCard{
+      margin-top:16px;
+      border-radius:24px;
+      padding:18px 16px;
+      border:5px solid rgba(0,0,0,.78);
+      background:linear-gradient(180deg,#f7f2da 0%, #fff9ec 100%);
+      color:#5a1d58;
+      box-shadow:0 14px 24px rgba(0,0,0,.18);
+      text-align:center;
+    }
+    .eduInfoTitle{font-size:34px;font-weight:900;line-height:1.2;margin:0 0 10px}
+    .eduInfoSub{font-size:21px;font-weight:900;line-height:1.75;margin:0;color:#6b2d5f}
     .modeChoiceTop{display:flex;align-items:center;gap:12px;justify-content:space-between}
     .modeChoiceNum{
       width:48px;height:48px;border-radius:50%;flex:0 0 auto;
@@ -4025,6 +4087,17 @@ function hideEidIntro(immediate){
       const mode = String(room?.settings?.hostLobbyMode || room?.hostLobbyMode || "").trim();
       return (mode === "single" || mode === "separate") ? mode : "";
     }
+    function getHostLobbyExperience(room){
+      const mode = String(room?.settings?.hostLobbyExperience || "").trim();
+      return (mode === "normal" || mode === "education") ? mode : "";
+    }
+    function getEducationPlayType(room){
+      const mode = String(room?.settings?.educationPlayType || "").trim();
+      return (mode === "single" || mode === "multi") ? mode : "";
+    }
+    function isEducationDisplayOnly(room){
+      return !!room?.settings?.educationDisplayOnly;
+    }
     function buildQrUrl(dataUrl){
       const size = "220x220";
       return `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(dataUrl)}`;
@@ -5394,6 +5467,10 @@ function hideEidIntro(immediate){
       const players = room.players || {};
       const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
       const hostMode = getHostLobbyMode(room);
+      const hostExperience = getHostLobbyExperience(room);
+      const eduPlayType = getEducationPlayType(room);
+      const eduDisplayOnly = isEducationDisplayOnly(room);
+      const isEducation = hostExperience === "education";
       const visualTeams = getVisualTeams(room);
       const greenText = getReadableTextColor(visualTeams.green.color);
       const orangeText = getReadableTextColor(visualTeams.orange.color);
@@ -5405,7 +5482,20 @@ function hideEidIntro(immediate){
       const displayUrl = buildDisplayUrl(room.code || code);
       const displayQrUrl = buildQrUrl(displayUrl);
       const currentSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
-      const modeLabel = hostMode === "separate" ? "مع شاشة عرض منفصلة" : "بدون شاشة عرض من جهاز آخر";
+      const showEducationSelector = isEducation && !eduPlayType;
+      const showModeChooser = !hostExperience && !hostMode;
+      const showEducationSingle = isEducation && eduPlayType === "single";
+      const showPlayerLinks = !isEducation || eduPlayType === "multi";
+      const showDisplayLink = showPlayerLinks && ((!isEducation && hostMode === "separate") || (isEducation && eduPlayType === "multi" && eduDisplayOnly));
+      const normalModeLabel = hostMode === "separate" ? "مع شاشة عرض منفصلة" : "بدون شاشة عرض من جهاز آخر";
+      const modeLabel = isEducation
+        ? (eduPlayType === "single"
+            ? "فعاليات تعليمية — جهاز واحد"
+            : (eduDisplayOnly ? "فعاليات تعليمية — أجهزة متعددة + جهاز مخصص للعرض" : "فعاليات تعليمية — أجهزة متعددة"))
+        : normalModeLabel;
+      const startBtnLabel = showEducationSingle
+        ? "ابدأ اللعب المباشر"
+        : (updatesEnabled ? "فتح وضع الستريمر" : "ابدأ اللعبة");
 
       const staffModeHtml = `
         <div class="staffModeFab">
@@ -5434,7 +5524,7 @@ function hideEidIntro(immediate){
         </div>
       `;
 
-      if(!hostMode){
+      if(showModeChooser){
         main.innerHTML = `
           <div class="lobbyCard">
             <div class="modeSelectorWrap">
@@ -5456,6 +5546,53 @@ function hideEidIntro(immediate){
                   </div>
                   <div class="modeChoiceDesc">المقدم يدير اللعبة من جهازه<br>اللاعبون يدخلون من جوالاتهم<br>مع جهاز آخر يُفتح برابط خاص ليتم عرضه على شاشة التلفاز</div>
                 </button>
+
+                <button class="modeChoiceBtn education" type="button" data-lobby-experience="education">
+                  <div class="modeChoiceTop">
+                    <div class="modeChoiceNum">3</div>
+                    <div class="modeChoiceTitle">فعاليات تعليمية</div>
+                  </div>
+                  <div class="modeChoiceDesc">مسار مبسط للمعلمين<br>وفيه جهاز واحد أو أجهزة متعددة</div>
+                </button>
+              </div>
+            </div>
+            ${staffModeHtml}
+          </div>
+        `;
+      }else if(showEducationSelector){
+        main.innerHTML = `
+          <div class="lobbyCard">
+            <div class="selectedModeBar">
+              <div class="selectedModeText">النمط المختار: فعاليات تعليمية</div>
+              <button id="changeModeBtn" class="changeModeBtn" type="button">تغيير النمط</button>
+            </div>
+
+            <div class="modeSelectorWrap">
+              <div class="modeSelectorTitle">اختر طريقة الاستخدام</div>
+              <div class="modeSelectorCards">
+                <button class="modeChoiceBtn eduSingle" type="button" data-edu-play="single">
+                  <div class="modeChoiceTop">
+                    <div class="modeChoiceNum">1</div>
+                    <div class="modeChoiceTitle">جهاز واحد — لعب مباشر</div>
+                  </div>
+                  <div class="modeChoiceDesc">المعلم يشغل اللعبة من جهازه مباشرة<br>ويعرضها على البروجكتر أو الشاشة</div>
+                </button>
+
+                <button class="modeChoiceBtn eduMulti" type="button" data-edu-play="multi">
+                  <div class="modeChoiceTop">
+                    <div class="modeChoiceNum">2</div>
+                    <div class="modeChoiceTitle">أجهزة متعددة</div>
+                  </div>
+                  <div class="modeChoiceDesc">نفس منطق اللعبة الحالي للطلاب<br>مع خيار جهاز مخصص للعرض فقط عند الحاجة</div>
+                  <label class="eduDisplayToggleWrap" for="eduDisplayOnlyToggle">
+                    <div class="eduDisplayToggleText">تفعيل جهاز مخصص للعرض فقط</div>
+                    <input id="eduDisplayOnlyToggle" class="eduDisplayToggleInput" type="checkbox">
+                  </label>
+                </button>
+              </div>
+              <div class="eduOptionHint">اختر الخيار المناسب لفصلك، وبعدها نكمل باقي تخصيصات النمط خطوة بخطوة.</div>
+              <div class="eduModeBackWrap">
+                <button id="eduBackBtn" class="eduModeBackBtn" type="button">رجوع</button>
               </div>
             </div>
             ${staffModeHtml}
@@ -5469,6 +5606,7 @@ function hideEidIntro(immediate){
               <button id="changeModeBtn" class="changeModeBtn" type="button">تغيير النمط</button>
             </div>
 
+            ${showPlayerLinks ? `
             <div class="teams">
               <div class="teamCol teamGreen" style="background:${escapeHtml(hexToRgba(visualTeams.green.color, 0.86))};color:${escapeHtml(greenText)};border-color:rgba(0,0,0,.70)">
                 <div class="teamTitle">${escapeHtml(visualTeams.green.name)}</div>
@@ -5497,7 +5635,7 @@ function hideEidIntro(immediate){
                 </div>
               </div>
 
-              ${hostMode === "separate" ? `
+              ${showDisplayLink ? `
               <div class="hostLinkCard display">
                 <div class="hostLinkHead">
                   <div class="hostLinkBadge">2</div>
@@ -5514,36 +5652,45 @@ function hideEidIntro(immediate){
               <div class="hostWarning">تنبيه: شاشة العرض لا يدخل منها اللاعبون.</div>
               ` : ``}
             </div>
+            ` : `
+            <div class="eduInfoCard">
+              <div class="eduInfoTitle">جهاز واحد — لعب مباشر</div>
+              <p class="eduInfoSub">هذا الوضع مخصص للمعلم فقط.<br>شغّل اللعبة من جهازك، ثم اعرض الشاشة مباشرة على البروجكتر أو التلفاز عبر انعكاس الشاشة أو HDMI.</p>
+            </div>
+            `}
 
             <div class="row hostLobbyActions">
-              <button id="startBtn" class="btn btnGreen" type="button">${updatesEnabled ? "فتح وضع الستريمر" : "ابدأ اللعبة"}</button>
+              <button id="startBtn" class="btn btnGreen" type="button">${escapeHtml(startBtnLabel)}</button>
             </div>
 
-            ${updatesEnabled ? `<div class="smallNote" style="margin-top:8px">في وضع الستريمر يفتح المقدم الواجهة الخاصة أولًا، بينما يبقى اللاعبون على وضعهم المعتاد.</div>` : ``}
+            ${updatesEnabled && !showEducationSingle ? `<div class="smallNote" style="margin-top:8px">في وضع الستريمر يفتح المقدم الواجهة الخاصة أولًا، بينما يبقى اللاعبون على وضعهم المعتاد.</div>` : ``}
 
+            ${showPlayerLinks ? `
             <div id="qrZoomOverlay" class="qrZoomOverlay" aria-hidden="true">
               <div class="qrZoomCard">
                 <div id="qrZoomTitle" class="qrZoomTitle">الباركود</div>
-                <img id="qrZoomImg" class="qrZoomImg" src="" alt="باركود مكبر">
-                <div class="qrZoomHint">اضغط على الباركود أو أي مكان في الشاشة للإغلاق</div>
+                <img id="qrZoomImg" class="qrZoomImg" src="" alt="تكبير الباركود">
+                <div class="qrZoomHint">اضغط على الباركود مرة أخرى لإغلاقه</div>
               </div>
             </div>
+            ` : ``}
 
             ${staffModeHtml}
           </div>
         `;
+      }
 
+      if(showPlayerLinks){
         const greenList = document.getElementById("greenList");
         const orangeList = document.getElementById("orangeList");
+        greenList.innerHTML = green.length
+          ? green.map(p => `<div class="playerItem" data-id="${p.id}">${escapeHtml(p.name || "لاعب")}${p.isTv ? `<span class="playerTvBadge">عرض</span>` : ""}</div>`).join("")
+          : `<div class="playerItem" style="opacity:.8">لا يوجد لاعبين</div>`;
+        orangeList.innerHTML = orange.length
+          ? orange.map(p => `<div class="playerItem" data-id="${p.id}">${escapeHtml(p.name || "لاعب")}${p.isTv ? `<span class="playerTvBadge">عرض</span>` : ""}</div>`).join("")
+          : `<div class="playerItem" style="opacity:.8">لا يوجد لاعبين</div>`;
 
-        function draw(colEl, arr, teamColor, textColor){
-          const borderColor = getReadableBorderColor(textColor);
-          colEl.innerHTML = arr.map(p => `<div class="playerItem" data-id="${escapeHtml(p.id)}" style="background:${escapeHtml(hexToRgba(teamColor, 0.96))};color:${escapeHtml(textColor)};border-color:${escapeHtml(borderColor)}">${escapeHtml(p.name)}</div>`).join("") || `<div class="smallNote" style="color:${escapeHtml(textColor)}">لا يوجد</div>`;
-        }
-        draw(greenList, green, visualTeams.green.color, greenText);
-        draw(orangeList, orange, visualTeams.orange.color, orangeText);
-
-        main.querySelectorAll(".playerItem").forEach(el => {
+        main.querySelectorAll(".playerItem[data-id]").forEach(el => {
           el.addEventListener("click", async () => {
             const id = el.getAttribute("data-id");
             const p = players[id];
@@ -5552,79 +5699,130 @@ function hideEidIntro(immediate){
             await update(ref(db, `rooms/${code}/players/${id}`), { team: newTeam });
           });
         });
+      }
 
-        const changeModeBtn = document.getElementById("changeModeBtn");
-        if(changeModeBtn){
-          changeModeBtn.addEventListener("click", async () => {
-            try{
-              await update(ref(db, `rooms/${code}`), {
-                displayPid: null,
-                settings: { ...currentSettings, hostLobbyMode: null }
-              });
-            }catch(e){}
-          });
-        }
+      const changeModeBtn = document.getElementById("changeModeBtn");
+      if(changeModeBtn){
+        changeModeBtn.addEventListener("click", async () => {
+          try{
+            await update(ref(db, `rooms/${code}`), {
+              displayPid: null,
+              settings: {
+                ...currentSettings,
+                hostLobbyMode: null,
+                hostLobbyExperience: null,
+                educationPlayType: null,
+                educationDisplayOnly: false
+              }
+            });
+          }catch(e){}
+        });
+      }
 
-        const copyJoinBtn = document.getElementById("copyJoinBtn");
-        if(copyJoinBtn){
-          copyJoinBtn.addEventListener("click", async () => {
-            const ok = await copyText(joinUrl);
-            copyJoinBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-            setTimeout(()=> copyJoinBtn.textContent = "نسخ رابط اللاعبين", 1200);
-          });
-        }
+      const eduBackBtn = document.getElementById("eduBackBtn");
+      if(eduBackBtn){
+        eduBackBtn.addEventListener("click", async () => {
+          try{
+            await update(ref(db, `rooms/${code}`), {
+              displayPid: null,
+              settings: {
+                ...currentSettings,
+                hostLobbyMode: null,
+                hostLobbyExperience: null,
+                educationPlayType: null,
+                educationDisplayOnly: false
+              }
+            });
+          }catch(e){}
+        });
+      }
 
-        const copyDisplayBtn = document.getElementById("copyDisplayBtn");
-        if(copyDisplayBtn){
-          copyDisplayBtn.addEventListener("click", async () => {
-            const ok = await copyText(displayUrl);
-            copyDisplayBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-            setTimeout(()=> copyDisplayBtn.textContent = "نسخ رابط شاشة العرض", 1200);
-          });
-        }
+      const copyJoinBtn = document.getElementById("copyJoinBtn");
+      if(copyJoinBtn){
+        copyJoinBtn.addEventListener("click", async () => {
+          const ok = await copyText(joinUrl);
+          copyJoinBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyJoinBtn.textContent = "نسخ رابط اللاعبين", 1200);
+        });
+      }
 
-        const qrZoomOverlay = document.getElementById("qrZoomOverlay");
-        const qrZoomTitle = document.getElementById("qrZoomTitle");
-        const qrZoomImg = document.getElementById("qrZoomImg");
+      const copyDisplayBtn = document.getElementById("copyDisplayBtn");
+      if(copyDisplayBtn){
+        copyDisplayBtn.addEventListener("click", async () => {
+          const ok = await copyText(displayUrl);
+          copyDisplayBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyDisplayBtn.textContent = "نسخ رابط شاشة العرض", 1200);
+        });
+      }
 
-        function closeQrZoom(){
-          if(!qrZoomOverlay) return;
-          qrZoomOverlay.style.display = "none";
-          qrZoomOverlay.setAttribute("aria-hidden", "true");
-          if(qrZoomImg) qrZoomImg.src = "";
-        }
+      const qrZoomOverlay = document.getElementById("qrZoomOverlay");
+      const qrZoomTitle = document.getElementById("qrZoomTitle");
+      const qrZoomImg = document.getElementById("qrZoomImg");
 
-        function openQrZoom(src, title){
-          if(!qrZoomOverlay || !qrZoomImg) return;
-          qrZoomImg.src = src || "";
-          qrZoomTitle.textContent = title || "الباركود";
-          qrZoomOverlay.style.display = "flex";
-          qrZoomOverlay.setAttribute("aria-hidden", "false");
-        }
+      function closeQrZoom(){
+        if(!qrZoomOverlay) return;
+        qrZoomOverlay.style.display = "none";
+        qrZoomOverlay.setAttribute("aria-hidden", "true");
+        if(qrZoomImg) qrZoomImg.src = "";
+      }
 
-        if(qrZoomOverlay){
-          qrZoomOverlay.addEventListener("click", closeQrZoom);
-        }
-        if(qrZoomImg){
-          qrZoomImg.addEventListener("click", closeQrZoom);
-        }
-        document.querySelectorAll(".hostLinkQr").forEach(img => {
-          img.addEventListener("click", (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            openQrZoom(img.getAttribute("src") || "", img.getAttribute("data-qr-label") || img.getAttribute("alt") || "الباركود");
-          });
+      function openQrZoom(src, title){
+        if(!qrZoomOverlay || !qrZoomImg) return;
+        qrZoomImg.src = src || "";
+        qrZoomTitle.textContent = title || "الباركود";
+        qrZoomOverlay.style.display = "flex";
+        qrZoomOverlay.setAttribute("aria-hidden", "false");
+      }
+
+      if(qrZoomOverlay){
+        qrZoomOverlay.addEventListener("click", closeQrZoom);
+      }
+      if(qrZoomImg){
+        qrZoomImg.addEventListener("click", closeQrZoom);
+      }
+      document.querySelectorAll(".hostLinkQr").forEach(img => {
+        img.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openQrZoom(img.getAttribute("src") || "", img.getAttribute("data-qr-label") || img.getAttribute("alt") || "الباركود");
+        });
+      });
+
+      document.getElementById("startBtn")?.addEventListener("click", async () => {
+        const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+        const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
+        const board = rememberBoard(buildBoardState(latestRoomForStart, Date.now()), latestRoomForStart) || buildBoardState(latestRoomForStart, Date.now());
+        const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
+        const timerSel = Number(latestRoomForStart?.timer?.sel || 10);
+
+        const nextStartedRoom = normalizeLiveRoom({
+          ...(latestRoomForStart || {}),
+          status: "started",
+          displayPid: null,
+          activeMap: 0,
+          board,
+          freeze: false,
+          buzzer: null,
+          scores: { green:0, orange:0, a:0, b:0 },
+          winEvent: null,
+          winState: null,
+          writtenAnswer: null,
+          writtenAnswerModeEnabled: writtenEnabled,
+          modes: { ...((latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {}), writtenAnswerModeEnabled: writtenEnabled },
+          settings: { ...((latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {}), writtenAnswerModeEnabled: writtenEnabled },
+          customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
+          customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
+          round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
+          mapStates: { "0": {} },
+          current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
+          timer: { sel: timerSel, dur: timerSel, running:false, startTs:0, done:false }
         });
 
-        document.getElementById("startBtn").addEventListener("click", async () => {
-          const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
-          const writtenEnabled = isWrittenModeEnabled(latestRoomForStart);
-          const board = rememberBoard(buildBoardState(latestRoomForStart, Date.now()), latestRoomForStart) || buildBoardState(latestRoomForStart, Date.now());
-          const targetWins = normalizeWinRounds(latestRoomForStart?.settings?.winRounds || latestRoomForStart?.round?.targetWins || 1);
-          const timerSel = Number(latestRoomForStart?.timer?.sel || 10);
+        LIVE.room = nextStartedRoom;
+        scheduleRender();
 
-          const nextStartedRoom = normalizeLiveRoom({
-            ...(latestRoomForStart || {}),
+        try{
+          await update(roomRef, {
             status: "started",
             displayPid: null,
             activeMap: 0,
@@ -5645,95 +5843,72 @@ function hideEidIntro(immediate){
             current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
             timer: { sel: timerSel, dur: timerSel, running:false, startTs:0, done:false }
           });
+        }catch(e){}
 
-          LIVE.room = nextStartedRoom;
-          scheduleRender();
+        if(writtenEnabled){
+          const modeUrl = new URL(location.href);
+          modeUrl.searchParams.set("mode", "written");
+          modeUrl.searchParams.set("role", "host");
+          modeUrl.searchParams.set("code", code);
+          modeUrl.searchParams.set("hostKey", hostKey || "");
+          location.href = modeUrl.toString();
+        }
+      });
 
-          try{
-            await update(roomRef, {
-              status: "started",
-              displayPid: null,
-              activeMap: 0,
-              board,
-              freeze: false,
-              buzzer: null,
-              scores: { green:0, orange:0, a:0, b:0 },
-              winEvent: null,
-              winState: null,
-              writtenAnswer: null,
-              writtenAnswerModeEnabled: writtenEnabled,
-              modes: { ...((latestRoomForStart?.modes && typeof latestRoomForStart.modes === "object") ? latestRoomForStart.modes : {}), writtenAnswerModeEnabled: writtenEnabled },
-              settings: { ...((latestRoomForStart?.settings && typeof latestRoomForStart.settings === "object") ? latestRoomForStart.settings : {}), writtenAnswerModeEnabled: writtenEnabled },
-              customQuestions: normalizeCustomQuestionsMap(latestRoomForStart?.customQuestions || {}),
-              customQuestionsUpdatedAt: Number(latestRoomForStart?.customQuestionsUpdatedAt || 0),
-              round: { current:1, targetWins, winner:null, boardSeed: Number(board.seed || 0) || 0 },
-              mapStates: { "0": {} },
-              current: { letter: null, qIndex: 0, row: null, col: null, map: 0 },
-              timer: { sel: timerSel, dur: timerSel, running:false, startTs:0, done:false }
-            });
-          }catch(e){}
-
-          if(writtenEnabled){
-            try{ setLocalWrittenModeFlag(true); }catch(e){}
-            try{ storeWrittenHandoffRoom(nextStartedRoom); }catch(e){}
-            location.href = buildWrittenGameUrl();
-            return;
-          }
-        });
-      }
-
-      const staffModeBackdrop = document.getElementById("staffModeBackdrop");
       const staffModeBtn = document.getElementById("staffModeBtn");
+      const staffModeBackdrop = document.getElementById("staffModeBackdrop");
       const staffModeClose = document.getElementById("staffModeClose");
       const staffModeInput = document.getElementById("staffModeInput");
-      const staffModeMsg = document.getElementById("staffModeMsg");
       const staffModeApply = document.getElementById("staffModeApply");
-      const STAFF_MODE_CODE = "6635";
+      const staffModeMsg = document.getElementById("staffModeMsg");
+      const eduDisplayOnlyToggle = document.getElementById("eduDisplayOnlyToggle");
 
-      function setStaffModeMsg(text, type){
-        if(!staffModeMsg) return;
-        staffModeMsg.textContent = text || "";
-        staffModeMsg.className = "staffModeMsg" + (type ? ` ${type}` : "");
+      function resetStaffModeUi(){
+        if(!staffModeInput || !staffModeMsg) return;
+        staffModeInput.value = "";
+        staffModeMsg.textContent = "";
+        staffModeMsg.className = "staffModeMsg";
       }
-
       function openStaffMode(){
         if(!staffModeBackdrop) return;
+        resetStaffModeUi();
         staffModeBackdrop.style.display = "flex";
-        if(staffModeInput){
-          staffModeInput.value = "";
-          setTimeout(()=>{ try{ staffModeInput.focus(); }catch(e){} }, 20);
-        }
-        setStaffModeMsg(updatesEnabled ? "تم التفعيل" : "", updatesEnabled ? "success" : "");
+        setTimeout(() => {
+          try{ staffModeInput?.focus(); }catch(e){}
+        }, 20);
       }
-
       function closeStaffMode(){
         if(!staffModeBackdrop) return;
         staffModeBackdrop.style.display = "none";
-        setStaffModeMsg("", "");
       }
-
       async function applyStaffModeCode(){
-        const codeValue = String(staffModeInput?.value || "").trim();
-        if(codeValue !== STAFF_MODE_CODE){
-          setStaffModeMsg("الرمز غير صحيح", "error");
-          try{ staffModeInput?.focus(); staffModeInput?.select(); }catch(e){}
+        if(!staffModeInput || !staffModeMsg) return;
+        const codeVal = String(staffModeInput.value || "").replace(/\D+/g, "").slice(0, 4);
+        staffModeInput.value = codeVal;
+        if(codeVal !== WRITTEN_MODE_SECRET_CODE){
+          staffModeMsg.textContent = "الرمز غير صحيح";
+          staffModeMsg.className = "staffModeMsg error";
+          try{ staffModeInput.focus(); }catch(e){}
           return;
         }
-
         try{
-          const currentModes = (room?.modes && typeof room.modes === "object") ? room.modes : {};
-          const latestSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
+          const nextSettings = {
+            ...currentSettings,
+            writtenAnswerModeEnabled: true
+          };
           await update(ref(db, `rooms/${code}`), {
-            writtenAnswerModeEnabled: true,
-            modes: { ...currentModes, writtenAnswerModeEnabled: true },
-            settings: { ...latestSettings, writtenAnswerModeEnabled: true }
+            settings: nextSettings,
+            modes: {
+              ...((room?.modes && typeof room.modes === "object") ? room.modes : {}),
+              writtenAnswerModeEnabled: true
+            }
           });
-          setLocalWrittenModeFlag(true);
-          setStaffModeMsg("تم التفعيل", "success");
-          if(staffModeBtn) staffModeBtn.classList.add("active");
-          setTimeout(closeStaffMode, 450);
+          staffModeMsg.textContent = "تم التفعيل";
+          staffModeMsg.className = "staffModeMsg success";
+          setTimeout(closeStaffMode, 300);
         }catch(e){
-          setStaffModeMsg("تعذر التفعيل حالياً", "error");
+          staffModeMsg.textContent = "تعذر التفعيل الآن";
+          staffModeMsg.className = "staffModeMsg error";
         }
       }
 
@@ -5761,7 +5936,54 @@ function hideEidIntro(immediate){
           try{
             await update(ref(db, `rooms/${code}`), {
               displayPid: null,
-              settings: { ...currentSettings, hostLobbyMode: nextMode }
+              settings: {
+                ...currentSettings,
+                hostLobbyMode: nextMode,
+                hostLobbyExperience: "normal",
+                educationPlayType: null,
+                educationDisplayOnly: false
+              }
+            });
+          }catch(e){}
+        });
+      });
+
+      main.querySelectorAll("[data-lobby-experience]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const nextExperience = String(btn.getAttribute("data-lobby-experience") || "");
+          if(nextExperience !== "education") return;
+          try{
+            await update(ref(db, `rooms/${code}`), {
+              displayPid: null,
+              settings: {
+                ...currentSettings,
+                hostLobbyMode: null,
+                hostLobbyExperience: "education",
+                educationPlayType: null,
+                educationDisplayOnly: false
+              }
+            });
+          }catch(e){}
+        });
+      });
+
+      main.querySelectorAll("[data-edu-play]").forEach(btn => {
+        btn.addEventListener("click", async (ev) => {
+          const playType = String(btn.getAttribute("data-edu-play") || "");
+          if(!playType) return;
+          if(ev.target && ev.target.closest && ev.target.closest("label")) return;
+          const displayOnly = playType === "multi" ? !!eduDisplayOnlyToggle?.checked : false;
+          const nextHostMode = playType === "multi" && displayOnly ? "separate" : "single";
+          try{
+            await update(ref(db, `rooms/${code}`), {
+              displayPid: null,
+              settings: {
+                ...currentSettings,
+                hostLobbyMode: nextHostMode,
+                hostLobbyExperience: "education",
+                educationPlayType: playType,
+                educationDisplayOnly: displayOnly
+              }
             });
           }catch(e){}
         });
@@ -7367,7 +7589,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           afterRender(room);
           return;
         }else{
-          const sig = `${getHostLobbyMode(room)}|wm:${isWrittenModeVisualEnabled(room) ? 1 : 0}|${JSON.stringify(room.teams || {})}|` + Object.entries(players)
+          const sig = `${getHostLobbyMode(room)}|he:${getHostLobbyExperience(room)}|ep:${getEducationPlayType(room)}|ed:${isEducationDisplayOnly(room) ? 1 : 0}|wm:${isWrittenModeVisualEnabled(room) ? 1 : 0}|${JSON.stringify(room.teams || {})}|` + Object.entries(players)
             .map(([id,p]) => `${id}:${p?.team||""}:${p?.name||""}:${Number(p?.joinedAt||0)}`)
             .sort()
             .join("|");
