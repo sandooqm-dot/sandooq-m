@@ -301,10 +301,19 @@
     .eduInfoTitle{font-size:34px;font-weight:900;line-height:1.2;margin:0 0 10px}
     .eduInfoSub{font-size:21px;font-weight:900;line-height:1.75;margin:0;color:#6b2d5f}
 
+    .pickerLobbyCard{
+      background:#f4e9f1;
+      border:none;
+      border-radius:30px;
+      padding:20px 18px 18px;
+      box-shadow:0 18px 34px rgba(72,20,66,.18);
+      color:#4b1243;
+    }
+    .pickerLobbyCard *{ text-shadow:none !important; }
     .pickerHeaderSection{
       display:flex;
       flex-direction:column;
-      gap:14px;
+      gap:16px;
       margin-bottom:16px;
     }
     .pickerField{
@@ -314,11 +323,10 @@
     }
     .pickerFieldLabel{
       margin:0;
-      color:#fff;
-      font-size:22px;
+      color:#4b1243;
+      font-size:24px;
       font-weight:900;
       text-align:right;
-      text-shadow:none;
     }
     .pickerOptionGrid{
       display:grid;
@@ -326,72 +334,60 @@
       gap:12px;
     }
     .pickerOptionBtn{
-      min-height:68px;
-      border-radius:20px;
-      border:4px solid rgba(48,22,58,.88);
-      background:linear-gradient(180deg,#fbf7ef 0%, #f2ecdf 100%);
-      color:#5b2260;
-      font-size:25px;
+      min-height:72px;
+      border-radius:22px;
+      border:4px solid #d9cad7;
+      background:#fffdfd;
+      color:#4b1243;
+      font-size:24px;
       font-weight:900;
       cursor:pointer;
       padding:12px 14px;
-      box-shadow:0 10px 18px rgba(0,0,0,.14);
+      box-shadow:0 6px 14px rgba(75,18,67,.06);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
-      text-shadow:none;
-    }
-    .pickerOptionBtn.typeEducation{
-      background:linear-gradient(180deg,#edf7ff 0%, #dfefff 100%);
-      color:#0b4f77;
-    }
-    .pickerOptionBtn.modeSingle{
-      background:linear-gradient(180deg,#fff6df 0%, #f8eecb 100%);
-      color:#7a4d00;
-    }
-    .pickerOptionBtn.modeMulti{
-      background:linear-gradient(180deg,#eef7ff 0%, #dfefff 100%);
-      color:#0f4f85;
     }
     .pickerOptionBtn.activeChoice{
-      transform:translateY(-1px);
-      box-shadow:0 0 0 4px rgba(255,255,255,.18), 0 12px 22px rgba(0,0,0,.18);
+      background:#8b1f78;
+      color:#ffd44f;
+      border-color:#ffd44f;
+      box-shadow:0 10px 18px rgba(139,31,120,.18);
+      transform:none;
     }
     .pickerMainPanel{
-      border-radius:28px;
+      border-radius:26px;
       padding:18px 14px;
-      border:4px solid rgba(255,255,255,.18);
-      background:rgba(255,255,255,.08);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+      border:3px solid #e1d0dc;
+      background:#fbf7fa;
+      box-shadow:none;
     }
     .pickerSummaryCard{
-      border-radius:26px;
-      padding:20px 18px;
-      border:5px solid rgba(48,22,58,.88);
-      background:linear-gradient(180deg,#fff9ed 0%, #f4eedf 100%);
-      color:#5a1d58;
+      border-radius:24px;
+      padding:18px 16px;
+      border:4px solid #dcc9d8;
+      background:#fffdfd;
+      color:#4b1243;
       text-align:center;
-      box-shadow:0 14px 24px rgba(0,0,0,.16);
-      text-shadow:none;
+      box-shadow:none;
     }
-    .pickerSummaryCard.education{
-      background:linear-gradient(180deg,#eef7ff 0%, #ddefff 100%);
-      color:#0b4f77;
-    }
-    .pickerSummaryCard.singlePlay{
-      color:#7a4d00;
+    .pickerSummaryCard.education,
+    .pickerSummaryCard.singlePlay,
+    .pickerSummaryCard.multiPlay{
+      color:#4b1243;
+      background:#fffdfd;
     }
     .pickerSummaryTitle{
-      font-size:38px;
+      font-size:34px;
       line-height:1.15;
       font-weight:900;
       margin:0 0 10px;
-      text-shadow:none;
+      color:#4b1243;
     }
     .pickerSummaryDesc{
-      font-size:24px;
-      line-height:1.7;
+      font-size:22px;
+      line-height:1.65;
       font-weight:900;
-      text-shadow:none;
+      color:#4b1243;
     }
     .pickerLinksWrap{
       margin-top:16px;
@@ -399,29 +395,60 @@
       flex-direction:column;
       gap:14px;
     }
+    .pickerLobbyCard .hostLinkCard{
+      border-radius:24px;
+      padding:14px;
+      border:4px solid #dcc9d8;
+      box-shadow:none;
+      text-align:right;
+      color:#4b1243;
+    }
+    .pickerLobbyCard .hostLinkCard.players{ background:#fff5cf; }
+    .pickerLobbyCard .hostLinkCard.display{ background:#e9f8f2; }
+    .pickerLobbyCard .hostLinkBadge{
+      background:#ffffff;
+      color:#4b1243;
+      border:3px solid #d7cad5;
+    }
+    .pickerLobbyCard .hostLinkTitle{
+      font-size:30px;
+      font-weight:900;
+      line-height:1.15;
+      color:#4b1243;
+    }
+    .pickerLobbyCard .hostLinkSub{
+      margin-top:6px;
+      font-size:19px;
+      font-weight:900;
+      line-height:1.45;
+      color:#4b1243;
+    }
+    .pickerLobbyCard .hostLinkQr{
+      border:3px solid #eadce8;
+      box-shadow:none;
+    }
     .pickerInlineToggleWrap{
       margin-top:14px;
       display:flex;
-      justify-content:flex-end;
+      justify-content:flex-start;
     }
     .pickerInlineToggle{
       display:inline-flex;
       align-items:center;
       gap:10px;
-      padding:10px 14px;
-      border-radius:999px;
-      background:rgba(255,255,255,.86);
-      border:3px dashed rgba(48,22,58,.18);
-      color:#0f172a;
+      padding:8px 12px;
+      border-radius:16px;
+      background:#ffffff;
+      border:3px solid #dfd1dc;
+      color:#4b1243;
       font-size:16px;
       font-weight:900;
       cursor:pointer;
-      text-shadow:none;
     }
     .pickerInlineToggle input{
       width:18px;
       height:18px;
-      accent-color:#16a34a;
+      accent-color:#8b1f78;
       cursor:pointer;
       flex:0 0 auto;
     }
@@ -435,19 +462,38 @@
       max-width:100%;
       padding:14px 18px;
       border:none;
-      border-radius:18px;
+      border-radius:20px;
       cursor:pointer;
-      background:#fff;
+      background:#f5c400;
       color:#111;
-      font-size:24px;
+      font-size:25px;
       font-weight:900;
-      border:4px solid rgba(48,22,58,.88);
-      box-shadow:0 8px 0 rgba(48,22,58,.20);
+      border:4px solid #e0ab00;
+      box-shadow:none;
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
-      text-shadow:none;
     }
     .pickerApplyBtn:active{ transform:translateY(1px); }
+    .pickerLobbyCard .hostCopyBtn{
+      min-width:230px;
+      background:#ffffff;
+      color:#4b1243;
+      border:4px solid #d7cad5;
+      box-shadow:none;
+    }
+    .pickerLobbyCard .hostWarning{
+      margin-top:-2px;
+      font-size:18px;
+      font-weight:900;
+      line-height:1.5;
+      color:#4b1243;
+      text-shadow:none;
+    }
+    .pickerLobbyCard .qrZoomHint,
+    .pickerLobbyCard .qrZoomTitle{ color:#4b1243; }
+    .pickerLobbyCard .smallNote{ color:#6a4b64; }
+
+    .pickerHeaderSection{
     .modeChoiceTop{display:flex;align-items:center;gap:12px;justify-content:space-between}
     .modeChoiceNum{
       width:48px;height:48px;border-radius:50%;flex:0 0 auto;
@@ -5754,7 +5800,7 @@ function hideEidIntro(immediate){
         ` : ``;
 
         main.innerHTML = `
-          <div class="lobbyCard">
+          <div class="lobbyCard pickerLobbyCard">
             <div class="pickerHeaderSection">
               <div class="pickerField">
                 <div class="pickerFieldLabel">نوع اللعبة</div>
