@@ -1687,101 +1687,293 @@
     }
     .cqSavedMsg{font-size:12px;opacity:.9;text-align:center;margin-top:8px}
 
-    /* إعدادات */
-    .settingsPanel{
-      width:min(78vw, 360px);
-      height:min(72vh, 560px);
-      background:#ffd54a;
-      border-radius:26px;
-      border:8px solid rgba(0,0,0,.85);
-      box-shadow:0 16px 30px rgba(0,0,0,.25);
-      padding:18px 14px;
-      display:flex;
-      flex-direction:column;
-      gap:18px;
-    }
-    #settingsMenu{display:flex;flex-direction:column;gap:14px}
-    .settingsBtn{
-      width:100%;
-      height:64px;
-      border-radius:22px;
-      border:4px solid rgba(0,0,0,.85);
-      background:#fff;
-      color:#111;
-      font-weight:900;
-      font-size:30px;
-      cursor:pointer;
-      box-shadow:0 6px 0 rgba(0,0,0,.18);
-    }
-    .settingsBtn:active{ transform: translateY(1px); box-shadow:0 5px 0 rgba(0,0,0,.18); }
-
-    .settingsHomeBtn{
-      width:min(70%, 220px);
-      height:56px;
-      margin:38px auto 0;
-      display:block;
-      border-radius:999px;
-      border:4px solid rgba(0,0,0,.9);
-      background:#fff;
-      color:#111;
-      font-weight:900;
-      font-size:24px;
-      cursor:pointer;
-      box-shadow:0 6px 0 rgba(0,0,0,.18), 0 0 0 4px rgba(255,255,255,.35) inset;
-    }
-    .settingsHomeBtn:active{ transform: translateY(1px); box-shadow:0 5px 0 rgba(0,0,0,.18), 0 0 0 4px rgba(255,255,255,.35) inset; }
-
-    .settingsView{
+    /* إعدادات - صفحة كاملة */
+    #settingsBackdrop.settingsBackdrop{
+      position:fixed;
+      inset:0;
       display:none;
+      z-index:33000;
+      padding:0;
+      background:
+        radial-gradient(900px 520px at 12% 8%, rgba(255,255,255,.10), transparent 58%),
+        radial-gradient(860px 560px at 88% 14%, rgba(255,255,255,.08), transparent 56%),
+        linear-gradient(180deg, #3f235d 0%, #2e4c72 52%, #214b59 100%);
+      align-items:stretch;
+      justify-content:stretch;
+    }
+    .settingsPageShell{
+      position:relative;
       width:100%;
       height:100%;
-      overflow:auto;
-      background:#fff;
-      border-radius:18px;
-      border:3px solid rgba(0,0,0,.25);
-      padding:14px;
+      display:flex;
+      flex-direction:column;
       color:#111;
+      overflow:hidden;
+    }
+    .settingsTopBar{
+      position:sticky;
+      top:0;
+      z-index:2;
+      padding:18px 16px 12px;
+      background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.05));
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom:1px solid rgba(255,255,255,.14);
+    }
+    .settingsPageTitle{
+      color:#fff;
+      font-size:30px;
+      font-weight:900;
+      line-height:1.1;
+      text-align:center;
+      margin:0;
+    }
+    .settingsPageSub{
+      margin:8px 0 0;
+      color:rgba(255,255,255,.88);
+      font-size:16px;
+      font-weight:900;
+      line-height:1.55;
+      text-align:center;
+    }
+    .settingsTabsScroller{
+      margin-top:14px;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+    }
+    .settingsTabsScroller::-webkit-scrollbar{display:none;}
+    .settingsTabsRow{
+      display:flex;
+      gap:10px;
+      min-width:max-content;
+      padding-bottom:4px;
+    }
+    .settingsTabBtn{
+      height:50px;
+      padding:0 18px;
+      border:none;
+      border-radius:16px;
+      background:rgba(255,255,255,.14);
+      color:#fff;
+      font-size:18px;
+      font-weight:900;
+      cursor:pointer;
+      border:3px solid rgba(255,255,255,.18);
+      box-shadow:0 8px 20px rgba(0,0,0,.16);
+      white-space:nowrap;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+      transition:transform .16s ease, background .16s ease, border-color .16s ease;
+    }
+    .settingsTabBtn:active{ transform:translateY(1px); }
+    .settingsTabBtn.active{
+      background:#ffd54a;
+      color:#111;
+      border-color:rgba(0,0,0,.84);
+      box-shadow:0 10px 22px rgba(0,0,0,.18);
+    }
+    .settingsBody{
+      flex:1 1 auto;
+      overflow:auto;
+      padding:18px 16px calc(132px + env(safe-area-inset-bottom));
+      background:linear-gradient(180deg, rgba(245,239,224,.98) 0%, rgba(232,241,255,.98) 54%, rgba(241,247,240,.98) 100%);
+    }
+    .settingsSection{
+      display:none;
+      animation:settingsFade .18s ease;
+    }
+    .settingsSection.active{ display:block; }
+    @keyframes settingsFade{
+      from{ opacity:0; transform:translateY(8px); }
+      to{ opacity:1; transform:translateY(0); }
+    }
+    .settingsHeroCard,
+    .settingsCard{
+      background:#fff;
+      border-radius:24px;
+      border:5px solid rgba(0,0,0,.82);
+      box-shadow:0 18px 30px rgba(0,0,0,.14);
+      padding:18px 16px;
+      text-align:right;
+      color:#111;
+    }
+    .settingsHeroCard{
+      background:linear-gradient(180deg, #fff8d7 0%, #fff 100%);
+      margin-bottom:14px;
+    }
+    .settingsSectionTitle{
+      margin:0 0 8px;
+      font-size:28px;
+      font-weight:900;
+      color:#111;
+      line-height:1.2;
       text-align:right;
     }
-    .settingsView h3{margin:0 0 10px;text-align:center}
-    .settingsBackMini{
-      width:100%;
-      height:52px;
+    .settingsSectionLead,
+    .settingsMutedText{
+      margin:0;
+      font-size:16px;
+      font-weight:900;
+      line-height:1.75;
+      color:#435069;
+    }
+    .settingsCard + .settingsCard{ margin-top:14px; }
+    .settingsMiniTitle{
+      margin:0 0 10px;
+      font-size:22px;
+      font-weight:900;
+      color:#111;
+      line-height:1.25;
+    }
+    .settingsActionBtn,
+    .settingsStoreBtn,
+    .settingsHomeAction{
+      min-width:210px;
+      height:54px;
+      padding:0 18px;
+      border:none;
       border-radius:18px;
-      border:3px solid rgba(0,0,0,.65);
-      background:#fff;
+      background:#ffd54a;
+      color:#111;
+      font-size:20px;
       font-weight:900;
       cursor:pointer;
+      border:4px solid rgba(0,0,0,.86);
+      box-shadow:0 8px 0 rgba(0,0,0,.14);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .settingsActionBtn:active,
+    .settingsStoreBtn:active,
+    .settingsHomeAction:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.14); }
+    .settingsOptionGrid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:12px;
+    }
+    .settingsOptionTile{
+      border:none;
+      border-radius:18px;
+      background:#fff;
+      color:#111;
+      text-align:right;
+      padding:14px 14px 12px;
+      cursor:pointer;
+      border:4px solid rgba(0,0,0,.14);
+      box-shadow:0 10px 18px rgba(0,0,0,.08);
+      min-height:112px;
+    }
+    .settingsOptionTile.active{
+      background:linear-gradient(180deg, #ffd54a 0%, #fff5c4 100%);
+      border-color:rgba(0,0,0,.84);
+    }
+    .settingsOptionTileTitle{
+      display:block;
+      font-size:22px;
+      font-weight:900;
+      color:#111;
+      line-height:1.2;
+    }
+    .settingsOptionTileDesc{
+      display:block;
+      margin-top:8px;
+      font-size:14px;
+      font-weight:900;
+      line-height:1.65;
+      color:#566176;
+    }
+    .settingsRangeWrap{
+      margin-top:12px;
+      background:#f7fbff;
+      border-radius:20px;
+      border:3px solid rgba(0,0,0,.12);
+      padding:16px 14px 14px;
+    }
+    .settingsRangeValue{
+      margin-top:12px;
+      font-size:26px;
+      font-weight:900;
+      color:#111;
+      text-align:center;
+    }
+    .settingsInfoList{
+      margin:0;
+      padding:0 20px 0 0;
+      color:#24354f;
+      font-size:16px;
+      font-weight:900;
+      line-height:1.85;
+    }
+    .settingsInfoList li + li{ margin-top:6px; }
+    .settingsDualActions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-start;
+      margin-top:14px;
+    }
+    .settingsFixedBar{
+      position:absolute;
+      inset-inline:0;
+      bottom:0;
+      z-index:3;
+      padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+      background:linear-gradient(180deg, rgba(26,32,53,.05), rgba(26,32,53,.92) 24%, rgba(26,32,53,.98) 100%);
+      border-top:1px solid rgba(255,255,255,.10);
+      box-shadow:0 -12px 30px rgba(0,0,0,.18);
+    }
+    .settingsStatus{
+      min-height:22px;
+      margin-bottom:8px;
+      color:rgba(255,255,255,.88);
+      font-size:14px;
+      font-weight:900;
+      text-align:center;
+    }
+    .settingsSaveExitBtn{
+      width:min(100%, 420px);
+      height:58px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:none;
+      border-radius:18px;
+      background:#ffd54a;
+      color:#111;
+      font-size:24px;
+      font-weight:900;
+      cursor:pointer;
+      border:4px solid rgba(0,0,0,.88);
+      box-shadow:0 8px 0 rgba(0,0,0,.16);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .settingsSaveExitBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.16); }
+    .settingsSaveExitBtn[disabled]{ opacity:.6; cursor:not-allowed; }
+    .settingsCurrentModePill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:40px;
+      padding:8px 14px;
+      border-radius:999px;
+      background:#eef6ff;
+      border:3px solid rgba(0,0,0,.12);
+      color:#244164;
+      font-size:16px;
+      font-weight:900;
+      line-height:1.35;
       margin-top:10px;
     }
-
-    .timerMiniPicker{
-      display:none;
-      width:100%;
-      border-radius:18px;
-      border:3px solid rgba(0,0,0,.65);
-      background:#fff;
-      padding:10px;
+    @media (max-width:700px){
+      .settingsOptionGrid{ grid-template-columns:1fr; }
+      .settingsPageTitle{ font-size:28px; }
+      .settingsTabBtn{ font-size:17px; padding:0 16px; }
+      .settingsSectionTitle{ font-size:25px; }
     }
-    .timerMiniList{
-      display:flex;
-      flex-direction:row;
-      gap:10px;
-      justify-content:center;
-      flex-wrap:wrap;
-    }
-    .timerMiniItem{
-      height:52px;
-      border-radius:16px;
-      border:3px solid rgba(0,0,0,.25);
-      background:#fff;
-      font-weight:900;
-      font-size:22px;
-      cursor:pointer;
-      flex:1 1 72px;
-    }
-    .timerMiniItem:active{ transform: translateY(1px); }
-
 
     /* ✅ خاص بالتحديثات (زر + نافذة رمز في اللوبي فقط) */
     .staffModeFab{
@@ -5894,135 +6086,248 @@ function hideEidIntro(immediate){
       bd.id = "settingsBackdrop";
       bd.className = "settingsBackdrop";
       bd.innerHTML = `
-        <div class="settingsPanel" role="dialog" aria-modal="true" aria-label="الإعدادات">
-          <div id="settingsMenu">
-            <button id="sHelp" class="settingsBtn" type="button">التعليمات</button>
-            <button id="sTimer" class="settingsBtn" type="button">تعديل المؤقت</button>
-            <button id="sAddQ" class="settingsBtn" type="button">اضافة الاسئلة</button>
-            <button id="sMore" class="settingsBtn" type="button">العابنا الاخرى</button>
-            <button id="sHome" class="settingsHomeBtn" type="button">الرئيسية</button>
-
-            <div id="timerMiniPicker" class="timerMiniPicker" aria-label="اختيار وقت المؤقت">
-              <div class="timerMiniList" style="padding:14px 12px;display:block">
-                <div style="text-align:center;color:#111;font-size:18px;font-weight:900;margin-bottom:10px">حدد وقت المؤقت</div>
-                <input id="timerMiniRange" type="range" min="1" max="50" step="1" value="10" aria-label="وقت المؤقت">
-                <div id="timerMiniValue" style="margin-top:10px;text-align:center;color:#111;font-size:22px;font-weight:900">10</div>
-                <button id="timerMiniApply" class="settingsBtn" type="button" style="margin-top:12px;width:100%">حفظ الوقت</button>
+        <div class="settingsPageShell" role="dialog" aria-modal="true" aria-label="الإعدادات">
+          <div class="settingsTopBar">
+            <h2 class="settingsPageTitle">الإعدادات</h2>
+            <p class="settingsPageSub">كل الأدوات في صفحة واحدة واضحة ومرتبة، والمحتوى يتغير من التبويبات بالأعلى.</p>
+            <div class="settingsTabsScroller">
+              <div class="settingsTabsRow">
+                <button class="settingsTabBtn active" type="button" data-settings-tab="questions">إضافة الأسئلة</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="cells">محتوى الخلايا</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="timer">المؤقت</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="help">التعليمات</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="more">ألعابنا الأخرى</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="home">الرئيسية</button>
               </div>
             </div>
           </div>
 
-          <div id="helpView" class="settingsView">
-            <h3>تعليمات اللعبة</h3>
-            <div style="line-height:1.75;font-weight:700">
-              <p><b>فكرة اللعبة:</b> يختار المقدم حرفًا من الخريطة، ثم يظهر سؤال لهذا الحرف. أول لاعب يضغط زر الإجابة يظهر اسمه في الشريط.</p>
-              <p><b>دخول اللاعبين:</b> ينضم اللاعبون عبر رابط الدخول أو من خلال الباركود.</p>
+          <div class="settingsBody">
+            <section class="settingsSection active" data-settings-panel="questions">
+              <div class="settingsHeroCard">
+                <h3 class="settingsSectionTitle">إضافة الأسئلة</h3>
+                <p class="settingsSectionLead">من هنا تفتح إدارة الأسئلة الخاصة بالمقدم، وتضيف أو تعدل أو ترتب الأسئلة بنفس الطريقة المعروفة داخل اللعبة.</p>
+                <div class="settingsCurrentModePill" id="settingsModeHint">سيتم فتح إدارة الأسئلة الخاصة بهذه الغرفة</div>
+              </div>
+              <div class="settingsCard">
+                <h4 class="settingsMiniTitle">إدارة أسئلة المقدم</h4>
+                <p class="settingsMutedText">افتح شاشة إضافة الأسئلة الحالية لتعديل بنك الأسئلة الخاص بك، ثم ارجع مباشرة إلى اللعبة بعد الانتهاء.</p>
+                <div class="settingsDualActions">
+                  <button id="settingsOpenQuestions" class="settingsActionBtn" type="button">فتح إضافة الأسئلة</button>
+                </div>
+              </div>
+            </section>
 
-              <p><b>طريقة اللعب باختصار:</b></p>
-              <ul>
-                <li>المقدم يضغط على خلية حرف في الخريطة لاختيار الحرف.</li>
-                <li>يظهر السؤال داخل بطاقة السؤال.</li>
-                <li>اللاعبون يضغطون زر "اضغط هنا للإجابة". أول لاعب يضغط يظهر اسمه.</li>
-                <li>المقدم يضغط على الحرف أولًا، ثم يضغط على اسم الفريق لتلوين الخلية لذلك الفريق.</li>
-              </ul>
+            <section class="settingsSection" data-settings-panel="cells">
+              <div class="settingsHeroCard">
+                <h3 class="settingsSectionTitle">تعديل محتوى الخلايا</h3>
+                <p class="settingsSectionLead">اختر نوع المحتوى الافتراضي الذي تريد اعتماده داخل الخلايا. هذا الإعداد متاح للجميع، وسيكون أساس التخصيص اليدوي في المرحلة القادمة.</p>
+              </div>
+              <div class="settingsCard">
+                <h4 class="settingsMiniTitle">نوع المحتوى الافتراضي</h4>
+                <div class="settingsOptionGrid" id="settingsCellModeGrid">
+                  <button class="settingsOptionTile" type="button" data-cell-mode="arabic">
+                    <span class="settingsOptionTileTitle">حروف عربية</span>
+                    <span class="settingsOptionTileDesc">مناسب للعبة الأساسية والأنشطة العربية.</span>
+                  </button>
+                  <button class="settingsOptionTile" type="button" data-cell-mode="english">
+                    <span class="settingsOptionTileTitle">حروف إنجليزية</span>
+                    <span class="settingsOptionTileDesc">مناسب للحصص والأنشطة الإنجليزية.</span>
+                  </button>
+                  <button class="settingsOptionTile" type="button" data-cell-mode="numbers">
+                    <span class="settingsOptionTileTitle">أرقام</span>
+                    <span class="settingsOptionTileDesc">مفيد للأنشطة الحسابية والمسابقات الرقمية.</span>
+                  </button>
+                  <button class="settingsOptionTile" type="button" data-cell-mode="manual">
+                    <span class="settingsOptionTileTitle">تخصيص يدوي</span>
+                    <span class="settingsOptionTileDesc">تمهيد لمرحلة إدخال محتوى كل خلية يدويًا لاحقًا.</span>
+                  </button>
+                </div>
+              </div>
+            </section>
 
-              <p><b>شرح الأزرار للمقدم:</b></p>
-              <ul>
-                <li><b>تجميد الأزرار:</b> يمنع اللاعبين من الضغط على زر الإجابة مؤقتًا.</li>
-                <li><b>تغيير السؤال:</b> ينتقل للسؤال التالي لنفس الحرف المختار.</li>
-                <li><b>تفريغ الخريطة:</b> يمسح ألوان خلايا الخريطة الحالية ويرجعها للوضع الافتراضي.</li>
-                <li><b>تغيير نوع الأسئلة:</b> تبديل مصدر الأسئلة بين أسئلة اللعبة وأسئلة المقدم الخاصة.</li>
-                <li><b>المؤقت:</b> يتم تحديده من السلايدر داخل الإعدادات من 1 إلى 50 ثانية، ويبدأ تلقائيًا عند أول لاعب يضغط الجرس. ولتصفيره اضغط على دائرة المؤقت.</li>
-                <li><b>الزوم:</b> لتكبير/تصغير الخريطة.</li>
-                <li><b>الخلايا:</b> يتم تغيير الحروف ومسح التلوين تلقائيًا عند بدء الجولة الجديدة.</li>
-              </ul>
-            </div>
-            <button id="helpBack" class="settingsBackMini" type="button">رجوع</button>
+            <section class="settingsSection" data-settings-panel="timer">
+              <div class="settingsHeroCard">
+                <h3 class="settingsSectionTitle">تعديل المؤقت</h3>
+                <p class="settingsSectionLead">عدّل وقت المؤقت من نفس الصفحة، وسيتم تطبيقه على الغرفة عند الضغط على حفظ وخروج.</p>
+              </div>
+              <div class="settingsCard">
+                <h4 class="settingsMiniTitle">مدة المؤقت</h4>
+                <div class="settingsRangeWrap">
+                  <input id="settingsTimerRange" type="range" min="1" max="50" step="1" value="10" aria-label="وقت المؤقت">
+                  <div id="settingsTimerValue" class="settingsRangeValue">10 ثانية</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settingsSection" data-settings-panel="help">
+              <div class="settingsHeroCard">
+                <h3 class="settingsSectionTitle">التعليمات</h3>
+                <p class="settingsSectionLead">شرح مختصر وواضح لأهم أجزاء اللعبة الحالية.</p>
+              </div>
+              <div class="settingsCard">
+                <ul class="settingsInfoList">
+                  <li>اضغط على خلية من الخريطة لاختيار السؤال المرتبط بها.</li>
+                  <li>في وضع الأجهزة المتعددة: اللاعبون يدخلون من أجهزتهم عبر الباركود أو الرابط.</li>
+                  <li>في اللعب المباشر: الواجهة أبسط، ولا يظهر اسم أول ضاغط ولا زر تجميد الأزرار.</li>
+                  <li>زر تغيير السؤال يبدّل السؤال الحالي، وزر الإجابة يعرض الإجابة ثم يخفيها عند الضغط مرة أخرى.</li>
+                  <li>الإعدادات هنا عامة للجميع، ويمكنك العودة للعبة من زر حفظ وخروج في الأسفل.</li>
+                </ul>
+              </div>
+            </section>
+
+            <section class="settingsSection" data-settings-panel="more">
+              <div class="settingsHeroCard">
+                <h3 class="settingsSectionTitle">ألعابنا الأخرى</h3>
+                <p class="settingsSectionLead">افتح متجرنا مباشرة من هنا لمشاهدة بقية الألعاب والمنتجات.</p>
+              </div>
+              <div class="settingsCard">
+                <h4 class="settingsMiniTitle">الانتقال إلى المتجر</h4>
+                <p class="settingsMutedText">سيتم فتح المتجر في صفحة مستقلة حتى ترجع إلى اللعبة بسهولة.</p>
+                <div class="settingsDualActions">
+                  <button id="settingsOpenStore" class="settingsStoreBtn" type="button">فتح ألعابنا الأخرى</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="settingsSection" data-settings-panel="home">
+              <div class="settingsHeroCard">
+                <h3 class="settingsSectionTitle">الرئيسية</h3>
+                <p class="settingsSectionLead">إذا انتهيت من تجهيز اللعبة وتريد العودة للصفحة الرئيسية، تقدر تدخلها من هنا مباشرة.</p>
+              </div>
+              <div class="settingsCard">
+                <h4 class="settingsMiniTitle">العودة للرئيسية</h4>
+                <p class="settingsMutedText">سيتم الخروج من الغرفة الحالية والرجوع إلى صفحة البداية.</p>
+                <div class="settingsDualActions">
+                  <button id="settingsGoHome" class="settingsHomeAction" type="button">الذهاب إلى الرئيسية</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="settingsFixedBar">
+            <div id="settingsStatus" class="settingsStatus"></div>
+            <button id="settingsSaveExit" class="settingsSaveExitBtn" type="button">حفظ وخروج</button>
           </div>
         </div>
       `;
       document.body.appendChild(bd);
 
-      function closeSettings(){
-        bd.style.display = "none";
-        bd.querySelector("#helpView").style.display = "none";
-        bd.querySelector("#settingsMenu").style.display = "flex";
-        const tm = bd.querySelector("#timerMiniPicker");
-        if(tm) tm.style.display = "none";
+      const tabButtons = Array.from(bd.querySelectorAll('[data-settings-tab]'));
+      const panels = Array.from(bd.querySelectorAll('[data-settings-panel]'));
+      const timerRange = bd.querySelector('#settingsTimerRange');
+      const timerValue = bd.querySelector('#settingsTimerValue');
+      const statusEl = bd.querySelector('#settingsStatus');
+      const cellTiles = Array.from(bd.querySelectorAll('[data-cell-mode]'));
+      let pendingCellMode = 'arabic';
+      let activeTab = 'questions';
+
+      function setStatus(msg, isError=false){
+        if(!statusEl) return;
+        statusEl.textContent = msg || '';
+        statusEl.style.color = isError ? '#ffd1d1' : 'rgba(255,255,255,.88)';
       }
 
-      bd.addEventListener("click", (e) => {
-        if(e.target === bd) closeSettings();
-      });
+      function setActiveTab(tab){
+        activeTab = tab || 'questions';
+        tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.settingsTab === activeTab));
+        panels.forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === activeTab));
+      }
 
-      bd.querySelector("#helpBack").addEventListener("click", () => {
-        bd.querySelector("#helpView").style.display = "none";
-        bd.querySelector("#settingsMenu").style.display = "flex";
-      });
+      function setCellMode(mode){
+        pendingCellMode = String(mode || 'arabic');
+        cellTiles.forEach(tile => tile.classList.toggle('active', tile.dataset.cellMode === pendingCellMode));
+      }
 
-      bd.querySelector("#sHelp").addEventListener("click", () => {
-        bd.querySelector("#settingsMenu").style.display = "none";
-        bd.querySelector("#helpView").style.display = "block";
-      });
+      function syncFromRoom(room){
+        const r = room || {};
+        const settings = (r.settings && typeof r.settings === 'object') ? r.settings : {};
+        const selectedTimer = Number((r.timer && r.timer.sel) || LIVE.room?.timer?.sel || 10);
+        const selectedCellMode = String(settings.cellContentMode || 'arabic').trim() || 'arabic';
+        const currentGameType = getHostLobbyExperience(r) === 'education' ? 'لعبة تعليمية' : 'لعبة عادية';
+        const currentPlayType = ((getHostLobbyExperience(r) === 'education' ? getEducationPlayType(r) : getNormalPlayType(r)) || 'multi') === 'single'
+          ? 'اللعب من جهاز واحد'
+          : 'اللعب من أجهزة متعددة';
 
-      bd.querySelector("#sMore").addEventListener("click", () => {
-        closeSettings();
-        openStoreUrl();
-      });
+        if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
+        if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
+        setCellMode(selectedCellMode);
+        const hint = bd.querySelector('#settingsModeHint');
+        if(hint) hint.textContent = `${currentGameType} — ${currentPlayType}`;
+        setStatus('');
+      }
 
-      bd.querySelector("#sHome").addEventListener("click", () => {
-        location.href = "index.html";
-      });
+      async function saveAndClose(){
+        const saveBtn = bd.querySelector('#settingsSaveExit');
+        try{
+          if(saveBtn) saveBtn.disabled = true;
+          setStatus('جاري حفظ الإعدادات...');
+          const timerSel = Math.max(1, Math.min(50, Number(timerRange?.value || 10)));
+          const updates = {};
+          updates[`rooms/${code}/timer/sel`] = timerSel;
+          updates[`rooms/${code}/timer/dur`] = timerSel;
+          updates[`rooms/${code}/timer/running`] = false;
+          updates[`rooms/${code}/timer/done`] = false;
+          updates[`rooms/${code}/timer/startTs`] = 0;
+          updates[`rooms/${code}/settings/cellContentMode`] = pendingCellMode;
+          await update(ref(db), updates);
+          if(LIVE.room && typeof LIVE.room === 'object'){
+            if(!LIVE.room.settings || typeof LIVE.room.settings !== 'object') LIVE.room.settings = {};
+            if(!LIVE.room.timer || typeof LIVE.room.timer !== 'object') LIVE.room.timer = {};
+            LIVE.room.settings.cellContentMode = pendingCellMode;
+            LIVE.room.timer.sel = timerSel;
+            LIVE.room.timer.dur = timerSel;
+            LIVE.room.timer.running = false;
+            LIVE.room.timer.done = false;
+            LIVE.room.timer.startTs = 0;
+          }
+          SETTINGS_UI.roomLatest = LIVE.room || SETTINGS_UI.roomLatest || {};
+          bd.style.display = 'none';
+        }catch(err){
+          console.error(err);
+          setStatus('تعذر حفظ الإعدادات، حاول مرة أخرى.', true);
+        }finally{
+          if(saveBtn) saveBtn.disabled = false;
+        }
+      }
 
-      bd.querySelector("#sAddQ").addEventListener("click", () => {
-        const room = SETTINGS_UI.roomLatest || {};
-        closeSettings();
+      tabButtons.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.settingsTab)));
+      cellTiles.forEach(tile => tile.addEventListener('click', () => setCellMode(tile.dataset.cellMode)));
+      if(timerRange && timerValue){
+        timerRange.addEventListener('input', () => {
+          timerValue.textContent = `${timerRange.value || 10} ثانية`;
+        });
+      }
+
+      bd.querySelector('#settingsOpenQuestions').addEventListener('click', () => {
+        const room = SETTINGS_UI.roomLatest || LIVE.room || {};
+        bd.style.display = 'none';
         openCustomQuestionsModal(room);
       });
-
-      bd.querySelector("#sTimer").addEventListener("click", () => {
-        const tm = bd.querySelector("#timerMiniPicker");
-        const range = bd.querySelector("#timerMiniRange");
-        const valueEl = bd.querySelector("#timerMiniValue");
-        if(!tm || !range || !valueEl) return;
-        const curSel = Number((SETTINGS_UI.roomLatest && SETTINGS_UI.roomLatest.timer && SETTINGS_UI.roomLatest.timer.sel) || LIVE.room?.timer?.sel || 10);
-        range.value = String(Math.max(1, Math.min(50, curSel || 10)));
-        valueEl.textContent = String(range.value);
-        tm.style.display = (tm.style.display === "block") ? "none" : "block";
+      bd.querySelector('#settingsOpenStore').addEventListener('click', () => {
+        openStoreUrl();
       });
-
-      const timerMiniRange = bd.querySelector("#timerMiniRange");
-      const timerMiniValue = bd.querySelector("#timerMiniValue");
-      const timerMiniApply = bd.querySelector("#timerMiniApply");
-      if(timerMiniRange && timerMiniValue){
-        timerMiniRange.addEventListener("input", () => {
-          timerMiniValue.textContent = String(timerMiniRange.value || 10);
-        });
-      }
-      if(timerMiniApply && timerMiniRange){
-        timerMiniApply.addEventListener("click", async () => {
-          const v = Math.max(1, Math.min(50, Number(timerMiniRange.value || 10)));
-          await update(ref(db, `rooms/${code}/timer`), {
-            sel: v,
-            dur: v,
-            running: false,
-            done: false,
-            startTs: 0
-          });
-          const tm = bd.querySelector("#timerMiniPicker");
-          if(tm) tm.style.display = "none";
-        });
-      }
+      bd.querySelector('#settingsGoHome').addEventListener('click', () => {
+        location.href = 'index.html';
+      });
+      bd.querySelector('#settingsSaveExit').addEventListener('click', saveAndClose);
 
       SETTINGS_UI.ready = true;
-      SETTINGS_UI.els = { backdrop: bd, closeSettings };
+      SETTINGS_UI.els = {
+        backdrop: bd,
+        setActiveTab,
+        syncFromRoom,
+        setStatus,
+        closeSettings: () => { bd.style.display = 'none'; }
+      };
     }
 
     function openSettings(room){
       ensureSettingsModal();
-      SETTINGS_UI.roomLatest = room || {};
-      SETTINGS_UI.els.backdrop.style.display = "flex";
-      SETTINGS_UI.els.backdrop.querySelector("#settingsMenu").style.display = "flex";
+      SETTINGS_UI.roomLatest = room || LIVE.room || {};
+      SETTINGS_UI.els.syncFromRoom(SETTINGS_UI.roomLatest);
+      SETTINGS_UI.els.setActiveTab('questions');
+      SETTINGS_UI.els.backdrop.style.display = 'flex';
     }
 
     function renderHostLobby(room){
