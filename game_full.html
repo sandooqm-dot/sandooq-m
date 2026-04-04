@@ -1916,73 +1916,58 @@
       border-color:rgba(0,0,0,.84);
       color:#111;
     }
+
     .settingsMiniBoardWrap{
       margin-top:18px;
       background:linear-gradient(180deg, #fbfcff 0%, #f4f8ff 100%);
       border-radius:26px;
-      border:5px solid rgba(0,0,0,.12);
-      padding:18px 14px 16px;
+      border:5px solid rgba(0,0,0,.10);
+      padding:18px 10px 16px;
       overflow:auto hidden;
       box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);
     }
     .settingsMiniBoard{
+      width:100%;
+      min-width:0;
       display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:10px;
-      min-width:max-content;
-    }
-    .settingsMiniBoardRow{
-      display:flex;
-      gap:10px;
-      transform:translateX(var(--mini-offset, 0px));
       justify-content:center;
-    }
-    .settingsMiniCell{
-      width:66px;
-      height:58px;
-      border:none;
-      border-radius:16px;
-      background:#ffffff;
-      color:#5b2ba8;
-      font-size:22px;
-      font-weight:900;
-      cursor:pointer;
-      border:4px solid #6a39b3;
-      box-shadow:0 10px 16px rgba(0,0,0,.08);
-      clip-path:polygon(24% 0,76% 0,100% 50%,76% 100%,24% 100%,0 50%);
-      padding:0 4px;
-      display:flex;
       align-items:center;
-      justify-content:center;
-      text-align:center;
-      line-height:1;
-      -webkit-tap-highlight-color:transparent;
-      touch-action:manipulation;
-      transition:transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
     }
-    .settingsMiniCell.empty{
-      color:transparent;
-    }
-    .settingsMiniCell:hover{
-      transform:translateY(-1px);
-      box-shadow:0 12px 18px rgba(0,0,0,.10);
-    }
-    .settingsMiniCell.active{
-      background:#ffe978;
-      color:#111;
-      border-color:#111;
-      box-shadow:0 12px 18px rgba(0,0,0,.16);
-      transform:translateY(-1px) scale(1.02);
-    }
-    .settingsMiniCellValue{
+    .settingsMiniBoardSvg{
       display:block;
-      max-width:86%;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-      font-size:20px;
+      width:min(100%, 720px);
+      height:auto;
+      margin:0 auto;
+    }
+    .settingsMiniSvgCell{
+      fill:#ffffff;
+      stroke:#6a39b3;
+      stroke-width:5;
+      filter:drop-shadow(0 8px 14px rgba(0,0,0,.08));
+      transition:fill .15s ease, stroke .15s ease, transform .15s ease;
+      cursor:pointer;
+    }
+    .settingsMiniSvgCell.active{
+      fill:#ffe978;
+      stroke:#111111;
+      filter:drop-shadow(0 10px 18px rgba(0,0,0,.16));
+    }
+    .settingsMiniSvgText{
+      fill:#5d2a9d;
+      font-family:"AA-GALAXY", Arial, sans-serif;
       font-weight:900;
+      text-anchor:middle;
+      dominant-baseline:middle;
+      paint-order:stroke;
+      stroke:rgba(255,255,255,.78);
+      stroke-width:2.2px;
+      pointer-events:none;
+      user-select:none;
+    }
+    .settingsMiniSvgCell.active + .settingsMiniSvgText,
+    .settingsMiniSvgText.active{
+      fill:#111111;
+      stroke:rgba(255,255,255,.72);
     }
     .settingsCellEditorBox{
       margin-top:16px;
@@ -6412,27 +6397,68 @@ function hideEidIntro(immediate){
         const draft = getRoundDraft(activeCellsRound);
         const count = normalizeCellCount(draft?.cellCount || 5);
         const values = Array.isArray(draft?.values) ? draft.values : [];
-        const rows = [];
-        for(let r=0; r<count; r++){
-          const cells = [];
-          for(let c=0; c<count; c++){
-            const idx = (r * count) + c;
-            const rawVal = String(values[idx] || '').trim();
-            const shown = rawVal ? `<span class="settingsMiniCellValue">${escapeHtml(rawVal)}</span>` : '';
-            cells.push(`<button type="button" class="settingsMiniCell ${rawVal ? '' : 'empty'} ${activeCellsIndex === idx ? 'active' : ''}" data-mini-cell="${idx}" title="${escapeHtml(getRoundCellLabel(activeCellsRound, idx))}" aria-label="${escapeHtml(getRoundCellLabel(activeCellsRound, idx))}">${shown}</button>`);
+        const shape = 'hex';
+        const W = 720;
+        const H = count === 4 ? 380 : (count === 5 ? 430 : 510);
+        const marginX = W * 0.07;
+        const marginY = H * 0.06;
+        const usableW = W - marginX*2;
+        const usableH = H - marginY*2;
+
+        let cellW = usableW / (count + 0.5);
+        let cellH = usableH / (count * 0.84 + 0.25);
+        let stepX = cellW;
+        let stepY = cellH * 0.76;
+
+        const cellsMeta = [];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for(let row=0; row<count; row++){
+          for(let col=0; col<count; col++){
+            let x = marginX + (col * stepX);
+            let y = marginY + (row * stepY);
+            x += (row % 2) * (cellW / 2);
+            cellsMeta.push({ row, col, x, y, idx:(row * count) + col });
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + cellW);
+            maxY = Math.max(maxY, y + cellH);
           }
-          const offset = (r % 2 === 1) ? '30px' : '0px';
-          rows.push(`<div class="settingsMiniBoardRow" style="--mini-offset:${offset}">${cells.join('')}</div>`);
         }
-        miniBoardEl.innerHTML = rows.join('');
+
+        const offsetX = ((W - (maxX - minX)) / 2) - minX;
+        const offsetY = ((H - (maxY - minY)) / 2) - minY;
+
+        const cellsSvg = cellsMeta.map(meta => {
+          const x = meta.x + offsetX;
+          const y = meta.y + offsetY;
+          const rawVal = String(values[meta.idx] || '').trim();
+          const isActive = activeCellsIndex === meta.idx;
+          const points = polygonPointsForShape(shape, x, y, cellW, cellH);
+          const tx = (x + cellW/2).toFixed(2);
+          const ty = (y + cellH/2 + 2).toFixed(2);
+          const maxLen = rawVal.length;
+          const fontSize = Math.max(16, Math.min(cellW, cellH) * (maxLen > 2 ? 0.26 : 0.36));
+          const textClass = isActive ? 'settingsMiniSvgText active' : 'settingsMiniSvgText';
+          const textSvg = rawVal ? `<text class="${textClass}" x="${tx}" y="${ty}" font-size="${fontSize.toFixed(2)}">${escapeHtml(rawVal)}</text>` : '';
+          return `<g class="settingsMiniSvgCellGroup" data-mini-cell="${meta.idx}" aria-label="${escapeHtml(getRoundCellLabel(activeCellsRound, meta.idx))}" role="button" tabindex="0"><polygon class="settingsMiniSvgCell ${isActive ? 'active' : ''}" points="${points}"></polygon>${textSvg}</g>`;
+        }).join('');
+
+        miniBoardEl.innerHTML = `<svg class="settingsMiniBoardSvg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-label="خريطة الخلايا المصغرة">${cellsSvg}</svg>`;
         miniBoardEl.querySelectorAll('[data-mini-cell]').forEach(btn => {
-          btn.addEventListener('click', () => {
+          const activateCell = () => {
             activeCellsIndex = Number(btn.getAttribute('data-mini-cell') || 0);
             const val = String(getRoundDraft(activeCellsRound).values?.[activeCellsIndex] || '');
             if(cellInputEl) cellInputEl.value = val;
             if(selectedCellLabelEl) selectedCellLabelEl.textContent = `${getRoundCellLabel(activeCellsRound, activeCellsIndex)} — اكتب المحتوى هنا`;
             renderMiniBoard();
             try{ cellInputEl?.focus(); }catch(e){}
+          };
+          btn.addEventListener('click', activateCell);
+          btn.addEventListener('keydown', (ev) => {
+            if(ev.key === 'Enter' || ev.key === ' '){
+              ev.preventDefault();
+              activateCell();
+            }
           });
         });
       }
