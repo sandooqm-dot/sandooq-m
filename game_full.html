@@ -2134,7 +2134,7 @@
     }
     @media (max-width:700px){
       .settingsOptionGrid{ grid-template-columns:1fr; }
-      .settingsChoiceRow{ grid-template-columns:1fr; }
+      .settingsChoiceRow{ grid-template-columns:repeat(2,minmax(0,1fr)); }
       .settingsPageTitle{ font-size:28px; }
       .settingsTabBtn{ font-size:17px; padding:0 16px; }
       .settingsSectionTitle{ font-size:25px; }
@@ -6090,11 +6090,16 @@ function hideEidIntro(immediate){
       if(!body) return;
       body.innerHTML = "";
 
+      const inSettings = !!item.classList.contains("settingsInlineQuestionItem");
+      const pendingMap = normalizeCustomQuestionsMap((SETTINGS_UI && SETTINGS_UI.pendingCustomQuestions) || {});
+      const sourceRoom = inSettings
+        ? { ...(room || {}), customQuestions: pendingMap }
+        : room;
+
       const pairsWrap = document.createElement("div");
       pairsWrap.className = "cqPairs";
 
-      // ✅ (9) قصّ العرض/التحميل على 7
-      const existing = getCustomList(room, letter).slice(0, MAX_CUSTOM_PER_LETTER);
+      const existing = getCustomList(sourceRoom, letter).slice(0, MAX_CUSTOM_PER_LETTER);
       if(existing.length){
         existing.forEach(obj => pairsWrap.appendChild(createPairEl(String(obj.q||""), String(obj.a||""))));
       }else{
@@ -6105,20 +6110,101 @@ function hideEidIntro(immediate){
       addWrap.className = "cqAddWrap";
       addWrap.innerHTML = `<button class="cqAddBtn" type="button" aria-label="إضافة سؤال">+</button>`;
 
-      const saveBtn = document.createElement("button");
-      saveBtn.className = "btn btnYellow cqSaveFixed";
-      saveBtn.type = "button";
-      saveBtn.textContent = "حفظ";
-
       const savedMsg = document.createElement("div");
       savedMsg.className = "cqSavedMsg";
 
       body.appendChild(pairsWrap);
       body.appendChild(addWrap);
-      body.appendChild(saveBtn);
+      if(!inSettings){
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "btn btnYellow cqSaveFixed";
+        saveBtn.type = "button";
+        saveBtn.textContent = "حفظ";
+        body.appendChild(saveBtn);
+
+        saveBtn.addEventListener("click", async () => {
+          const out = [];
+          pairsWrap.querySelectorAll(".cqPair").forEach(p => {
+            const q = (p.querySelector(".cqQ")?.value || "").trim();
+            const a = (p.querySelector(".cqA")?.value || "").trim();
+            if(q || a) out.push({ q, a });
+          });
+
+          if(out.length > MAX_CUSTOM_PER_LETTER){
+            savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة فقط`;
+            setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+            return;
+          }
+
+          const latestRoom = getRoomWithPersistentCustomQuestions(CUSTOM_Q_UI.roomLatest || LIVE.room || {});
+          const mergedQuestions = normalizeCustomQuestionsMap(latestRoom?.customQuestions || {});
+          if(out.length) mergedQuestions[letter] = out;
+          else delete mergedQuestions[letter];
+
+          const saveTs = Date.now();
+          savePersistedCustomQuestions(mergedQuestions, saveTs);
+          CUSTOM_Q_PERSIST.remote = { updatedAt: saveTs, customQuestions: mergedQuestions };
+          CUSTOM_Q_PERSIST.remoteLoaded = true;
+          CUSTOM_Q_UI.roomLatest = {
+            ...latestRoom,
+            customQuestions: mergedQuestions,
+            customQuestionsUpdatedAt: saveTs
+          };
+
+          LIVE.room = normalizeLiveRoom({
+            ...(LIVE.room || {}),
+            customQuestions: mergedQuestions,
+            customQuestionsUpdatedAt: saveTs
+          });
+          scheduleRender();
+
+          let roomSaved = false;
+          let remoteSaved = false;
+
+          try{
+            await pushCustomQuestionsToRoom(mergedQuestions, saveTs);
+            roomSaved = true;
+          }catch(e){}
+
+          try{
+            await saveRemoteCustomQuestionsEnvelope(mergedQuestions, saveTs);
+            remoteSaved = true;
+          }catch(e){}
+
+          if(remoteSaved){
+            savedMsg.textContent = "تم الحفظ دائمًا ✅";
+          }else if(roomSaved){
+            savedMsg.textContent = "تم الحفظ داخل الجلسة ✅";
+          }else{
+            savedMsg.textContent = "تم الحفظ على هذا الجهاز ✅";
+          }
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+
+          refreshAddState();
+        });
+      }
       body.appendChild(savedMsg);
 
       const addBtn = addWrap.querySelector(".cqAddBtn");
+
+      function collectPairs(){
+        const out = [];
+        pairsWrap.querySelectorAll('.cqPair').forEach(p => {
+          const q = (p.querySelector('.cqQ')?.value || '').trim();
+          const a = (p.querySelector('.cqA')?.value || '').trim();
+          if(q || a) out.push({ q, a });
+        });
+        return out.slice(0, MAX_CUSTOM_PER_LETTER);
+      }
+
+      function syncPendingQuestions(){
+        if(!inSettings) return;
+        const map = normalizeCustomQuestionsMap((SETTINGS_UI && SETTINGS_UI.pendingCustomQuestions) || {});
+        const out = collectPairs();
+        if(out.length) map[letter] = out;
+        else delete map[letter];
+        SETTINGS_UI.pendingCustomQuestions = map;
+      }
 
       function refreshAddState(){
         const count = pairsWrap.querySelectorAll(".cqPair").length;
@@ -6133,77 +6219,20 @@ function hideEidIntro(immediate){
       addBtn.addEventListener("click", () => {
         const count = pairsWrap.querySelectorAll(".cqPair").length;
         if(count >= MAX_CUSTOM_PER_LETTER){
-          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة لهذا العنصر`;
+          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة لهذا الحرف`;
           setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
           return;
         }
-        pairsWrap.appendChild(createPairEl("", ""));
+        const pair = createPairEl("", "");
+        pair.querySelectorAll('.cqTA').forEach(ta => ta.addEventListener('input', syncPendingQuestions));
+        pairsWrap.appendChild(pair);
         refreshAddState();
+        syncPendingQuestions();
       });
 
-      saveBtn.addEventListener("click", async () => {
-        const out = [];
-        pairsWrap.querySelectorAll(".cqPair").forEach(p => {
-          const q = (p.querySelector(".cqQ")?.value || "").trim();
-          const a = (p.querySelector(".cqA")?.value || "").trim();
-          if(q || a) out.push({ q, a });
-        });
-
-        // ✅ (9) حد 7 — لا نحفظ أكثر
-        if(out.length > MAX_CUSTOM_PER_LETTER){
-          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة فقط`;
-          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
-          return;
-        }
-
-        const latestRoom = getRoomWithPersistentCustomQuestions(CUSTOM_Q_UI.roomLatest || LIVE.room || {});
-        const mergedQuestions = normalizeCustomQuestionsMap(latestRoom?.customQuestions || {});
-        if(out.length) mergedQuestions[letter] = out;
-        else delete mergedQuestions[letter];
-
-        const saveTs = Date.now();
-        savePersistedCustomQuestions(mergedQuestions, saveTs);
-        CUSTOM_Q_PERSIST.remote = { updatedAt: saveTs, customQuestions: mergedQuestions };
-        CUSTOM_Q_PERSIST.remoteLoaded = true;
-        CUSTOM_Q_UI.roomLatest = {
-          ...latestRoom,
-          customQuestions: mergedQuestions,
-          customQuestionsUpdatedAt: saveTs
-        };
-
-        LIVE.room = normalizeLiveRoom({
-          ...(LIVE.room || {}),
-          customQuestions: mergedQuestions,
-          customQuestionsUpdatedAt: saveTs
-        });
-        scheduleRender();
-
-        let roomSaved = false;
-        let remoteSaved = false;
-
-        try{
-          await pushCustomQuestionsToRoom(mergedQuestions, saveTs);
-          roomSaved = true;
-        }catch(e){}
-
-        try{
-          await saveRemoteCustomQuestionsEnvelope(mergedQuestions, saveTs);
-          remoteSaved = true;
-        }catch(e){}
-
-        if(remoteSaved){
-          savedMsg.textContent = "تم الحفظ دائمًا ✅";
-        }else if(roomSaved){
-          savedMsg.textContent = "تم الحفظ داخل الجلسة ✅";
-        }else{
-          savedMsg.textContent = "تم الحفظ على هذا الجهاز ✅";
-        }
-        setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
-
-        refreshAddState();
-      });
+      pairsWrap.querySelectorAll('.cqTA').forEach(ta => ta.addEventListener('input', syncPendingQuestions));
+      syncPendingQuestions();
     }
-
     function ensureCustomQuestionsModal(){
       if(CUSTOM_Q_UI.ready) return;
 
@@ -6453,6 +6482,7 @@ function hideEidIntro(immediate){
       let pendingSoundEnabled = true;
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
+      SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.pendingCustomQuestions || {});
 
       function setStatus(msg, isError=false){
         if(!statusEl) return;
@@ -6691,6 +6721,7 @@ function hideEidIntro(immediate){
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
         if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
         SETTINGS_UI.roomLatest = getRoomWithPersistentCustomQuestions(r || {});
+        SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.roomLatest?.customQuestions || {});
         loadManualRoundsFromRoom(SETTINGS_UI.roomLatest);
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
         setStatus('');
@@ -6704,6 +6735,8 @@ function hideEidIntro(immediate){
           const timerSel = Math.max(1, Math.min(50, Number(timerRange?.value || 10)));
           const manualCellRounds = JSON.parse(JSON.stringify(pendingManualCellRounds || {}));
           const baseRoom = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
+          const pendingCustomQuestions = normalizeCustomQuestionsMap((SETTINGS_UI && SETTINGS_UI.pendingCustomQuestions) || baseRoom?.customQuestions || {});
+          const customQuestionsUpdatedAt = Date.now();
           const nextSettings = {
             ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
             manualCellRounds,
@@ -6720,6 +6753,8 @@ function hideEidIntro(immediate){
           updates[`rooms/${code}/timer/done`] = false;
           updates[`rooms/${code}/timer/startTs`] = 0;
           updates[`rooms/${code}/questionMode`] = pendingQuestionMode;
+          updates[`rooms/${code}/customQuestions`] = pendingCustomQuestions;
+          updates[`rooms/${code}/customQuestionsUpdatedAt`] = customQuestionsUpdatedAt;
           updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
           updates[`rooms/${code}/settings/cellContentMode`] = pendingCellContentMode;
           updates[`rooms/${code}/settings/soundEnabled`] = !!pendingSoundEnabled;
@@ -6732,6 +6767,8 @@ function hideEidIntro(immediate){
             if(!LIVE.room.timer || typeof LIVE.room.timer !== 'object') LIVE.room.timer = {};
             if(!LIVE.room.round || typeof LIVE.room.round !== 'object') LIVE.room.round = { current:1, targetWins:1, winner:null, boardSeed:0 };
             LIVE.room.questionMode = pendingQuestionMode;
+            LIVE.room.customQuestions = pendingCustomQuestions;
+            LIVE.room.customQuestionsUpdatedAt = customQuestionsUpdatedAt;
             LIVE.room.settings.manualCellRounds = manualCellRounds;
             LIVE.room.settings.cellContentMode = pendingCellContentMode;
             LIVE.room.settings.soundEnabled = !!pendingSoundEnabled;
@@ -6744,6 +6781,11 @@ function hideEidIntro(immediate){
             LIVE.room.board = nextBoard;
             LIVE.room.round.boardSeed = Number(nextBoard.seed || 0) || currentSeed;
           }
+          savePersistedCustomQuestions(pendingCustomQuestions, customQuestionsUpdatedAt);
+          CUSTOM_Q_PERSIST.remote = { updatedAt: customQuestionsUpdatedAt, customQuestions: pendingCustomQuestions };
+          CUSTOM_Q_PERSIST.remoteLoaded = true;
+          try{ await saveRemoteCustomQuestionsEnvelope(pendingCustomQuestions, customQuestionsUpdatedAt); }catch(e){}
+          SETTINGS_UI.pendingCustomQuestions = pendingCustomQuestions;
           SETTINGS_UI.roomLatest = LIVE.room || SETTINGS_UI.roomLatest || {};
           buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
           scheduleRender();
