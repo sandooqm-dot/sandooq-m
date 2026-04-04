@@ -1883,6 +1883,127 @@
       line-height:1.65;
       color:#566176;
     }
+
+    .settingsRoundsRow,
+    .settingsCountsRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-start;
+      margin-top:12px;
+    }
+    .settingsRoundBtn,
+    .settingsCountBtn{
+      min-width:110px;
+      height:48px;
+      padding:0 14px;
+      border:none;
+      border-radius:16px;
+      background:#fff;
+      color:#111;
+      font-size:18px;
+      font-weight:900;
+      cursor:pointer;
+      border:3px solid rgba(0,0,0,.16);
+      box-shadow:0 8px 16px rgba(0,0,0,.08);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .settingsRoundBtn.active,
+    .settingsCountBtn.active{
+      background:#ffd54a;
+      border-color:rgba(0,0,0,.84);
+      color:#111;
+    }
+    .settingsMiniBoardWrap{
+      margin-top:18px;
+      background:linear-gradient(180deg, #fdfcff 0%, #f3f8ff 100%);
+      border-radius:24px;
+      border:4px solid rgba(0,0,0,.12);
+      padding:16px 10px 14px;
+      overflow:auto hidden;
+    }
+    .settingsMiniBoard{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
+      min-width:max-content;
+    }
+    .settingsMiniBoardRow{
+      display:flex;
+      gap:8px;
+      transform:translateX(var(--mini-offset, 0px));
+      justify-content:center;
+    }
+    .settingsMiniCell{
+      width:54px;
+      height:48px;
+      border:none;
+      border-radius:14px;
+      background:#fff;
+      color:#5b2ba8;
+      font-size:22px;
+      font-weight:900;
+      cursor:pointer;
+      border:3px solid #6a39b3;
+      box-shadow:0 8px 14px rgba(0,0,0,.08);
+      clip-path:polygon(24% 0,76% 0,100% 50%,76% 100%,24% 100%,0 50%);
+      padding:0 4px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      line-height:1;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .settingsMiniCell.empty{
+      color:rgba(91,43,168,.28);
+    }
+    .settingsMiniCell.active{
+      background:#ffe978;
+      color:#111;
+      border-color:#111;
+      box-shadow:0 10px 18px rgba(0,0,0,.14);
+    }
+    .settingsCellEditorBox{
+      margin-top:16px;
+      background:#fff;
+      border-radius:20px;
+      border:3px solid rgba(0,0,0,.12);
+      padding:14px;
+    }
+    .settingsCellEditorLabel{
+      font-size:18px;
+      font-weight:900;
+      color:#111;
+      margin:0 0 10px;
+      text-align:right;
+    }
+    .settingsCellInput{
+      width:100%;
+      height:58px;
+      border-radius:16px;
+      border:3px solid rgba(0,0,0,.14);
+      background:#fff;
+      color:#111;
+      font-size:24px;
+      font-weight:900;
+      text-align:center;
+      outline:none;
+      padding:0 14px;
+    }
+    .settingsCellInput::placeholder{ color:rgba(0,0,0,.34); }
+    .settingsCellsHint{
+      margin-top:10px;
+      font-size:15px;
+      font-weight:900;
+      color:#5a667b;
+      line-height:1.7;
+      text-align:right;
+    }
     .settingsRangeWrap{
       margin-top:12px;
       background:#f7fbff;
@@ -3000,10 +3121,28 @@
     }
 
     function buildBoardState(roomLike, seedTs){
-      const size = getBoardSize(roomLike || {});
-      const shape = getBoardShape(roomLike || {});
+      const roomRefLike = roomLike || {};
+      const settings = (roomRefLike.settings && typeof roomRefLike.settings === 'object') ? roomRefLike.settings : {};
+      const currentRound = Math.max(1, Number(roomRefLike?.round?.current || 1));
+      const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
+      const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
+      const size = normalizeCellCount(manualConfig?.cellCount || getBoardSize(roomRefLike || {}));
+      const shape = getBoardShape(roomRefLike || {});
       const seed = Number(seedTs || Date.now()) || Date.now();
-      const special = { letters: generateBoardLetters(size, seed), hiddenLetters: {} };
+      const baseLetters = generateBoardLetters(size, seed);
+      const special = { letters: baseLetters, hiddenLetters: {} };
+
+      if(manualConfig && Array.isArray(manualConfig.values)){
+        const overlay = manualConfig.values.map(v => String(v || ''));
+        for(let r=0; r<size; r++){
+          for(let c=0; c<size; c++){
+            const idx = (r * size) + c;
+            const raw = String(overlay[idx] || '').trim();
+            if(raw) special.letters[r][c] = raw;
+          }
+        }
+      }
+
       return {
         size,
         shape,
@@ -6113,26 +6252,26 @@ function hideEidIntro(immediate){
 
             <section class="settingsSection" data-settings-panel="cells">
               <div class="settingsCard settingsDirectCard">
-                <h3 class="settingsSectionTitle compact">تعديل محتوى الخلايا</h3>
-                <p class="settingsMutedText compact">اختر نوع المحتوى الافتراضي داخل الخلايا. التخصيص اليدوي التفصيلي سنكمله في الخطوة القادمة.</p>
-                <h4 class="settingsMiniTitle">نوع المحتوى الافتراضي</h4>
-                <div class="settingsOptionGrid" id="settingsCellModeGrid">
-                  <button class="settingsOptionTile" type="button" data-cell-mode="arabic">
-                    <span class="settingsOptionTileTitle">حروف عربية</span>
-                    <span class="settingsOptionTileDesc">مناسب للعبة الأساسية والأنشطة العربية.</span>
-                  </button>
-                  <button class="settingsOptionTile" type="button" data-cell-mode="english">
-                    <span class="settingsOptionTileTitle">حروف إنجليزية</span>
-                    <span class="settingsOptionTileDesc">مناسب للحصص والأنشطة الإنجليزية.</span>
-                  </button>
-                  <button class="settingsOptionTile" type="button" data-cell-mode="numbers">
-                    <span class="settingsOptionTileTitle">أرقام</span>
-                    <span class="settingsOptionTileDesc">مفيد للأنشطة الحسابية والمسابقات الرقمية.</span>
-                  </button>
-                  <button class="settingsOptionTile" type="button" data-cell-mode="manual">
-                    <span class="settingsOptionTileTitle">تخصيص يدوي</span>
-                    <span class="settingsOptionTileDesc">تمهيد لمرحلة إدخال محتوى كل خلية يدويًا لاحقًا.</span>
-                  </button>
+                <h3 class="settingsSectionTitle compact">تكوين محتوى الخلايا</h3>
+                <div class="settingsRoundsRow" id="settingsRoundsRow">
+                  <button class="settingsRoundBtn active" type="button" data-cells-round="1">الجولة الأولى</button>
+                  <button class="settingsRoundBtn" type="button" data-cells-round="2">الجولة الثانية</button>
+                  <button class="settingsRoundBtn" type="button" data-cells-round="3">الجولة الثالثة</button>
+                  <button class="settingsRoundBtn" type="button" data-cells-round="4">الجولة الرابعة</button>
+                  <button class="settingsRoundBtn" type="button" data-cells-round="5">الجولة الخامسة</button>
+                </div>
+                <div class="settingsCountsRow" id="settingsCountsRow">
+                  <button class="settingsCountBtn" type="button" data-cells-count="4">رباعية</button>
+                  <button class="settingsCountBtn active" type="button" data-cells-count="5">خماسية</button>
+                  <button class="settingsCountBtn" type="button" data-cells-count="6">سداسية</button>
+                </div>
+                <div class="settingsMiniBoardWrap">
+                  <div id="settingsMiniBoard" class="settingsMiniBoard"></div>
+                </div>
+                <div class="settingsCellEditorBox">
+                  <div id="settingsSelectedCellLabel" class="settingsCellEditorLabel">اختر خلية من الخريطة الصغيرة ثم اكتب محتواها هنا.</div>
+                  <input id="settingsCellInput" class="settingsCellInput" type="text" inputmode="text" placeholder="اكتب محتوى الخلية المختارة">
+                  <div class="settingsCellsHint">اضغط على أي خلية من الخريطة المصغرة، ثم اكتب محتواها في المربع. عند الانتقال إلى جولة أخرى ستبقى مدخلاتك محفوظة حتى تضغط حفظ وخروج.</div>
                 </div>
               </div>
             </section>
@@ -6198,10 +6337,16 @@ function hideEidIntro(immediate){
       const timerRange = bd.querySelector('#settingsTimerRange');
       const timerValue = bd.querySelector('#settingsTimerValue');
       const statusEl = bd.querySelector('#settingsStatus');
-      const cellTiles = Array.from(bd.querySelectorAll('[data-cell-mode]'));
       const questionsList = bd.querySelector('#settingsQuestionsList');
-      let pendingCellMode = 'arabic';
+      const roundButtons = Array.from(bd.querySelectorAll('[data-cells-round]'));
+      const countButtons = Array.from(bd.querySelectorAll('[data-cells-count]'));
+      const miniBoardEl = bd.querySelector('#settingsMiniBoard');
+      const cellInputEl = bd.querySelector('#settingsCellInput');
+      const selectedCellLabelEl = bd.querySelector('#settingsSelectedCellLabel');
       let activeTab = 'questions';
+      let activeCellsRound = 1;
+      let activeCellsIndex = null;
+      let pendingManualCellRounds = {};
 
       function setStatus(msg, isError=false){
         if(!statusEl) return;
@@ -6215,9 +6360,105 @@ function hideEidIntro(immediate){
         panels.forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === activeTab));
       }
 
-      function setCellMode(mode){
-        pendingCellMode = String(mode || 'arabic');
-        cellTiles.forEach(tile => tile.classList.toggle('active', tile.dataset.cellMode === pendingCellMode));
+      const CELL_COUNT_META = {
+        4: { label:'رباعية', size:4 },
+        5: { label:'خماسية', size:5 },
+        6: { label:'سداسية', size:6 }
+      };
+
+      function getDefaultCellsCount(roomLike){
+        return normalizeCellCount(roomLike?.settings?.cellCount || roomLike?.settings?.cellsCount || roomLike?.settings?.boardSize || 5);
+      }
+
+      function normalizeRoundDraft(raw, fallbackCount){
+        const count = normalizeCellCount(raw?.cellCount || fallbackCount || 5);
+        const total = count * count;
+        const source = Array.isArray(raw?.values) ? raw.values : [];
+        const values = new Array(total).fill('');
+        for(let i=0;i<Math.min(total, source.length); i++) values[i] = String(source[i] || '');
+        return { cellCount: count, values };
+      }
+
+      function getRoundDraft(roundNum){
+        const key = String(roundNum || 1);
+        if(!pendingManualCellRounds[key]){
+          pendingManualCellRounds[key] = normalizeRoundDraft({}, getDefaultCellsCount(SETTINGS_UI.roomLatest || LIVE.room || {}));
+        }
+        return pendingManualCellRounds[key];
+      }
+
+      function getRoundCellLabel(roundNum, idx){
+        return `الجولة ${roundNum} - الخلية ${idx + 1}`;
+      }
+
+      function renderMiniBoard(){
+        if(!miniBoardEl) return;
+        const draft = getRoundDraft(activeCellsRound);
+        const count = normalizeCellCount(draft?.cellCount || 5);
+        const values = Array.isArray(draft?.values) ? draft.values : [];
+        const rows = [];
+        for(let r=0; r<count; r++){
+          const cells = [];
+          for(let c=0; c<count; c++){
+            const idx = (r * count) + c;
+            const rawVal = String(values[idx] || '').trim();
+            const shown = rawVal || '•';
+            cells.push(`<button type="button" class="settingsMiniCell ${rawVal ? '' : 'empty'} ${activeCellsIndex === idx ? 'active' : ''}" data-mini-cell="${idx}" title="${escapeHtml(getRoundCellLabel(activeCellsRound, idx))}">${escapeHtml(shown)}</button>`);
+          }
+          const offset = (r % 2 === 1) ? '30px' : '0px';
+          rows.push(`<div class="settingsMiniBoardRow" style="--mini-offset:${offset}">${cells.join('')}</div>`);
+        }
+        miniBoardEl.innerHTML = rows.join('');
+        miniBoardEl.querySelectorAll('[data-mini-cell]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            activeCellsIndex = Number(btn.getAttribute('data-mini-cell') || 0);
+            const val = String(getRoundDraft(activeCellsRound).values?.[activeCellsIndex] || '');
+            if(cellInputEl) cellInputEl.value = val;
+            if(selectedCellLabelEl) selectedCellLabelEl.textContent = `${getRoundCellLabel(activeCellsRound, activeCellsIndex)} — اكتب المحتوى هنا`;
+            renderMiniBoard();
+            try{ cellInputEl?.focus(); }catch(e){}
+          });
+        });
+      }
+
+      function setActiveCellsRound(roundNum){
+        activeCellsRound = Math.max(1, Math.min(5, Number(roundNum || 1)));
+        roundButtons.forEach(btn => btn.classList.toggle('active', Number(btn.dataset.cellsRound || 0) === activeCellsRound));
+        const draft = getRoundDraft(activeCellsRound);
+        const activeCount = normalizeCellCount(draft?.cellCount || 5);
+        countButtons.forEach(btn => btn.classList.toggle('active', Number(btn.dataset.cellsCount || 0) === activeCount));
+        if(activeCellsIndex !== null && activeCellsIndex >= activeCount * activeCount) activeCellsIndex = null;
+        if(activeCellsIndex === null){
+          if(selectedCellLabelEl) selectedCellLabelEl.textContent = 'اختر خلية من الخريطة الصغيرة ثم اكتب محتواها هنا.';
+          if(cellInputEl) cellInputEl.value = '';
+        }else{
+          const currentValue = String(draft.values?.[activeCellsIndex] || '');
+          if(selectedCellLabelEl) selectedCellLabelEl.textContent = `${getRoundCellLabel(activeCellsRound, activeCellsIndex)} — اكتب المحتوى هنا`;
+          if(cellInputEl) cellInputEl.value = currentValue;
+        }
+        renderMiniBoard();
+      }
+
+      function setActiveCellsCount(countVal){
+        const count = normalizeCellCount(countVal || 5);
+        const current = getRoundDraft(activeCellsRound);
+        pendingManualCellRounds[String(activeCellsRound)] = normalizeRoundDraft({ values: current.values }, count);
+        countButtons.forEach(btn => btn.classList.toggle('active', Number(btn.dataset.cellsCount || 0) === count));
+        if(activeCellsIndex !== null && activeCellsIndex >= count * count) activeCellsIndex = null;
+        setActiveCellsRound(activeCellsRound);
+      }
+
+      function loadManualRoundsFromRoom(roomLike){
+        const settings = (roomLike?.settings && typeof roomLike.settings === 'object') ? roomLike.settings : {};
+        const stored = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
+        const fallbackCount = getDefaultCellsCount(roomLike || LIVE.room || {});
+        const next = {};
+        for(let r=1; r<=5; r++){
+          next[String(r)] = normalizeRoundDraft(stored[String(r)] || stored[r] || {}, fallbackCount);
+        }
+        pendingManualCellRounds = next;
+        activeCellsIndex = null;
+        setActiveCellsRound(activeCellsRound || 1);
       }
 
       function buildSettingsQuestionsList(room){
@@ -6244,12 +6485,11 @@ function hideEidIntro(immediate){
         const r = room || {};
         const settings = (r.settings && typeof r.settings === 'object') ? r.settings : {};
         const selectedTimer = Number((r.timer && r.timer.sel) || LIVE.room?.timer?.sel || 10);
-        const selectedCellMode = String(settings.cellContentMode || 'arabic').trim() || 'arabic';
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
         if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
-        setCellMode(selectedCellMode);
         SETTINGS_UI.roomLatest = getRoomWithPersistentCustomQuestions(r || {});
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
+        loadManualRoundsFromRoom(SETTINGS_UI.roomLatest);
         setStatus('');
       }
 
@@ -6259,23 +6499,37 @@ function hideEidIntro(immediate){
           if(saveBtn) saveBtn.disabled = true;
           setStatus('جاري حفظ الإعدادات...');
           const timerSel = Math.max(1, Math.min(50, Number(timerRange?.value || 10)));
+          const manualCellRounds = JSON.parse(JSON.stringify(pendingManualCellRounds || {}));
+          const baseRoom = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
+          const nextSettings = {
+            ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
+            manualCellRounds
+          };
+          const roomForBoard = { ...baseRoom, settings: nextSettings };
+          const currentSeed = Number(baseRoom?.round?.boardSeed || baseRoom?.board?.seed || Date.now()) || Date.now();
+          const nextBoard = rememberBoard(buildBoardState(roomForBoard, currentSeed), roomForBoard) || buildBoardState(roomForBoard, currentSeed);
           const updates = {};
           updates[`rooms/${code}/timer/sel`] = timerSel;
           updates[`rooms/${code}/timer/dur`] = timerSel;
           updates[`rooms/${code}/timer/running`] = false;
           updates[`rooms/${code}/timer/done`] = false;
           updates[`rooms/${code}/timer/startTs`] = 0;
-          updates[`rooms/${code}/settings/cellContentMode`] = pendingCellMode;
+          updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
+          updates[`rooms/${code}/board`] = nextBoard;
+          updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || currentSeed;
           await update(ref(db), updates);
           if(LIVE.room && typeof LIVE.room === 'object'){
             if(!LIVE.room.settings || typeof LIVE.room.settings !== 'object') LIVE.room.settings = {};
             if(!LIVE.room.timer || typeof LIVE.room.timer !== 'object') LIVE.room.timer = {};
-            LIVE.room.settings.cellContentMode = pendingCellMode;
+            if(!LIVE.room.round || typeof LIVE.room.round !== 'object') LIVE.room.round = { current:1, targetWins:1, winner:null, boardSeed:0 };
+            LIVE.room.settings.manualCellRounds = manualCellRounds;
             LIVE.room.timer.sel = timerSel;
             LIVE.room.timer.dur = timerSel;
             LIVE.room.timer.running = false;
             LIVE.room.timer.done = false;
             LIVE.room.timer.startTs = 0;
+            LIVE.room.board = nextBoard;
+            LIVE.room.round.boardSeed = Number(nextBoard.seed || 0) || currentSeed;
           }
           SETTINGS_UI.roomLatest = LIVE.room || SETTINGS_UI.roomLatest || {};
           bd.style.display = 'none';
@@ -6288,7 +6542,16 @@ function hideEidIntro(immediate){
       }
 
       tabButtons.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.settingsTab)));
-      cellTiles.forEach(tile => tile.addEventListener('click', () => setCellMode(tile.dataset.cellMode)));
+      roundButtons.forEach(btn => btn.addEventListener('click', () => setActiveCellsRound(btn.dataset.cellsRound)));
+      countButtons.forEach(btn => btn.addEventListener('click', () => setActiveCellsCount(btn.dataset.cellsCount)));
+      if(cellInputEl){
+        cellInputEl.addEventListener('input', () => {
+          if(activeCellsIndex === null) return;
+          const draft = getRoundDraft(activeCellsRound);
+          draft.values[activeCellsIndex] = String(cellInputEl.value || '');
+          renderMiniBoard();
+        });
+      }
       if(timerRange && timerValue){
         timerRange.addEventListener('input', () => {
           timerValue.textContent = `${timerRange.value || 10} ثانية`;
