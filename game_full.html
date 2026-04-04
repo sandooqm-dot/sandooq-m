@@ -2573,40 +2573,234 @@
       body{ padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
       .wrap{ max-width:1200px; }
 
-      .gameLayout{
-        display:flex;
-        flex-direction:row;
-        align-items:flex-start;
-        justify-content:center;
-        gap:16px;
-        width:95vw;
+      body.startedGameView{
+        overflow:hidden;
+        padding-bottom: calc(14px + env(safe-area-inset-bottom));
+      }
+      body.startedGameView header{
+        padding:10px 14px 6px;
+      }
+      body.startedGameView .headerRow{
+        grid-template-columns:58px minmax(0,1fr) auto;
+        gap:10px;
+      }
+      body.startedGameView .logo{
+        width:58px;
+        height:58px;
+      }
+      body.startedGameView .gameName{
+        padding-top:0;
+      }
+      body.startedGameView .gnText{
+        font-size:28px;
+      }
+      body.startedGameView .topSettingsHostSlot{
+        min-height:46px;
+      }
+      body.startedGameView .topSettingsBtn{
+        min-width:108px;
+        height:46px;
+        padding:0 14px;
+        font-size:20px;
+        border-width:3px;
+        border-radius:15px;
+      }
+      body.startedGameView .wrap{
+        width:min(96vw, 1380px);
+        max-width:1380px;
+      }
+      body.startedGameView #main.inGame{
+        margin-top:2px;
+        padding-top:0;
+      }
+      body.startedGameView .gameLayout{
+        display:grid;
+        grid-template-columns:minmax(0, 1fr) minmax(320px, .88fr);
+        gap:14px;
+        width:100%;
         margin:0 auto;
+        align-items:start;
       }
-      .landRight{
-        flex:0 0 56%;
-        max-width:56%;
+      body.startedGameView .landRight,
+      body.startedGameView .landLeft{
+        min-width:0;
+        max-width:none;
       }
-      .landLeft{
-        flex:0 0 44%;
-        max-width:44%;
+      body.startedGameView .landRight{
+        display:flex;
+        flex-direction:column;
       }
-
-      .mapScale{ width:100%; }
-      .mapToolsRow{ width:100%; }
-      .scoreBoard{ width:100%; }
-      .firstPressBar{ width:100%; font-size:22px; padding:14px 14px; }
-      .controlsRow{ width:100%; margin:10px auto 10px; }
-      .questionCard{ width:100%; margin:10px auto 0; }
-      .playerBigBtn{ width:100%; }
-      .buyNowBtn{ width:100%; }
-
-      .pillBtn{ max-width:100%; width:100%; }
-      .controlsRow{
-        gap:12px;
+      body.startedGameView .landLeft{
+        display:flex;
+        flex-direction:column;
+        gap:10px;
       }
-      .controlsRow .pillBtn{
-        height:72px;
+      body.startedGameView .mapOuter{
+        margin:0;
+      }
+      body.startedGameView .mapScale{
+        width:100%;
+      }
+      body.startedGameView .mapBox{
+        border-width:5px;
+        border-radius:24px;
+      }
+      body.startedGameView .mapToolsRow{
+        width:100%;
+        margin:8px auto 6px;
+      }
+      body.startedGameView input[type="range"]{
+        height:8px;
+        border-width:3px;
+      }
+      body.startedGameView input[type="range"]::-webkit-slider-thumb{
+        width:16px;
+        height:28px;
+        border-radius:9px;
+      }
+      body.startedGameView input[type="range"]::-moz-range-thumb{
+        width:16px;
+        height:28px;
+        border-radius:9px;
+      }
+      body.startedGameView .scoreBoard{
+        width:100%;
+        margin:8px auto 0;
+        gap:8px;
+      }
+      body.startedGameView .teamPill{
+        height:50px;
+        font-size:18px;
+        border-width:3px;
+        padding:0 14px;
+      }
+      body.startedGameView .scoreBox{
+        width:54px;
+        height:50px;
         font-size:24px;
+        border-width:3px;
+        border-radius:12px;
+      }
+      body.startedGameView .firstPressBar{
+        width:100%;
+        margin:0;
+        padding:12px 14px;
+        border-width:3px;
+        font-size:20px;
+      }
+      body.startedGameView .controlsRow{
+        width:100%;
+        margin:0;
+        gap:12px;
+        align-items:center;
+      }
+      body.startedGameView .pillBtn{
+        width:100%;
+        max-width:none;
+        height:62px;
+        font-size:22px;
+        border-width:3px;
+      }
+      body.startedGameView .timerWrap{
+        width:96px;
+        height:96px;
+      }
+      body.startedGameView .timerClockBtn{
+        width:96px;
+        height:96px;
+        border-width:5px;
+      }
+      body.startedGameView .timerRing circle{
+        stroke-width:8;
+      }
+      body.startedGameView .timerNumber{
+        font-size:40px;
+      }
+      body.startedGameView .questionCard{
+        width:100%;
+        margin:0;
+        padding:16px 14px 14px;
+        border-width:7px;
+        border-radius:24px;
+      }
+      body.startedGameView .qText{
+        margin:0 0 10px;
+        font-size:24px;
+        line-height:1.4;
+      }
+      body.startedGameView .answerBtn{
+        font-size:22px;
+        padding:10px 18px;
+        border-width:4px;
+        min-width:160px;
+      }
+      body.startedGameView .playerBtnWrap{
+        margin-top:10px;
+      }
+      body.startedGameView .playerBigBtn{
+        width:100%;
+        height:84px;
+        font-size:24px;
+        border-width:5px;
+      }
+      body.startedGameView .buyNowWrap{
+        margin-top:10px;
+      }
+      body.startedGameView .buyNowBtn{
+        width:100%;
+        padding:12px 16px;
+        font-size:18px;
+        border-width:3px;
+        border-radius:16px;
+      }
+      body.startedGameView .playerWrittenRow{
+        gap:10px;
+      }
+      body.startedGameView .writtenAnswerInput{
+        height:62px;
+        font-size:20px;
+        border-width:3px;
+        border-radius:18px;
+      }
+      body.startedGameView .directQuestionCard{
+        margin:44px 0 0;
+        padding:58px 14px 16px;
+      }
+      body.startedGameView .directTimerWrap{
+        top:-42px;
+      }
+      body.startedGameView .directTimerBtn{
+        width:86px;
+        height:86px;
+        border-width:5px;
+      }
+      body.startedGameView .directTimerBtn .timerNumber{
+        font-size:36px;
+      }
+      body.startedGameView .directQActions{
+        gap:10px;
+      }
+      body.startedGameView .directNextBtn{
+        min-width:150px;
+        height:52px;
+        padding:0 16px;
+        font-size:20px;
+        border-width:3px;
+      }
+      body.startedGameView .directActionBtn{
+        min-width:180px;
+      }
+      body.startedGameView .footerBtn{
+        left:12px;
+        bottom:12px;
+        padding:10px 14px;
+        font-size:18px;
+        border-width:3px;
+      }
+      body.startedGameView .rights{
+        right:12px;
+        bottom:12px;
+        font-size:12px;
       }
 
       .pickerHeaderSection{
@@ -2631,6 +2825,115 @@
       }
       .pickerOptionBtn{
         min-height:74px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 560px){
+      body.startedGameView header{
+        padding:8px 12px 4px;
+      }
+      body.startedGameView .headerRow{
+        grid-template-columns:50px minmax(0,1fr) auto;
+      }
+      body.startedGameView .logo{
+        width:50px;
+        height:50px;
+      }
+      body.startedGameView .gnText{
+        font-size:24px;
+      }
+      body.startedGameView .topSettingsBtn{
+        min-width:96px;
+        height:40px;
+        font-size:18px;
+        padding:0 12px;
+      }
+      body.startedGameView .gameLayout{
+        gap:12px;
+        grid-template-columns:minmax(0, 1fr) minmax(300px, .88fr);
+      }
+      body.startedGameView .mapToolsRow{
+        margin:6px auto 4px;
+      }
+      body.startedGameView .teamPill{
+        height:44px;
+        font-size:16px;
+        padding:0 10px;
+      }
+      body.startedGameView .scoreBox{
+        width:48px;
+        height:44px;
+        font-size:20px;
+      }
+      body.startedGameView .firstPressBar{
+        padding:10px 12px;
+        font-size:18px;
+      }
+      body.startedGameView .controlsRow{
+        gap:10px;
+      }
+      body.startedGameView .pillBtn{
+        height:54px;
+        font-size:19px;
+      }
+      body.startedGameView .timerWrap{
+        width:84px;
+        height:84px;
+      }
+      body.startedGameView .timerClockBtn{
+        width:84px;
+        height:84px;
+        border-width:4px;
+      }
+      body.startedGameView .timerRing circle{
+        stroke-width:7;
+      }
+      body.startedGameView .timerNumber{
+        font-size:34px;
+      }
+      body.startedGameView .questionCard{
+        padding:14px 12px 12px;
+        border-width:6px;
+      }
+      body.startedGameView .qText{
+        font-size:21px;
+        margin-bottom:8px;
+      }
+      body.startedGameView .answerBtn{
+        font-size:20px;
+        padding:9px 16px;
+      }
+      body.startedGameView .playerBigBtn{
+        height:74px;
+        font-size:22px;
+        border-width:4px;
+      }
+      body.startedGameView .buyNowBtn{
+        font-size:16px;
+        padding:10px 14px;
+      }
+      body.startedGameView .writtenAnswerInput{
+        height:56px;
+        font-size:18px;
+      }
+      body.startedGameView .directQuestionCard{
+        margin:34px 0 0;
+        padding:50px 12px 14px;
+      }
+      body.startedGameView .directTimerWrap{
+        top:-34px;
+      }
+      body.startedGameView .directTimerBtn{
+        width:74px;
+        height:74px;
+      }
+      body.startedGameView .directTimerBtn .timerNumber{
+        font-size:31px;
+      }
+      body.startedGameView .directNextBtn{
+        height:46px;
+        font-size:18px;
+        min-width:130px;
       }
     }
 
@@ -4737,6 +5040,10 @@ function hideEidIntro(immediate){
       applyZoomFix: null,
       resizeBound: false
     };
+
+    function setStartedGameLandscapeMode(active){
+      document.body.classList.toggle("startedGameView", !!active);
+    }
 
     function teamColor(team){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
@@ -7080,6 +7387,7 @@ function hideEidIntro(immediate){
     function renderHostLobby(room){
       setTopSettingsButton(false);
       document.body.classList.remove("tvMode");
+      setStartedGameLandscapeMode(false);
       main.classList.remove("inGame");
       setGameName(room?.name || code);
 
@@ -7431,6 +7739,7 @@ function hideEidIntro(immediate){
 
     function renderWaiting(msg){
       document.body.classList.remove("tvMode");
+      setStartedGameLandscapeMode(false);
       main.classList.remove("inGame");
       main.innerHTML = `
         <div class="lobbyCard">
@@ -7444,6 +7753,7 @@ function hideEidIntro(immediate){
 
     function renderDisplayOnlyWaiting(msgText){
       document.body.classList.remove("tvMode");
+      setStartedGameLandscapeMode(false);
       main.classList.remove("inGame");
       main.innerHTML = `
         <div class="lobbyCard displayOnlyCard">
@@ -7513,6 +7823,8 @@ function hideEidIntro(immediate){
 
     function renderHostWaiting(msgText){
       setTopSettingsButton(false);
+      document.body.classList.remove("tvMode");
+      setStartedGameLandscapeMode(false);
       main.innerHTML = `
         <div class="wrap">
           <div class="card">
@@ -7540,6 +7852,8 @@ function hideEidIntro(immediate){
     // ✅ (Fix) للاعب: قبل ما نحكم إن الغرفة غير موجودة نخليها "جاري الاتصال" شوي
     function renderConnecting(msgText){
       setTopSettingsButton(false);
+      document.body.classList.remove("tvMode");
+      setStartedGameLandscapeMode(false);
       main.innerHTML = `
         <div class="wrap">
           <div class="card">
@@ -7555,6 +7869,8 @@ function hideEidIntro(immediate){
 
     // ✅✅✅ (جديد) رسم واجهة اللعب مرة واحدة فقط (بدون رمشة)
     function renderGame(room, me){
+      document.body.classList.remove("tvMode");
+      setStartedGameLandscapeMode(true);
       GAME_UI.mounted = true;
 
       main.classList.add("inGame");
@@ -8206,6 +8522,7 @@ function hideEidIntro(immediate){
     
     // ✅ شاشة "عرض الشاشة" (TV) — تعرض الخريطة + النتائج فقط بدون أي تحكم
     function renderTvDisplay(room, me){
+      setStartedGameLandscapeMode(false);
       document.body.classList.add("tvMode");
       main.classList.add("inGame");
 
