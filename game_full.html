@@ -5789,6 +5789,88 @@ function hideEidIntro(immediate){
       lastFetchFailAt: 0
     };
 
+    function getHostSettingsStorageKey(){
+      try{
+        const candidates = [
+          localStorage.getItem("sandooq_user_email"),
+          localStorage.getItem("user_email"),
+          localStorage.getItem("auth_email"),
+          localStorage.getItem("customer_email")
+        ].map(v => String(v || "").trim().toLowerCase()).filter(Boolean);
+        if(candidates.length) return `horof_host_settings_v1::${candidates[0]}`;
+      }catch(e){}
+      return "horof_host_settings_v1";
+    }
+
+    function sanitizeManualCellRounds(raw){
+      const src = (raw && typeof raw === 'object') ? raw : {};
+      const out = {};
+      for(let r=1; r<=5; r++){
+        const item = src[String(r)] || src[r] || {};
+        const count = normalizeCellCount(item?.cellCount || 5);
+        const need = count * count;
+        const valsSrc = Array.isArray(item?.values) ? item.values : [];
+        const values = Array.from({ length: need }, (_, i) => String(valsSrc[i] || ''));
+        out[String(r)] = { cellCount: count, values };
+      }
+      return out;
+    }
+
+    function loadPersistedHostSettingsEnvelope(){
+      try{
+        const raw = localStorage.getItem(getHostSettingsStorageKey());
+        if(!raw) return { updatedAt:0, manualCellRounds:{}, cellContentMode:'default', questionMode:'default', soundEnabled:true };
+        const parsed = JSON.parse(raw);
+        return {
+          updatedAt: Number(parsed?.updatedAt || 0),
+          manualCellRounds: sanitizeManualCellRounds(parsed?.manualCellRounds || {}),
+          cellContentMode: String(parsed?.cellContentMode === 'manual' ? 'manual' : 'default'),
+          questionMode: String(parsed?.questionMode === 'custom' ? 'custom' : 'default'),
+          soundEnabled: parsed?.soundEnabled !== false
+        };
+      }catch(e){
+        return { updatedAt:0, manualCellRounds:{}, cellContentMode:'default', questionMode:'default', soundEnabled:true };
+      }
+    }
+
+    function savePersistedHostSettingsEnvelope(data){
+      try{
+        const payload = {
+          version: 1,
+          updatedAt: Number(data?.updatedAt || Date.now()) || Date.now(),
+          manualCellRounds: sanitizeManualCellRounds(data?.manualCellRounds || {}),
+          cellContentMode: String(data?.cellContentMode === 'manual' ? 'manual' : 'default'),
+          questionMode: String(data?.questionMode === 'custom' ? 'custom' : 'default'),
+          soundEnabled: data?.soundEnabled !== false
+        };
+        localStorage.setItem(getHostSettingsStorageKey(), JSON.stringify(payload));
+      }catch(e){}
+    }
+
+    function mergeRoomWithPersistentHostSettings(room){
+      const baseRoom = (room && typeof room === 'object') ? room : {};
+      if(role !== 'host') return baseRoom;
+      const persisted = loadPersistedHostSettingsEnvelope();
+      const baseSettings = (baseRoom.settings && typeof baseRoom.settings === 'object') ? { ...baseRoom.settings } : {};
+      const hasManual = !!(baseSettings.manualCellRounds && Object.keys(baseSettings.manualCellRounds || {}).length);
+      const persistedManual = sanitizeManualCellRounds(persisted.manualCellRounds || {});
+      if(!hasManual && Object.keys(persistedManual).length){
+        baseSettings.manualCellRounds = persistedManual;
+      }
+      if(!String(baseSettings.cellContentMode || '').trim() && persisted.cellContentMode === 'manual'){
+        baseSettings.cellContentMode = 'manual';
+      }
+      if(typeof baseSettings.soundEnabled !== 'boolean' && persisted.soundEnabled === false){
+        baseSettings.soundEnabled = false;
+      }
+      const next = { ...baseRoom, settings: baseSettings };
+      const roomQuestionMode = String(baseRoom.questionMode || 'default');
+      if(roomQuestionMode !== 'custom' && persisted.questionMode === 'custom'){
+        next.questionMode = 'custom';
+      }
+      return next;
+    }
+
     function getCustomQuestionsStorageKey(){
       try{
         const candidates = [
@@ -5964,7 +6046,7 @@ function hideEidIntro(immediate){
     }
 
     function getRoomWithPersistentCustomQuestions(room){
-      const baseRoom = (room && typeof room === "object") ? room : {};
+      const baseRoom = mergeRoomWithPersistentHostSettings((room && typeof room === "object") ? room : {});
       const localEnv = loadPersistedCustomQuestionsEnvelope();
       const remoteEnv = getRemoteCustomQuestionsEnvelope();
       const roomEnv = {
@@ -6804,6 +6886,13 @@ function hideEidIntro(immediate){
             LIVE.room.round.boardSeed = Number(nextBoard.seed || 0) || currentSeed;
           }
           savePersistedCustomQuestions(pendingCustomQuestions, customQuestionsUpdatedAt);
+          savePersistedHostSettingsEnvelope({
+            updatedAt: customQuestionsUpdatedAt,
+            manualCellRounds,
+            cellContentMode: pendingCellContentMode,
+            questionMode: pendingQuestionMode,
+            soundEnabled: !!pendingSoundEnabled
+          });
           CUSTOM_Q_PERSIST.remote = { updatedAt: customQuestionsUpdatedAt, customQuestions: pendingCustomQuestions };
           CUSTOM_Q_PERSIST.remoteLoaded = true;
           try{ await saveRemoteCustomQuestionsEnvelope(pendingCustomQuestions, customQuestionsUpdatedAt); }catch(e){}
@@ -7279,7 +7368,8 @@ function hideEidIntro(immediate){
       if(role !== "host") return;
       if(HOST_ROOM_INIT.tried) return;
       HOST_ROOM_INIT.tried = true;
-      const baseSettings = (LIVE.room?.settings && typeof LIVE.room.settings === "object") ? { ...LIVE.room.settings } : {};
+      const persistedHostRoom = mergeRoomWithPersistentHostSettings(LIVE.room || {});
+      const baseSettings = (persistedHostRoom?.settings && typeof persistedHostRoom.settings === "object") ? { ...persistedHostRoom.settings } : {};
       const teams = getVisualTeams(LIVE.room || {});
       const seedRoom = {
         code,
@@ -7306,16 +7396,16 @@ function hideEidIntro(immediate){
           a: { name: teams.green.name || "الفريق الأول", color: teams.green.color || "#31b80f" },
           b: { name: teams.orange.name || "الفريق الثاني", color: teams.orange.color || "#ff8a3d" }
         },
-        board: buildBoardState(LIVE.room || {}, Date.now()),
+        board: buildBoardState(persistedHostRoom || LIVE.room || {}, Date.now()),
         round: { current:1, targetWins: normalizeWinRounds(baseSettings.winRounds || 1), winner:null, boardSeed: 0 },
         winEvent: null,
         winState: {},
         mapStates: { "0": {} },
         current: { letter:null, qIndex:0, row:null, col:null, map:0 },
         timer: { sel:10, dur:10, running:false, startTs:0, done:false },
-        questionMode: "default",
-        customQuestions: normalizeCustomQuestionsMap(LIVE.room?.customQuestions || {}),
-        customQuestionsUpdatedAt: Number(LIVE.room?.customQuestionsUpdatedAt || 0)
+        questionMode: String(persistedHostRoom?.questionMode || LIVE.room?.questionMode || "default"),
+        customQuestions: normalizeCustomQuestionsMap(persistedHostRoom?.customQuestions || LIVE.room?.customQuestions || {}),
+        customQuestionsUpdatedAt: Number(persistedHostRoom?.customQuestionsUpdatedAt || LIVE.room?.customQuestionsUpdatedAt || 0)
       };
       LIVE.room = normalizeLiveRoom(seedRoom);
       scheduleRender();
@@ -8733,7 +8823,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
     }
 
     function normalizeLiveRoom(room){
-      room = (room && typeof room === "object") ? room : {};
+      room = mergeRoomWithPersistentHostSettings((room && typeof room === "object") ? room : {});
       const activeMap = Number(room.activeMap || 0);
       const normalized = {
         code,
