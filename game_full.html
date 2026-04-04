@@ -518,6 +518,119 @@
     .pickerLobbyCard .qrZoomHint,
     .pickerLobbyCard .qrZoomTitle{ color:#4b1243; }
     .pickerLobbyCard .smallNote{ color:#6a4b64; }
+    .compactModeHint{
+      font-size:17px;
+      line-height:1.55;
+      font-weight:900;
+      color:#6a4b64;
+      text-align:center;
+      margin:4px 0 12px;
+    }
+    .compactSingleCard{
+      border-radius:22px;
+      border:3px solid #dcc9d8;
+      background:#fffdfd;
+      padding:18px 14px;
+      text-align:center;
+      color:#4b1243;
+      margin-top:4px;
+    }
+    .compactSingleTitle{
+      font-size:30px;
+      line-height:1.15;
+      font-weight:900;
+      margin:0 0 8px;
+      color:#4b1243;
+    }
+    .compactSingleDesc{
+      font-size:20px;
+      line-height:1.6;
+      font-weight:900;
+      color:#4b1243;
+      margin:0;
+    }
+    .compactTeamsWrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-top:4px;
+    }
+    .compactTeamsWrap .teams{ gap:10px; }
+    .compactTeamsWrap .teamCol{ padding:10px; border-radius:18px; }
+    .compactTeamsWrap .teamTitle{ font-size:18px; margin-bottom:6px; }
+    .compactTeamsWrap .playerItem{
+      margin:6px 0;
+      padding:8px 10px;
+      border-radius:12px;
+      font-size:18px;
+    }
+    .compactActionsRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:center;
+      margin-top:6px;
+    }
+    .compactActionBtn{
+      min-width:200px;
+      padding:12px 16px;
+      border-radius:18px;
+      border:4px solid #2f2130;
+      background:#fffdfd;
+      color:#4b1243;
+      font-size:22px;
+      font-weight:900;
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .compactActionBtn.players{ background:#f6cf45; color:#111; }
+    .compactActionBtn.display{ background:#dde4ff; color:#23489b; }
+    .compactDisplayToggleRow{
+      display:flex;
+      justify-content:center;
+      margin-top:2px;
+      margin-bottom:2px;
+    }
+    .compactDisplayToggleRow .pickerInlineToggle{ background:#fffafc; }
+    .compactPlayersCount{
+      font-size:16px;
+      font-weight:900;
+      color:#6a4b64;
+      text-align:center;
+      margin-top:2px;
+    }
+    .shareModal .shareWideQr{
+      width:min(62vw, 280px);
+      height:min(62vw, 280px);
+      display:block;
+      margin:12px auto;
+      border-radius:16px;
+      background:#fff;
+      border:3px solid rgba(0,0,0,.18);
+    }
+    .shareModal .shareUrlBox{
+      width:100%;
+      padding:12px 14px;
+      border-radius:14px;
+      border:2px solid rgba(0,0,0,.12);
+      background:#faf7fb;
+      color:#4b1243;
+      font-size:15px;
+      font-weight:900;
+      line-height:1.6;
+      text-align:center;
+      word-break:break-all;
+      direction:ltr;
+      margin:0 0 12px;
+    }
+    .shareModal .shareActionsRow{
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:4px;
+    }
     body.mode-picker header,
     body.mode-picker #eidIntroOverlay,
     body.mode-picker .rights,
@@ -5731,236 +5844,109 @@ function hideEidIntro(immediate){
         ? (eduPlayType || "single")
         : ((hostExperience === "normal" && normalPlayType) ? normalPlayType : ((hostMode === "single" || hostMode === "separate") ? "multi" : ""));
       const currentDisplayOnly = currentPlayType === "multi" && hostMode === "separate";
-      const showModeChooser = !currentGameType && !currentPlayType;
-      const showDirectSingle = currentPlayType === "single";
-      const showPlayerLinks = currentPlayType === "multi";
-      const showDisplayLink = showPlayerLinks && currentDisplayOnly;
-      const modeLabel = currentGameType === "education"
-        ? (showPlayerLinks ? (showDisplayLink ? "لعبة تعليمية — أجهزة متعددة + شاشة عرض مستقلة" : "لعبة تعليمية — أجهزة متعددة") : "لعبة تعليمية — جهاز واحد")
-        : (showPlayerLinks ? (showDisplayLink ? "لعبة عادية — أجهزة متعددة + شاشة عرض مستقلة" : "لعبة عادية — أجهزة متعددة") : "لعبة عادية — جهاز واحد");
-      const startBtnLabel = (updatesEnabled && showPlayerLinks)
-        ? "فتح وضع الستريمر"
-        : "ابدأ اللعبة";
+      const selectedGameType = currentGameType || "normal";
+      const selectedPlayType = currentPlayType || "multi";
+      const selectedDisplayOnly = selectedPlayType === "multi" ? !!currentDisplayOnly : false;
+      const showPlayerLinks = selectedPlayType === "multi";
+      const showDisplayLink = showPlayerLinks && selectedDisplayOnly;
+      const singleTitle = selectedGameType === "education" ? "لعبة تعليمية" : "لعبة عادية";
+      const singleDesc = selectedGameType === "education"
+        ? "تشغّل اللعبة مباشرة من جهاز واحد بدون روابط أو باركود، ومناسبة للحصص والأنشطة الصفية."
+        : "تشغّل اللعبة مباشرة من جهاز واحد بدون روابط أو باركود، وتبدأ اللعب فورًا من نفس الجهاز.";
 
-      const staffModeHtml = `
-        <div class="staffModeFab">
-          <button id="staffModeBtn" class="staffModeBtn ${updatesEnabled ? 'active' : ''}" type="button">خاص بالتحديثات</button>
-        </div>
+      document.body.classList.remove("mode-picker");
+      main.innerHTML = `
+        <div class="lobbyCard pickerLobbyCard">
+          <div class="pickerHeaderSection">
+            <div class="pickerField">
+              <div class="pickerFieldLabel">نوع اللعبة</div>
+              <div class="pickerOptionGrid">
+                <button class="pickerOptionBtn typeNormal ${selectedGameType === "normal" ? "activeChoice" : ""}" type="button" data-picker-game-type="normal">لعبة عادية</button>
+                <button class="pickerOptionBtn typeEducation ${selectedGameType === "education" ? "activeChoice" : ""}" type="button" data-picker-game-type="education">لعبة تعليمية</button>
+              </div>
+            </div>
 
-        <div id="staffModeBackdrop" class="staffModeBackdrop">
-          <div class="staffModeModal">
-            <button id="staffModeClose" class="staffModeClose" aria-label="إغلاق">×</button>
-            <div class="staffModeTitle">خاص بالتحديثات</div>
-            <div class="staffModeSub">خاص بموظفين صندوق المسابقات</div>
-            <input
-              id="staffModeInput"
-              class="staffModeInput"
-              type="password"
-              inputmode="numeric"
-              maxlength="4"
-              autocomplete="off"
-              placeholder="أدخل الرمز"
-            >
-            <div id="staffModeMsg" class="staffModeMsg"></div>
-            <div class="staffModeActions">
-              <button id="staffModeApply" class="staffModeApply" type="button">تفعيل</button>
+            <div class="pickerField">
+              <div class="pickerFieldLabel">طريقة التشغيل</div>
+              <div class="pickerOptionGrid">
+                <button class="pickerOptionBtn modeMulti ${selectedPlayType === "multi" ? "activeChoice" : ""}" type="button" data-picker-play-mode="multi">اللعب من أجهزة متعددة</button>
+                <button class="pickerOptionBtn modeSingle ${selectedPlayType === "single" ? "activeChoice" : ""}" type="button" data-picker-play-mode="single">اللعب من جهاز واحد</button>
+              </div>
             </div>
           </div>
-        </div>
-      `;
 
-      const showUnifiedPicker = showModeChooser;
-      document.body.classList.toggle("mode-picker", !!showUnifiedPicker);
-      if(showUnifiedPicker){
-        if(!MODE_PICKER.inited){
-          MODE_PICKER.gameType = currentGameType || "normal";
-          MODE_PICKER.playMode = currentPlayType || "multi";
-          MODE_PICKER.displayOnly = !!currentDisplayOnly;
-          MODE_PICKER.inited = true;
-        }
-
-        const pickerGameType = MODE_PICKER.gameType || "normal";
-        const pickerPlayMode = MODE_PICKER.playMode || "multi";
-        const pickerDisplayOnly = !!MODE_PICKER.displayOnly;
-        const pickerIsEducation = pickerGameType === "education";
-        const pickerModeTag = pickerIsEducation ? "لعبة تعليمية" : "لعبة عادية";
-        const pickerSingleTitle = pickerIsEducation ? "تشغيل مباشر للحصة" : "تشغيل مباشر";
-        const pickerSingleDesc = pickerIsEducation
-          ? "شغّل اللعبة من نفس جهازك مباشرة، ثم اعرضها على الشاشة أو البروجكتر بدون روابط أو باركود."
-          : "شغّل اللعبة من جهاز واحد مباشرة بدون روابط أو باركود أو خطوات إضافية.";
-
-        const pickerDisplayCardHtml = (pickerPlayMode === "multi" && pickerDisplayOnly) ? `
-          <div class="hostLinkCard display">
-            <div class="pickerCardModeRow"><span class="pickerCardModeTag">${pickerModeTag}</span></div>
-            <div class="hostLinkHead">
-              <div class="hostLinkBadge">2</div>
-              <div class="hostLinkBody">
-                <div class="hostLinkTitle">رابط شاشة العرض</div>
-                <div class="hostLinkSub">استخدمه فقط إذا كان عندك جهاز منفصل لعرض اللعبة على التلفزيون أو البروجكتر.</div>
-              </div>
-              <img class="hostLinkQr" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض" data-qr-label="باركود شاشة العرض">
-            </div>
-            <div class="hostLinkCopyRow">
-              <button id="copyPickerDisplayBtn" class="btn btnBlue hostCopyBtn" type="button">نسخ رابط شاشة العرض</button>
-            </div>
-          </div>
-        ` : ``;
-
-        const pickerContentHtml = pickerPlayMode === "multi" ? `
-          <div class="pickerLinksWrap">
-            <div class="hostLinkCard players">
-              <div class="pickerCardModeRow"><span class="pickerCardModeTag">${pickerModeTag}</span></div>
-              <div class="hostLinkHead">
-                <div class="hostLinkBadge">1</div>
-                <div class="hostLinkBody">
-                  <div class="hostLinkTitle">رابط دخول اللاعبين</div>
-                  <div class="hostLinkSub">المقدم يدير اللعبة من جهازه، واللاعبون يشاركون من جوالاتهم.</div>
-                </div>
-                <img class="hostLinkQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين" data-qr-label="باركود دخول اللاعبين">
-              </div>
-              <div class="hostLinkCopyRow">
-                <button id="copyPickerJoinBtn" class="btn btnYellow hostCopyBtn" type="button">نسخ رابط اللاعبين</button>
-              </div>
-            </div>
-
-            <div class="pickerInlineToggleWrap">
-              <label class="pickerInlineToggle" for="pickerDisplayOnlyToggle">
-                <input id="pickerDisplayOnlyToggle" type="checkbox" ${pickerDisplayOnly ? "checked" : ""}>
-                <span>إضافة شاشة عرض مستقلة</span>
-              </label>
-            </div>
-
-            ${pickerDisplayCardHtml}
-            ${pickerDisplayOnly ? `<div class="hostWarning">تنبيه: رابط شاشة العرض مخصص للشاشة فقط وليس للاعبين.</div>` : ``}
-          </div>
-        ` : `
-          <div class="pickerSingleInfo">
-            <div class="pickerModeMini">${pickerModeTag}</div>
-            <div class="pickerSingleInfoTitle">${pickerSingleTitle}</div>
-            <p class="pickerSingleInfoDesc">${pickerSingleDesc}</p>
-          </div>
-        `;
-
-        main.innerHTML = `
-          <div class="lobbyCard pickerLobbyCard">
-            <div class="pickerHeaderSection">
-              <div class="pickerField">
-                <div class="pickerFieldLabel">نوع اللعبة</div>
-                <div class="pickerOptionGrid">
-                  <button class="pickerOptionBtn typeNormal ${pickerGameType === "normal" ? "activeChoice" : ""}" type="button" data-picker-game-type="normal">لعبة عادية</button>
-                  <button class="pickerOptionBtn typeEducation ${pickerGameType === "education" ? "activeChoice" : ""}" type="button" data-picker-game-type="education">لعبة تعليمية</button>
-                </div>
-              </div>
-
-              <div class="pickerField">
-                <div class="pickerFieldLabel">طريقة التشغيل</div>
-                <div class="pickerOptionGrid">
-                  <button class="pickerOptionBtn modeMulti ${pickerPlayMode === "multi" ? "activeChoice" : ""}" type="button" data-picker-play-mode="multi">اللعب من أجهزة متعددة</button>
-                  <button class="pickerOptionBtn modeSingle ${pickerPlayMode === "single" ? "activeChoice" : ""}" type="button" data-picker-play-mode="single">اللعب من جهاز واحد</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="pickerMainPanel">
-              ${pickerContentHtml}
-
-              <div class="pickerApplyArea">
-                <button id="applyUnifiedModeBtn" class="pickerApplyBtn" type="button">اعتماد الاختيارات</button>
-              </div>
-            </div>
-
-            <div id="qrZoomOverlay" class="qrZoomOverlay" aria-hidden="true">
-              <div class="qrZoomCard">
-                <div id="qrZoomTitle" class="qrZoomTitle">الباركود</div>
-                <img id="qrZoomImg" class="qrZoomImg" src="" alt="تكبير الباركود">
-                <div class="qrZoomHint">اضغط على الباركود مرة أخرى لإغلاقه</div>
-              </div>
-            </div>
-
-            ${staffModeHtml}
-          </div>
-                `;
-      }else{
-        main.innerHTML = `
-          <div class="lobbyCard">
-            <div class="selectedModeBar">
-              <div class="selectedModeText">النمط المختار: ${escapeHtml(modeLabel)}</div>
-              <button id="changeModeBtn" class="changeModeBtn" type="button">تغيير النمط</button>
-            </div>
-
+          <div class="pickerMainPanel">
             ${showPlayerLinks ? `
-            <div class="teams">
-              <div class="teamCol teamGreen" style="background:${escapeHtml(hexToRgba(visualTeams.green.color, 0.86))};color:${escapeHtml(greenText)};border-color:rgba(0,0,0,.70)">
-                <div class="teamTitle">${escapeHtml(visualTeams.green.name)}</div>
-                <div id="greenList"></div>
-              </div>
-              <div class="teamCol teamOrange" style="background:${escapeHtml(hexToRgba(visualTeams.orange.color, 0.86))};color:${escapeHtml(orangeText)};border-color:rgba(0,0,0,.70)">
-                <div class="teamTitle">${escapeHtml(visualTeams.orange.name)}</div>
-                <div id="orangeList"></div>
-              </div>
-            </div>
-
-            <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
-
-            <div class="hostLinksWrap">
-              <div class="hostLinkCard players">
-                <div class="hostLinkHead">
-                  <div class="hostLinkBadge">1</div>
-                  <div class="hostLinkBody">
-                    <div class="hostLinkTitle">رابط دخول اللاعبين</div>
-                    <div class="hostLinkSub">هذا الرابط للاعبين فقط</div>
+              <div class="compactTeamsWrap">
+                <div class="teams">
+                  <div class="teamCol teamGreen" style="background:${escapeHtml(hexToRgba(visualTeams.green.color, 0.86))};color:${escapeHtml(greenText)};border-color:rgba(0,0,0,.70)">
+                    <div class="teamTitle">${escapeHtml(visualTeams.green.name)}</div>
+                    <div id="greenList"></div>
                   </div>
-                  <img class="hostLinkQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين" data-qr-label="باركود دخول اللاعبين">
+                  <div class="teamCol teamOrange" style="background:${escapeHtml(hexToRgba(visualTeams.orange.color, 0.86))};color:${escapeHtml(orangeText)};border-color:rgba(0,0,0,.70)">
+                    <div class="teamTitle">${escapeHtml(visualTeams.orange.name)}</div>
+                    <div id="orangeList"></div>
+                  </div>
                 </div>
-                <div class="hostLinkCopyRow">
-                  <button id="copyJoinBtn" class="btn btnYellow hostCopyBtn" type="button">نسخ رابط اللاعبين</button>
-                </div>
+                <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
+                <div class="compactPlayersCount">عدد اللاعبين الحالي: ${list.length}</div>
               </div>
 
-              ${showDisplayLink ? `
-              <div class="hostLinkCard display">
-                <div class="hostLinkHead">
-                  <div class="hostLinkBadge">2</div>
-                  <div class="hostLinkBody">
-                    <div class="hostLinkTitle">رابط شاشة العرض</div>
-                    <div class="hostLinkSub">هذا الرابط للشاشة فقط وليس للاعبين</div>
-                  </div>
-                  <img class="hostLinkQr" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض" data-qr-label="باركود شاشة العرض">
-                </div>
-                <div class="hostLinkCopyRow">
-                  <button id="copyDisplayBtn" class="btn btnBlue hostCopyBtn" type="button">نسخ رابط شاشة العرض</button>
-                </div>
+              <div class="compactActionsRow">
+                <button id="openJoinModalBtn" class="compactActionBtn players" type="button">مشاركة اللاعبين</button>
+                ${showDisplayLink ? `<button id="openDisplayModalBtn" class="compactActionBtn display" type="button">شاشة العرض</button>` : ``}
               </div>
-              <div class="hostWarning">تنبيه: شاشة العرض لا يدخل منها اللاعبون.</div>
-              ` : ``}
-            </div>
+
+              <div class="compactDisplayToggleRow">
+                <label class="pickerInlineToggle" for="pickerDisplayOnlyToggle">
+                  <input id="pickerDisplayOnlyToggle" type="checkbox" ${selectedDisplayOnly ? "checked" : ""}>
+                  <span>إضافة شاشة عرض مستقلة</span>
+                </label>
+              </div>
+              ${showDisplayLink ? `<div class="compactModeHint">رابط شاشة العرض مخصص للشاشة فقط وليس للاعبين.</div>` : ``}
             ` : `
-            <div class="eduInfoCard">
-              <div class="eduInfoTitle">${currentGameType === "education" ? "لعبة تعليمية — جهاز واحد" : "لعبة عادية — جهاز واحد"}</div>
-              <p class="eduInfoSub">شغّل اللعبة مباشرة من جهازك، ثم ابدأ اللعب فورًا. ويمكنك عرض الشاشة على التلفاز أو البروجكتر عبر انعكاس الشاشة أو HDMI عند الحاجة.</p>
-            </div>
+              <div class="compactSingleCard">
+                <div class="compactSingleTitle">${singleTitle}</div>
+                <p class="compactSingleDesc">${singleDesc}</p>
+              </div>
             `}
 
-            <div class="row hostLobbyActions">
+            <div class="row hostLobbyActions" style="margin-top:14px">
               <button id="startBtn" class="btn btnGreen" type="button">${escapeHtml(startBtnLabel)}</button>
             </div>
+          </div>
 
-            ${updatesEnabled && !showEducationSingle ? `<div class="smallNote" style="margin-top:8px">في وضع الستريمر يفتح المقدم الواجهة الخاصة أولًا، بينما يبقى اللاعبون على وضعهم المعتاد.</div>` : ``}
-
-            ${showPlayerLinks ? `
-            <div id="qrZoomOverlay" class="qrZoomOverlay" aria-hidden="true">
-              <div class="qrZoomCard">
-                <div id="qrZoomTitle" class="qrZoomTitle">الباركود</div>
-                <img id="qrZoomImg" class="qrZoomImg" src="" alt="تكبير الباركود">
-                <div class="qrZoomHint">اضغط على الباركود مرة أخرى لإغلاقه</div>
+          <div id="shareJoinBackdrop" class="shareBackdrop" style="display:none">
+            <div class="shareModal">
+              <button id="closeJoinModalBtn" class="shareClose" type="button">×</button>
+              <div class="shareTitle">رابط دخول اللاعبين</div>
+              <div class="shareSmall" style="margin:0 0 8px">هذا الرابط للاعبين فقط</div>
+              <img class="shareWideQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين">
+              <div class="shareUrlBox">${escapeHtml(joinUrl)}</div>
+              <div class="shareActionsRow">
+                <button id="copyJoinModalBtn" class="btn btnYellow" type="button">نسخ رابط اللاعبين</button>
               </div>
             </div>
-            ` : ``}
-
-            ${staffModeHtml}
           </div>
-        `;
-      }
+
+          ${showDisplayLink ? `
+          <div id="shareDisplayBackdrop" class="shareBackdrop" style="display:none">
+            <div class="shareModal">
+              <button id="closeDisplayModalBtn" class="shareClose" type="button">×</button>
+              <div class="shareTitle">رابط شاشة العرض</div>
+              <div class="shareSmall" style="margin:0 0 8px">هذا الرابط للشاشة فقط وليس للاعبين</div>
+              <img class="shareWideQr" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض">
+              <div class="shareUrlBox">${escapeHtml(displayUrl)}</div>
+              <div class="shareActionsRow">
+                <button id="copyDisplayModalBtn" class="btn btnBlue" type="button">نسخ رابط شاشة العرض</button>
+              </div>
+            </div>
+          </div>
+          ` : ``}
+
+          ${staffModeHtml}
+        </div>
+      `;
 
       const greenList = document.getElementById("greenList");
       const orangeList = document.getElementById("orangeList");
@@ -5974,125 +5960,181 @@ function hideEidIntro(immediate){
 
         main.querySelectorAll(".playerItem[data-id]").forEach(el => {
           el.addEventListener("click", async () => {
-            const id = el.getAttribute("data-id");
-            const p = players[id];
+            const pid = el.getAttribute("data-id");
+            const p = players[pid];
             if(!p) return;
-            const newTeam = (p.team === "green") ? "orange" : "green";
-            await update(ref(db, `rooms/${code}/players/${id}`), { team: newTeam });
+            const nextTeam = (p.team === "green") ? "orange" : "green";
+            try{ await update(ref(db, `rooms/${code}/players/${pid}`), { team: nextTeam }); }catch(e){}
           });
         });
       }
 
-      const changeModeBtn = document.getElementById("changeModeBtn");
-      if(changeModeBtn){
-        changeModeBtn.addEventListener("click", async () => {
-          MODE_PICKER.inited = false;
-          MODE_PICKER.gameType = "normal";
-          MODE_PICKER.playMode = "multi";
-          MODE_PICKER.displayOnly = false;
+      const staffModeBtn = document.getElementById("staffModeBtn");
+      const staffModeBackdrop = document.getElementById("staffModeBackdrop");
+      const staffModeClose = document.getElementById("staffModeClose");
+      const staffModeInput = document.getElementById("staffModeInput");
+      const staffModeApply = document.getElementById("staffModeApply");
+      const staffModeMsg = document.getElementById("staffModeMsg");
+
+      function resetStaffModeUi(){
+        if(!staffModeInput || !staffModeMsg) return;
+        staffModeInput.value = "";
+        staffModeMsg.textContent = "";
+        staffModeMsg.className = "staffModeMsg";
+      }
+      function openStaffMode(){
+        if(!staffModeBackdrop) return;
+        resetStaffModeUi();
+        staffModeBackdrop.style.display = "flex";
+        setTimeout(() => {
+          try{ staffModeInput?.focus(); }catch(e){}
+        }, 20);
+      }
+      function closeStaffMode(){
+        if(!staffModeBackdrop) return;
+        staffModeBackdrop.style.display = "none";
+      }
+      async function applyStaffModeCode(){
+        if(!staffModeInput || !staffModeMsg) return;
+        const codeVal = String(staffModeInput.value || "").replace(/\D+/g, "").slice(0, 4);
+        staffModeInput.value = codeVal;
+        if(codeVal !== WRITTEN_MODE_SECRET_CODE){
+          staffModeMsg.textContent = "الرمز غير صحيح";
+          staffModeMsg.className = "staffModeMsg error";
+          try{ staffModeInput.focus(); }catch(e){}
+          return;
+        }
+        try{
           const nextSettings = {
             ...currentSettings,
-            hostLobbyMode: null,
-            hostLobbyExperience: null,
-            normalPlayType: null,
-            educationPlayType: null,
-            educationDisplayOnly: false
+            writtenAnswerModeEnabled: true
           };
-          const baseRoom = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
-          const merged = normalizeLiveRoom({
-            ...baseRoom,
+          await update(ref(db, `rooms/${code}`), {
+            settings: nextSettings,
+            modes: {
+              ...((room?.modes && typeof room.modes === "object") ? room.modes : {}),
+              writtenAnswerModeEnabled: true
+            }
+          });
+          staffModeMsg.textContent = "تم التفعيل";
+          staffModeMsg.className = "staffModeMsg success";
+          setTimeout(closeStaffMode, 300);
+        }catch(e){
+          staffModeMsg.textContent = "تعذر التفعيل الآن";
+          staffModeMsg.className = "staffModeMsg error";
+        }
+      }
+
+      if(staffModeBtn) staffModeBtn.addEventListener("click", openStaffMode);
+      if(staffModeClose) staffModeClose.addEventListener("click", closeStaffMode);
+      if(staffModeBackdrop){
+        staffModeBackdrop.addEventListener("click", (e)=>{
+          if(e.target === staffModeBackdrop) closeStaffMode();
+        });
+      }
+      if(staffModeApply) staffModeApply.addEventListener("click", applyStaffModeCode);
+      if(staffModeInput){
+        staffModeInput.addEventListener("keydown", (e)=>{
+          if(e.key === "Enter"){
+            e.preventDefault();
+            applyStaffModeCode();
+          }
+        });
+      }
+
+      function applyHostLobbySettingsLocal(nextSettings){
+        const baseRoom = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
+        const merged = normalizeLiveRoom({
+          ...baseRoom,
+          displayPid: null,
+          settings: {
+            ...((baseRoom?.settings && typeof baseRoom.settings === "object") ? baseRoom.settings : {}),
+            ...nextSettings
+          }
+        });
+        LIVE.room = merged;
+        renderHostLobby(merged);
+      }
+
+      async function setUnifiedModeSelection(nextGameType, nextPlayMode, nextDisplayOnly){
+        const finalGameType = nextGameType || selectedGameType || "normal";
+        const finalPlayMode = nextPlayMode || selectedPlayType || "multi";
+        const finalDisplayOnly = finalPlayMode === "multi" ? !!nextDisplayOnly : false;
+        const nextSettings = {
+          ...currentSettings,
+          hostLobbyMode: finalPlayMode === "multi" && finalDisplayOnly ? "separate" : "single",
+          hostLobbyExperience: finalGameType,
+          normalPlayType: finalGameType === "normal" ? finalPlayMode : null,
+          educationPlayType: finalGameType === "education" ? finalPlayMode : null,
+          educationDisplayOnly: finalGameType === "education" ? finalDisplayOnly : false
+        };
+        applyHostLobbySettingsLocal(nextSettings);
+        try{
+          await update(ref(db, `rooms/${code}`), {
             displayPid: null,
             settings: nextSettings
           });
-          LIVE.room = merged;
-          renderHostLobby(merged);
-          try{
-            await update(ref(db, `rooms/${code}`), {
-              displayPid: null,
-              settings: nextSettings
-            });
-          }catch(e){}
-        });
+        }catch(e){}
       }
 
-      const eduBackBtn = document.getElementById("eduBackBtn");
-      if(eduBackBtn){
-        eduBackBtn.addEventListener("click", async () => {
-          const nextSettings = {
-            ...currentSettings,
-            hostLobbyMode: null,
-            hostLobbyExperience: null,
-            normalPlayType: null,
-            educationPlayType: null,
-            educationDisplayOnly: false
-          };
-          const baseRoom = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
-          const merged = normalizeLiveRoom({
-            ...baseRoom,
-            displayPid: null,
-            settings: nextSettings
-          });
-          LIVE.room = merged;
-          renderHostLobby(merged);
-          try{
-            await update(ref(db, `rooms/${code}`), {
-              displayPid: null,
-              settings: nextSettings
-            });
-          }catch(e){}
-        });
-      }
-
-      const copyJoinBtn = document.getElementById("copyJoinBtn");
-      if(copyJoinBtn){
-        copyJoinBtn.addEventListener("click", async () => {
-          const ok = await copyText(joinUrl);
-          copyJoinBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-          setTimeout(()=> copyJoinBtn.textContent = "نسخ رابط اللاعبين", 1200);
-        });
-      }
-
-      const copyDisplayBtn = document.getElementById("copyDisplayBtn");
-      if(copyDisplayBtn){
-        copyDisplayBtn.addEventListener("click", async () => {
-          const ok = await copyText(displayUrl);
-          copyDisplayBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-          setTimeout(()=> copyDisplayBtn.textContent = "نسخ رابط شاشة العرض", 1200);
-        });
-      }
-
-      const qrZoomOverlay = document.getElementById("qrZoomOverlay");
-      const qrZoomTitle = document.getElementById("qrZoomTitle");
-      const qrZoomImg = document.getElementById("qrZoomImg");
-
-      function closeQrZoom(){
-        if(!qrZoomOverlay) return;
-        qrZoomOverlay.style.display = "none";
-        qrZoomOverlay.setAttribute("aria-hidden", "true");
-        if(qrZoomImg) qrZoomImg.src = "";
-      }
-
-      function openQrZoom(src, title){
-        if(!qrZoomOverlay || !qrZoomImg) return;
-        qrZoomImg.src = src || "";
-        qrZoomTitle.textContent = title || "الباركود";
-        qrZoomOverlay.style.display = "flex";
-        qrZoomOverlay.setAttribute("aria-hidden", "false");
-      }
-
-      if(qrZoomOverlay){
-        qrZoomOverlay.addEventListener("click", closeQrZoom);
-      }
-      if(qrZoomImg){
-        qrZoomImg.addEventListener("click", closeQrZoom);
-      }
-      document.querySelectorAll(".hostLinkQr").forEach(img => {
-        img.addEventListener("click", (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          openQrZoom(img.getAttribute("src") || "", img.getAttribute("data-qr-label") || img.getAttribute("alt") || "الباركود");
+      main.querySelectorAll("[data-picker-game-type]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const nextGameType = String(btn.getAttribute("data-picker-game-type") || "normal");
+          setUnifiedModeSelection(nextGameType, selectedPlayType, selectedDisplayOnly);
         });
       });
+
+      main.querySelectorAll("[data-picker-play-mode]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const nextPlayMode = String(btn.getAttribute("data-picker-play-mode") || "multi");
+          const nextDisplayOnly = nextPlayMode === "multi" ? selectedDisplayOnly : false;
+          setUnifiedModeSelection(selectedGameType, nextPlayMode, nextDisplayOnly);
+        });
+      });
+
+      const pickerDisplayOnlyToggle = document.getElementById("pickerDisplayOnlyToggle");
+      if(pickerDisplayOnlyToggle){
+        pickerDisplayOnlyToggle.addEventListener("change", () => {
+          setUnifiedModeSelection(selectedGameType, "multi", !!pickerDisplayOnlyToggle.checked);
+        });
+      }
+
+      function bindSimpleModal(openId, closeId, backdropId){
+        const openBtn = document.getElementById(openId);
+        const closeBtn = document.getElementById(closeId);
+        const backdrop = document.getElementById(backdropId);
+        if(openBtn && backdrop){
+          openBtn.addEventListener("click", () => backdrop.style.display = "flex");
+        }
+        if(closeBtn && backdrop){
+          closeBtn.addEventListener("click", () => backdrop.style.display = "none");
+        }
+        if(backdrop){
+          backdrop.addEventListener("click", (e)=>{
+            if(e.target === backdrop) backdrop.style.display = "none";
+          });
+        }
+      }
+      bindSimpleModal("openJoinModalBtn", "closeJoinModalBtn", "shareJoinBackdrop");
+      bindSimpleModal("openDisplayModalBtn", "closeDisplayModalBtn", "shareDisplayBackdrop");
+
+      const copyJoinModalBtn = document.getElementById("copyJoinModalBtn");
+      if(copyJoinModalBtn){
+        copyJoinModalBtn.addEventListener("click", async () => {
+          const ok = await copyText(joinUrl);
+          copyJoinModalBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyJoinModalBtn.textContent = "نسخ رابط اللاعبين", 1200);
+        });
+      }
+
+      const copyDisplayModalBtn = document.getElementById("copyDisplayModalBtn");
+      if(copyDisplayModalBtn){
+        copyDisplayModalBtn.addEventListener("click", async () => {
+          const ok = await copyText(displayUrl);
+          copyDisplayModalBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
+          setTimeout(()=> copyDisplayModalBtn.textContent = "نسخ رابط شاشة العرض", 1200);
+        });
+      }
 
       document.getElementById("startBtn")?.addEventListener("click", async () => {
         const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
@@ -6235,92 +6277,6 @@ function hideEidIntro(immediate){
         });
       }
 
-      function applyHostLobbySettingsLocal(nextSettings){
-        const baseRoom = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
-        const merged = normalizeLiveRoom({
-          ...baseRoom,
-          displayPid: null,
-          settings: {
-            ...((baseRoom?.settings && typeof baseRoom.settings === "object") ? baseRoom.settings : {}),
-            ...nextSettings
-          }
-        });
-        LIVE.room = merged;
-        renderHostLobby(merged);
-      }
-
-      const copyPickerDisplayBtn = document.getElementById("copyPickerDisplayBtn");
-      if(copyPickerDisplayBtn){
-        copyPickerDisplayBtn.addEventListener("click", async () => {
-          const ok = await copyText(displayUrl);
-          copyPickerDisplayBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-          setTimeout(()=> copyPickerDisplayBtn.textContent = "نسخ رابط شاشة العرض", 1200);
-        });
-      }
-
-      const copyPickerJoinBtn = document.getElementById("copyPickerJoinBtn");
-      if(copyPickerJoinBtn){
-        copyPickerJoinBtn.addEventListener("click", async () => {
-          const ok = await copyText(joinUrl);
-          copyPickerJoinBtn.textContent = ok ? "تم النسخ ✅" : "فشل النسخ";
-          setTimeout(()=> copyPickerJoinBtn.textContent = "نسخ رابط اللاعبين", 1200);
-        });
-      }
-
-      function rerenderPickerOnly(){
-        const latest = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
-        renderHostLobby(latest);
-      }
-
-      main.querySelectorAll("[data-picker-game-type]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          MODE_PICKER.gameType = String(btn.getAttribute("data-picker-game-type") || "normal");
-          MODE_PICKER.inited = true;
-          rerenderPickerOnly();
-        });
-      });
-
-      main.querySelectorAll("[data-picker-play-mode]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          MODE_PICKER.playMode = String(btn.getAttribute("data-picker-play-mode") || "multi");
-          if(MODE_PICKER.playMode !== "multi") MODE_PICKER.displayOnly = false;
-          MODE_PICKER.inited = true;
-          rerenderPickerOnly();
-        });
-      });
-
-      const pickerDisplayOnlyToggle = document.getElementById("pickerDisplayOnlyToggle");
-      if(pickerDisplayOnlyToggle){
-        pickerDisplayOnlyToggle.addEventListener("change", () => {
-          MODE_PICKER.playMode = "multi";
-          MODE_PICKER.displayOnly = !!pickerDisplayOnlyToggle.checked;
-          MODE_PICKER.inited = true;
-          rerenderPickerOnly();
-        });
-      }
-
-      async function applyUnifiedModeSelection(){
-        const nextGameType = MODE_PICKER.gameType || "normal";
-        const nextPlayMode = MODE_PICKER.playMode || "multi";
-        const nextDisplayOnly = nextPlayMode === "multi" ? !!MODE_PICKER.displayOnly : false;
-        const nextSettings = {
-          ...currentSettings,
-          hostLobbyMode: nextPlayMode === "multi" && nextDisplayOnly ? "separate" : "single",
-          hostLobbyExperience: nextGameType,
-          normalPlayType: nextGameType === "normal" ? nextPlayMode : null,
-          educationPlayType: nextGameType === "education" ? nextPlayMode : null,
-          educationDisplayOnly: nextGameType === "education" ? nextDisplayOnly : false
-        };
-        applyHostLobbySettingsLocal(nextSettings);
-        try{
-          await update(ref(db, `rooms/${code}`), {
-            displayPid: null,
-            settings: nextSettings
-          });
-        }catch(e){}
-      }
-
-      document.getElementById("applyUnifiedModeBtn")?.addEventListener("click", applyUnifiedModeSelection);
     }
 
     function renderWaiting(msg){
