@@ -6104,26 +6104,17 @@ function hideEidIntro(immediate){
 
           <div class="settingsBody">
             <section class="settingsSection active" data-settings-panel="questions">
-              <div class="settingsHeroCard">
-                <h3 class="settingsSectionTitle">إضافة الأسئلة</h3>
-                <p class="settingsSectionLead">من هنا تفتح إدارة الأسئلة الخاصة بالمقدم، وتضيف أو تعدل أو ترتب الأسئلة بنفس الطريقة المعروفة داخل اللعبة.</p>
-                <div class="settingsCurrentModePill" id="settingsModeHint">سيتم فتح إدارة الأسئلة الخاصة بهذه الغرفة</div>
-              </div>
-              <div class="settingsCard">
-                <h4 class="settingsMiniTitle">إدارة أسئلة المقدم</h4>
-                <p class="settingsMutedText">افتح شاشة إضافة الأسئلة الحالية لتعديل بنك الأسئلة الخاص بك، ثم ارجع مباشرة إلى اللعبة بعد الانتهاء.</p>
-                <div class="settingsDualActions">
-                  <button id="settingsOpenQuestions" class="settingsActionBtn" type="button">فتح إضافة الأسئلة</button>
-                </div>
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">إضافة الأسئلة</h3>
+                <p class="settingsMutedText compact">اضغط على الحرف لفتح أسئلته وإضافة أكثر من سؤال وجواب مباشرة.</p>
+                <div id="settingsQuestionsList" class="settingsQuestionsList"></div>
               </div>
             </section>
 
             <section class="settingsSection" data-settings-panel="cells">
-              <div class="settingsHeroCard">
-                <h3 class="settingsSectionTitle">تعديل محتوى الخلايا</h3>
-                <p class="settingsSectionLead">اختر نوع المحتوى الافتراضي الذي تريد اعتماده داخل الخلايا. هذا الإعداد متاح للجميع، وسيكون أساس التخصيص اليدوي في المرحلة القادمة.</p>
-              </div>
-              <div class="settingsCard">
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">تعديل محتوى الخلايا</h3>
+                <p class="settingsMutedText compact">اختر نوع المحتوى الافتراضي داخل الخلايا. التخصيص اليدوي التفصيلي سنكمله في الخطوة القادمة.</p>
                 <h4 class="settingsMiniTitle">نوع المحتوى الافتراضي</h4>
                 <div class="settingsOptionGrid" id="settingsCellModeGrid">
                   <button class="settingsOptionTile" type="button" data-cell-mode="arabic">
@@ -6147,11 +6138,9 @@ function hideEidIntro(immediate){
             </section>
 
             <section class="settingsSection" data-settings-panel="timer">
-              <div class="settingsHeroCard">
-                <h3 class="settingsSectionTitle">تعديل المؤقت</h3>
-                <p class="settingsSectionLead">عدّل وقت المؤقت من نفس الصفحة، وسيتم تطبيقه على الغرفة عند الضغط على حفظ وخروج.</p>
-              </div>
-              <div class="settingsCard">
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">تعديل المؤقت</h3>
+                <p class="settingsMutedText compact">عدّل وقت المؤقت من هنا، وسيتم تطبيقه عند الضغط على حفظ وخروج.</p>
                 <h4 class="settingsMiniTitle">مدة المؤقت</h4>
                 <div class="settingsRangeWrap">
                   <input id="settingsTimerRange" type="range" min="1" max="50" step="1" value="10" aria-label="وقت المؤقت">
@@ -6161,11 +6150,8 @@ function hideEidIntro(immediate){
             </section>
 
             <section class="settingsSection" data-settings-panel="help">
-              <div class="settingsHeroCard">
-                <h3 class="settingsSectionTitle">التعليمات</h3>
-                <p class="settingsSectionLead">شرح مختصر وواضح لأهم أجزاء اللعبة الحالية.</p>
-              </div>
-              <div class="settingsCard">
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">التعليمات</h3>
                 <ul class="settingsInfoList">
                   <li>اضغط على خلية من الخريطة لاختيار السؤال المرتبط بها.</li>
                   <li>في وضع الأجهزة المتعددة: اللاعبون يدخلون من أجهزتهم عبر الباركود أو الرابط.</li>
@@ -6177,11 +6163,8 @@ function hideEidIntro(immediate){
             </section>
 
             <section class="settingsSection" data-settings-panel="more">
-              <div class="settingsHeroCard">
-                <h3 class="settingsSectionTitle">ألعابنا الأخرى</h3>
-                <p class="settingsSectionLead">افتح متجرنا مباشرة من هنا لمشاهدة بقية الألعاب والمنتجات.</p>
-              </div>
-              <div class="settingsCard">
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">ألعابنا الأخرى</h3>
                 <h4 class="settingsMiniTitle">الانتقال إلى المتجر</h4>
                 <p class="settingsMutedText">سيتم فتح المتجر في صفحة مستقلة حتى ترجع إلى اللعبة بسهولة.</p>
                 <div class="settingsDualActions">
@@ -6191,11 +6174,8 @@ function hideEidIntro(immediate){
             </section>
 
             <section class="settingsSection" data-settings-panel="home">
-              <div class="settingsHeroCard">
-                <h3 class="settingsSectionTitle">الرئيسية</h3>
-                <p class="settingsSectionLead">إذا انتهيت من تجهيز اللعبة وتريد العودة للصفحة الرئيسية، تقدر تدخلها من هنا مباشرة.</p>
-              </div>
-              <div class="settingsCard">
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">الرئيسية</h3>
                 <h4 class="settingsMiniTitle">العودة للرئيسية</h4>
                 <p class="settingsMutedText">سيتم الخروج من الغرفة الحالية والرجوع إلى صفحة البداية.</p>
                 <div class="settingsDualActions">
@@ -6219,6 +6199,7 @@ function hideEidIntro(immediate){
       const timerValue = bd.querySelector('#settingsTimerValue');
       const statusEl = bd.querySelector('#settingsStatus');
       const cellTiles = Array.from(bd.querySelectorAll('[data-cell-mode]'));
+      const questionsList = bd.querySelector('#settingsQuestionsList');
       let pendingCellMode = 'arabic';
       let activeTab = 'questions';
 
@@ -6239,21 +6220,36 @@ function hideEidIntro(immediate){
         cellTiles.forEach(tile => tile.classList.toggle('active', tile.dataset.cellMode === pendingCellMode));
       }
 
+      function buildSettingsQuestionsList(room){
+        if(!questionsList) return;
+        questionsList.innerHTML = GAME_LETTERS.map(L => `
+          <details class="cqItem settingsInlineQuestionItem" data-letter="${escapeHtml(L)}">
+            <summary>حرف ${escapeHtml(L)}</summary>
+            <div class="cqLetterBody"></div>
+          </details>
+        `).join('');
+
+        questionsList.querySelectorAll('.settingsInlineQuestionItem').forEach(det => {
+          det.addEventListener('toggle', () => {
+            if(!det.open) return;
+            questionsList.querySelectorAll('.settingsInlineQuestionItem').forEach(other => { if(other !== det) other.removeAttribute('open'); });
+            const letter = det.getAttribute('data-letter') || '';
+            const roomRef = getRoomWithPersistentCustomQuestions(room || SETTINGS_UI.roomLatest || LIVE.room || {});
+            buildLetterEditor(det, letter, roomRef);
+          });
+        });
+      }
+
       function syncFromRoom(room){
         const r = room || {};
         const settings = (r.settings && typeof r.settings === 'object') ? r.settings : {};
         const selectedTimer = Number((r.timer && r.timer.sel) || LIVE.room?.timer?.sel || 10);
         const selectedCellMode = String(settings.cellContentMode || 'arabic').trim() || 'arabic';
-        const currentGameType = getHostLobbyExperience(r) === 'education' ? 'لعبة تعليمية' : 'لعبة عادية';
-        const currentPlayType = ((getHostLobbyExperience(r) === 'education' ? getEducationPlayType(r) : getNormalPlayType(r)) || 'multi') === 'single'
-          ? 'اللعب من جهاز واحد'
-          : 'اللعب من أجهزة متعددة';
-
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
         if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
         setCellMode(selectedCellMode);
-        const hint = bd.querySelector('#settingsModeHint');
-        if(hint) hint.textContent = `${currentGameType} — ${currentPlayType}`;
+        SETTINGS_UI.roomLatest = getRoomWithPersistentCustomQuestions(r || {});
+        buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
         setStatus('');
       }
 
@@ -6299,11 +6295,6 @@ function hideEidIntro(immediate){
         });
       }
 
-      bd.querySelector('#settingsOpenQuestions').addEventListener('click', () => {
-        const room = SETTINGS_UI.roomLatest || LIVE.room || {};
-        bd.style.display = 'none';
-        openCustomQuestionsModal(room);
-      });
       bd.querySelector('#settingsOpenStore').addEventListener('click', () => {
         openStoreUrl();
       });
