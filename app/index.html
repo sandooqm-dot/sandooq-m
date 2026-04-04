@@ -598,6 +598,184 @@
         font-size:15px;
       }
     }
+
+    @media (orientation: landscape) and (min-width: 700px){
+      html, body{
+        min-height:100dvh;
+        overflow:hidden;
+      }
+
+      body{
+        display:flex;
+        flex-direction:column;
+      }
+
+      header{
+        flex:0 0 auto;
+        padding:10px 16px 0;
+      }
+
+      .logo{
+        top:10px;
+        left:12px;
+        width:56px;
+        height:56px;
+      }
+
+      h1{
+        margin:4px 0 8px;
+        font-size:22px;
+        line-height:1.15;
+      }
+
+      .wrap{
+        width:min(96%, 1200px);
+        max-width:none;
+        padding-bottom:10px;
+      }
+
+      .card{
+        display:grid;
+        grid-template-columns:minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.08fr);
+        grid-template-areas:
+          "name teams colors"
+          "controls rounds colors"
+          "cells actions colors";
+        gap:10px 12px;
+        align-items:start;
+        padding:12px 14px;
+        border-radius:24px;
+        max-height:calc(100dvh - 84px);
+        overflow:hidden;
+      }
+
+      .section{
+        margin:0;
+      }
+
+      .section-name{ grid-area:name; }
+      .section-teams{ grid-area:teams; }
+      .section-controls{ grid-area:controls; }
+      .section-rounds{ grid-area:rounds; }
+      .section-cells{ grid-area:cells; }
+      .section-colors{
+        grid-area:colors;
+        display:flex;
+        flex-direction:column;
+        justify-content:flex-start;
+      }
+      .action-row-main{
+        grid-area:actions;
+        margin:0;
+        align-self:end;
+      }
+
+      .label{
+        font-size:15px;
+        margin:0 0 6px;
+      }
+
+      input{
+        padding:10px 12px;
+        font-size:15px;
+        border-radius:10px;
+      }
+
+      .row-2,
+      .control-grid,
+      .option-grid,
+      .colors-grid,
+      .action-row{
+        gap:8px;
+      }
+
+      .control-box{
+        min-height:46px;
+        padding:6px 10px;
+        border-radius:12px;
+      }
+
+      .players-box{
+        gap:14px;
+      }
+
+      .players-btn{
+        width:30px;
+        height:30px;
+        flex-basis:30px;
+        font-size:15px;
+      }
+
+      .players-value{
+        min-width:28px;
+        font-size:16px;
+      }
+
+      .theme-box{
+        padding:4px 10px;
+      }
+
+      .theme-toggle{
+        width:78px;
+        height:34px;
+      }
+
+      .theme-toggle-dot{
+        top:5px;
+        right:5px;
+        width:24px;
+        height:24px;
+      }
+
+      .theme-toggle.on .theme-toggle-dot{
+        transform:translateX(-44px);
+      }
+
+      .opt-btn{
+        min-height:40px;
+        padding:8px 6px;
+        font-size:14px;
+        border-radius:10px;
+      }
+
+      .colors-grid{
+        grid-template-columns:repeat(4, 1fr);
+      }
+
+      .color-pair{
+        min-height:56px;
+        border-radius:12px;
+      }
+
+      .pair-icon-wrap{
+        padding:5px 4px;
+      }
+
+      .pair-icon{
+        width:56px;
+        height:36px;
+      }
+
+      .pair-cell{
+        width:24px;
+        height:24px;
+        top:6px;
+      }
+
+      .pair-cell.left{ left:6px; }
+      .pair-cell.right{ right:6px; }
+
+      .submit-btn,
+      .help-open-btn{
+        padding:12px 10px;
+        font-size:17px;
+        border-radius:12px;
+      }
+
+      .help-dialog{
+        width:min(720px, 100%);
+      }
+    }
   </style>
 </head>
 <body>
@@ -610,12 +788,12 @@
   <div class="wrap">
     <div class="card">
 
-      <div class="section">
+      <div class="section section-name">
         <label class="label" for="name">اسم المسابقة</label>
         <input id="name" class="center-input" placeholder="اكتب اسم المسابقة">
       </div>
 
-      <div class="section">
+      <div class="section section-teams">
         <div class="label">أسماء الفريقين</div>
         <div class="row-2">
           <input id="team1" class="center-input" placeholder="اسم الفريق الأول">
@@ -623,7 +801,7 @@
         </div>
       </div>
 
-      <div class="section">
+      <div class="section section-controls">
         <div class="control-grid">
           <div class="control-card">
             <div class="label">عدد اللاعبين</div>
@@ -647,7 +825,7 @@
         </div>
       </div>
 
-      <div class="section">
+      <div class="section section-rounds">
         <div class="label">عدد جولات الفوز</div>
         <div class="option-grid" id="roundsOptions">
           <button type="button" class="opt-btn active" data-group="rounds" data-value="1">جولة</button>
@@ -656,7 +834,7 @@
         </div>
       </div>
 
-      <div class="section">
+      <div class="section section-cells">
         <div class="label">نوع الخلايا</div>
         <div class="option-grid" id="cellCountOptions">
           <button type="button" class="opt-btn active" data-group="cellCount" data-value="4">رباعية</button>
@@ -665,12 +843,12 @@
         </div>
       </div>
 
-      <div class="section">
+      <div class="section section-colors">
         <div class="label">لون الخلايا</div>
         <div class="colors-grid" id="colorPairs"></div>
       </div>
 
-      <div class="action-row">
+      <div class="action-row action-row-main">
         <button id="btn" class="submit-btn">إنشاء اللعبة</button>
         <button type="button" id="openHelpBtn" class="help-open-btn">التعليمات</button>
       </div>
