@@ -147,6 +147,33 @@
       text-shadow:none;
     }
 
+    .topSettingsHostSlot{
+      grid-column:3;
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      min-height:52px;
+    }
+    .topSettingsBtn{
+      min-width:118px;
+      height:52px;
+      padding:0 16px;
+      border:none;
+      border-radius:16px;
+      background:#ffd54a;
+      color:#111;
+      font-size:22px;
+      font-weight:900;
+      cursor:pointer;
+      border:4px solid rgba(0,0,0,.85);
+      box-shadow:0 8px 0 rgba(0,0,0,.18);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+      display:none;
+    }
+    .topSettingsBtn.show{ display:inline-flex; align-items:center; justify-content:center; }
+    .topSettingsBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.18); }
+
     .wrap{ width:95%; max-width:900px; margin:0 auto; }
 
     /* ✅ جسم الصفحة شفاف مثل الصورة */
@@ -994,6 +1021,14 @@
       flex-wrap:nowrap;
       width:min(92vw, 760px);
     }
+    .mapToolsRow.sliderOnly{
+      gap:0;
+    }
+    .mapToolsRow.sliderOnly .zoomWrap{
+      min-width:0;
+      width:100%;
+      max-width:none;
+    }
 
     .circleBtn{
       width:58px;height:58px;
@@ -1383,6 +1418,65 @@
       color:#fff;
     }
     .answerBtn:active{ transform: translateY(1px); }
+
+    .directQuestionCard{
+      position:relative;
+      margin:68px auto 0;
+      padding:72px 16px 20px;
+      overflow:visible;
+    }
+    .directTimerWrap{
+      position:absolute;
+      top:-52px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:3;
+    }
+    .directTimerBtn{
+      width:104px;
+      height:104px;
+      border:6px solid rgba(0,0,0,.88);
+      background:#fff;
+      box-shadow:0 16px 28px rgba(0,0,0,.18);
+    }
+    .directTimerBtn .timerRing circle{
+      stroke:rgba(0,0,0,.88);
+    }
+    .directTimerBtn .timerNumber{
+      color:#111;
+      text-shadow:none;
+      font-size:46px;
+    }
+    .directTimerBtn .timerNumber.last5{ color:#111; }
+    .directQText{
+      margin:0 0 14px;
+    }
+    .directQActions{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:6px;
+    }
+    .directActionBtn{
+      margin:0;
+      min-width:220px;
+    }
+    .directNextBtn{
+      width:auto;
+      max-width:none;
+      min-width:180px;
+      height:64px;
+      padding:0 18px;
+      border-radius:999px;
+      background:#fff;
+      color:#111;
+      border:4px solid rgba(0,0,0,.85);
+      box-shadow:0 12px 20px rgba(0,0,0,.18);
+      font-size:24px;
+    }
+    .directNextBtn:active{ transform:translateY(1px); }
 
     /* ✅ زر شراء اللعبة */
     .buyNowWrap{margin-top:14px;display:flex;justify-content:center}
@@ -2500,6 +2594,7 @@
       <img class="logo" src="logo.png?v=2026-02-15-1" alt="شعار صندوق المسابقات" width="72" height="72" decoding="async" loading="eager" fetchpriority="high">
       <h1>سباق الحروف</h1>
       <div id="gameName" class="gameName"></div>
+      <div id="topSettingsHostSlot" class="topSettingsHostSlot"></div>
     </div>
   </header>
 
@@ -3441,6 +3536,20 @@ _startPolling();
 
 const main = document.getElementById("main");
 const gameNameEl = document.getElementById("gameName");
+const topSettingsHostSlot = document.getElementById("topSettingsHostSlot");
+
+function setTopSettingsButton(show, onClick){
+  if(!topSettingsHostSlot) return;
+  topSettingsHostSlot.innerHTML = "";
+  if(!show) return;
+  const btn = document.createElement("button");
+  btn.id = "settingsBtn";
+  btn.type = "button";
+  btn.className = "topSettingsBtn show";
+  btn.textContent = "الإعدادات";
+  if(typeof onClick === "function") btn.addEventListener("click", onClick);
+  topSettingsHostSlot.appendChild(btn);
+}
 
 const homeBtn = document.getElementById("homeBtn");
 if(homeBtn && role !== "host"){
@@ -5917,6 +6026,7 @@ function hideEidIntro(immediate){
     }
 
     function renderHostLobby(room){
+      setTopSettingsButton(false);
       document.body.classList.remove("tvMode");
       main.classList.remove("inGame");
       setGameName(room?.name || code);
@@ -6349,6 +6459,7 @@ function hideEidIntro(immediate){
     }
 
     function renderHostWaiting(msgText){
+      setTopSettingsButton(false);
       main.innerHTML = `
         <div class="wrap">
           <div class="card">
@@ -6375,6 +6486,7 @@ function hideEidIntro(immediate){
 
     // ✅ (Fix) للاعب: قبل ما نحكم إن الغرفة غير موجودة نخليها "جاري الاتصال" شوي
     function renderConnecting(msgText){
+      setTopSettingsButton(false);
       main.innerHTML = `
         <div class="wrap">
           <div class="card">
@@ -6403,6 +6515,7 @@ function hideEidIntro(immediate){
       const isHost = role === "host";
       const started = room.status === "started";
       const writtenModeActive = isWrittenModeEnabled(room);
+      setTopSettingsButton(!!isHost, () => openSettings(LIVE.room || room));
 
       initTimerDefaultsIfNeeded(room);
       initScoresIfNeeded(room);
@@ -6444,6 +6557,7 @@ function hideEidIntro(immediate){
       const board = getBoard(room);
       const boardShapeLabel = ({hex:"سداسية", pentagon:"خماسية", square:"رباعية"}[board.shape] || "سداسية");
       const boardCountLabel = `${board.size} × ${board.size}`;
+      const directPlayMode = !!(isHost && (getNormalPlayType(room) === "single" || getEducationPlayType(room) === "single" || getHostLobbyMode(room) === "single"));
 
       main.innerHTML = `
         <div class="gameLayout">
@@ -6458,26 +6572,10 @@ function hideEidIntro(immediate){
               </div>
             </div>
 
-            <div class="mapToolsRow">
+            <div class="mapToolsRow sliderOnly">
               <div class="zoomWrap">
                 <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
               </div>
-
-              ${isHost ? `
-                <button id="clearBoardBtn" class="circleBtn" type="button" aria-label="تفريغ الخريطة" title="تفريغ الخريطة">
-                  ${ICON_CLEAR}
-                  <span class="helpDot" data-tip="تفريغ الخريطة: مسح ألوان الخلايا وإرجاعها للوضع الافتراضي.">؟</span>
-                </button>
-              ` : ``}
-
-              ${isHost ? `
-                <button id="qModeBtn" class="circleBtn ${qMode === "custom" ? "cyan" : ""}" type="button" aria-label="تغيير نوع الأسئلة" title="${modeBtnTitle}">
-                  ${ICON_Q}
-                  <span class="helpDot" data-tip="تغيير نوع الأسئلة: التبديل بين أسئلة اللعبة وأسئلة المقدم الخاصة.">؟</span>
-                </button>
-              ` : ``}
-
-              ${isHost ? `<button id="settingsBtn" class="circleBtn" type="button" aria-label="الاعدادات" title="الاعدادات">${ICON_GEAR}</button>` : ``}
             </div>
 
             <div class="scoreBoard">
@@ -6489,43 +6587,74 @@ function hideEidIntro(immediate){
           </div>
 
           <div class="landLeft">
-            <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
+            ${isHost ? (directPlayMode ? `
+              <div class="questionCard directQuestionCard">
+                <div class="directTimerWrap">
+                  <button id="timerClock" class="timerClockBtn directTimerBtn" type="button">
+                    <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
+                      <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+                    </svg>
+                    <span id="timerNumber" class="timerNumber">10</span>
+                  </button>
+                </div>
+                <div id="qText" class="qText directQText">اختر حرفًا من الخريطة</div>
+                <div class="directQActions">
+                  <button id="ansBtn" class="answerBtn red directActionBtn" type="button">إظهار الإجابة</button>
+                  <button id="nextQ" class="pillBtn directNextBtn" type="button">تغيير السؤال</button>
+                </div>
+              </div>
+            ` : `
+              <div id="firstPressBar" class="firstPressBar">اسم اللاعب الذي يضغط أولاً</div>
 
-            <div class="controlsRow ${(!isHost && writtenModeActive) ? "playerWrittenRow" : ""}">
-              ${isHost ? `<button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>` : (!writtenModeActive ? `<span style="width:260px;max-width:42vw"></span>` : ``)}
+              <div class="controlsRow">
+                <button id="nextQ" class="pillBtn" type="button">تغيير السؤال</button>
 
-              <div class="timerWrap ${isHost ? "" : "timerPlayerView"}">
-                <button id="timerClock" class="timerClockBtn" type="button" ${isHost ? "" : "tabindex='-1' aria-hidden='true'"}>
-                  <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
-                    <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
-                  </svg>
-                  <span id="timerNumber" class="timerNumber">10</span>
-                </button>
+                <div class="timerWrap">
+                  <button id="timerClock" class="timerClockBtn" type="button">
+                    <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
+                      <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+                    </svg>
+                    <span id="timerNumber" class="timerNumber">10</span>
+                  </button>
+                </div>
+
+                <button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>
               </div>
 
-              ${isHost ? `<button id="freezeBtn" class="pillBtn ${room.freeze ? "red" : ""}" type="button">تجميد الازرار</button>` : (writtenModeActive ? `
-                <div id="writtenAnswerWrap" class="writtenAnswerWrap">
-                  <input
-                    id="writtenAnswerInput"
-                    class="writtenAnswerInput"
-                    type="text"
-                    maxlength="80"
-                    autocomplete="off"
-                    autocorrect="off"
-                    autocapitalize="off"
-                    spellcheck="false"
-                    placeholder="اضغط الجرس أولًا ثم اكتب الإجابة"
-                  >
-                </div>
-              ` : `<span style="width:260px;max-width:42vw"></span>`)}
-            </div>
-
-            ${isHost ? `
               <div class="questionCard">
                 <div id="qText" class="qText">اختر حرفًا من الخريطة</div>
                 <button id="ansBtn" class="answerBtn red" type="button">إظهار الإجابة</button>
               </div>
-            ` : `
+            `) : `
+              <div class="controlsRow ${writtenModeActive ? "playerWrittenRow" : ""}">
+                ${!writtenModeActive ? `<span style="width:260px;max-width:42vw"></span>` : ``}
+
+                <div class="timerWrap timerPlayerView">
+                  <button id="timerClock" class="timerClockBtn" type="button" tabindex='-1' aria-hidden='true'>
+                    <svg class="timerRing" viewBox="0 0 120 120" aria-hidden="true">
+                      <circle id="timerRingCircle" cx="60" cy="60" r="54"></circle>
+                    </svg>
+                    <span id="timerNumber" class="timerNumber">10</span>
+                  </button>
+                </div>
+
+                ${writtenModeActive ? `
+                  <div id="writtenAnswerWrap" class="writtenAnswerWrap">
+                    <input
+                      id="writtenAnswerInput"
+                      class="writtenAnswerInput"
+                      type="text"
+                      maxlength="80"
+                      autocomplete="off"
+                      autocorrect="off"
+                      autocapitalize="off"
+                      spellcheck="false"
+                      placeholder="اضغط الجرس أولًا ثم اكتب الإجابة"
+                    >
+                  </div>
+                ` : `<span style="width:260px;max-width:42vw"></span>`}
+              </div>
+
               <div class="playerBtnWrap">
                 <button id="buzzBtn" class="playerBigBtn">اضغط هنا للإجابة</button>
                 ${started ? `` : `<div class="smallNote">بانتظار بدء اللعبة</div>`}
