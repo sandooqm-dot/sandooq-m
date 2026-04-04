@@ -1697,7 +1697,7 @@
       background:
         radial-gradient(900px 520px at 12% 8%, rgba(255,255,255,.10), transparent 58%),
         radial-gradient(860px 560px at 88% 14%, rgba(255,255,255,.08), transparent 56%),
-        linear-gradient(180deg, #3f235d 0%, #2e4c72 52%, #214b59 100%);
+        linear-gradient(180deg, #7b1f63 0%, #5f214f 52%, #3a1234 100%);
       align-items:stretch;
       justify-content:stretch;
     }
@@ -1715,10 +1715,10 @@
       top:0;
       z-index:2;
       padding:18px 16px 12px;
-      background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.05));
+      background:linear-gradient(180deg, rgba(123,31,99,.92), rgba(95,33,79,.88));
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      border-bottom:1px solid rgba(255,255,255,.14);
+      border-bottom:1px solid rgba(255,255,255,.12);
     }
     .settingsPageTitle{
       color:#fff;
@@ -1726,15 +1726,10 @@
       font-weight:900;
       line-height:1.1;
       text-align:center;
-      margin:0;
+      margin:0 0 10px;
     }
     .settingsPageSub{
-      margin:8px 0 0;
-      color:rgba(255,255,255,.88);
-      font-size:16px;
-      font-weight:900;
-      line-height:1.55;
-      text-align:center;
+      display:none !important;
     }
     .settingsTabsScroller{
       margin-top:14px;
@@ -1776,8 +1771,8 @@
     .settingsBody{
       flex:1 1 auto;
       overflow:auto;
-      padding:18px 16px calc(132px + env(safe-area-inset-bottom));
-      background:linear-gradient(180deg, rgba(245,239,224,.98) 0%, rgba(232,241,255,.98) 54%, rgba(241,247,240,.98) 100%);
+      padding:18px 16px calc(152px + env(safe-area-inset-bottom));
+      background:linear-gradient(180deg, rgba(246,238,242,.98) 0%, rgba(242,233,238,.98) 54%, rgba(239,228,235,.98) 100%);
     }
     .settingsSection{
       display:none;
@@ -1808,7 +1803,7 @@
       font-weight:900;
       color:#111;
       line-height:1.2;
-      text-align:right;
+      text-align:center;
     }
     .settingsSectionLead,
     .settingsMutedText{
@@ -1825,6 +1820,7 @@
       font-weight:900;
       color:#111;
       line-height:1.25;
+      text-align:center;
     }
     .settingsActionBtn,
     .settingsStoreBtn,
@@ -1890,7 +1886,7 @@
       font-weight:900;
       color:#111;
       line-height:1.25;
-      text-align:right;
+      text-align:center;
     }
     .settingsChoiceRow{
       display:grid;
@@ -2023,7 +2019,7 @@
       font-weight:900;
       color:#111;
       margin:0 0 10px;
-      text-align:right;
+      text-align:center;
     }
     .settingsCellInput{
       width:100%;
@@ -2045,8 +2041,24 @@
       font-weight:900;
       color:#5a667b;
       line-height:1.7;
-      text-align:right;
+      text-align:center;
     }
+
+    .settingsMutedText,
+    .settingsSectionLead,
+    .settingsInfoList,
+    .settingsCurrentModePill,
+    .settingsQuestionsHint,
+    .settingsQuestionLetterTitle,
+    .settingsQuestionHint{
+      text-align:center !important;
+    }
+    .settingsDualActions,
+    .settingsRoundsRow,
+    .settingsCountsRow{
+      justify-content:center;
+    }
+
     .settingsRangeWrap{
       margin-top:12px;
       background:#f7fbff;
@@ -2084,7 +2096,7 @@
       bottom:0;
       z-index:3;
       padding:12px 16px calc(14px + env(safe-area-inset-bottom));
-      background:linear-gradient(180deg, rgba(26,32,53,.05), rgba(26,32,53,.92) 24%, rgba(26,32,53,.98) 100%);
+      background:linear-gradient(180deg, rgba(123,31,99,.08), rgba(95,33,79,.92) 24%, rgba(58,18,52,.98) 100%);
       border-top:1px solid rgba(255,255,255,.10);
       box-shadow:0 -12px 30px rgba(0,0,0,.18);
     }
@@ -2117,6 +2129,31 @@
     }
     .settingsSaveExitBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.16); }
     .settingsSaveExitBtn[disabled]{ opacity:.6; cursor:not-allowed; }
+
+    .settingsBottomHomeWrap{
+      display:flex;
+      justify-content:center;
+      margin:18px auto 12px;
+    }
+    .settingsPageHomeBtn{
+      min-width:280px;
+      max-width:100%;
+      height:54px;
+      padding:0 20px;
+      border:none;
+      border-radius:18px;
+      background:#ff4b4b;
+      color:#fff;
+      font-size:22px;
+      font-weight:900;
+      cursor:pointer;
+      border:4px solid rgba(0,0,0,.86);
+      box-shadow:0 8px 0 rgba(0,0,0,.16);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .settingsPageHomeBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.16); }
+
     .settingsCurrentModePill{
       display:inline-flex;
       align-items:center;
@@ -2134,7 +2171,7 @@
     }
     @media (max-width:700px){
       .settingsOptionGrid{ grid-template-columns:1fr; }
-      .settingsChoiceRow{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .settingsChoiceRow{ grid-template-columns:1fr; }
       .settingsPageTitle{ font-size:28px; }
       .settingsTabBtn{ font-size:17px; padding:0 16px; }
       .settingsSectionTitle{ font-size:25px; }
@@ -6090,16 +6127,11 @@ function hideEidIntro(immediate){
       if(!body) return;
       body.innerHTML = "";
 
-      const inSettings = !!item.classList.contains("settingsInlineQuestionItem");
-      const pendingMap = normalizeCustomQuestionsMap((SETTINGS_UI && SETTINGS_UI.pendingCustomQuestions) || {});
-      const sourceRoom = inSettings
-        ? { ...(room || {}), customQuestions: pendingMap }
-        : room;
-
       const pairsWrap = document.createElement("div");
       pairsWrap.className = "cqPairs";
 
-      const existing = getCustomList(sourceRoom, letter).slice(0, MAX_CUSTOM_PER_LETTER);
+      // ✅ (9) قصّ العرض/التحميل على 7
+      const existing = getCustomList(room, letter).slice(0, MAX_CUSTOM_PER_LETTER);
       if(existing.length){
         existing.forEach(obj => pairsWrap.appendChild(createPairEl(String(obj.q||""), String(obj.a||""))));
       }else{
@@ -6110,101 +6142,20 @@ function hideEidIntro(immediate){
       addWrap.className = "cqAddWrap";
       addWrap.innerHTML = `<button class="cqAddBtn" type="button" aria-label="إضافة سؤال">+</button>`;
 
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btnYellow cqSaveFixed";
+      saveBtn.type = "button";
+      saveBtn.textContent = "حفظ";
+
       const savedMsg = document.createElement("div");
       savedMsg.className = "cqSavedMsg";
 
       body.appendChild(pairsWrap);
       body.appendChild(addWrap);
-      if(!inSettings){
-        const saveBtn = document.createElement("button");
-        saveBtn.className = "btn btnYellow cqSaveFixed";
-        saveBtn.type = "button";
-        saveBtn.textContent = "حفظ";
-        body.appendChild(saveBtn);
-
-        saveBtn.addEventListener("click", async () => {
-          const out = [];
-          pairsWrap.querySelectorAll(".cqPair").forEach(p => {
-            const q = (p.querySelector(".cqQ")?.value || "").trim();
-            const a = (p.querySelector(".cqA")?.value || "").trim();
-            if(q || a) out.push({ q, a });
-          });
-
-          if(out.length > MAX_CUSTOM_PER_LETTER){
-            savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة فقط`;
-            setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
-            return;
-          }
-
-          const latestRoom = getRoomWithPersistentCustomQuestions(CUSTOM_Q_UI.roomLatest || LIVE.room || {});
-          const mergedQuestions = normalizeCustomQuestionsMap(latestRoom?.customQuestions || {});
-          if(out.length) mergedQuestions[letter] = out;
-          else delete mergedQuestions[letter];
-
-          const saveTs = Date.now();
-          savePersistedCustomQuestions(mergedQuestions, saveTs);
-          CUSTOM_Q_PERSIST.remote = { updatedAt: saveTs, customQuestions: mergedQuestions };
-          CUSTOM_Q_PERSIST.remoteLoaded = true;
-          CUSTOM_Q_UI.roomLatest = {
-            ...latestRoom,
-            customQuestions: mergedQuestions,
-            customQuestionsUpdatedAt: saveTs
-          };
-
-          LIVE.room = normalizeLiveRoom({
-            ...(LIVE.room || {}),
-            customQuestions: mergedQuestions,
-            customQuestionsUpdatedAt: saveTs
-          });
-          scheduleRender();
-
-          let roomSaved = false;
-          let remoteSaved = false;
-
-          try{
-            await pushCustomQuestionsToRoom(mergedQuestions, saveTs);
-            roomSaved = true;
-          }catch(e){}
-
-          try{
-            await saveRemoteCustomQuestionsEnvelope(mergedQuestions, saveTs);
-            remoteSaved = true;
-          }catch(e){}
-
-          if(remoteSaved){
-            savedMsg.textContent = "تم الحفظ دائمًا ✅";
-          }else if(roomSaved){
-            savedMsg.textContent = "تم الحفظ داخل الجلسة ✅";
-          }else{
-            savedMsg.textContent = "تم الحفظ على هذا الجهاز ✅";
-          }
-          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
-
-          refreshAddState();
-        });
-      }
+      body.appendChild(saveBtn);
       body.appendChild(savedMsg);
 
       const addBtn = addWrap.querySelector(".cqAddBtn");
-
-      function collectPairs(){
-        const out = [];
-        pairsWrap.querySelectorAll('.cqPair').forEach(p => {
-          const q = (p.querySelector('.cqQ')?.value || '').trim();
-          const a = (p.querySelector('.cqA')?.value || '').trim();
-          if(q || a) out.push({ q, a });
-        });
-        return out.slice(0, MAX_CUSTOM_PER_LETTER);
-      }
-
-      function syncPendingQuestions(){
-        if(!inSettings) return;
-        const map = normalizeCustomQuestionsMap((SETTINGS_UI && SETTINGS_UI.pendingCustomQuestions) || {});
-        const out = collectPairs();
-        if(out.length) map[letter] = out;
-        else delete map[letter];
-        SETTINGS_UI.pendingCustomQuestions = map;
-      }
 
       function refreshAddState(){
         const count = pairsWrap.querySelectorAll(".cqPair").length;
@@ -6219,20 +6170,77 @@ function hideEidIntro(immediate){
       addBtn.addEventListener("click", () => {
         const count = pairsWrap.querySelectorAll(".cqPair").length;
         if(count >= MAX_CUSTOM_PER_LETTER){
-          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة لهذا الحرف`;
+          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة لهذا العنصر`;
           setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
           return;
         }
-        const pair = createPairEl("", "");
-        pair.querySelectorAll('.cqTA').forEach(ta => ta.addEventListener('input', syncPendingQuestions));
-        pairsWrap.appendChild(pair);
+        pairsWrap.appendChild(createPairEl("", ""));
         refreshAddState();
-        syncPendingQuestions();
       });
 
-      pairsWrap.querySelectorAll('.cqTA').forEach(ta => ta.addEventListener('input', syncPendingQuestions));
-      syncPendingQuestions();
+      saveBtn.addEventListener("click", async () => {
+        const out = [];
+        pairsWrap.querySelectorAll(".cqPair").forEach(p => {
+          const q = (p.querySelector(".cqQ")?.value || "").trim();
+          const a = (p.querySelector(".cqA")?.value || "").trim();
+          if(q || a) out.push({ q, a });
+        });
+
+        // ✅ (9) حد 7 — لا نحفظ أكثر
+        if(out.length > MAX_CUSTOM_PER_LETTER){
+          savedMsg.textContent = `الحد الأقصى ${MAX_CUSTOM_PER_LETTER} أسئلة فقط`;
+          setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+          return;
+        }
+
+        const latestRoom = getRoomWithPersistentCustomQuestions(CUSTOM_Q_UI.roomLatest || LIVE.room || {});
+        const mergedQuestions = normalizeCustomQuestionsMap(latestRoom?.customQuestions || {});
+        if(out.length) mergedQuestions[letter] = out;
+        else delete mergedQuestions[letter];
+
+        const saveTs = Date.now();
+        savePersistedCustomQuestions(mergedQuestions, saveTs);
+        CUSTOM_Q_PERSIST.remote = { updatedAt: saveTs, customQuestions: mergedQuestions };
+        CUSTOM_Q_PERSIST.remoteLoaded = true;
+        CUSTOM_Q_UI.roomLatest = {
+          ...latestRoom,
+          customQuestions: mergedQuestions,
+          customQuestionsUpdatedAt: saveTs
+        };
+
+        LIVE.room = normalizeLiveRoom({
+          ...(LIVE.room || {}),
+          customQuestions: mergedQuestions,
+          customQuestionsUpdatedAt: saveTs
+        });
+        scheduleRender();
+
+        let roomSaved = false;
+        let remoteSaved = false;
+
+        try{
+          await pushCustomQuestionsToRoom(mergedQuestions, saveTs);
+          roomSaved = true;
+        }catch(e){}
+
+        try{
+          await saveRemoteCustomQuestionsEnvelope(mergedQuestions, saveTs);
+          remoteSaved = true;
+        }catch(e){}
+
+        if(remoteSaved){
+          savedMsg.textContent = "تم الحفظ دائمًا ✅";
+        }else if(roomSaved){
+          savedMsg.textContent = "تم الحفظ داخل الجلسة ✅";
+        }else{
+          savedMsg.textContent = "تم الحفظ على هذا الجهاز ✅";
+        }
+        setTimeout(()=> { savedMsg.textContent = ""; }, 1400);
+
+        refreshAddState();
+      });
     }
+
     function ensureCustomQuestionsModal(){
       if(CUSTOM_Q_UI.ready) return;
 
@@ -6342,7 +6350,7 @@ function hideEidIntro(immediate){
         <div class="settingsPageShell" role="dialog" aria-modal="true" aria-label="الإعدادات">
           <div class="settingsTopBar">
             <h2 class="settingsPageTitle">الإعدادات</h2>
-            <p class="settingsPageSub">كل الأدوات في صفحة واحدة واضحة ومرتبة، والمحتوى يتغير من التبويبات بالأعلى.</p>
+            
             <div class="settingsTabsScroller">
               <div class="settingsTabsRow">
                 <button class="settingsTabBtn active" type="button" data-settings-tab="main">الرئيسية</button>
@@ -6452,6 +6460,9 @@ function hideEidIntro(immediate){
                 </div>
               </div>
             </section>
+            <div class="settingsBottomHomeWrap">
+              <button id="settingsPageHome" class="settingsPageHomeBtn" type="button">الصفحة الرئيسية</button>
+            </div>
           </div>
           </div>
 
@@ -6482,7 +6493,6 @@ function hideEidIntro(immediate){
       let pendingSoundEnabled = true;
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
-      SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.pendingCustomQuestions || {});
 
       function setStatus(msg, isError=false){
         if(!statusEl) return;
@@ -6721,7 +6731,6 @@ function hideEidIntro(immediate){
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
         if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
         SETTINGS_UI.roomLatest = getRoomWithPersistentCustomQuestions(r || {});
-        SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.roomLatest?.customQuestions || {});
         loadManualRoundsFromRoom(SETTINGS_UI.roomLatest);
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
         setStatus('');
@@ -6729,14 +6738,13 @@ function hideEidIntro(immediate){
 
       async function saveAndClose(){
         const saveBtn = bd.querySelector('#settingsSaveExit');
+      const pageHomeBtn = bd.querySelector('#settingsPageHome');
         try{
           if(saveBtn) saveBtn.disabled = true;
           setStatus('جاري حفظ الإعدادات...');
           const timerSel = Math.max(1, Math.min(50, Number(timerRange?.value || 10)));
           const manualCellRounds = JSON.parse(JSON.stringify(pendingManualCellRounds || {}));
           const baseRoom = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
-          const pendingCustomQuestions = normalizeCustomQuestionsMap((SETTINGS_UI && SETTINGS_UI.pendingCustomQuestions) || baseRoom?.customQuestions || {});
-          const customQuestionsUpdatedAt = Date.now();
           const nextSettings = {
             ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
             manualCellRounds,
@@ -6753,8 +6761,6 @@ function hideEidIntro(immediate){
           updates[`rooms/${code}/timer/done`] = false;
           updates[`rooms/${code}/timer/startTs`] = 0;
           updates[`rooms/${code}/questionMode`] = pendingQuestionMode;
-          updates[`rooms/${code}/customQuestions`] = pendingCustomQuestions;
-          updates[`rooms/${code}/customQuestionsUpdatedAt`] = customQuestionsUpdatedAt;
           updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
           updates[`rooms/${code}/settings/cellContentMode`] = pendingCellContentMode;
           updates[`rooms/${code}/settings/soundEnabled`] = !!pendingSoundEnabled;
@@ -6767,8 +6773,6 @@ function hideEidIntro(immediate){
             if(!LIVE.room.timer || typeof LIVE.room.timer !== 'object') LIVE.room.timer = {};
             if(!LIVE.room.round || typeof LIVE.room.round !== 'object') LIVE.room.round = { current:1, targetWins:1, winner:null, boardSeed:0 };
             LIVE.room.questionMode = pendingQuestionMode;
-            LIVE.room.customQuestions = pendingCustomQuestions;
-            LIVE.room.customQuestionsUpdatedAt = customQuestionsUpdatedAt;
             LIVE.room.settings.manualCellRounds = manualCellRounds;
             LIVE.room.settings.cellContentMode = pendingCellContentMode;
             LIVE.room.settings.soundEnabled = !!pendingSoundEnabled;
@@ -6781,11 +6785,6 @@ function hideEidIntro(immediate){
             LIVE.room.board = nextBoard;
             LIVE.room.round.boardSeed = Number(nextBoard.seed || 0) || currentSeed;
           }
-          savePersistedCustomQuestions(pendingCustomQuestions, customQuestionsUpdatedAt);
-          CUSTOM_Q_PERSIST.remote = { updatedAt: customQuestionsUpdatedAt, customQuestions: pendingCustomQuestions };
-          CUSTOM_Q_PERSIST.remoteLoaded = true;
-          try{ await saveRemoteCustomQuestionsEnvelope(pendingCustomQuestions, customQuestionsUpdatedAt); }catch(e){}
-          SETTINGS_UI.pendingCustomQuestions = pendingCustomQuestions;
           SETTINGS_UI.roomLatest = LIVE.room || SETTINGS_UI.roomLatest || {};
           buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
           scheduleRender();
@@ -6843,6 +6842,14 @@ function hideEidIntro(immediate){
         openStoreUrl();
       });
       bd.querySelector('#settingsSaveExit').addEventListener('click', saveAndClose);
+      if(pageHomeBtn){
+        pageHomeBtn.addEventListener('click', () => {
+          try{
+            if(location.pathname.includes('/app/')) location.href = './index.html';
+            else location.href = '/app';
+          }catch(e){ location.href = '/app'; }
+        });
+      }
 
       SETTINGS_UI.ready = true;
       SETTINGS_UI.els = {
