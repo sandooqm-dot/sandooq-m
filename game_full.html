@@ -2202,6 +2202,247 @@
       line-height:1.35;
       margin-top:10px;
     }
+    @media (orientation: landscape){
+      #settingsBackdrop.settingsBackdrop{
+        padding:0;
+      }
+      #settingsBackdrop .settingsTopBar{
+        padding:12px 16px 10px;
+      }
+      #settingsBackdrop .settingsPageTitle{
+        font-size:24px;
+      }
+      #settingsBackdrop .settingsTabsScroller{
+        margin-top:10px;
+      }
+      #settingsBackdrop .settingsTabsRow{
+        gap:8px;
+      }
+      #settingsBackdrop .settingsTabBtn{
+        height:42px;
+        padding:0 14px;
+        font-size:16px;
+        border-width:3px;
+        border-radius:14px;
+      }
+      #settingsBackdrop .settingsBody{
+        padding:12px 14px calc(92px + env(safe-area-inset-bottom));
+      }
+      #settingsBackdrop .settingsCard,
+      #settingsBackdrop .settingsHeroCard{
+        border-width:4px;
+        border-radius:20px;
+        padding:14px 14px;
+      }
+      #settingsBackdrop .settingsCard + .settingsCard{
+        margin-top:10px;
+      }
+      #settingsBackdrop .settingsSectionTitle{
+        font-size:24px;
+        margin-bottom:6px;
+      }
+      #settingsBackdrop .settingsMutedText,
+      #settingsBackdrop .settingsSectionLead{
+        font-size:14px;
+        line-height:1.55;
+      }
+      #settingsBackdrop .settingsMiniTitle{
+        font-size:19px;
+        margin-bottom:8px;
+      }
+      #settingsBackdrop .settingsChoiceBlock + .settingsChoiceBlock{
+        margin-top:12px;
+      }
+      #settingsBackdrop .settingsChoiceTitle{
+        font-size:18px;
+        margin-bottom:10px;
+      }
+      #settingsBackdrop .settingsChoiceRow{
+        gap:10px;
+      }
+      #settingsBackdrop .settingsChoiceBtn{
+        min-height:54px;
+        padding:10px 12px;
+        border-radius:18px;
+        font-size:20px;
+        border-width:3px;
+      }
+      #settingsBackdrop .settingsMainBottomActions{
+        margin-top:18px;
+        column-gap:18px;
+        row-gap:16px;
+        padding:0 8px 2px;
+      }
+      #settingsBackdrop .settingsMainBottomBtn{
+        min-height:54px;
+        font-size:19px;
+        border-width:3px;
+        border-radius:16px;
+      }
+      #settingsBackdrop .settingsRoundsRow,
+      #settingsBackdrop .settingsCountsRow{
+        gap:8px;
+        margin-top:10px;
+      }
+      #settingsBackdrop .settingsRoundBtn,
+      #settingsBackdrop .settingsCountBtn{
+        min-width:92px;
+        height:42px;
+        font-size:16px;
+        border-width:2px;
+        border-radius:14px;
+      }
+      #settingsBackdrop .settingsMiniBoardWrap{
+        margin-top:12px;
+        padding:12px 10px 10px;
+        border-width:4px;
+        border-radius:22px;
+      }
+      #settingsBackdrop .settingsCellEditorBox{
+        margin-top:12px;
+        padding:12px;
+        border-radius:18px;
+      }
+      #settingsBackdrop .settingsCellEditorLabel{
+        font-size:16px;
+        margin-bottom:8px;
+      }
+      #settingsBackdrop .settingsCellInput{
+        height:50px;
+        font-size:20px;
+        border-radius:14px;
+      }
+      #settingsBackdrop .settingsCellsHint{
+        font-size:13px;
+        line-height:1.55;
+      }
+      #settingsBackdrop .settingsRangeWrap{
+        margin-top:10px;
+        padding:12px 12px 10px;
+        border-radius:18px;
+      }
+      #settingsBackdrop .settingsRangeValue{
+        margin-top:10px;
+        font-size:22px;
+      }
+      #settingsBackdrop .settingsInfoList{
+        font-size:14px;
+        line-height:1.75;
+        padding:0 18px 0 0;
+      }
+      #settingsBackdrop .settingsDualActions{
+        margin-top:12px;
+        gap:8px;
+      }
+      #settingsBackdrop .settingsStoreBtn,
+      #settingsBackdrop .settingsActionBtn{
+        min-width:190px;
+        height:48px;
+        font-size:18px;
+        border-width:3px;
+        border-radius:16px;
+      }
+      #settingsBackdrop .settingsFixedBar{
+        padding:8px 14px calc(10px + env(safe-area-inset-bottom));
+      }
+      #settingsBackdrop .settingsStatus{
+        min-height:18px;
+        margin-bottom:6px;
+        font-size:13px;
+      }
+      #settingsBackdrop .settingsSaveExitBtn{
+        width:min(100%, 360px);
+        height:52px;
+        font-size:22px;
+        border-width:3px;
+        border-radius:16px;
+      }
+    }
+
+    @media (orientation: landscape) and (min-width: 980px){
+      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsCard.settingsDirectCard{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0,1fr));
+        gap:14px;
+        align-items:start;
+      }
+      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsChoiceBlock + .settingsChoiceBlock{
+        margin-top:0;
+      }
+      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsChoiceRow{
+        grid-template-columns:1fr;
+      }
+      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsChoiceBtn{
+        min-height:52px;
+        font-size:18px;
+      }
+      #settingsBackdrop .settingsMainBottomActions{
+        margin-top:16px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 560px){
+      #settingsBackdrop .settingsTopBar{
+        padding:10px 14px 8px;
+      }
+      #settingsBackdrop .settingsPageTitle{
+        font-size:22px;
+      }
+      #settingsBackdrop .settingsTabsScroller{
+        margin-top:8px;
+      }
+      #settingsBackdrop .settingsTabBtn{
+        height:38px;
+        padding:0 12px;
+        font-size:15px;
+      }
+      #settingsBackdrop .settingsBody{
+        padding:10px 12px calc(84px + env(safe-area-inset-bottom));
+      }
+      #settingsBackdrop .settingsCard,
+      #settingsBackdrop .settingsHeroCard{
+        padding:12px 12px;
+      }
+      #settingsBackdrop .settingsSectionTitle{
+        font-size:21px;
+      }
+      #settingsBackdrop .settingsMutedText,
+      #settingsBackdrop .settingsSectionLead,
+      #settingsBackdrop .settingsInfoList,
+      #settingsBackdrop .settingsCellsHint{
+        font-size:13px;
+      }
+      #settingsBackdrop .settingsChoiceTitle{
+        font-size:16px;
+        margin-bottom:8px;
+      }
+      #settingsBackdrop .settingsChoiceBtn{
+        min-height:48px;
+        font-size:18px;
+      }
+      #settingsBackdrop .settingsRoundBtn,
+      #settingsBackdrop .settingsCountBtn{
+        min-width:84px;
+        height:38px;
+        font-size:14px;
+      }
+      #settingsBackdrop .settingsMainBottomBtn{
+        min-height:48px;
+        font-size:17px;
+      }
+      #settingsBackdrop .settingsSaveExitBtn{
+        height:48px;
+        font-size:20px;
+      }
+      #settingsBackdrop .settingsCellInput{
+        height:46px;
+        font-size:18px;
+      }
+      #settingsBackdrop .settingsRangeValue{
+        font-size:20px;
+      }
+    }
+
     @media (max-width:700px){
       .settingsOptionGrid{ grid-template-columns:1fr; }
       .settingsChoiceRow{ grid-template-columns:repeat(2,minmax(0,1fr)); }
