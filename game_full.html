@@ -3197,6 +3197,35 @@
       };
     }
 
+
+    function applyConfiguredCellContent(boardLike, roomLike){
+      const base = cloneBoardState(boardLike, roomLike);
+      if(!base) return base;
+      const roomRefLike = roomLike || {};
+      const settings = (roomRefLike.settings && typeof roomRefLike.settings === 'object') ? roomRefLike.settings : {};
+      const mode = String(settings.cellContentMode || 'default');
+      if(mode !== 'manual') return base;
+      const currentRound = Math.max(1, Number(roomRefLike?.round?.current || 1));
+      const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
+      const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
+      if(!manualConfig || !Array.isArray(manualConfig.values)) return base;
+      const manualSize = normalizeCellCount(manualConfig?.cellCount || base.size || getBoardSize(roomRefLike || {}));
+      if(manualSize !== Number(base.size || 0)){
+        const rebuilt = buildBoardState({ ...roomRefLike, settings }, Number(base.seed || Date.now()) || Date.now());
+        return cloneBoardState(rebuilt, roomRefLike);
+      }
+      const out = cloneBoardState(base, roomRefLike);
+      const vals = manualConfig.values.map(v => String(v || ''));
+      for(let r=0; r<manualSize; r++){
+        for(let c=0; c<manualSize; c++){
+          const idx = (r * manualSize) + c;
+          const raw = String(vals[idx] || '').trim();
+          if(raw) out.letters[r][c] = raw;
+        }
+      }
+      return out;
+    }
+
     let LAST_STABLE_BOARD = null;
     const BOARD_CACHE_BY_SEED = new Map();
 
@@ -3236,34 +3265,34 @@
       const fromRoom = normalizeBoardState(room?.board, room);
 
       if(fromRoom && (!expectedSeed || Number(fromRoom.seed || 0) === expectedSeed)){
-        return rememberBoard(fromRoom, room);
+        return applyConfiguredCellContent(rememberBoard(fromRoom, room), room);
       }
 
       if(expectedSeed && BOARD_CACHE_BY_SEED.has(expectedSeed)){
         const cached = BOARD_CACHE_BY_SEED.get(expectedSeed);
         LAST_STABLE_BOARD = cached;
-        return cached;
+        return applyConfiguredCellContent(cached, room);
       }
 
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
         if(!expectedSeed || Number(LAST_STABLE_BOARD.seed || 0) === expectedSeed){
-          return LAST_STABLE_BOARD;
+          return applyConfiguredCellContent(LAST_STABLE_BOARD, room);
         }
       }
 
       if(expectedSeed){
-        return rememberBoard(buildBoardState(room || {}, expectedSeed), room);
+        return applyConfiguredCellContent(rememberBoard(buildBoardState(room || {}, expectedSeed), room), room);
       }
 
       if(fromRoom){
-        return rememberBoard(fromRoom, room);
+        return applyConfiguredCellContent(rememberBoard(fromRoom, room), room);
       }
 
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
-        return LAST_STABLE_BOARD;
+        return applyConfiguredCellContent(LAST_STABLE_BOARD, room);
       }
 
-      return rememberBoard(buildBoardState(room || {}, Date.now()), room);
+      return applyConfiguredCellContent(rememberBoard(buildBoardState(room || {}, Date.now()), room), room);
     }
 
     // أسئلة افتراضية (Fallback) إذا ما كان فيه بنك أسئلة
