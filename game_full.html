@@ -2220,6 +2220,287 @@
       }
     }
 
+    @media (orientation: landscape){
+      .settingsTopBar{
+        padding:12px 14px 8px;
+      }
+      .settingsPageTitle{
+        font-size:24px;
+      }
+      .settingsTabsScroller{
+        margin-top:10px;
+      }
+      .settingsTabsRow{
+        gap:8px;
+        padding-bottom:2px;
+      }
+      .settingsTabBtn{
+        height:42px;
+        padding:0 14px;
+        font-size:16px;
+        border-radius:14px;
+        border-width:3px;
+      }
+      .settingsBody{
+        padding:12px 14px calc(92px + env(safe-area-inset-bottom));
+      }
+      .settingsHeroCard,
+      .settingsCard{
+        border-radius:20px;
+        border-width:4px;
+        padding:14px 14px;
+      }
+      .settingsCard + .settingsCard{
+        margin-top:12px;
+      }
+      .settingsSectionTitle{
+        font-size:24px;
+        margin-bottom:6px;
+      }
+      .settingsMiniTitle,
+      .settingsChoiceTitle{
+        font-size:18px;
+        margin-bottom:8px;
+      }
+      .settingsSectionLead,
+      .settingsMutedText{
+        font-size:14px;
+        line-height:1.6;
+      }
+      .settingsChoiceBlock + .settingsChoiceBlock{
+        margin-top:12px;
+      }
+      .settingsChoiceRow{
+        gap:10px;
+      }
+      .settingsChoiceBtn{
+        min-height:52px;
+        padding:10px 12px;
+        font-size:18px;
+        border-radius:16px;
+        border-width:3px;
+      }
+      .settingsMainBottomActions{
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        grid-template-areas:"help home more";
+        column-gap:12px;
+        row-gap:0;
+        margin-top:18px;
+        padding:0 2px;
+      }
+      .settingsMainBottomBtn{
+        min-height:50px;
+        font-size:16px;
+        padding:0 8px;
+        border-width:3px;
+        border-radius:14px;
+      }
+      .settingsOptionGrid{
+        gap:10px;
+      }
+      .settingsOptionTile{
+        min-height:88px;
+        padding:12px 12px 10px;
+        border-radius:16px;
+        border-width:3px;
+      }
+      .settingsOptionTileTitle{
+        font-size:19px;
+      }
+      .settingsOptionTileDesc{
+        margin-top:6px;
+        font-size:13px;
+        line-height:1.5;
+      }
+      .settingsRoundsRow,
+      .settingsCountsRow{
+        gap:8px;
+        margin-top:10px;
+      }
+      .settingsRoundBtn,
+      .settingsCountBtn{
+        min-width:88px;
+        height:42px;
+        padding:0 12px;
+        font-size:15px;
+        border-radius:14px;
+        border-width:3px;
+      }
+      .settingsMiniBoardWrap{
+        margin-top:12px;
+        padding:12px 10px 10px;
+        border-radius:20px;
+      }
+      .settingsCellEditorBox{
+        margin-top:12px;
+        padding:12px;
+        border-radius:18px;
+      }
+      .settingsCellEditorLabel{
+        font-size:16px;
+        margin-bottom:8px;
+      }
+      .settingsCellInput{
+        height:50px;
+        font-size:20px;
+        border-radius:14px;
+        border-width:3px;
+      }
+      .settingsCellsHint{
+        margin-top:8px;
+        font-size:13px;
+        line-height:1.6;
+      }
+      .settingsRangeWrap{
+        margin-top:10px;
+        padding:12px 12px 10px;
+        border-radius:18px;
+      }
+      .settingsRangeValue{
+        margin-top:10px;
+        font-size:22px;
+      }
+      .settingsInfoList{
+        font-size:14px;
+        line-height:1.7;
+      }
+      .settingsDualActions{
+        gap:8px;
+        margin-top:12px;
+      }
+      .settingsActionBtn,
+      .settingsStoreBtn,
+      .settingsHomeAction{
+        min-width:170px;
+        height:48px;
+        padding:0 14px;
+        font-size:17px;
+        border-radius:14px;
+        border-width:3px;
+      }
+      .settingsFixedBar{
+        padding:8px 14px calc(10px + env(safe-area-inset-bottom));
+      }
+      .settingsStatus{
+        min-height:18px;
+        margin-bottom:6px;
+        font-size:12px;
+      }
+      .settingsSaveExitBtn{
+        width:min(100%, 320px);
+        height:50px;
+        font-size:21px;
+        border-radius:16px;
+        border-width:3px;
+      }
+      .settingsCurrentModePill{
+        min-height:34px;
+        padding:6px 12px;
+        font-size:14px;
+        margin-top:8px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height:500px){
+      .settingsTopBar{
+        padding:10px 12px 6px;
+      }
+      .settingsPageTitle{
+        font-size:22px;
+      }
+      .settingsTabsScroller{
+        margin-top:8px;
+      }
+      .settingsTabBtn{
+        height:38px;
+        padding:0 12px;
+        font-size:15px;
+        border-radius:12px;
+      }
+      .settingsBody{
+        padding:10px 12px calc(82px + env(safe-area-inset-bottom));
+      }
+      .settingsHeroCard,
+      .settingsCard{
+        padding:12px 12px;
+        border-radius:18px;
+      }
+      .settingsSectionTitle{
+        font-size:21px;
+      }
+      .settingsMiniTitle,
+      .settingsChoiceTitle{
+        font-size:16px;
+      }
+      .settingsSectionLead,
+      .settingsMutedText,
+      .settingsInfoList{
+        font-size:13px;
+        line-height:1.55;
+      }
+      .settingsChoiceBlock + .settingsChoiceBlock{
+        margin-top:10px;
+      }
+      .settingsChoiceRow{
+        gap:8px;
+      }
+      .settingsChoiceBtn{
+        min-height:46px;
+        padding:8px 10px;
+        font-size:16px;
+      }
+      .settingsMainBottomActions{
+        margin-top:14px;
+        column-gap:8px;
+      }
+      .settingsMainBottomBtn{
+        min-height:44px;
+        font-size:14px;
+        padding:0 6px;
+      }
+      .settingsRoundBtn,
+      .settingsCountBtn{
+        min-width:78px;
+        height:38px;
+        font-size:14px;
+      }
+      .settingsMiniBoardWrap{
+        padding:10px 8px 8px;
+      }
+      .settingsCellEditorLabel{
+        font-size:15px;
+      }
+      .settingsCellInput{
+        height:44px;
+        font-size:18px;
+      }
+      .settingsCellsHint{
+        font-size:12px;
+        line-height:1.5;
+      }
+      .settingsRangeWrap{
+        padding:10px 10px 8px;
+      }
+      .settingsRangeValue{
+        font-size:19px;
+      }
+      .settingsActionBtn,
+      .settingsStoreBtn,
+      .settingsHomeAction{
+        min-width:150px;
+        height:44px;
+        font-size:15px;
+      }
+      .settingsFixedBar{
+        padding:6px 12px calc(8px + env(safe-area-inset-bottom));
+      }
+      .settingsSaveExitBtn{
+        width:min(100%, 280px);
+        height:46px;
+        font-size:18px;
+      }
+    }
+
     /* ✅ خاص بالتحديثات (زر + نافذة رمز في اللوبي فقط) */
     .staffModeFab{
       position:fixed;
