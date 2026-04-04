@@ -563,6 +563,50 @@
       padding:8px 10px;
       border-radius:12px;
       font-size:18px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .compactTeamsWrap .playerItem.isEmpty{
+      justify-content:center;
+    }
+    .compactPlayerName{
+      flex:1 1 auto;
+      min-width:0;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      overflow:hidden;
+      white-space:nowrap;
+      text-overflow:ellipsis;
+    }
+    .compactPlayerActions{
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .compactPlayerIconBtn{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      border:2px solid rgba(255,255,255,.55);
+      background:rgba(255,255,255,.22);
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      font-size:18px;
+      font-weight:900;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .compactPlayerIconBtn:active{ transform:translateY(1px); }
+    .compactPlayerIconBtn.remove{
+      background:rgba(183,28,28,.28);
+      border-color:rgba(255,255,255,.50);
     }
     .compactActionsRow{
       display:flex;
@@ -609,20 +653,18 @@
       background:#fff;
       border:3px solid rgba(0,0,0,.18);
     }
-    .shareModal .shareUrlBox{
+    .shareModal .shareExplainBox{
       width:100%;
       padding:12px 14px;
       border-radius:14px;
-      border:2px solid rgba(0,0,0,.12);
+      border:2px solid rgba(0,0,0,.10);
       background:#faf7fb;
       color:#4b1243;
-      font-size:15px;
+      font-size:16px;
       font-weight:900;
-      line-height:1.6;
+      line-height:1.7;
       text-align:center;
-      word-break:break-all;
-      direction:ltr;
-      margin:0 0 12px;
+      margin:8px 0 12px;
     }
     .shareModal .shareActionsRow{
       display:flex;
@@ -5886,7 +5928,6 @@ function hideEidIntro(immediate){
                     <div id="orangeList"></div>
                   </div>
                 </div>
-                <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
               </div>
 
               <div class="compactActionsRow">
@@ -5917,9 +5958,8 @@ function hideEidIntro(immediate){
             <div class="shareModal">
               <button id="closeJoinModalBtn" class="shareClose" type="button">×</button>
               <div class="shareTitle">إضافة أجهزة اللاعبين</div>
-              <div class="shareSmall" style="margin:0 0 8px">يدخل اللاعبون من أجهزتهم عبر هذا الرابط أو الباركود فقط</div>
               <img class="shareWideQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين">
-              <div class="shareUrlBox">${escapeHtml(joinUrl)}</div>
+              <div class="shareExplainBox">يدخل اللاعبون من أجهزتهم عبر الباركود أو رابط الانضمام المخصص لهم فقط.</div>
               <div class="shareActionsRow">
                 <button id="copyJoinModalBtn" class="btn btnYellow" type="button">نسخ رابط اللاعبين</button>
               </div>
@@ -5931,9 +5971,8 @@ function hideEidIntro(immediate){
             <div class="shareModal">
               <button id="closeDisplayModalBtn" class="shareClose" type="button">×</button>
               <div class="shareTitle">رابط شاشة العرض</div>
-              <div class="shareSmall" style="margin:0 0 8px">هذا الرابط للشاشة فقط وليس للاعبين</div>
               <img class="shareWideQr" src="${escapeHtml(displayQrUrl)}" alt="باركود شاشة العرض">
-              <div class="shareUrlBox">${escapeHtml(displayUrl)}</div>
+              <div class="shareExplainBox">هذا الباركود والرابط مخصصان لشاشة العرض فقط، ولا يدخل منهما اللاعبون.</div>
               <div class="shareActionsRow">
                 <button id="copyDisplayModalBtn" class="btn btnBlue" type="button">نسخ رابط شاشة العرض</button>
               </div>
@@ -5946,20 +5985,48 @@ function hideEidIntro(immediate){
       const greenList = document.getElementById("greenList");
       const orangeList = document.getElementById("orangeList");
       if(showPlayerLinks && greenList && orangeList){
-        greenList.innerHTML = green.length
-          ? green.map(p => `<div class="playerItem" data-id="${p.id}">${escapeHtml(p.name || "لاعب")}${p.isTv ? `<span class="playerTvBadge">عرض</span>` : ""}</div>`).join("")
-          : `<div class="playerItem" style="opacity:.8">لا يوجد لاعبين</div>`;
-        orangeList.innerHTML = orange.length
-          ? orange.map(p => `<div class="playerItem" data-id="${p.id}">${escapeHtml(p.name || "لاعب")}${p.isTv ? `<span class="playerTvBadge">عرض</span>` : ""}</div>`).join("")
-          : `<div class="playerItem" style="opacity:.8">لا يوجد لاعبين</div>`;
+        function renderLobbyPlayer(p){
+          return `<div class="playerItem" data-id="${p.id}">
+            <div class="compactPlayerName">${escapeHtml(p.name || "لاعب")}${p.isTv ? `<span class="playerTvBadge">عرض</span>` : ""}</div>
+            <div class="compactPlayerActions">
+              <button class="compactPlayerIconBtn move" type="button" data-move-player="${p.id}" title="نقل اللاعب">⇄</button>
+              <button class="compactPlayerIconBtn remove" type="button" data-remove-player="${p.id}" title="حذف اللاعب">×</button>
+            </div>
+          </div>`;
+        }
 
-        main.querySelectorAll(".playerItem[data-id]").forEach(el => {
-          el.addEventListener("click", async () => {
-            const pid = el.getAttribute("data-id");
+        greenList.innerHTML = green.length
+          ? green.map(renderLobbyPlayer).join("")
+          : `<div class="playerItem isEmpty" style="opacity:.8">لا يوجد لاعبين</div>`;
+        orangeList.innerHTML = orange.length
+          ? orange.map(renderLobbyPlayer).join("")
+          : `<div class="playerItem isEmpty" style="opacity:.8">لا يوجد لاعبين</div>`;
+
+        async function writePlayersObject(nextPlayers){
+          try{
+            await update(ref(db, `rooms/${code}`), { players: nextPlayers });
+          }catch(e){}
+        }
+
+        main.querySelectorAll("[data-move-player]").forEach(el => {
+          el.addEventListener("click", async (ev) => {
+            ev.stopPropagation();
+            const pid = el.getAttribute("data-move-player");
             const p = players[pid];
             if(!p) return;
-            const nextTeam = (p.team === "green") ? "orange" : "green";
-            try{ await update(ref(db, `rooms/${code}/players/${pid}`), { team: nextTeam }); }catch(e){}
+            const nextPlayers = { ...players, [pid]: { ...p, team: (p.team === "green") ? "orange" : "green" } };
+            await writePlayersObject(nextPlayers);
+          });
+        });
+
+        main.querySelectorAll("[data-remove-player]").forEach(el => {
+          el.addEventListener("click", async (ev) => {
+            ev.stopPropagation();
+            const pid = el.getAttribute("data-remove-player");
+            if(!pid || !players[pid]) return;
+            const nextPlayers = { ...players };
+            delete nextPlayers[pid];
+            await writePlayersObject(nextPlayers);
           });
         });
       }
