@@ -2081,6 +2081,62 @@
     }
     .settingsSaveExitBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.16); }
     .settingsSaveExitBtn[disabled]{ opacity:.6; cursor:not-allowed; }
+
+    .settingsMainGroups{
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+    }
+    .settingsMainGroup{
+      background:rgba(255,255,255,.78);
+      border:4px solid rgba(0,0,0,.78);
+      border-radius:24px;
+      padding:16px 14px 14px;
+      box-shadow:0 12px 24px rgba(0,0,0,.10);
+      text-align:right;
+    }
+    .settingsMainGroupTitle{
+      margin:0 0 12px;
+      color:#111;
+      font-size:28px;
+      font-weight:900;
+      line-height:1.2;
+    }
+    .settingsToggleRow{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:12px;
+    }
+    .settingsToggleBtn{
+      min-height:68px;
+      border:none;
+      border-radius:20px;
+      background:#ffffff;
+      color:#4b1243;
+      font-size:24px;
+      font-weight:900;
+      cursor:pointer;
+      border:4px solid rgba(0,0,0,.16);
+      box-shadow:0 10px 18px rgba(0,0,0,.08);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+      transition:transform .12s ease, background .18s ease, color .18s ease, border-color .18s ease;
+    }
+    .settingsToggleBtn:active{ transform:translateY(1px); }
+    .settingsToggleBtn.active{
+      background:#ffd54a;
+      color:#111;
+      border-color:rgba(0,0,0,.82);
+      box-shadow:0 10px 0 rgba(0,0,0,.16);
+    }
+    .settingsMainHint{
+      margin:0;
+      color:#5c647c;
+      font-size:18px;
+      font-weight:900;
+      line-height:1.7;
+    }
+
     .settingsCurrentModePill{
       display:inline-flex;
       align-items:center;
@@ -3132,7 +3188,8 @@
       const settings = (roomRefLike.settings && typeof roomRefLike.settings === 'object') ? roomRefLike.settings : {};
       const currentRound = Math.max(1, Number(roomRefLike?.round?.current || 1));
       const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
-      const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
+      const manualEnabled = String(settings.cellContentSource || 'default') === 'custom';
+      const manualConfig = manualEnabled ? (manualRounds[String(currentRound)] || manualRounds[currentRound] || null) : null;
       const size = normalizeCellCount(manualConfig?.cellCount || getBoardSize(roomRefLike || {}));
       const shape = getBoardShape(roomRefLike || {});
       const seed = Number(seedTs || Date.now()) || Date.now();
@@ -4155,6 +4212,12 @@ if(homeBtn && role !== "host"){
       AUDIO_FLOW.celebrationTs = 0;
     }
 
+    function isGameSoundEnabled(roomLike){
+      const room = roomLike || LIVE.room || {};
+      const settings = (room?.settings && typeof room.settings === 'object') ? room.settings : {};
+      return settings.soundsEnabled !== false;
+    }
+
     function isCelebrationAudioLocked(roomLike){
       const room = roomLike || LIVE.room || {};
       if(FINAL_OVERLAY_ACTIVE) return true;
@@ -4178,11 +4241,13 @@ if(homeBtn && role !== "host"){
 
     function playRong(roomLike){
       try{
+        if(!isGameSoundEnabled(roomLike)) return false;
         if(shouldBlockBellFx(roomLike)) return false;
         return SOUND.playBell();
       }catch(e){ return false; }
     }
     function playRongOrFallback(roomLike){
+      if(!isGameSoundEnabled(roomLike)) return false;
       if(shouldBlockBellFx(roomLike)) return false;
       return playRong(roomLike);
     }
@@ -4193,6 +4258,7 @@ if(homeBtn && role !== "host"){
     }
     function playVois(){
       try{
+        if(!isGameSoundEnabled()) return false;
         stopRong();
         return SOUND.playMusic();
       }catch(e){ return false; }
@@ -4216,6 +4282,7 @@ if(homeBtn && role !== "host"){
       if(!keepLock) clearCelebrationAudioLock();
     }
     function playVoisFor(ms, winTs){
+      if(!isGameSoundEnabled()) return false;
       SOUND.init();
       const normalizedWinTs = Number(winTs || 0);
       const now = Date.now();
@@ -4412,6 +4479,7 @@ if(homeBtn && role !== "host"){
     }
 
     function playEidIntroAudio(){
+      if(!isGameSoundEnabled()) return;
       const audio = ensureEidIntroAudio();
       if(!audio) return;
       EID_INTRO.wantsPlay = true;
@@ -6238,18 +6306,47 @@ function hideEidIntro(immediate){
             <p class="settingsPageSub">كل الأدوات في صفحة واحدة واضحة ومرتبة، والمحتوى يتغير من التبويبات بالأعلى.</p>
             <div class="settingsTabsScroller">
               <div class="settingsTabsRow">
-                <button class="settingsTabBtn active" type="button" data-settings-tab="questions">إضافة الأسئلة</button>
+                <button class="settingsTabBtn active" type="button" data-settings-tab="main">الرئيسية</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="questions">إضافة الأسئلة</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="cells">محتوى الخلايا</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="timer">المؤقت</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="help">التعليمات</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="more">ألعابنا الأخرى</button>
-                <button class="settingsTabBtn" type="button" data-settings-tab="home">الرئيسية</button>
               </div>
             </div>
           </div>
 
           <div class="settingsBody">
-            <section class="settingsSection active" data-settings-panel="questions">
+            <section class="settingsSection active" data-settings-panel="main">
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">الرئيسية</h3>
+                <div class="settingsMainGroups">
+                  <div class="settingsMainGroup">
+                    <h4 class="settingsMainGroupTitle">نوع عرض الأسئلة</h4>
+                    <div class="settingsToggleRow" id="settingsQuestionModeRow">
+                      <button class="settingsToggleBtn active" type="button" data-main-question-mode="custom">أسئلة مخصصة</button>
+                      <button class="settingsToggleBtn" type="button" data-main-question-mode="default">أسئلة اللعبة</button>
+                    </div>
+                  </div>
+                  <div class="settingsMainGroup">
+                    <h4 class="settingsMainGroupTitle">عرض محتوى الخلايا</h4>
+                    <div class="settingsToggleRow" id="settingsCellsSourceRow">
+                      <button class="settingsToggleBtn active" type="button" data-main-cells-source="default">حروف اللعبة الجاهزة</button>
+                      <button class="settingsToggleBtn" type="button" data-main-cells-source="custom">المحتوى المخصص</button>
+                    </div>
+                  </div>
+                  <div class="settingsMainGroup">
+                    <h4 class="settingsMainGroupTitle">أصوات اللعبة</h4>
+                    <div class="settingsToggleRow" id="settingsSoundRow">
+                      <button class="settingsToggleBtn active" type="button" data-main-sound="on">تشغيل</button>
+                      <button class="settingsToggleBtn" type="button" data-main-sound="off">إطفاء</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settingsSection" data-settings-panel="questions">
               <div class="settingsCard settingsDirectCard">
                 <h3 class="settingsSectionTitle compact">إضافة الأسئلة</h3>
                 <p class="settingsMutedText compact">اضغط على الحرف لفتح أسئلته وإضافة أكثر من سؤال وجواب مباشرة.</p>
@@ -6318,17 +6415,6 @@ function hideEidIntro(immediate){
                 </div>
               </div>
             </section>
-
-            <section class="settingsSection" data-settings-panel="home">
-              <div class="settingsCard settingsDirectCard">
-                <h3 class="settingsSectionTitle compact">الرئيسية</h3>
-                <h4 class="settingsMiniTitle">العودة للرئيسية</h4>
-                <p class="settingsMutedText">سيتم الخروج من الغرفة الحالية والرجوع إلى صفحة البداية.</p>
-                <div class="settingsDualActions">
-                  <button id="settingsGoHome" class="settingsHomeAction" type="button">الذهاب إلى الرئيسية</button>
-                </div>
-              </div>
-            </section>
           </div>
 
           <div class="settingsFixedBar">
@@ -6350,10 +6436,14 @@ function hideEidIntro(immediate){
       const miniBoardEl = bd.querySelector('#settingsMiniBoard');
       const cellInputEl = bd.querySelector('#settingsCellInput');
       const selectedCellLabelEl = bd.querySelector('#settingsSelectedCellLabel');
-      let activeTab = 'questions';
+      const questionModeButtons = Array.from(bd.querySelectorAll('[data-main-question-mode]'));
+      const cellsSourceButtons = Array.from(bd.querySelectorAll('[data-main-cells-source]'));
+      const soundButtons = Array.from(bd.querySelectorAll('[data-main-sound]'));
+      let activeTab = 'main';
       let activeCellsRound = 1;
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
+      let pendingMainSettings = { questionMode:'default', cellContentSource:'default', soundsEnabled:true };
 
       function setStatus(msg, isError=false){
         if(!statusEl) return;
@@ -6365,6 +6455,22 @@ function hideEidIntro(immediate){
         activeTab = tab || 'questions';
         tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.settingsTab === activeTab));
         panels.forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === activeTab));
+      }
+
+      function renderMainSettingsButtons(){
+        questionModeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mainQuestionMode === pendingMainSettings.questionMode));
+        cellsSourceButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mainCellsSource === pendingMainSettings.cellContentSource));
+        soundButtons.forEach(btn => btn.classList.toggle('active', (btn.dataset.mainSound === 'on') === !!pendingMainSettings.soundsEnabled));
+      }
+
+      function loadMainSettingsFromRoom(roomLike){
+        const settings = (roomLike?.settings && typeof roomLike.settings === 'object') ? roomLike.settings : {};
+        pendingMainSettings = {
+          questionMode: String(roomLike?.questionMode || 'default') === 'custom' ? 'custom' : 'default',
+          cellContentSource: String(settings.cellContentSource || 'default') === 'custom' ? 'custom' : 'default',
+          soundsEnabled: settings.soundsEnabled !== false
+        };
+        renderMainSettingsButtons();
       }
 
       const CELL_COUNT_META = {
@@ -6536,6 +6642,7 @@ function hideEidIntro(immediate){
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
         if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
         SETTINGS_UI.roomLatest = getRoomWithPersistentCustomQuestions(r || {});
+        loadMainSettingsFromRoom(SETTINGS_UI.roomLatest);
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
         loadManualRoundsFromRoom(SETTINGS_UI.roomLatest);
         setStatus('');
@@ -6551,7 +6658,9 @@ function hideEidIntro(immediate){
           const baseRoom = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
           const nextSettings = {
             ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
-            manualCellRounds
+            manualCellRounds,
+            cellContentSource: pendingMainSettings.cellContentSource === 'custom' ? 'custom' : 'default',
+            soundsEnabled: !!pendingMainSettings.soundsEnabled
           };
           const roomForBoard = { ...baseRoom, settings: nextSettings };
           const currentSeed = Number(baseRoom?.round?.boardSeed || baseRoom?.board?.seed || Date.now()) || Date.now();
@@ -6562,7 +6671,10 @@ function hideEidIntro(immediate){
           updates[`rooms/${code}/timer/running`] = false;
           updates[`rooms/${code}/timer/done`] = false;
           updates[`rooms/${code}/timer/startTs`] = 0;
+          updates[`rooms/${code}/questionMode`] = pendingMainSettings.questionMode === 'custom' ? 'custom' : 'default';
           updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
+          updates[`rooms/${code}/settings/cellContentSource`] = pendingMainSettings.cellContentSource === 'custom' ? 'custom' : 'default';
+          updates[`rooms/${code}/settings/soundsEnabled`] = !!pendingMainSettings.soundsEnabled;
           updates[`rooms/${code}/board`] = nextBoard;
           updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || currentSeed;
           await update(ref(db), updates);
@@ -6570,7 +6682,10 @@ function hideEidIntro(immediate){
             if(!LIVE.room.settings || typeof LIVE.room.settings !== 'object') LIVE.room.settings = {};
             if(!LIVE.room.timer || typeof LIVE.room.timer !== 'object') LIVE.room.timer = {};
             if(!LIVE.room.round || typeof LIVE.room.round !== 'object') LIVE.room.round = { current:1, targetWins:1, winner:null, boardSeed:0 };
+            LIVE.room.questionMode = pendingMainSettings.questionMode === 'custom' ? 'custom' : 'default';
             LIVE.room.settings.manualCellRounds = manualCellRounds;
+            LIVE.room.settings.cellContentSource = pendingMainSettings.cellContentSource === 'custom' ? 'custom' : 'default';
+            LIVE.room.settings.soundsEnabled = !!pendingMainSettings.soundsEnabled;
             LIVE.room.timer.sel = timerSel;
             LIVE.room.timer.dur = timerSel;
             LIVE.room.timer.running = false;
@@ -6606,11 +6721,21 @@ function hideEidIntro(immediate){
         });
       }
 
+      questionModeButtons.forEach(btn => btn.addEventListener('click', () => {
+        pendingMainSettings.questionMode = btn.dataset.mainQuestionMode === 'custom' ? 'custom' : 'default';
+        renderMainSettingsButtons();
+      }));
+      cellsSourceButtons.forEach(btn => btn.addEventListener('click', () => {
+        pendingMainSettings.cellContentSource = btn.dataset.mainCellsSource === 'custom' ? 'custom' : 'default';
+        renderMainSettingsButtons();
+      }));
+      soundButtons.forEach(btn => btn.addEventListener('click', () => {
+        pendingMainSettings.soundsEnabled = (btn.dataset.mainSound === 'on');
+        renderMainSettingsButtons();
+      }));
+
       bd.querySelector('#settingsOpenStore').addEventListener('click', () => {
         openStoreUrl();
-      });
-      bd.querySelector('#settingsGoHome').addEventListener('click', () => {
-        location.href = 'index.html';
       });
       bd.querySelector('#settingsSaveExit').addEventListener('click', saveAndClose);
 
@@ -6628,7 +6753,7 @@ function hideEidIntro(immediate){
       ensureSettingsModal();
       SETTINGS_UI.roomLatest = room || LIVE.room || {};
       SETTINGS_UI.els.syncFromRoom(SETTINGS_UI.roomLatest);
-      SETTINGS_UI.els.setActiveTab('questions');
+      SETTINGS_UI.els.setActiveTab('main');
       SETTINGS_UI.els.backdrop.style.display = 'flex';
     }
 
