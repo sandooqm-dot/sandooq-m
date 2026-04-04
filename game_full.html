@@ -6599,8 +6599,8 @@ function hideEidIntro(immediate){
                 </div>
                 <div id="qText" class="qText directQText">اختر حرفًا من الخريطة</div>
                 <div class="directQActions">
-                  <button id="ansBtn" class="answerBtn red directActionBtn" type="button">إظهار الإجابة</button>
                   <button id="nextQ" class="pillBtn directNextBtn" type="button">تغيير السؤال</button>
+                  <button id="ansBtn" class="answerBtn red directActionBtn" type="button">إظهار الإجابة</button>
                 </div>
               </div>
             ` : `
@@ -7576,8 +7576,14 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
               ansBtn.addEventListener("click", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if(ANSWER_UI.revealed) return;
-                ANSWER_UI.revealed = true;
+
+                if(ANSWER_UI.revealed){
+                  ANSWER_UI.revealed = false;
+                  ansBtn.classList.remove("green");
+                  ansBtn.classList.add("red");
+                  ansBtn.textContent = "إظهار الإجابة";
+                  return;
+                }
 
                 // نعيد القراءة من LIVE حتى لو تغيّر السؤال بسرعة
                 const rr = LIVE.room;
@@ -7598,6 +7604,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 const a = (item?.a ?? "").trim();
                 if(!a) return;
 
+                ANSWER_UI.revealed = true;
                 ansBtn.classList.remove("red");
                 ansBtn.classList.add("green");
                 ansBtn.textContent = a;
