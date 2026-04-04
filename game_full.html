@@ -5887,11 +5887,10 @@ function hideEidIntro(immediate){
                   </div>
                 </div>
                 <div class="smallNote">يمكنك الضغط على اسم لاعب لنقله للفريق الآخر</div>
-                <div class="compactPlayersCount">عدد اللاعبين الحالي: ${list.length}</div>
               </div>
 
               <div class="compactActionsRow">
-                <button id="openJoinModalBtn" class="compactActionBtn players" type="button">رابط اللاعبين</button>
+                <button id="openJoinModalBtn" class="compactActionBtn players" type="button">إضافة أجهزة اللاعبين</button>
                 ${showDisplayLink ? `<button id="openDisplayModalBtn" class="compactActionBtn display" type="button">شاشة العرض</button>` : ``}
               </div>
 
@@ -5917,8 +5916,8 @@ function hideEidIntro(immediate){
           <div id="shareJoinBackdrop" class="shareBackdrop" style="display:none">
             <div class="shareModal">
               <button id="closeJoinModalBtn" class="shareClose" type="button">×</button>
-              <div class="shareTitle">رابط دخول اللاعبين</div>
-              <div class="shareSmall" style="margin:0 0 8px">هذا الرابط للاعبين فقط</div>
+              <div class="shareTitle">إضافة أجهزة اللاعبين</div>
+              <div class="shareSmall" style="margin:0 0 8px">يدخل اللاعبون من أجهزتهم عبر هذا الرابط أو الباركود فقط</div>
               <img class="shareWideQr" src="${escapeHtml(joinQrUrl)}" alt="باركود دخول اللاعبين">
               <div class="shareUrlBox">${escapeHtml(joinUrl)}</div>
               <div class="shareActionsRow">
@@ -7683,13 +7682,25 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
       // وجود الغرفة (تقريبي)
       const players = room.players || {};
+      const roomSettingsNow = (room.settings && typeof room.settings === "object") ? room.settings : {};
+      const roomTeamsNow = (room.teams && typeof room.teams === "object") ? room.teams : {};
       const hasAny =
         room.status !== null ||
         room.hostKey !== null ||
-        (players && Object.keys(players).length > 0);
+        (players && Object.keys(players).length > 0) ||
+        !!String(room.name || "").trim() ||
+        Object.keys(roomSettingsNow).length > 0 ||
+        Object.keys(roomTeamsNow).length > 0;
 
       if(!hasAny){
         if(role === "host"){
+          if(!VIEW.missingSince) VIEW.missingSince = Date.now();
+          const dtHost = Date.now() - VIEW.missingSince;
+          if(dtHost < 2500){
+            renderConnecting("جاري تجهيز الغرفة…");
+            VIEW.type = "connecting";
+            return;
+          }
           ensureHostRoomExists();
           if(VIEW.type !== "host_lobby"){
             renderHostLobby(LIVE.room || {});
