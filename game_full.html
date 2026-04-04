@@ -3022,6 +3022,92 @@
     body.tvMode .landLeft{ display:none !important; }   /* لا مؤقت/أزرار/سؤال */
     body.tvMode .overlaySvg{ pointer-events:none !important; } /* الخريطة غير قابلة للنقر */
 
+
+
+    /* ✅ النمط التعليمي التفاعلي */
+    .eduGuideOverlay{
+      position:fixed;
+      inset:0;
+      z-index:47000;
+      display:none;
+      pointer-events:auto;
+    }
+    .eduGuideOverlay.show{ display:block; }
+    .eduGuideSpotlight{
+      position:fixed;
+      border-radius:24px;
+      border:4px solid rgba(255,255,255,.96);
+      box-shadow:0 0 0 9999px rgba(12,10,24,.76), 0 18px 36px rgba(0,0,0,.28);
+      pointer-events:none;
+      transition:all .22s ease;
+      z-index:47001;
+      display:none;
+    }
+    .eduGuideSpotlight.show{ display:block; }
+    .eduGuideCard{
+      position:fixed;
+      width:min(92vw, 420px);
+      background:#fff8d4;
+      color:#111;
+      border-radius:26px;
+      border:6px solid rgba(0,0,0,.88);
+      box-shadow:0 24px 38px rgba(0,0,0,.34);
+      padding:18px 16px 16px;
+      text-align:right;
+      z-index:47002;
+      transition:transform .22s ease, opacity .22s ease;
+    }
+    .eduGuideCard.centered{
+      left:50% !important;
+      top:50% !important;
+      transform:translate(-50%, -50%);
+    }
+    .eduGuideProgress{
+      font-size:14px;
+      font-weight:900;
+      color:#7b1f63;
+      text-align:center;
+      margin:0 0 8px;
+    }
+    .eduGuideTitle{
+      margin:0 0 10px;
+      font-size:28px;
+      font-weight:900;
+      line-height:1.2;
+      text-align:center;
+      color:#111;
+    }
+    .eduGuideText{
+      margin:0;
+      font-size:20px;
+      font-weight:900;
+      line-height:1.75;
+      color:#3d2750;
+      text-align:center;
+    }
+    .eduGuideActions{
+      display:flex;
+      justify-content:center;
+      margin-top:16px;
+    }
+    .eduGuideNext{
+      min-width:180px;
+      height:58px;
+      padding:0 16px;
+      border:none;
+      border-radius:18px;
+      background:#ffd54a;
+      color:#111;
+      font-size:24px;
+      font-weight:900;
+      cursor:pointer;
+      border:4px solid rgba(0,0,0,.86);
+      box-shadow:0 8px 0 rgba(0,0,0,.14);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .eduGuideNext:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.14); }
+
     @media (max-width:520px){
       body.tvMode .wrap{ padding-top:86px; }
       .tvLogo{width:46px;height:46px;}
@@ -6799,6 +6885,243 @@ function hideEidIntro(immediate){
 
     const SETTINGS_UI = { ready:false, els:{}, roomLatest:null };
 
+    const EDUCATION_GUIDE = {
+      ready:false,
+      active:false,
+      completedOnce:false,
+      currentIndex:0,
+      steps:[],
+      overlay:null,
+      spotlight:null,
+      card:null,
+      progressEl:null,
+      titleEl:null,
+      textEl:null,
+      nextBtn:null,
+      syncTimer:null,
+      room:null
+    };
+
+    function isEducationGuideMode(roomLike){
+      const room = roomLike || LIVE.room || {};
+      return role === "host" && String(room?.status || "") === "started" && getHostLobbyExperience(room) === "education" && !document.body.classList.contains("tvMode");
+    }
+
+    function ensureEducationGuideUI(){
+      if(EDUCATION_GUIDE.ready) return;
+      const overlay = document.createElement('div');
+      overlay.id = 'eduGuideOverlay';
+      overlay.className = 'eduGuideOverlay';
+      overlay.innerHTML = `
+        <div id="eduGuideSpotlight" class="eduGuideSpotlight"></div>
+        <div id="eduGuideCard" class="eduGuideCard centered" role="dialog" aria-modal="true" aria-label="شرح اللعبة التعليمية">
+          <div id="eduGuideProgress" class="eduGuideProgress"></div>
+          <h3 id="eduGuideTitle" class="eduGuideTitle"></h3>
+          <p id="eduGuideText" class="eduGuideText"></p>
+          <div class="eduGuideActions">
+            <button id="eduGuideNext" class="eduGuideNext" type="button">فهمت</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      EDUCATION_GUIDE.overlay = overlay;
+      EDUCATION_GUIDE.spotlight = overlay.querySelector('#eduGuideSpotlight');
+      EDUCATION_GUIDE.card = overlay.querySelector('#eduGuideCard');
+      EDUCATION_GUIDE.progressEl = overlay.querySelector('#eduGuideProgress');
+      EDUCATION_GUIDE.titleEl = overlay.querySelector('#eduGuideTitle');
+      EDUCATION_GUIDE.textEl = overlay.querySelector('#eduGuideText');
+      EDUCATION_GUIDE.nextBtn = overlay.querySelector('#eduGuideNext');
+      EDUCATION_GUIDE.nextBtn.addEventListener('click', () => goEducationGuideNext());
+      EDUCATION_GUIDE.ready = true;
+      window.addEventListener('resize', () => queueEducationGuideSync(), { passive:true });
+      window.addEventListener('scroll', () => queueEducationGuideSync(), { passive:true });
+    }
+
+    function buildEducationGuideSteps(roomLike){
+      const directPlayMode = !!(role === 'host' && (getNormalPlayType(roomLike) === 'single' || getEducationPlayType(roomLike) === 'single' || getHostLobbyMode(roomLike) === 'single'));
+      const steps = [
+        { id:'welcome', title:'شرح اللعبة التعليمية', text:'هذا النمط يعرّفك على أهم أزرار اللعبة وطريقة استخدامها خطوة بخطوة. اضغط فهمت ونبدأ مباشرة.', centered:true, buttonText:'ابدأ' },
+        { id:'map', title:'الخريطة', text:'هذه هي خريطة اللعب. المقدم يضغط على أي خلية لاختيار حرف أو محتوى، ومنه يظهر السؤال أو المهمة المرتبطة بها.', target:'#mapBox', closeSettings:true },
+        { id:'score', title:'اسم الفريقين والنتيجة', text:'هنا تظهر أسماء الفريقين ونتيجتهم. بعد الإجابة الصحيحة يضغط المقدم على اسم الفريق المستحق ليتم اعتماد النقطة وتلوين الخلية.', target:'.scoreBoard', closeSettings:true },
+        { id:'first-player', title:'أول لاعب ضغط', text:'هذا الشريط يعرض اسم أول لاعب ضغط على الجرس. وإذا كان هناك جواب مكتوب في بعض الأنماط سيظهر هنا أيضًا.', target:'#firstPressBar', closeSettings:true },
+        { id:'timer', title:'المؤقت', text:'هذا هو المؤقت. يبدأ العد بعد اعتماد أول لاعب، ويستخدم لتحديد وقت الإجابة داخل الجولة.', target:'#timerClock', closeSettings:true },
+        { id:'next-question', title:'تغيير السؤال', text:'زر تغيير السؤال يبدّل السؤال الحالي إلى سؤال آخر لنفس الحرف أو لنفس محتوى الخلية إذا احتجت سؤالًا بديلًا.', target:'#nextQ', closeSettings:true },
+        { id:'freeze', title:'تجميد الأزرار', text:'زر تجميد الأزرار يوقف استقبال ضغطات اللاعبين مؤقتًا حتى يرتّب المقدم الجولة أو يوقف التسرّع والسبام.', target:'#freezeBtn', closeSettings:true },
+        { id:'settings-button', title:'الإعدادات', text:'من هذا الزر تدخل إلى صفحة الإعدادات، ومنها تغيّر نوع الأسئلة، وتضيف أسئلتك، وتعدّل محتوى الخلايا، وتضبط المؤقت.', target:'#settingsBtn', closeSettings:true },
+        { id:'settings-main', title:'الرئيسية داخل الإعدادات', text:'هذا هو تبويب الرئيسية. منه تغيّر بسرعة نوع الأسئلة المعروض، ونوع محتوى الخلايا، وتشغيل أو إطفاء أصوات اللعبة.', target:'[data-settings-panel="main"] .settingsCard', panel:'main' },
+        { id:'settings-questions-choice', title:'نوع عرض الأسئلة', text:'من هنا تختار بين أسئلة اللعبة الجاهزة أو الأسئلة المخصصة التي تضيفها بنفسك للمسابقة.', targetResolver:() => document.querySelector('[data-main-choice-group="questions"]')?.closest('.settingsChoiceBlock') || null, panel:'main' },
+        { id:'settings-cells-choice', title:'عرض محتوى الخلايا', text:'من هنا تحدد هل الخلايا تعرض حروف اللعبة الجاهزة أو تعرض المحتوى المخصص الذي ستكتبه يدويًا لكل جولة.', targetResolver:() => document.querySelector('[data-main-choice-group="cells"]')?.closest('.settingsChoiceBlock') || null, panel:'main' },
+        { id:'settings-questions-tab', title:'إضافة الأسئلة', text:'هذا تبويب إضافة الأسئلة. بالضغط عليه تدخل إلى قائمة الحروف حتى تضيف لكل حرف أسئلة وأجوبة خاصة بك.', target:'[data-settings-tab="questions"]', panel:'questions' },
+        { id:'settings-questions-list', title:'قائمة الحروف', text:'هنا تظهر الحروف. افتح الحرف الذي تريده ثم أضف السؤال والجواب، وبعد الحفظ ستقدر تستخدمها داخل اللعبة.', target:'#settingsQuestionsList', panel:'questions' },
+        { id:'settings-cells-tab', title:'محتوى الخلايا', text:'هذا تبويب محتوى الخلايا. منه تخصص محتوى كل خلية يدويًا بحسب الجولة التي تريدها.', target:'[data-settings-tab="cells"]', panel:'cells' },
+        { id:'settings-mini-board', title:'الخريطة المصغرة', text:'هذه خريطة مصغرة للجولة. اضغط على أي خلية منها لتحديدها قبل كتابة المحتوى الخاص بها.', target:'#settingsMiniBoard', panel:'cells' },
+        { id:'settings-cell-input', title:'كتابة محتوى الخلية', text:'بعد تحديد الخلية من الخريطة المصغرة، اكتب هنا محتواها. ويمكنك التنقل بين الجولات وتخصيص كل جولة على حدة.', target:'#settingsCellInput', panel:'cells' },
+        { id:'settings-timer-tab', title:'تعديل المؤقت', text:'هذا تبويب المؤقت. منه تختار عدد الثواني المناسب للجولات حسب عمر المشاركين أو طبيعة النشاط.', target:'[data-settings-tab="timer"]', panel:'timer' },
+        { id:'settings-timer-range', title:'سلايدر المؤقت', text:'حرّك هذا السلايدر لزيادة وقت المؤقت أو تقليله، ثم احفظ التعديل ليطبق في اللعبة.', target:'#settingsTimerRange', panel:'timer' },
+        { id:'settings-save', title:'حفظ وخروج', text:'بعد الانتهاء من أي تعديل، اضغط هنا لحفظ الإعدادات والرجوع مباشرة إلى صفحة اللعبة.', target:'#settingsSaveExit', panel:'timer', buttonText:'تم' }
+      ];
+      if(directPlayMode){
+        return steps.filter(step => step.id !== 'freeze' && step.id !== 'first-player');
+      }
+      return steps;
+    }
+
+    function getEducationGuideTarget(step){
+      if(!step) return null;
+      try{
+        if(typeof step.targetResolver === 'function') return step.targetResolver() || null;
+        if(step.target) return document.querySelector(step.target);
+      }catch(e){}
+      return null;
+    }
+
+    function closeEducationGuideSettingsIfNeeded(){
+      try{
+        if(SETTINGS_UI.ready && SETTINGS_UI.els?.backdrop && SETTINGS_UI.els.backdrop.style.display === 'flex'){
+          SETTINGS_UI.els.closeSettings();
+        }
+      }catch(e){}
+    }
+
+    function placeEducationGuideCard(targetRect, centered){
+      const card = EDUCATION_GUIDE.card;
+      const spotlight = EDUCATION_GUIDE.spotlight;
+      if(!card || !spotlight) return;
+      if(centered || !targetRect){
+        card.classList.add('centered');
+        spotlight.classList.remove('show');
+        return;
+      }
+      card.classList.remove('centered');
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 14;
+      const gap = 14;
+      const cardW = Math.min(vw - (pad * 2), 420);
+      card.style.width = `${cardW}px`;
+      const cardH = card.offsetHeight || 220;
+      const spaceBelow = vh - targetRect.bottom;
+      const spaceAbove = targetRect.top;
+      let top = targetRect.bottom + gap;
+      if(spaceBelow < cardH + 24 && spaceAbove > spaceBelow){
+        top = targetRect.top - cardH - gap;
+      }
+      top = Math.max(pad, Math.min(vh - cardH - pad, top));
+      let left = targetRect.left + (targetRect.width / 2) - (cardW / 2);
+      left = Math.max(pad, Math.min(vw - cardW - pad, left));
+      card.style.left = `${left}px`;
+      card.style.top = `${top}px`;
+      spotlight.classList.add('show');
+    }
+
+    function renderEducationGuideStep(){
+      ensureEducationGuideUI();
+      if(!EDUCATION_GUIDE.active) return;
+      const step = EDUCATION_GUIDE.steps[EDUCATION_GUIDE.currentIndex];
+      if(!step){
+        finishEducationGuide();
+        return;
+      }
+      if(step.closeSettings) closeEducationGuideSettingsIfNeeded();
+      if(step.panel){
+        openSettings(LIVE.room || EDUCATION_GUIDE.room || {});
+        try{ SETTINGS_UI.els.setActiveTab(step.panel); }catch(e){}
+      }
+      window.clearTimeout(EDUCATION_GUIDE.syncTimer);
+      EDUCATION_GUIDE.syncTimer = window.setTimeout(() => {
+        const liveStep = EDUCATION_GUIDE.steps[EDUCATION_GUIDE.currentIndex];
+        if(!EDUCATION_GUIDE.active || !liveStep) return;
+        let target = getEducationGuideTarget(liveStep);
+        if((liveStep.target || liveStep.targetResolver) && !target){
+          goEducationGuideNext(true);
+          return;
+        }
+        if(target){
+          try{ target.scrollIntoView({ block:'center', inline:'center', behavior:'smooth' }); }catch(e){}
+        }
+        requestAnimationFrame(() => {
+          if(!EDUCATION_GUIDE.active) return;
+          const currentStep = EDUCATION_GUIDE.steps[EDUCATION_GUIDE.currentIndex];
+          if(!currentStep) return;
+          target = getEducationGuideTarget(currentStep);
+          if((currentStep.target || currentStep.targetResolver) && !target){
+            goEducationGuideNext(true);
+            return;
+          }
+          EDUCATION_GUIDE.overlay.classList.add('show');
+          EDUCATION_GUIDE.progressEl.textContent = `${EDUCATION_GUIDE.currentIndex + 1} / ${EDUCATION_GUIDE.steps.length}`;
+          EDUCATION_GUIDE.titleEl.textContent = currentStep.title || 'شرح اللعبة';
+          EDUCATION_GUIDE.textEl.textContent = currentStep.text || '';
+          EDUCATION_GUIDE.nextBtn.textContent = currentStep.buttonText || (EDUCATION_GUIDE.currentIndex === EDUCATION_GUIDE.steps.length - 1 ? 'تم' : 'فهمت');
+          if(target){
+            const rect = target.getBoundingClientRect();
+            const pad = 10;
+            EDUCATION_GUIDE.spotlight.style.left = `${Math.max(8, rect.left - pad)}px`;
+            EDUCATION_GUIDE.spotlight.style.top = `${Math.max(8, rect.top - pad)}px`;
+            EDUCATION_GUIDE.spotlight.style.width = `${Math.max(36, rect.width + (pad * 2))}px`;
+            EDUCATION_GUIDE.spotlight.style.height = `${Math.max(36, rect.height + (pad * 2))}px`;
+            placeEducationGuideCard(rect, false);
+          }else{
+            placeEducationGuideCard(null, true);
+          }
+        });
+      }, step.panel ? 90 : 40);
+    }
+
+    function queueEducationGuideSync(){
+      if(!EDUCATION_GUIDE.active) return;
+      window.clearTimeout(EDUCATION_GUIDE.syncTimer);
+      EDUCATION_GUIDE.syncTimer = window.setTimeout(() => {
+        renderEducationGuideStep();
+      }, 30);
+    }
+
+    function goEducationGuideNext(){
+      if(!EDUCATION_GUIDE.active) return;
+      EDUCATION_GUIDE.currentIndex += 1;
+      if(EDUCATION_GUIDE.currentIndex >= EDUCATION_GUIDE.steps.length){
+        finishEducationGuide();
+        return;
+      }
+      renderEducationGuideStep();
+    }
+
+    function finishEducationGuide(){
+      if(!EDUCATION_GUIDE.ready) return;
+      EDUCATION_GUIDE.active = false;
+      EDUCATION_GUIDE.completedOnce = true;
+      EDUCATION_GUIDE.overlay.classList.remove('show');
+      EDUCATION_GUIDE.spotlight.classList.remove('show');
+      window.clearTimeout(EDUCATION_GUIDE.syncTimer);
+      closeEducationGuideSettingsIfNeeded();
+    }
+
+    function startEducationGuide(roomLike){
+      ensureEducationGuideUI();
+      EDUCATION_GUIDE.room = roomLike || LIVE.room || {};
+      EDUCATION_GUIDE.steps = buildEducationGuideSteps(EDUCATION_GUIDE.room);
+      EDUCATION_GUIDE.currentIndex = 0;
+      EDUCATION_GUIDE.active = true;
+      renderEducationGuideStep();
+    }
+
+    function syncEducationGuide(roomLike){
+      const room = roomLike || LIVE.room || {};
+      if(!isEducationGuideMode(room)){
+        if(EDUCATION_GUIDE.active) finishEducationGuide();
+        return;
+      }
+      if(!EDUCATION_GUIDE.completedOnce && !EDUCATION_GUIDE.active){
+        startEducationGuide(room);
+        return;
+      }
+      if(EDUCATION_GUIDE.active){
+        EDUCATION_GUIDE.room = room;
+        queueEducationGuideSync();
+      }
+    }
+
+
     function ensureSettingsModal(){
       if(SETTINGS_UI.ready) return;
 
@@ -6962,6 +7285,7 @@ function hideEidIntro(immediate){
         activeTab = tab || 'main';
         tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.settingsTab === activeTab));
         panels.forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === activeTab));
+        queueEducationGuideSync();
       }
 
       const CELL_COUNT_META = {
@@ -7270,6 +7594,7 @@ function hideEidIntro(immediate){
             try{ stopEidIntroAudio(); }catch(e){}
           }
           bd.style.display = 'none';
+          queueEducationGuideSync();
 
           try{
             const liveRoomNow = LIVE.room || roomForBoard || baseRoom || {};
@@ -7346,7 +7671,7 @@ function hideEidIntro(immediate){
         setActiveTab,
         syncFromRoom,
         setStatus,
-        closeSettings: () => { bd.style.display = 'none'; }
+        closeSettings: () => { bd.style.display = 'none'; queueEducationGuideSync(); }
       };
     }
 
@@ -7356,6 +7681,7 @@ function hideEidIntro(immediate){
       SETTINGS_UI.els.syncFromRoom(SETTINGS_UI.roomLatest);
       SETTINGS_UI.els.setActiveTab('main');
       SETTINGS_UI.els.backdrop.style.display = 'flex';
+      queueEducationGuideSync();
     }
 
     function renderHostLobby(room){
@@ -8186,6 +8512,8 @@ function hideEidIntro(immediate){
           try{ placeHexes(); applyZoomFix(); }catch(e){}
         });
       }
+
+      queueEducationGuideSync();
 
       // ✅ تحديثات (مؤقت) أولية
       TIMER_UI.latestTimer = room.timer || {};
@@ -9051,6 +9379,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       }catch(e){}
 
       try{ syncPersistentCustomQuestions(room); }catch(e){}
+      try{ syncEducationGuide(room); }catch(e){}
 
       try{
         const restartTs = Number(room?.restartTs || 0);
