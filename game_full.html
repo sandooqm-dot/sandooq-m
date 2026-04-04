@@ -5818,32 +5818,29 @@ function hideEidIntro(immediate){
     function renderHostLobby(room){
       document.body.classList.remove("tvMode");
       main.classList.remove("inGame");
-      setGameName(room?.name);
+      setGameName(room?.name || code);
 
       const players = room.players || {};
       const list = Object.entries(players).map(([id,p]) => ({id, ...p}));
       const hostMode = getHostLobbyMode(room);
       const hostExperience = getHostLobbyExperience(room);
-      const eduPlayType = getEducationPlayType(room);
-      const eduDisplayOnly = isEducationDisplayOnly(room);
-      const isEducation = hostExperience === "education";
       const visualTeams = getVisualTeams(room);
       const greenText = getReadableTextColor(visualTeams.green.color);
       const orangeText = getReadableTextColor(visualTeams.orange.color);
       const green = list.filter(p => p.team === "green");
       const orange = list.filter(p => p.team === "orange");
-      const updatesEnabled = isWrittenModeVisualEnabled(room);
       const joinUrl = buildJoinUrl(room.code || code);
       const joinQrUrl = buildQrUrl(joinUrl);
       const displayUrl = buildDisplayUrl(room.code || code);
       const displayQrUrl = buildQrUrl(displayUrl);
       const currentSettings = (room?.settings && typeof room.settings === "object") ? room.settings : {};
       const normalPlayType = getNormalPlayType(room);
-      const currentGameType = isEducation ? "education" : ((hostExperience === "normal" || (!hostExperience && hostMode)) ? "normal" : "");
-      const currentPlayType = isEducation
+      const eduPlayType = getEducationPlayType(room);
+      const currentGameType = hostExperience === "education" ? "education" : "normal";
+      const currentPlayType = currentGameType === "education"
         ? (eduPlayType || "single")
-        : ((hostExperience === "normal" && normalPlayType) ? normalPlayType : ((hostMode === "single" || hostMode === "separate") ? "multi" : ""));
-      const currentDisplayOnly = currentPlayType === "multi" && hostMode === "separate";
+        : (normalPlayType || "multi");
+      const currentDisplayOnly = currentPlayType === "multi" && (currentGameType === "education" ? isEducationDisplayOnly(room) : hostMode === "separate");
       const selectedGameType = currentGameType || "normal";
       const selectedPlayType = currentPlayType || "multi";
       const selectedDisplayOnly = selectedPlayType === "multi" ? !!currentDisplayOnly : false;
@@ -5851,8 +5848,9 @@ function hideEidIntro(immediate){
       const showDisplayLink = showPlayerLinks && selectedDisplayOnly;
       const singleTitle = selectedGameType === "education" ? "لعبة تعليمية" : "لعبة عادية";
       const singleDesc = selectedGameType === "education"
-        ? "تشغّل اللعبة مباشرة من جهاز واحد بدون روابط أو باركود، ومناسبة للحصص والأنشطة الصفية."
-        : "تشغّل اللعبة مباشرة من جهاز واحد بدون روابط أو باركود، وتبدأ اللعب فورًا من نفس الجهاز.";
+        ? "تشغّل اللعبة مباشرة من جهاز واحد، ومناسبة للحصص والأنشطة الصفية بدون روابط لاعبين أو باركود."
+        : "تشغّل اللعبة مباشرة من جهاز واحد بدون روابط لاعبين أو باركود، وتبدأ اللعب فورًا من نفس الجهاز.";
+      const startBtnLabel = "ابدأ اللعبة";
 
       document.body.classList.remove("mode-picker");
       main.innerHTML = `
@@ -5893,7 +5891,7 @@ function hideEidIntro(immediate){
               </div>
 
               <div class="compactActionsRow">
-                <button id="openJoinModalBtn" class="compactActionBtn players" type="button">مشاركة اللاعبين</button>
+                <button id="openJoinModalBtn" class="compactActionBtn players" type="button">رابط اللاعبين</button>
                 ${showDisplayLink ? `<button id="openDisplayModalBtn" class="compactActionBtn display" type="button">شاشة العرض</button>` : ``}
               </div>
 
@@ -5912,7 +5910,7 @@ function hideEidIntro(immediate){
             `}
 
             <div class="row hostLobbyActions" style="margin-top:14px">
-              <button id="startBtn" class="btn btnGreen" type="button">${escapeHtml(startBtnLabel)}</button>
+              <button id="startBtn" class="btn btnGreen" type="button">${startBtnLabel}</button>
             </div>
           </div>
 
@@ -5943,8 +5941,6 @@ function hideEidIntro(immediate){
             </div>
           </div>
           ` : ``}
-
-          ${staffModeHtml}
         </div>
       `;
 
@@ -5966,79 +5962,6 @@ function hideEidIntro(immediate){
             const nextTeam = (p.team === "green") ? "orange" : "green";
             try{ await update(ref(db, `rooms/${code}/players/${pid}`), { team: nextTeam }); }catch(e){}
           });
-        });
-      }
-
-      const staffModeBtn = document.getElementById("staffModeBtn");
-      const staffModeBackdrop = document.getElementById("staffModeBackdrop");
-      const staffModeClose = document.getElementById("staffModeClose");
-      const staffModeInput = document.getElementById("staffModeInput");
-      const staffModeApply = document.getElementById("staffModeApply");
-      const staffModeMsg = document.getElementById("staffModeMsg");
-
-      function resetStaffModeUi(){
-        if(!staffModeInput || !staffModeMsg) return;
-        staffModeInput.value = "";
-        staffModeMsg.textContent = "";
-        staffModeMsg.className = "staffModeMsg";
-      }
-      function openStaffMode(){
-        if(!staffModeBackdrop) return;
-        resetStaffModeUi();
-        staffModeBackdrop.style.display = "flex";
-        setTimeout(() => {
-          try{ staffModeInput?.focus(); }catch(e){}
-        }, 20);
-      }
-      function closeStaffMode(){
-        if(!staffModeBackdrop) return;
-        staffModeBackdrop.style.display = "none";
-      }
-      async function applyStaffModeCode(){
-        if(!staffModeInput || !staffModeMsg) return;
-        const codeVal = String(staffModeInput.value || "").replace(/\D+/g, "").slice(0, 4);
-        staffModeInput.value = codeVal;
-        if(codeVal !== WRITTEN_MODE_SECRET_CODE){
-          staffModeMsg.textContent = "الرمز غير صحيح";
-          staffModeMsg.className = "staffModeMsg error";
-          try{ staffModeInput.focus(); }catch(e){}
-          return;
-        }
-        try{
-          const nextSettings = {
-            ...currentSettings,
-            writtenAnswerModeEnabled: true
-          };
-          await update(ref(db, `rooms/${code}`), {
-            settings: nextSettings,
-            modes: {
-              ...((room?.modes && typeof room.modes === "object") ? room.modes : {}),
-              writtenAnswerModeEnabled: true
-            }
-          });
-          staffModeMsg.textContent = "تم التفعيل";
-          staffModeMsg.className = "staffModeMsg success";
-          setTimeout(closeStaffMode, 300);
-        }catch(e){
-          staffModeMsg.textContent = "تعذر التفعيل الآن";
-          staffModeMsg.className = "staffModeMsg error";
-        }
-      }
-
-      if(staffModeBtn) staffModeBtn.addEventListener("click", openStaffMode);
-      if(staffModeClose) staffModeClose.addEventListener("click", closeStaffMode);
-      if(staffModeBackdrop){
-        staffModeBackdrop.addEventListener("click", (e)=>{
-          if(e.target === staffModeBackdrop) closeStaffMode();
-        });
-      }
-      if(staffModeApply) staffModeApply.addEventListener("click", applyStaffModeCode);
-      if(staffModeInput){
-        staffModeInput.addEventListener("keydown", (e)=>{
-          if(e.key === "Enter"){
-            e.preventDefault();
-            applyStaffModeCode();
-          }
         });
       }
 
@@ -6232,6 +6155,60 @@ function hideEidIntro(immediate){
     }
 
     // ✅ (Fix) للمقدم: إذا الغرفة ما ظهرت مباشرة بعد الإنشاء لا نعرض صفحة اللاعبين
+
+    const HOST_ROOM_INIT = { tried:false };
+
+    async function ensureHostRoomExists(){
+      if(role !== "host") return;
+      if(HOST_ROOM_INIT.tried) return;
+      HOST_ROOM_INIT.tried = true;
+      const baseSettings = (LIVE.room?.settings && typeof LIVE.room.settings === "object") ? { ...LIVE.room.settings } : {};
+      const teams = getVisualTeams(LIVE.room || {});
+      const seedRoom = {
+        code,
+        status: "lobby",
+        hostKey: hostKey || null,
+        name: LIVE.room?.name || code,
+        players: (LIVE.room?.players && typeof LIVE.room.players === "object") ? LIVE.room.players : {},
+        displayPid: null,
+        activeMap: 0,
+        freeze: false,
+        buzzer: null,
+        scores: { green:0, orange:0, a:0, b:0 },
+        settings: {
+          ...baseSettings,
+          hostLobbyExperience: baseSettings.hostLobbyExperience || "normal",
+          normalPlayType: baseSettings.normalPlayType || "multi",
+          educationPlayType: baseSettings.educationPlayType || "single",
+          hostLobbyMode: baseSettings.hostLobbyMode || "single",
+          educationDisplayOnly: !!baseSettings.educationDisplayOnly,
+          team1Name: baseSettings.team1Name || teams.green.name || "الفريق الأول",
+          team2Name: baseSettings.team2Name || teams.orange.name || "الفريق الثاني"
+        },
+        teams: {
+          a: { name: teams.green.name || "الفريق الأول", color: teams.green.color || "#31b80f" },
+          b: { name: teams.orange.name || "الفريق الثاني", color: teams.orange.color || "#ff8a3d" }
+        },
+        board: buildBoardState(LIVE.room || {}, Date.now()),
+        round: { current:1, targetWins: normalizeWinRounds(baseSettings.winRounds || 1), winner:null, boardSeed: 0 },
+        winEvent: null,
+        winState: {},
+        mapStates: { "0": {} },
+        current: { letter:null, qIndex:0, row:null, col:null, map:0 },
+        timer: { sel:10, dur:10, running:false, startTs:0, done:false },
+        questionMode: "default",
+        customQuestions: normalizeCustomQuestionsMap(LIVE.room?.customQuestions || {}),
+        customQuestionsUpdatedAt: Number(LIVE.room?.customQuestionsUpdatedAt || 0)
+      };
+      LIVE.room = normalizeLiveRoom(seedRoom);
+      scheduleRender();
+      try{
+        await update(roomRef, seedRoom);
+      }catch(e){
+        console.warn("ensureHostRoomExists failed", e);
+      }
+    }
+
     function renderHostWaiting(msgText){
       main.innerHTML = `
         <div class="wrap">
@@ -7712,15 +7689,20 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         (players && Object.keys(players).length > 0);
 
       if(!hasAny){
-        // ✅ (Fix) أحياناً بعد إنشاء الغرفة مباشرة يحتاج ثواني بسيطة قبل ما تظهر الحالة
+        if(role === "host"){
+          ensureHostRoomExists();
+          if(VIEW.type !== "host_lobby"){
+            renderHostLobby(LIVE.room || {});
+            VIEW.type = "host_lobby";
+          }
+          return;
+        }
+
         if(!VIEW.missingSince) VIEW.missingSince = Date.now();
         const dt = Date.now() - VIEW.missingSince;
 
         if(dt < 2500){
-          // أول ثانيتين ونص: نعرض "جاري الاتصال" بدل "الغرفة غير موجودة"
-          if(role === "host"){
-            renderHostWaiting("جاري إنشاء الغرفة… انتظر لحظة.");
-          }else if(role === "display"){
+          if(role === "display"){
             renderDisplayOnlyWaiting("جاري الاتصال بجهاز العرض...");
           }else{
             renderConnecting("جاري الاتصال بالغرفة…");
@@ -7729,13 +7711,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           return;
         }
 
-        // بعد المهلة: اللاعب يشوف صفحة (الغرفة غير موجودة) + شراء
-        // المقدم يشوف رسالة خاصة (بدون صفحة اللاعبين)
-        if(role === "host"){
-          renderHostWaiting("تعذر العثور على بيانات الغرفة. جرّب إعادة المحاولة أو ارجع وأنشئ غرفة جديدة.");
-          VIEW.type = "host_wait";
-          return;
-        }
         if(role === "display"){
           renderDisplayOnlyWaiting("تعذر العثور على بيانات الغرفة.");
           VIEW.type = "display_wait";
