@@ -6715,6 +6715,23 @@ function hideEidIntro(immediate){
             try{ stopEidIntroAudio(); }catch(e){}
           }
           bd.style.display = 'none';
+
+          try{
+            const liveRoomNow = LIVE.room || roomForBoard || baseRoom || {};
+            if(role === 'host'){
+              if(String(liveRoomNow.status || '') === 'started'){
+                renderGame(liveRoomNow, LIVE.me || null);
+              }else{
+                renderHostLobby(liveRoomNow);
+              }
+            }else if(role === 'display'){
+              renderTvDisplay(liveRoomNow, LIVE.me || null);
+            }else{
+              renderGame(liveRoomNow, LIVE.me || null);
+            }
+          }catch(renderErr){
+            console.error('settings immediate render failed', renderErr);
+          }
         }catch(err){
           console.error(err);
           setStatus('تعذر حفظ الإعدادات، حاول مرة أخرى.', true);
