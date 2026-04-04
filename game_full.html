@@ -1883,42 +1883,54 @@
       line-height:1.65;
       color:#566176;
     }
-    .settingsChoiceBlock + .settingsChoiceBlock{ margin-top:16px; }
-    .settingsChoiceTitle{
-      margin:0 0 12px;
-      font-size:22px;
-      font-weight:900;
-      color:#111;
-      line-height:1.25;
+
+    .settingsMainGroups{
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+    .settingsMainGroup{
+      background:#fff;
+      border-radius:24px;
+      border:5px solid rgba(0,0,0,.82);
+      box-shadow:0 18px 30px rgba(0,0,0,.12);
+      padding:16px 14px;
       text-align:right;
     }
-    .settingsChoiceRow{
+    .settingsMainGroupTitle{
+      margin:0 0 12px;
+      font-size:28px;
+      font-weight:900;
+      color:#111;
+      line-height:1.2;
+    }
+    .settingsMainChoices{
       display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));
       gap:14px;
     }
-    .settingsChoiceBtn{
-      min-height:64px;
-      padding:12px 14px;
+    .settingsMainChoice{
+      min-height:88px;
       border:none;
-      border-radius:20px;
+      border-radius:22px;
       background:#fff;
       color:#5a1d58;
-      font-size:24px;
+      font-size:22px;
       font-weight:900;
       cursor:pointer;
-      border:4px solid rgba(0,0,0,.16);
+      border:4px solid rgba(0,0,0,.14);
       box-shadow:0 10px 18px rgba(0,0,0,.08);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
+      padding:0 12px;
     }
-    .settingsChoiceBtn.activeChoice{
+    .settingsMainChoice.active{
       background:#ffd54a;
       color:#111;
       border-color:rgba(0,0,0,.84);
-      box-shadow:0 12px 20px rgba(0,0,0,.12);
+      box-shadow:0 10px 22px rgba(0,0,0,.14);
     }
-    .settingsChoiceBtn:active{ transform:translateY(1px); }
+    .settingsMainChoice:active{ transform:translateY(1px); }
 
     .settingsRoundsRow,
     .settingsCountsRow{
@@ -2134,7 +2146,6 @@
     }
     @media (max-width:700px){
       .settingsOptionGrid{ grid-template-columns:1fr; }
-      .settingsChoiceRow{ grid-template-columns:1fr; }
       .settingsPageTitle{ font-size:28px; }
       .settingsTabBtn{ font-size:17px; padding:0 16px; }
       .settingsSectionTitle{ font-size:25px; }
@@ -3166,24 +3177,24 @@
 
     function buildBoardState(roomLike, seedTs){
       const roomRefLike = roomLike || {};
-      const settings = (roomRefLike.settings && typeof roomRefLike.settings === 'object') ? roomRefLike.settings : {};
+      const settings = getEffectiveRoomSettings(roomRefLike);
       const currentRound = Math.max(1, Number(roomRefLike?.round?.current || 1));
       const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
       const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
-      const cellContentMode = String(settings.cellContentMode || 'default');
-      const size = normalizeCellCount(manualConfig?.cellCount || getBoardSize(roomRefLike || {}));
+      const customMode = String(settings.cellContentMode || 'default') === 'custom';
+      const size = normalizeCellCount((customMode ? manualConfig?.cellCount : null) || getBoardSize(roomRefLike || {}));
       const shape = getBoardShape(roomRefLike || {});
       const seed = Number(seedTs || Date.now()) || Date.now();
       const baseLetters = generateBoardLetters(size, seed);
       const special = { letters: baseLetters, hiddenLetters: {} };
 
-      if(cellContentMode === 'manual' && manualConfig && Array.isArray(manualConfig.values)){
+      if(customMode && manualConfig && Array.isArray(manualConfig.values)){
         const overlay = manualConfig.values.map(v => String(v || ''));
         for(let r=0; r<size; r++){
           for(let c=0; c<size; c++){
             const idx = (r * size) + c;
             const raw = String(overlay[idx] || '').trim();
-            if(raw) special.letters[r][c] = raw;
+            special.letters[r][c] = raw || '';
           }
         }
       }
@@ -3195,35 +3206,6 @@
         letters: special.letters,
         hiddenLetters: special.hiddenLetters || {}
       };
-    }
-
-
-    function applyConfiguredCellContent(boardLike, roomLike){
-      const base = cloneBoardState(boardLike, roomLike);
-      if(!base) return base;
-      const roomRefLike = roomLike || {};
-      const settings = (roomRefLike.settings && typeof roomRefLike.settings === 'object') ? roomRefLike.settings : {};
-      const mode = String(settings.cellContentMode || 'default');
-      if(mode !== 'manual') return base;
-      const currentRound = Math.max(1, Number(roomRefLike?.round?.current || 1));
-      const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
-      const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
-      if(!manualConfig || !Array.isArray(manualConfig.values)) return base;
-      const manualSize = normalizeCellCount(manualConfig?.cellCount || base.size || getBoardSize(roomRefLike || {}));
-      if(manualSize !== Number(base.size || 0)){
-        const rebuilt = buildBoardState({ ...roomRefLike, settings }, Number(base.seed || Date.now()) || Date.now());
-        return cloneBoardState(rebuilt, roomRefLike);
-      }
-      const out = cloneBoardState(base, roomRefLike);
-      const vals = manualConfig.values.map(v => String(v || ''));
-      for(let r=0; r<manualSize; r++){
-        for(let c=0; c<manualSize; c++){
-          const idx = (r * manualSize) + c;
-          const raw = String(vals[idx] || '').trim();
-          if(raw) out.letters[r][c] = raw;
-        }
-      }
-      return out;
     }
 
     let LAST_STABLE_BOARD = null;
@@ -3265,34 +3247,34 @@
       const fromRoom = normalizeBoardState(room?.board, room);
 
       if(fromRoom && (!expectedSeed || Number(fromRoom.seed || 0) === expectedSeed)){
-        return applyConfiguredCellContent(rememberBoard(fromRoom, room), room);
+        return rememberBoard(fromRoom, room);
       }
 
       if(expectedSeed && BOARD_CACHE_BY_SEED.has(expectedSeed)){
         const cached = BOARD_CACHE_BY_SEED.get(expectedSeed);
         LAST_STABLE_BOARD = cached;
-        return applyConfiguredCellContent(cached, room);
+        return cached;
       }
 
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
         if(!expectedSeed || Number(LAST_STABLE_BOARD.seed || 0) === expectedSeed){
-          return applyConfiguredCellContent(LAST_STABLE_BOARD, room);
+          return LAST_STABLE_BOARD;
         }
       }
 
       if(expectedSeed){
-        return applyConfiguredCellContent(rememberBoard(buildBoardState(room || {}, expectedSeed), room), room);
+        return rememberBoard(buildBoardState(room || {}, expectedSeed), room);
       }
 
       if(fromRoom){
-        return applyConfiguredCellContent(rememberBoard(fromRoom, room), room);
+        return rememberBoard(fromRoom, room);
       }
 
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
-        return applyConfiguredCellContent(LAST_STABLE_BOARD, room);
+        return LAST_STABLE_BOARD;
       }
 
-      return applyConfiguredCellContent(rememberBoard(buildBoardState(room || {}, Date.now()), room), room);
+      return rememberBoard(buildBoardState(room || {}, Date.now()), room);
     }
 
     // أسئلة افتراضية (Fallback) إذا ما كان فيه بنك أسئلة
@@ -3996,11 +3978,6 @@ if(homeBtn && role !== "host"){
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
 
-    function isSoundEnabled(roomLike){
-      const settings = (roomLike?.settings && typeof roomLike.settings === 'object') ? roomLike.settings : {};
-      return settings.soundEnabled !== false;
-    }
-
     // ✅✅✅ (تعديل الأصوات فقط) — جرس: rong / موسيقى: vois
     const SOUND = (function(){
       const bellCandidates  = ["rong.mp3","rong.wav","rong.m4a","rong.ogg"];
@@ -4250,7 +4227,7 @@ if(homeBtn && role !== "host"){
 
     function playRong(roomLike){
       try{
-        if(!isSoundEnabled(roomLike || LIVE.room || {})) return false;
+        if(!isGameSoundEnabled(roomLike)) return false;
         if(shouldBlockBellFx(roomLike)) return false;
         return SOUND.playBell();
       }catch(e){ return false; }
@@ -4264,9 +4241,9 @@ if(homeBtn && role !== "host"){
         SOUND.stopBell();
       }catch(e){}
     }
-    function playVois(){
+    function playVois(roomLike){
       try{
-        if(!isSoundEnabled(LIVE.room || {})) return false;
+        if(!isGameSoundEnabled(roomLike)) return false;
         stopRong();
         return SOUND.playMusic();
       }catch(e){ return false; }
@@ -4312,7 +4289,7 @@ if(homeBtn && role !== "host"){
       ACTIVE_VOIS_WIN_TS = normalizedWinTs || ACTIVE_VOIS_WIN_TS || 0;
       LAST_VOIS_PLAY_AT = now;
       markCelebrationAudio(normalizedWinTs, ms);
-      const ok = playVois();
+      const ok = playVois(LIVE.room || room);
       if(!ok) return false;
       if(VOIS_STOP_T) clearTimeout(VOIS_STOP_T);
       VOIS_STOP_T = setTimeout(() => { stopVois(); }, Math.max(0, Number(ms)||0));
@@ -4463,7 +4440,6 @@ if(homeBtn && role !== "host"){
 
     function tryPlayEidAudio(audio){
       if(!audio) return;
-      if(!isSoundEnabled(LIVE.room || {})) return;
       try{
         const p = audio.play();
         if(p && typeof p.then === "function") {
@@ -5836,6 +5812,84 @@ function hideEidIntro(immediate){
       }catch(e){}
     }
 
+
+    function getHostGameSettingsStorageKey(){
+      try{
+        const candidates = [
+          localStorage.getItem("sandooq_user_email"),
+          localStorage.getItem("user_email"),
+          localStorage.getItem("auth_email"),
+          localStorage.getItem("customer_email")
+        ].map(v => String(v || "").trim().toLowerCase()).filter(Boolean);
+        if(candidates.length) return `horof_host_settings_v1::${candidates[0]}`;
+      }catch(e){}
+      return "horof_host_settings_v1";
+    }
+
+    function normalizeGameSettingsEnvelope(raw){
+      const src = (raw && typeof raw === "object") ? raw : {};
+      const out = {
+        updatedAt: Number(src.updatedAt || 0),
+        questionMode: String(src.questionMode || "default") === "custom" ? "custom" : "default",
+        cellContentMode: String(src.cellContentMode || "default") === "custom" ? "custom" : "default",
+        soundEnabled: src.soundEnabled !== false,
+        manualCellRounds: {}
+      };
+      const rounds = (src.manualCellRounds && typeof src.manualCellRounds === "object") ? src.manualCellRounds : {};
+      for(let r=1; r<=5; r++){
+        const rr = rounds[String(r)] || rounds[r] || {};
+        const count = normalizeCellCount(rr.cellCount || 5);
+        const total = count * count;
+        const vals = Array.isArray(rr.values) ? rr.values.slice(0, total).map(v => String(v || '')) : [];
+        while(vals.length < total) vals.push('');
+        out.manualCellRounds[String(r)] = { cellCount: count, values: vals };
+      }
+      return out;
+    }
+
+    function loadPersistedGameSettingsEnvelope(){
+      try{
+        const raw = localStorage.getItem(getHostGameSettingsStorageKey());
+        if(!raw) return normalizeGameSettingsEnvelope({});
+        return normalizeGameSettingsEnvelope(JSON.parse(raw));
+      }catch(e){
+        return normalizeGameSettingsEnvelope({});
+      }
+    }
+
+    function savePersistedGameSettingsEnvelope(data){
+      try{
+        const env = normalizeGameSettingsEnvelope({ ...(data || {}), updatedAt: Number(data?.updatedAt || Date.now()) || Date.now() });
+        localStorage.setItem(getHostGameSettingsStorageKey(), JSON.stringify(env));
+      }catch(e){}
+    }
+
+    function getEffectiveRoomSettings(roomLike){
+      const room = (roomLike && typeof roomLike === 'object') ? roomLike : {};
+      const base = (room.settings && typeof room.settings === 'object') ? room.settings : {};
+      if(role !== 'host') return base;
+      const persisted = loadPersistedGameSettingsEnvelope();
+      const out = { ...base };
+      if(!Object.prototype.hasOwnProperty.call(out, 'cellContentMode')) out.cellContentMode = persisted.cellContentMode;
+      if(!Object.prototype.hasOwnProperty.call(out, 'soundEnabled')) out.soundEnabled = persisted.soundEnabled;
+      const roomManual = (out.manualCellRounds && typeof out.manualCellRounds === 'object') ? out.manualCellRounds : null;
+      if(!roomManual || !Object.keys(roomManual).length) out.manualCellRounds = persisted.manualCellRounds;
+      return out;
+    }
+
+    function getEffectiveQuestionMode(roomLike){
+      const room = (roomLike && typeof roomLike === 'object') ? roomLike : {};
+      const roomMode = String(room.questionMode || '').trim();
+      if(roomMode === 'custom' || roomMode === 'default') return roomMode;
+      if(role === 'host') return loadPersistedGameSettingsEnvelope().questionMode;
+      return 'default';
+    }
+
+    function isGameSoundEnabled(roomLike){
+      const settings = getEffectiveRoomSettings(roomLike || LIVE.room || {});
+      return settings.soundEnabled !== false;
+    }
+
     function getStoredApiToken(){
       const keys = ["sandooq_token_v1", "sandooq_session_v1", "token", "auth_token"];
       try{
@@ -6261,7 +6315,7 @@ function hideEidIntro(immediate){
 
     function getQuestionMode(room){
       const m = String(room?.questionMode || "default");
-      return (m === "custom") ? "custom" : "default";
+      return getEffectiveQuestionMode(room);
     }
 
     function getQuestionCursorField(mode){
@@ -6325,27 +6379,26 @@ function hideEidIntro(immediate){
 
           <div class="settingsBody">
             <section class="settingsSection active" data-settings-panel="main">
-              <div class="settingsCard settingsDirectCard">
-                <h3 class="settingsSectionTitle compact">الرئيسية</h3>
-                <div class="settingsChoiceBlock">
-                  <h4 class="settingsChoiceTitle">نوع عرض الأسئلة</h4>
-                  <div class="settingsChoiceRow">
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="questions" data-main-choice-value="default">أسئلة اللعبة</button>
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="questions" data-main-choice-value="custom">أسئلة مخصصة</button>
+              <div class="settingsMainGroups">
+                <div class="settingsMainGroup">
+                  <h3 class="settingsMainGroupTitle">نوع عرض الأسئلة</h3>
+                  <div class="settingsMainChoices">
+                    <button id="settingsQuestionModeDefault" class="settingsMainChoice" type="button" data-main-group="questionMode" data-main-value="default">أسئلة اللعبة</button>
+                    <button id="settingsQuestionModeCustom" class="settingsMainChoice" type="button" data-main-group="questionMode" data-main-value="custom">أسئلة مخصصة</button>
                   </div>
                 </div>
-                <div class="settingsChoiceBlock">
-                  <h4 class="settingsChoiceTitle">عرض محتوى الخلايا</h4>
-                  <div class="settingsChoiceRow">
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="cells" data-main-choice-value="default">حروف اللعبة الجاهزة</button>
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="cells" data-main-choice-value="manual">المحتوى المخصص</button>
+                <div class="settingsMainGroup">
+                  <h3 class="settingsMainGroupTitle">عرض محتوى الخلايا</h3>
+                  <div class="settingsMainChoices">
+                    <button id="settingsCellModeDefault" class="settingsMainChoice" type="button" data-main-group="cellContentMode" data-main-value="default">حروف اللعبة الجاهزة</button>
+                    <button id="settingsCellModeCustom" class="settingsMainChoice" type="button" data-main-group="cellContentMode" data-main-value="custom">المحتوى المخصص</button>
                   </div>
                 </div>
-                <div class="settingsChoiceBlock">
-                  <h4 class="settingsChoiceTitle">أصوات اللعبة</h4>
-                  <div class="settingsChoiceRow">
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="sound" data-main-choice-value="on">تشغيل</button>
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="sound" data-main-choice-value="off">إطفاء</button>
+                <div class="settingsMainGroup">
+                  <h3 class="settingsMainGroupTitle">أصوات اللعبة</h3>
+                  <div class="settingsMainChoices">
+                    <button id="settingsSoundOn" class="settingsMainChoice" type="button" data-main-group="soundEnabled" data-main-value="on">تشغيل</button>
+                    <button id="settingsSoundOff" class="settingsMainChoice" type="button" data-main-group="soundEnabled" data-main-value="off">إطفاء</button>
                   </div>
                 </div>
               </div>
@@ -6421,7 +6474,6 @@ function hideEidIntro(immediate){
               </div>
             </section>
           </div>
-          </div>
 
           <div class="settingsFixedBar">
             <div id="settingsStatus" class="settingsStatus"></div>
@@ -6436,18 +6488,16 @@ function hideEidIntro(immediate){
       const timerRange = bd.querySelector('#settingsTimerRange');
       const timerValue = bd.querySelector('#settingsTimerValue');
       const statusEl = bd.querySelector('#settingsStatus');
-      const mainChoiceButtons = Array.from(bd.querySelectorAll('[data-main-choice-group]'));
       const questionsList = bd.querySelector('#settingsQuestionsList');
       const roundButtons = Array.from(bd.querySelectorAll('[data-cells-round]'));
       const countButtons = Array.from(bd.querySelectorAll('[data-cells-count]'));
       const miniBoardEl = bd.querySelector('#settingsMiniBoard');
       const cellInputEl = bd.querySelector('#settingsCellInput');
       const selectedCellLabelEl = bd.querySelector('#settingsSelectedCellLabel');
+      const mainChoiceButtons = Array.from(bd.querySelectorAll('[data-main-group]'));
+      let pendingSettingsState = { questionMode:'default', cellContentMode:'default', soundEnabled:true };
       let activeTab = 'main';
       let activeCellsRound = 1;
-      let pendingQuestionMode = 'default';
-      let pendingCellContentMode = 'default';
-      let pendingSoundEnabled = true;
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
 
@@ -6458,9 +6508,31 @@ function hideEidIntro(immediate){
       }
 
       function setActiveTab(tab){
-        activeTab = tab || 'questions';
+        activeTab = tab || 'main';
         tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.settingsTab === activeTab));
         panels.forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === activeTab));
+      }
+
+      function normalizePendingSettingsState(raw, roomLike){
+        const persisted = loadPersistedGameSettingsEnvelope();
+        const roomSettings = getEffectiveRoomSettings(roomLike || SETTINGS_UI.roomLatest || LIVE.room || {});
+        return {
+          questionMode: String(raw?.questionMode || roomLike?.questionMode || persisted.questionMode || 'default') === 'custom' ? 'custom' : 'default',
+          cellContentMode: String(raw?.cellContentMode || roomSettings.cellContentMode || persisted.cellContentMode || 'default') === 'custom' ? 'custom' : 'default',
+          soundEnabled: raw?.soundEnabled === false ? false : (roomSettings.soundEnabled === false ? false : (persisted.soundEnabled === false ? false : true))
+        };
+      }
+
+      function applyMainChoiceVisuals(){
+        mainChoiceButtons.forEach(btn => {
+          const grp = String(btn.dataset.mainGroup || '');
+          const val = String(btn.dataset.mainValue || '');
+          let active = false;
+          if(grp === 'questionMode') active = pendingSettingsState.questionMode === val;
+          else if(grp === 'cellContentMode') active = pendingSettingsState.cellContentMode === val;
+          else if(grp === 'soundEnabled') active = (pendingSettingsState.soundEnabled ? 'on' : 'off') === val;
+          btn.classList.toggle('active', !!active);
+        });
       }
 
       const CELL_COUNT_META = {
@@ -6468,27 +6540,6 @@ function hideEidIntro(immediate){
         5: { label:'خماسية', size:5 },
         6: { label:'سداسية', size:6 }
       };
-      function renderMainChoices(){
-        mainChoiceButtons.forEach(btn => {
-          const group = String(btn.dataset.mainChoiceGroup || '');
-          const value = String(btn.dataset.mainChoiceValue || '');
-          let active = false;
-          if(group === 'questions') active = (value === pendingQuestionMode);
-          else if(group === 'cells') active = (value === pendingCellContentMode);
-          else if(group === 'sound') active = ((value === 'on') === !!pendingSoundEnabled);
-          btn.classList.toggle('activeChoice', active);
-        });
-      }
-
-      function setMainChoice(group, value){
-        const g = String(group || '');
-        const v = String(value || '');
-        if(g === 'questions') pendingQuestionMode = (v === 'custom') ? 'custom' : 'default';
-        else if(g === 'cells') pendingCellContentMode = (v === 'manual') ? 'manual' : 'default';
-        else if(g === 'sound') pendingSoundEnabled = (v !== 'off');
-        renderMainChoices();
-      }
-
 
       function getDefaultCellsCount(roomLike){
         return normalizeCellCount(roomLike?.settings?.cellCount || roomLike?.settings?.cellsCount || roomLike?.settings?.boardSize || 5);
@@ -6648,15 +6699,12 @@ function hideEidIntro(immediate){
 
       function syncFromRoom(room){
         const r = room || {};
-        const settings = (r.settings && typeof r.settings === 'object') ? r.settings : {};
         const selectedTimer = Number((r.timer && r.timer.sel) || LIVE.room?.timer?.sel || 10);
-        pendingQuestionMode = getQuestionMode(r);
-        pendingCellContentMode = (settings.cellContentMode === 'manual') ? 'manual' : 'default';
-        pendingSoundEnabled = settings.soundEnabled !== false;
-        renderMainChoices();
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
         if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
         SETTINGS_UI.roomLatest = getRoomWithPersistentCustomQuestions(r || {});
+        pendingSettingsState = normalizePendingSettingsState(null, SETTINGS_UI.roomLatest);
+        applyMainChoiceVisuals();
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
         loadManualRoundsFromRoom(SETTINGS_UI.roomLatest);
         setStatus('');
@@ -6670,25 +6718,35 @@ function hideEidIntro(immediate){
           const timerSel = Math.max(1, Math.min(50, Number(timerRange?.value || 10)));
           const manualCellRounds = JSON.parse(JSON.stringify(pendingManualCellRounds || {}));
           const baseRoom = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
+          const nextQuestionMode = pendingSettingsState.questionMode === 'custom' ? 'custom' : 'default';
+          const nextCellContentMode = pendingSettingsState.cellContentMode === 'custom' ? 'custom' : 'default';
+          const nextSoundEnabled = pendingSettingsState.soundEnabled !== false;
           const nextSettings = {
             ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
             manualCellRounds,
-            cellContentMode: pendingCellContentMode,
-            soundEnabled: !!pendingSoundEnabled
+            cellContentMode: nextCellContentMode,
+            soundEnabled: nextSoundEnabled
           };
-          const roomForBoard = { ...baseRoom, settings: nextSettings };
+          const roomForBoard = { ...baseRoom, questionMode: nextQuestionMode, settings: nextSettings };
           const currentSeed = Number(baseRoom?.round?.boardSeed || baseRoom?.board?.seed || Date.now()) || Date.now();
           const nextBoard = rememberBoard(buildBoardState(roomForBoard, currentSeed), roomForBoard) || buildBoardState(roomForBoard, currentSeed);
+          savePersistedGameSettingsEnvelope({
+            updatedAt: Date.now(),
+            questionMode: nextQuestionMode,
+            cellContentMode: nextCellContentMode,
+            soundEnabled: nextSoundEnabled,
+            manualCellRounds
+          });
           const updates = {};
           updates[`rooms/${code}/timer/sel`] = timerSel;
           updates[`rooms/${code}/timer/dur`] = timerSel;
           updates[`rooms/${code}/timer/running`] = false;
           updates[`rooms/${code}/timer/done`] = false;
           updates[`rooms/${code}/timer/startTs`] = 0;
-          updates[`rooms/${code}/questionMode`] = pendingQuestionMode;
           updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
-          updates[`rooms/${code}/settings/cellContentMode`] = pendingCellContentMode;
-          updates[`rooms/${code}/settings/soundEnabled`] = !!pendingSoundEnabled;
+          updates[`rooms/${code}/settings/cellContentMode`] = nextCellContentMode;
+          updates[`rooms/${code}/settings/soundEnabled`] = nextSoundEnabled;
+          updates[`rooms/${code}/questionMode`] = nextQuestionMode;
           updates[`rooms/${code}/board`] = nextBoard;
           updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || currentSeed;
           await update(ref(db), updates);
@@ -6696,10 +6754,10 @@ function hideEidIntro(immediate){
             if(!LIVE.room.settings || typeof LIVE.room.settings !== 'object') LIVE.room.settings = {};
             if(!LIVE.room.timer || typeof LIVE.room.timer !== 'object') LIVE.room.timer = {};
             if(!LIVE.room.round || typeof LIVE.room.round !== 'object') LIVE.room.round = { current:1, targetWins:1, winner:null, boardSeed:0 };
-            LIVE.room.questionMode = pendingQuestionMode;
             LIVE.room.settings.manualCellRounds = manualCellRounds;
-            LIVE.room.settings.cellContentMode = pendingCellContentMode;
-            LIVE.room.settings.soundEnabled = !!pendingSoundEnabled;
+            LIVE.room.settings.cellContentMode = nextCellContentMode;
+            LIVE.room.settings.soundEnabled = nextSoundEnabled;
+            LIVE.room.questionMode = nextQuestionMode;
             LIVE.room.timer.sel = timerSel;
             LIVE.room.timer.dur = timerSel;
             LIVE.room.timer.running = false;
@@ -6709,29 +6767,8 @@ function hideEidIntro(immediate){
             LIVE.room.round.boardSeed = Number(nextBoard.seed || 0) || currentSeed;
           }
           SETTINGS_UI.roomLatest = LIVE.room || SETTINGS_UI.roomLatest || {};
-          if(!pendingSoundEnabled){
-            try{ stopVois(); }catch(e){}
-            try{ stopRong(); }catch(e){}
-            try{ stopEidIntroAudio(); }catch(e){}
-          }
           bd.style.display = 'none';
-
-          try{
-            const liveRoomNow = LIVE.room || roomForBoard || baseRoom || {};
-            if(role === 'host'){
-              if(String(liveRoomNow.status || '') === 'started'){
-                renderGame(liveRoomNow, LIVE.me || null);
-              }else{
-                renderHostLobby(liveRoomNow);
-              }
-            }else if(role === 'display'){
-              renderTvDisplay(liveRoomNow, LIVE.me || null);
-            }else{
-              renderGame(liveRoomNow, LIVE.me || null);
-            }
-          }catch(renderErr){
-            console.error('settings immediate render failed', renderErr);
-          }
+          scheduleRender();
         }catch(err){
           console.error(err);
           setStatus('تعذر حفظ الإعدادات، حاول مرة أخرى.', true);
@@ -6741,9 +6778,19 @@ function hideEidIntro(immediate){
       }
 
       tabButtons.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.settingsTab)));
-      mainChoiceButtons.forEach(btn => btn.addEventListener('click', () => setMainChoice(btn.dataset.mainChoiceGroup, btn.dataset.mainChoiceValue)));
       roundButtons.forEach(btn => btn.addEventListener('click', () => setActiveCellsRound(btn.dataset.cellsRound)));
       countButtons.forEach(btn => btn.addEventListener('click', () => setActiveCellsCount(btn.dataset.cellsCount)));
+      mainChoiceButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const grp = String(btn.dataset.mainGroup || '');
+          const val = String(btn.dataset.mainValue || '');
+          if(grp === 'questionMode') pendingSettingsState.questionMode = (val === 'custom') ? 'custom' : 'default';
+          else if(grp === 'cellContentMode') pendingSettingsState.cellContentMode = (val === 'custom') ? 'custom' : 'default';
+          else if(grp === 'soundEnabled') pendingSettingsState.soundEnabled = (val !== 'off');
+          applyMainChoiceVisuals();
+        });
+      });
+
       if(cellInputEl){
         cellInputEl.addEventListener('input', () => {
           if(activeCellsIndex === null) return;
@@ -6777,7 +6824,7 @@ function hideEidIntro(immediate){
       ensureSettingsModal();
       SETTINGS_UI.roomLatest = room || LIVE.room || {};
       SETTINGS_UI.els.syncFromRoom(SETTINGS_UI.roomLatest);
-      SETTINGS_UI.els.setActiveTab('questions');
+      SETTINGS_UI.els.setActiveTab('main');
       SETTINGS_UI.els.backdrop.style.display = 'flex';
     }
 
