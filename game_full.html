@@ -1867,56 +1867,6 @@
       touch-action:manipulation;
     }
     .settingsMainHomeBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.14); }
-    .settingsMainBottomActions{
-      display:grid;
-      grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
-      grid-template-areas:
-        "help . more"
-        ". home .";
-      column-gap:22px;
-      row-gap:22px;
-      align-items:start;
-      margin-top:24px;
-      padding:0 10px 4px;
-    }
-    .settingsMainBottomBtn{
-      width:100%;
-      min-height:60px;
-      padding:0 14px;
-      border:none;
-      border-radius:18px;
-      font-size:22px;
-      font-weight:900;
-      cursor:pointer;
-      border:4px solid rgba(0,0,0,.86);
-      box-shadow:0 8px 0 rgba(0,0,0,.14);
-      -webkit-tap-highlight-color:transparent;
-      touch-action:manipulation;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-    }
-    .settingsMainBottomBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.14); }
-    .settingsMainBottomBtnHelp{
-      grid-area:help;
-      background:#ffffff;
-      color:#6e2b79;
-      border-color:rgba(0,0,0,.18);
-      box-shadow:0 0 0 4px rgba(0,0,0,.06) inset;
-    }
-    .settingsMainBottomBtnStore{
-      grid-area:more;
-      background:#ffffff;
-      color:#6e2b79;
-      border-color:rgba(0,0,0,.18);
-      box-shadow:0 0 0 4px rgba(0,0,0,.06) inset;
-    }
-    .settingsMainBottomBtnHome{
-      grid-area:home;
-      background:#ff4b4b;
-      color:#fff;
-    }
     .settingsOptionGrid{
       display:grid;
       grid-template-columns:repeat(2, minmax(0,1fr));
@@ -2208,16 +2158,6 @@
       .settingsPageTitle{ font-size:28px; }
       .settingsTabBtn{ font-size:17px; padding:0 16px; }
       .settingsSectionTitle{ font-size:25px; }
-      .settingsMainBottomActions{
-        column-gap:14px;
-        row-gap:18px;
-        padding:0 4px 2px;
-      }
-      .settingsMainBottomBtn{
-        min-height:56px;
-        font-size:18px;
-        padding:0 10px;
-      }
     }
 
     /* ✅ خاص بالتحديثات (زر + نافذة رمز في اللوبي فقط) */
@@ -2607,30 +2547,6 @@
       .controlsRow .pillBtn{
         height:72px;
         font-size:24px;
-      }
-
-      .pickerHeaderSection{
-        display:grid;
-        grid-template-columns:repeat(2, minmax(0,1fr));
-        gap:18px;
-        margin-bottom:18px;
-        align-items:stretch;
-      }
-      .pickerField{
-        background:#fbf7fa;
-        border:3px solid #e1d0dc;
-        border-radius:24px;
-        padding:16px 16px 18px;
-      }
-      .pickerFieldLabel{
-        text-align:center;
-        margin:0 0 12px;
-      }
-      .pickerOptionGrid{
-        gap:14px;
-      }
-      .pickerOptionBtn{
-        min-height:74px;
       }
     }
 
@@ -4099,6 +4015,7 @@ if(homeBtn && role !== "host"){
 
     const LETTER_ORDER = ["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"];
     const GAME_LETTERS = LETTER_ORDER.filter(l => ALL_LETTERS.includes(l));
+    const DEFAULT_GAME_ZOOM = 0.82;
 
     function isSoundEnabled(roomLike){
       const settings = (roomLike?.settings && typeof roomLike.settings === 'object') ? roomLike.settings : {};
@@ -6534,6 +6451,8 @@ function hideEidIntro(immediate){
                 <button class="settingsTabBtn" type="button" data-settings-tab="questions">إضافة الأسئلة</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="cells">محتوى الخلايا</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="timer">المؤقت</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="help">التعليمات</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="more">ألعابنا الأخرى</button>
               </div>
             </div>
           </div>
@@ -6541,6 +6460,7 @@ function hideEidIntro(immediate){
           <div class="settingsBody">
             <section class="settingsSection active" data-settings-panel="main">
               <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">الرئيسية</h3>
                 <div class="settingsChoiceBlock">
                   <h4 class="settingsChoiceTitle">نوع عرض الأسئلة</h4>
                   <div class="settingsChoiceRow">
@@ -6562,11 +6482,9 @@ function hideEidIntro(immediate){
                     <button class="settingsChoiceBtn" type="button" data-main-choice-group="sound" data-main-choice-value="off">إطفاء</button>
                   </div>
                 </div>
-              </div>
-              <div class="settingsMainBottomActions">
-                <button id="settingsHelpQuick" class="settingsMainBottomBtn settingsMainBottomBtnHelp" type="button">التعليمات</button>
-                <button id="settingsGoHomeQuick" class="settingsMainBottomBtn settingsMainBottomBtnHome" type="button">الصفحة الرئيسية</button>
-                <button id="settingsOpenStoreQuick" class="settingsMainBottomBtn settingsMainBottomBtnStore" type="button">ألعابنا الأخرى</button>
+                <div class="settingsMainHomeWrap">
+                  <button id="settingsGoHomeQuick" class="settingsMainHomeBtn" type="button">الصفحة الرئيسية</button>
+                </div>
               </div>
             </section>
 
@@ -6678,7 +6596,7 @@ function hideEidIntro(immediate){
       }
 
       function setActiveTab(tab){
-        activeTab = tab || 'main';
+        activeTab = tab || 'questions';
         tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.settingsTab === activeTab));
         panels.forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === activeTab));
       }
@@ -7036,18 +6954,6 @@ function hideEidIntro(immediate){
       bd.querySelector('#settingsOpenStore').addEventListener('click', () => {
         openStoreUrl();
       });
-      const settingsOpenStoreQuick = bd.querySelector('#settingsOpenStoreQuick');
-      if(settingsOpenStoreQuick){
-        settingsOpenStoreQuick.addEventListener('click', () => {
-          openStoreUrl();
-        });
-      }
-      const settingsHelpQuick = bd.querySelector('#settingsHelpQuick');
-      if(settingsHelpQuick){
-        settingsHelpQuick.addEventListener('click', () => {
-          setActiveTab('help');
-        });
-      }
       const settingsGoHomeQuick = bd.querySelector('#settingsGoHomeQuick');
       if(settingsGoHomeQuick){
         settingsGoHomeQuick.addEventListener('click', () => {
@@ -7073,7 +6979,7 @@ function hideEidIntro(immediate){
       ensureSettingsModal();
       SETTINGS_UI.roomLatest = room || LIVE.room || {};
       SETTINGS_UI.els.syncFromRoom(SETTINGS_UI.roomLatest);
-      SETTINGS_UI.els.setActiveTab('main');
+      SETTINGS_UI.els.setActiveTab('questions');
       SETTINGS_UI.els.backdrop.style.display = 'flex';
     }
 
@@ -7627,7 +7533,7 @@ function hideEidIntro(immediate){
 
             <div class="mapToolsRow sliderOnly">
               <div class="zoomWrap">
-                <input id="zoom" type="range" min="0.55" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
+                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="0.82" aria-label="تكبير تصغير الخريطة"/>
               </div>
             </div>
 
@@ -7784,9 +7690,9 @@ function hideEidIntro(immediate){
       applyBoardTheme(room);
 
       const ZOOM_KEY = `sabaq_zoom_${code}`;
-      const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
-      if(zoom && Number.isFinite(savedZoom) && savedZoom >= 0.55 && savedZoom <= 1.35){
-        zoom.value = String(savedZoom);
+      if(zoom){
+        zoom.value = String(DEFAULT_GAME_ZOOM);
+        try{ localStorage.setItem(ZOOM_KEY, String(DEFAULT_GAME_ZOOM)); }catch(e){}
       }
 
       function applyZoomFix(){
@@ -8211,8 +8117,8 @@ function hideEidIntro(immediate){
 
       const board = getBoard(room);
       const ZOOM_KEY = `sabaq_zoom_${code}`;
-      const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "1");
-      const initialZoom = Math.max(0.55, Math.min(1.35, Number.isFinite(savedZoom) ? savedZoom : 1));
+      const initialZoom = DEFAULT_GAME_ZOOM;
+      try{ localStorage.setItem(ZOOM_KEY, String(DEFAULT_GAME_ZOOM)); }catch(e){}
 
       const visualTeams = getVisualTeams(room);
       const visualScores = getVisualScores(room);
