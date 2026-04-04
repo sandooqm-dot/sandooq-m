@@ -2202,247 +2202,6 @@
       line-height:1.35;
       margin-top:10px;
     }
-    @media (orientation: landscape){
-      #settingsBackdrop.settingsBackdrop{
-        padding:0;
-      }
-      #settingsBackdrop .settingsTopBar{
-        padding:12px 16px 10px;
-      }
-      #settingsBackdrop .settingsPageTitle{
-        font-size:24px;
-      }
-      #settingsBackdrop .settingsTabsScroller{
-        margin-top:10px;
-      }
-      #settingsBackdrop .settingsTabsRow{
-        gap:8px;
-      }
-      #settingsBackdrop .settingsTabBtn{
-        height:42px;
-        padding:0 14px;
-        font-size:16px;
-        border-width:3px;
-        border-radius:14px;
-      }
-      #settingsBackdrop .settingsBody{
-        padding:12px 14px calc(92px + env(safe-area-inset-bottom));
-      }
-      #settingsBackdrop .settingsCard,
-      #settingsBackdrop .settingsHeroCard{
-        border-width:4px;
-        border-radius:20px;
-        padding:14px 14px;
-      }
-      #settingsBackdrop .settingsCard + .settingsCard{
-        margin-top:10px;
-      }
-      #settingsBackdrop .settingsSectionTitle{
-        font-size:24px;
-        margin-bottom:6px;
-      }
-      #settingsBackdrop .settingsMutedText,
-      #settingsBackdrop .settingsSectionLead{
-        font-size:14px;
-        line-height:1.55;
-      }
-      #settingsBackdrop .settingsMiniTitle{
-        font-size:19px;
-        margin-bottom:8px;
-      }
-      #settingsBackdrop .settingsChoiceBlock + .settingsChoiceBlock{
-        margin-top:12px;
-      }
-      #settingsBackdrop .settingsChoiceTitle{
-        font-size:18px;
-        margin-bottom:10px;
-      }
-      #settingsBackdrop .settingsChoiceRow{
-        gap:10px;
-      }
-      #settingsBackdrop .settingsChoiceBtn{
-        min-height:54px;
-        padding:10px 12px;
-        border-radius:18px;
-        font-size:20px;
-        border-width:3px;
-      }
-      #settingsBackdrop .settingsMainBottomActions{
-        margin-top:18px;
-        column-gap:18px;
-        row-gap:16px;
-        padding:0 8px 2px;
-      }
-      #settingsBackdrop .settingsMainBottomBtn{
-        min-height:54px;
-        font-size:19px;
-        border-width:3px;
-        border-radius:16px;
-      }
-      #settingsBackdrop .settingsRoundsRow,
-      #settingsBackdrop .settingsCountsRow{
-        gap:8px;
-        margin-top:10px;
-      }
-      #settingsBackdrop .settingsRoundBtn,
-      #settingsBackdrop .settingsCountBtn{
-        min-width:92px;
-        height:42px;
-        font-size:16px;
-        border-width:2px;
-        border-radius:14px;
-      }
-      #settingsBackdrop .settingsMiniBoardWrap{
-        margin-top:12px;
-        padding:12px 10px 10px;
-        border-width:4px;
-        border-radius:22px;
-      }
-      #settingsBackdrop .settingsCellEditorBox{
-        margin-top:12px;
-        padding:12px;
-        border-radius:18px;
-      }
-      #settingsBackdrop .settingsCellEditorLabel{
-        font-size:16px;
-        margin-bottom:8px;
-      }
-      #settingsBackdrop .settingsCellInput{
-        height:50px;
-        font-size:20px;
-        border-radius:14px;
-      }
-      #settingsBackdrop .settingsCellsHint{
-        font-size:13px;
-        line-height:1.55;
-      }
-      #settingsBackdrop .settingsRangeWrap{
-        margin-top:10px;
-        padding:12px 12px 10px;
-        border-radius:18px;
-      }
-      #settingsBackdrop .settingsRangeValue{
-        margin-top:10px;
-        font-size:22px;
-      }
-      #settingsBackdrop .settingsInfoList{
-        font-size:14px;
-        line-height:1.75;
-        padding:0 18px 0 0;
-      }
-      #settingsBackdrop .settingsDualActions{
-        margin-top:12px;
-        gap:8px;
-      }
-      #settingsBackdrop .settingsStoreBtn,
-      #settingsBackdrop .settingsActionBtn{
-        min-width:190px;
-        height:48px;
-        font-size:18px;
-        border-width:3px;
-        border-radius:16px;
-      }
-      #settingsBackdrop .settingsFixedBar{
-        padding:8px 14px calc(10px + env(safe-area-inset-bottom));
-      }
-      #settingsBackdrop .settingsStatus{
-        min-height:18px;
-        margin-bottom:6px;
-        font-size:13px;
-      }
-      #settingsBackdrop .settingsSaveExitBtn{
-        width:min(100%, 360px);
-        height:52px;
-        font-size:22px;
-        border-width:3px;
-        border-radius:16px;
-      }
-    }
-
-    @media (orientation: landscape) and (min-width: 980px){
-      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsCard.settingsDirectCard{
-        display:grid;
-        grid-template-columns:repeat(3, minmax(0,1fr));
-        gap:14px;
-        align-items:start;
-      }
-      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsChoiceBlock + .settingsChoiceBlock{
-        margin-top:0;
-      }
-      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsChoiceRow{
-        grid-template-columns:1fr;
-      }
-      #settingsBackdrop .settingsSection[data-settings-panel="main"] .settingsChoiceBtn{
-        min-height:52px;
-        font-size:18px;
-      }
-      #settingsBackdrop .settingsMainBottomActions{
-        margin-top:16px;
-      }
-    }
-
-    @media (orientation: landscape) and (max-height: 560px){
-      #settingsBackdrop .settingsTopBar{
-        padding:10px 14px 8px;
-      }
-      #settingsBackdrop .settingsPageTitle{
-        font-size:22px;
-      }
-      #settingsBackdrop .settingsTabsScroller{
-        margin-top:8px;
-      }
-      #settingsBackdrop .settingsTabBtn{
-        height:38px;
-        padding:0 12px;
-        font-size:15px;
-      }
-      #settingsBackdrop .settingsBody{
-        padding:10px 12px calc(84px + env(safe-area-inset-bottom));
-      }
-      #settingsBackdrop .settingsCard,
-      #settingsBackdrop .settingsHeroCard{
-        padding:12px 12px;
-      }
-      #settingsBackdrop .settingsSectionTitle{
-        font-size:21px;
-      }
-      #settingsBackdrop .settingsMutedText,
-      #settingsBackdrop .settingsSectionLead,
-      #settingsBackdrop .settingsInfoList,
-      #settingsBackdrop .settingsCellsHint{
-        font-size:13px;
-      }
-      #settingsBackdrop .settingsChoiceTitle{
-        font-size:16px;
-        margin-bottom:8px;
-      }
-      #settingsBackdrop .settingsChoiceBtn{
-        min-height:48px;
-        font-size:18px;
-      }
-      #settingsBackdrop .settingsRoundBtn,
-      #settingsBackdrop .settingsCountBtn{
-        min-width:84px;
-        height:38px;
-        font-size:14px;
-      }
-      #settingsBackdrop .settingsMainBottomBtn{
-        min-height:48px;
-        font-size:17px;
-      }
-      #settingsBackdrop .settingsSaveExitBtn{
-        height:48px;
-        font-size:20px;
-      }
-      #settingsBackdrop .settingsCellInput{
-        height:46px;
-        font-size:18px;
-      }
-      #settingsBackdrop .settingsRangeValue{
-        font-size:20px;
-      }
-    }
-
     @media (max-width:700px){
       .settingsOptionGrid{ grid-template-columns:1fr; }
       .settingsChoiceRow{ grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -2814,234 +2573,40 @@
       body{ padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
       .wrap{ max-width:1200px; }
 
-      body.startedGameView{
-        overflow:hidden;
-        padding-bottom: calc(14px + env(safe-area-inset-bottom));
-      }
-      body.startedGameView header{
-        padding:10px 14px 6px;
-      }
-      body.startedGameView .headerRow{
-        grid-template-columns:58px minmax(0,1fr) auto;
-        gap:10px;
-      }
-      body.startedGameView .logo{
-        width:58px;
-        height:58px;
-      }
-      body.startedGameView .gameName{
-        padding-top:0;
-      }
-      body.startedGameView .gnText{
-        font-size:28px;
-      }
-      body.startedGameView .topSettingsHostSlot{
-        min-height:46px;
-      }
-      body.startedGameView .topSettingsBtn{
-        min-width:108px;
-        height:46px;
-        padding:0 14px;
-        font-size:20px;
-        border-width:3px;
-        border-radius:15px;
-      }
-      body.startedGameView .wrap{
-        width:min(96vw, 1380px);
-        max-width:1380px;
-      }
-      body.startedGameView #main.inGame{
-        margin-top:2px;
-        padding-top:0;
-      }
-      body.startedGameView .gameLayout{
-        display:grid;
-        grid-template-columns:minmax(0, 1fr) minmax(320px, .88fr);
-        gap:14px;
-        width:100%;
+      .gameLayout{
+        display:flex;
+        flex-direction:row;
+        align-items:flex-start;
+        justify-content:center;
+        gap:16px;
+        width:95vw;
         margin:0 auto;
-        align-items:start;
       }
-      body.startedGameView .landRight,
-      body.startedGameView .landLeft{
-        min-width:0;
-        max-width:none;
+      .landRight{
+        flex:0 0 56%;
+        max-width:56%;
       }
-      body.startedGameView .landRight{
-        display:flex;
-        flex-direction:column;
+      .landLeft{
+        flex:0 0 44%;
+        max-width:44%;
       }
-      body.startedGameView .landLeft{
-        display:flex;
-        flex-direction:column;
-        gap:10px;
-      }
-      body.startedGameView .mapOuter{
-        margin:0;
-      }
-      body.startedGameView .mapScale{
-        width:100%;
-      }
-      body.startedGameView .mapBox{
-        border-width:5px;
-        border-radius:24px;
-      }
-      body.startedGameView .mapToolsRow{
-        width:100%;
-        margin:8px auto 6px;
-      }
-      body.startedGameView input[type="range"]{
-        height:8px;
-        border-width:3px;
-      }
-      body.startedGameView input[type="range"]::-webkit-slider-thumb{
-        width:16px;
-        height:28px;
-        border-radius:9px;
-      }
-      body.startedGameView input[type="range"]::-moz-range-thumb{
-        width:16px;
-        height:28px;
-        border-radius:9px;
-      }
-      body.startedGameView .scoreBoard{
-        width:100%;
-        margin:8px auto 0;
-        gap:8px;
-      }
-      body.startedGameView .teamPill{
-        height:50px;
-        font-size:18px;
-        border-width:3px;
-        padding:0 14px;
-      }
-      body.startedGameView .scoreBox{
-        width:54px;
-        height:50px;
-        font-size:24px;
-        border-width:3px;
-        border-radius:12px;
-      }
-      body.startedGameView .firstPressBar{
-        width:100%;
-        margin:0;
-        padding:12px 14px;
-        border-width:3px;
-        font-size:20px;
-      }
-      body.startedGameView .controlsRow{
-        width:100%;
-        margin:0;
+
+      .mapScale{ width:100%; }
+      .mapToolsRow{ width:100%; }
+      .scoreBoard{ width:100%; }
+      .firstPressBar{ width:100%; font-size:22px; padding:14px 14px; }
+      .controlsRow{ width:100%; margin:10px auto 10px; }
+      .questionCard{ width:100%; margin:10px auto 0; }
+      .playerBigBtn{ width:100%; }
+      .buyNowBtn{ width:100%; }
+
+      .pillBtn{ max-width:100%; width:100%; }
+      .controlsRow{
         gap:12px;
-        align-items:center;
       }
-      body.startedGameView .pillBtn{
-        width:100%;
-        max-width:none;
-        height:62px;
-        font-size:22px;
-        border-width:3px;
-      }
-      body.startedGameView .timerWrap{
-        width:96px;
-        height:96px;
-      }
-      body.startedGameView .timerClockBtn{
-        width:96px;
-        height:96px;
-        border-width:5px;
-      }
-      body.startedGameView .timerRing circle{
-        stroke-width:8;
-      }
-      body.startedGameView .timerNumber{
-        font-size:40px;
-      }
-      body.startedGameView .questionCard{
-        width:100%;
-        margin:0;
-        padding:16px 14px 14px;
-        border-width:7px;
-        border-radius:24px;
-      }
-      body.startedGameView .qText{
-        margin:0 0 10px;
+      .controlsRow .pillBtn{
+        height:72px;
         font-size:24px;
-        line-height:1.4;
-      }
-      body.startedGameView .answerBtn{
-        font-size:22px;
-        padding:10px 18px;
-        border-width:4px;
-        min-width:160px;
-      }
-      body.startedGameView .playerBtnWrap{
-        margin-top:10px;
-      }
-      body.startedGameView .playerBigBtn{
-        width:100%;
-        height:84px;
-        font-size:24px;
-        border-width:5px;
-      }
-      body.startedGameView .buyNowWrap{
-        margin-top:10px;
-      }
-      body.startedGameView .buyNowBtn{
-        width:100%;
-        padding:12px 16px;
-        font-size:18px;
-        border-width:3px;
-        border-radius:16px;
-      }
-      body.startedGameView .playerWrittenRow{
-        gap:10px;
-      }
-      body.startedGameView .writtenAnswerInput{
-        height:62px;
-        font-size:20px;
-        border-width:3px;
-        border-radius:18px;
-      }
-      body.startedGameView .directQuestionCard{
-        margin:44px 0 0;
-        padding:58px 14px 16px;
-      }
-      body.startedGameView .directTimerWrap{
-        top:-42px;
-      }
-      body.startedGameView .directTimerBtn{
-        width:86px;
-        height:86px;
-        border-width:5px;
-      }
-      body.startedGameView .directTimerBtn .timerNumber{
-        font-size:36px;
-      }
-      body.startedGameView .directQActions{
-        gap:10px;
-      }
-      body.startedGameView .directNextBtn{
-        min-width:150px;
-        height:52px;
-        padding:0 16px;
-        font-size:20px;
-        border-width:3px;
-      }
-      body.startedGameView .directActionBtn{
-        min-width:180px;
-      }
-      body.startedGameView .footerBtn{
-        left:12px;
-        bottom:12px;
-        padding:10px 14px;
-        font-size:18px;
-        border-width:3px;
-      }
-      body.startedGameView .rights{
-        right:12px;
-        bottom:12px;
-        font-size:12px;
       }
 
       .pickerHeaderSection{
@@ -3066,115 +2631,6 @@
       }
       .pickerOptionBtn{
         min-height:74px;
-      }
-    }
-
-    @media (orientation: landscape) and (max-height: 560px){
-      body.startedGameView header{
-        padding:8px 12px 4px;
-      }
-      body.startedGameView .headerRow{
-        grid-template-columns:50px minmax(0,1fr) auto;
-      }
-      body.startedGameView .logo{
-        width:50px;
-        height:50px;
-      }
-      body.startedGameView .gnText{
-        font-size:24px;
-      }
-      body.startedGameView .topSettingsBtn{
-        min-width:96px;
-        height:40px;
-        font-size:18px;
-        padding:0 12px;
-      }
-      body.startedGameView .gameLayout{
-        gap:12px;
-        grid-template-columns:minmax(0, 1fr) minmax(300px, .88fr);
-      }
-      body.startedGameView .mapToolsRow{
-        margin:6px auto 4px;
-      }
-      body.startedGameView .teamPill{
-        height:44px;
-        font-size:16px;
-        padding:0 10px;
-      }
-      body.startedGameView .scoreBox{
-        width:48px;
-        height:44px;
-        font-size:20px;
-      }
-      body.startedGameView .firstPressBar{
-        padding:10px 12px;
-        font-size:18px;
-      }
-      body.startedGameView .controlsRow{
-        gap:10px;
-      }
-      body.startedGameView .pillBtn{
-        height:54px;
-        font-size:19px;
-      }
-      body.startedGameView .timerWrap{
-        width:84px;
-        height:84px;
-      }
-      body.startedGameView .timerClockBtn{
-        width:84px;
-        height:84px;
-        border-width:4px;
-      }
-      body.startedGameView .timerRing circle{
-        stroke-width:7;
-      }
-      body.startedGameView .timerNumber{
-        font-size:34px;
-      }
-      body.startedGameView .questionCard{
-        padding:14px 12px 12px;
-        border-width:6px;
-      }
-      body.startedGameView .qText{
-        font-size:21px;
-        margin-bottom:8px;
-      }
-      body.startedGameView .answerBtn{
-        font-size:20px;
-        padding:9px 16px;
-      }
-      body.startedGameView .playerBigBtn{
-        height:74px;
-        font-size:22px;
-        border-width:4px;
-      }
-      body.startedGameView .buyNowBtn{
-        font-size:16px;
-        padding:10px 14px;
-      }
-      body.startedGameView .writtenAnswerInput{
-        height:56px;
-        font-size:18px;
-      }
-      body.startedGameView .directQuestionCard{
-        margin:34px 0 0;
-        padding:50px 12px 14px;
-      }
-      body.startedGameView .directTimerWrap{
-        top:-34px;
-      }
-      body.startedGameView .directTimerBtn{
-        width:74px;
-        height:74px;
-      }
-      body.startedGameView .directTimerBtn .timerNumber{
-        font-size:31px;
-      }
-      body.startedGameView .directNextBtn{
-        height:46px;
-        font-size:18px;
-        min-width:130px;
       }
     }
 
@@ -5281,10 +4737,6 @@ function hideEidIntro(immediate){
       applyZoomFix: null,
       resizeBound: false
     };
-
-    function setStartedGameLandscapeMode(active){
-      document.body.classList.toggle("startedGameView", !!active);
-    }
 
     function teamColor(team){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
@@ -7628,7 +7080,6 @@ function hideEidIntro(immediate){
     function renderHostLobby(room){
       setTopSettingsButton(false);
       document.body.classList.remove("tvMode");
-      setStartedGameLandscapeMode(false);
       main.classList.remove("inGame");
       setGameName(room?.name || code);
 
@@ -7980,7 +7431,6 @@ function hideEidIntro(immediate){
 
     function renderWaiting(msg){
       document.body.classList.remove("tvMode");
-      setStartedGameLandscapeMode(false);
       main.classList.remove("inGame");
       main.innerHTML = `
         <div class="lobbyCard">
@@ -7994,7 +7444,6 @@ function hideEidIntro(immediate){
 
     function renderDisplayOnlyWaiting(msgText){
       document.body.classList.remove("tvMode");
-      setStartedGameLandscapeMode(false);
       main.classList.remove("inGame");
       main.innerHTML = `
         <div class="lobbyCard displayOnlyCard">
@@ -8064,8 +7513,6 @@ function hideEidIntro(immediate){
 
     function renderHostWaiting(msgText){
       setTopSettingsButton(false);
-      document.body.classList.remove("tvMode");
-      setStartedGameLandscapeMode(false);
       main.innerHTML = `
         <div class="wrap">
           <div class="card">
@@ -8093,8 +7540,6 @@ function hideEidIntro(immediate){
     // ✅ (Fix) للاعب: قبل ما نحكم إن الغرفة غير موجودة نخليها "جاري الاتصال" شوي
     function renderConnecting(msgText){
       setTopSettingsButton(false);
-      document.body.classList.remove("tvMode");
-      setStartedGameLandscapeMode(false);
       main.innerHTML = `
         <div class="wrap">
           <div class="card">
@@ -8110,8 +7555,6 @@ function hideEidIntro(immediate){
 
     // ✅✅✅ (جديد) رسم واجهة اللعب مرة واحدة فقط (بدون رمشة)
     function renderGame(room, me){
-      document.body.classList.remove("tvMode");
-      setStartedGameLandscapeMode(true);
       GAME_UI.mounted = true;
 
       main.classList.add("inGame");
@@ -8184,7 +7627,7 @@ function hideEidIntro(immediate){
 
             <div class="mapToolsRow sliderOnly">
               <div class="zoomWrap">
-                <input id="zoom" type="range" min="0.8" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
+                <input id="zoom" type="range" min="0.55" max="1.35" step="0.01" value="1" aria-label="تكبير تصغير الخريطة"/>
               </div>
             </div>
 
@@ -8342,7 +7785,7 @@ function hideEidIntro(immediate){
 
       const ZOOM_KEY = `sabaq_zoom_${code}`;
       const savedZoom = Number(localStorage.getItem(ZOOM_KEY) || "");
-      if(zoom && Number.isFinite(savedZoom) && savedZoom >= 0.8 && savedZoom <= 1.35){
+      if(zoom && Number.isFinite(savedZoom) && savedZoom >= 0.55 && savedZoom <= 1.35){
         zoom.value = String(savedZoom);
       }
 
@@ -8763,7 +8206,6 @@ function hideEidIntro(immediate){
     
     // ✅ شاشة "عرض الشاشة" (TV) — تعرض الخريطة + النتائج فقط بدون أي تحكم
     function renderTvDisplay(room, me){
-      setStartedGameLandscapeMode(false);
       document.body.classList.add("tvMode");
       main.classList.add("inGame");
 
