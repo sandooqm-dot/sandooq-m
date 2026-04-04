@@ -1918,37 +1918,38 @@
     }
     .settingsMiniBoardWrap{
       margin-top:18px;
-      background:linear-gradient(180deg, #fdfcff 0%, #f3f8ff 100%);
-      border-radius:24px;
-      border:4px solid rgba(0,0,0,.12);
-      padding:16px 10px 14px;
+      background:linear-gradient(180deg, #fbfcff 0%, #f4f8ff 100%);
+      border-radius:26px;
+      border:5px solid rgba(0,0,0,.12);
+      padding:18px 14px 16px;
       overflow:auto hidden;
+      box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);
     }
     .settingsMiniBoard{
       display:flex;
       flex-direction:column;
       align-items:center;
-      gap:8px;
+      gap:10px;
       min-width:max-content;
     }
     .settingsMiniBoardRow{
       display:flex;
-      gap:8px;
+      gap:10px;
       transform:translateX(var(--mini-offset, 0px));
       justify-content:center;
     }
     .settingsMiniCell{
-      width:54px;
-      height:48px;
+      width:66px;
+      height:58px;
       border:none;
-      border-radius:14px;
-      background:#fff;
+      border-radius:16px;
+      background:#ffffff;
       color:#5b2ba8;
       font-size:22px;
       font-weight:900;
       cursor:pointer;
-      border:3px solid #6a39b3;
-      box-shadow:0 8px 14px rgba(0,0,0,.08);
+      border:4px solid #6a39b3;
+      box-shadow:0 10px 16px rgba(0,0,0,.08);
       clip-path:polygon(24% 0,76% 0,100% 50%,76% 100%,24% 100%,0 50%);
       padding:0 4px;
       display:flex;
@@ -1958,15 +1959,30 @@
       line-height:1;
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
+      transition:transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
     }
     .settingsMiniCell.empty{
-      color:rgba(91,43,168,.28);
+      color:transparent;
+    }
+    .settingsMiniCell:hover{
+      transform:translateY(-1px);
+      box-shadow:0 12px 18px rgba(0,0,0,.10);
     }
     .settingsMiniCell.active{
       background:#ffe978;
       color:#111;
       border-color:#111;
-      box-shadow:0 10px 18px rgba(0,0,0,.14);
+      box-shadow:0 12px 18px rgba(0,0,0,.16);
+      transform:translateY(-1px) scale(1.02);
+    }
+    .settingsMiniCellValue{
+      display:block;
+      max-width:86%;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:20px;
+      font-weight:900;
     }
     .settingsCellEditorBox{
       margin-top:16px;
@@ -6402,8 +6418,8 @@ function hideEidIntro(immediate){
           for(let c=0; c<count; c++){
             const idx = (r * count) + c;
             const rawVal = String(values[idx] || '').trim();
-            const shown = rawVal || '•';
-            cells.push(`<button type="button" class="settingsMiniCell ${rawVal ? '' : 'empty'} ${activeCellsIndex === idx ? 'active' : ''}" data-mini-cell="${idx}" title="${escapeHtml(getRoundCellLabel(activeCellsRound, idx))}">${escapeHtml(shown)}</button>`);
+            const shown = rawVal ? `<span class="settingsMiniCellValue">${escapeHtml(rawVal)}</span>` : '';
+            cells.push(`<button type="button" class="settingsMiniCell ${rawVal ? '' : 'empty'} ${activeCellsIndex === idx ? 'active' : ''}" data-mini-cell="${idx}" title="${escapeHtml(getRoundCellLabel(activeCellsRound, idx))}" aria-label="${escapeHtml(getRoundCellLabel(activeCellsRound, idx))}">${shown}</button>`);
           }
           const offset = (r % 2 === 1) ? '30px' : '0px';
           rows.push(`<div class="settingsMiniBoardRow" style="--mini-offset:${offset}">${cells.join('')}</div>`);
