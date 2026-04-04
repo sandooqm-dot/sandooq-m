@@ -642,25 +642,59 @@
     }
     .compactActionBtn.players{ background:#f6cf45; color:#111; }
     .compactActionBtn.display{ background:#dde4ff; color:#23489b; }
+    .compactDisplayActionsRow{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      align-items:stretch;
+      flex-wrap:wrap;
+      margin-top:10px;
+      margin-bottom:4px;
+    }
+    .compactDisplayToggleBtn{
+      min-width:200px;
+      padding:10px 14px;
+      border-radius:18px;
+      border:4px solid #d7c2d3;
+      background:#fffafc;
+      color:#5c2d57;
+      font-size:20px;
+      font-weight:900;
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+      display:inline-flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      box-shadow:0 8px 18px rgba(0,0,0,.08);
+    }
+    .compactDisplayToggleBtn input{
+      width:22px;
+      height:22px;
+      accent-color:#8b1f78;
+      cursor:pointer;
+      flex:0 0 auto;
+    }
+    .compactDisplayToggleTextWrap{
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+      gap:2px;
+      text-align:right;
+      line-height:1.15;
+      flex:1 1 auto;
+    }
     .compactDisplayToggleLabel{
       font-size:18px;
       font-weight:900;
       color:#5c2d57;
     }
-    .compactDisplayToggleRow{
-      display:flex;
-      justify-content:center;
-      margin-top:10px;
-      margin-bottom:2px;
-    }
-    .compactDisplayToggleRow .pickerInlineToggle{
-      background:#fffafc;
-      border:3px solid #d7c2d3;
-      border-radius:18px;
-      padding:10px 14px;
-      min-width:270px;
-      justify-content:space-between;
-      box-shadow:0 8px 18px rgba(0,0,0,.08);
+    .compactDisplayOptional{
+      font-size:12px;
+      font-weight:900;
+      color:#8d7488;
+      line-height:1;
     }
     .compactPlayersCount{
       font-size:16px;
@@ -5955,18 +5989,23 @@ function hideEidIntro(immediate){
                 </div>
               </div>
 
-              <div class="compactActionsRow">
+              <div class="compactDisplayActionsRow">
                 <button id="openJoinModalBtn" class="compactActionBtn players" type="button">إضافة أجهزة اللاعبين</button>
-                ${showDisplayLink ? `<button id="openDisplayModalBtn" class="compactActionBtn display" type="button">شاشة العرض</button>` : ``}
-              </div>
-
-              <div class="compactDisplayToggleRow">
-                <label class="pickerInlineToggle" for="pickerDisplayOnlyToggle">
-                  <span class="compactDisplayToggleLabel">إضافة شاشة عرض مستقلة</span>
+                <label class="compactDisplayToggleBtn" for="pickerDisplayOnlyToggle">
+                  <span class="compactDisplayToggleTextWrap">
+                    <span class="compactDisplayToggleLabel">شاشة عرض مستقلة</span>
+                    <span class="compactDisplayOptional">اختياري</span>
+                  </span>
                   <input id="pickerDisplayOnlyToggle" type="checkbox" ${selectedDisplayOnly ? "checked" : ""}>
                 </label>
               </div>
-              ${showDisplayLink ? `<div class="compactModeHint">رابط شاشة العرض مخصص للشاشة فقط وليس للاعبين.</div>` : ``}
+
+              ${showDisplayLink ? `
+                <div class="compactActionsRow" style="margin-top:4px">
+                  <button id="openDisplayModalBtn" class="compactActionBtn display" type="button">رابط شاشة العرض</button>
+                </div>
+                <div class="compactModeHint">رابط شاشة العرض مخصص للشاشة فقط وليس للاعبين.</div>
+              ` : ``}
             ` : `
               <div class="compactSingleCard">
                 <div class="compactSingleTitle">${singleTitle}</div>
