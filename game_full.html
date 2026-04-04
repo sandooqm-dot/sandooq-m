@@ -3906,8 +3906,8 @@ function hideEidIntro(immediate){
     function isEidThemeEnabled(room){
       const direct = room?.eidThemeEnabled;
       const settingsVal = room?.settings?.eidThemeEnabled;
-      if(direct === false || settingsVal === false) return false;
-      return true;
+      if(direct === true || settingsVal === true) return true;
+      return false;
     }
 
     function maybeShowEidIntro(room){
