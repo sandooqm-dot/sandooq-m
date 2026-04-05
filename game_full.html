@@ -6937,20 +6937,19 @@ function hideEidIntro(immediate){
       window.addEventListener('scroll', () => queueEducationGuideSync(), { passive:true });
     }
 
-    function buildEducationGuideSteps(roomLike){
-      const currentExperience = getHostLobbyExperience(roomLike);
-      const selectedGuidePlayMode = currentExperience === 'education'
-        ? getEducationPlayType(roomLike)
-        : getNormalPlayType(roomLike);
-      const directPlayMode = selectedGuidePlayMode === 'single';
-      const steps = [
-        { id:'welcome', title:'شرح اللعبة التعليمية', text:'هذا النمط يعرّفك على أهم أزرار اللعبة وطريقة استخدامها خطوة بخطوة. اضغط فهمت ونبدأ مباشرة.', centered:true, buttonText:'ابدأ' },
-        { id:'map', title:'الخريطة', text:'هذه هي خريطة اللعب. المقدم يضغط على أي خلية لاختيار حرف أو محتوى، ومنه يظهر السؤال أو المهمة المرتبطة بها.', target:'#mapBox', closeSettings:true },
-        { id:'score', title:'اسم الفريقين والنتيجة', text:'هنا تظهر أسماء الفريقين ونتيجتهم. بعد الإجابة الصحيحة يضغط المقدم على اسم الفريق المستحق ليتم اعتماد النقطة وتلوين الخلية.', target:'.scoreBoard', closeSettings:true },
-        { id:'first-player', title:'أول لاعب ضغط', text:'هذا الشريط يعرض اسم أول لاعب ضغط على الجرس. وإذا كان هناك جواب مكتوب في بعض الأنماط سيظهر هنا أيضًا.', target:'#firstPressBar', closeSettings:true },
-        { id:'timer', title:'المؤقت', text:'هذا هو المؤقت. يبدأ العد بعد اعتماد أول لاعب، ويستخدم لتحديد وقت الإجابة داخل الجولة.', target:'#timerClock', closeSettings:true },
-        { id:'next-question', title:'تغيير السؤال', text:'زر تغيير السؤال يبدّل السؤال الحالي إلى سؤال آخر لنفس الحرف أو لنفس محتوى الخلية إذا احتجت سؤالًا بديلًا.', target:'#nextQ', closeSettings:true },
-        { id:'freeze', title:'تجميد الأزرار', text:'زر تجميد الأزرار يوقف استقبال ضغطات اللاعبين مؤقتًا حتى يرتّب المقدم الجولة أو يوقف التسرّع والسبام.', target:'#freezeBtn', closeSettings:true },
+    function getEducationGuideActualPlayMode(roomLike){
+      const room = roomLike || LIVE.room || {};
+      const explicit = getHostLobbyExperience(room) === 'education' ? getEducationPlayType(room) : getNormalPlayType(room);
+      if(explicit === 'single' || explicit === 'multi'){
+        const hasMultiUi = !!(document.getElementById('freezeBtn') || document.getElementById('firstPressBar'));
+        if(explicit === 'multi' && hasMultiUi) return 'multi';
+        if(explicit === 'single' && !hasMultiUi) return 'single';
+      }
+      return (document.getElementById('freezeBtn') || document.getElementById('firstPressBar')) ? 'multi' : 'single';
+    }
+
+    function buildEducationGuideSharedSteps(){
+      return [
         { id:'settings-button', title:'الإعدادات', text:'من هذا الزر تدخل إلى صفحة الإعدادات، ومنها تغيّر نوع الأسئلة، وتضيف أسئلتك، وتعدّل محتوى الخلايا، وتضبط المؤقت.', target:'#settingsBtn', closeSettings:true },
         { id:'settings-main', title:'الرئيسية داخل الإعدادات', text:'هذا هو تبويب الرئيسية. منه تغيّر بسرعة نوع الأسئلة المعروض، ونوع محتوى الخلايا، وتشغيل أو إطفاء أصوات اللعبة.', target:'[data-settings-panel="main"] .settingsCard', panel:'main' },
         { id:'settings-questions-choice', title:'نوع عرض الأسئلة', text:'من هنا تختار بين أسئلة اللعبة الجاهزة أو الأسئلة المخصصة التي تضيفها بنفسك للمسابقة.', targetResolver:() => document.querySelector('[data-main-choice-group="questions"]')?.closest('.settingsChoiceBlock') || null, panel:'main' },
@@ -6963,15 +6962,38 @@ function hideEidIntro(immediate){
         { id:'settings-cell-input', title:'كتابة محتوى الخلية', text:'بعد تحديد الخلية من الخريطة المصغرة، اكتب محتواها في هذا الحقل تحديدًا. ويمكنك التنقل بين الجولات وتخصيص كل جولة على حدة.', targetResolver:() => {
             const input = SETTINGS_UI?.els?.backdrop?.querySelector?.('#settingsCellInput') || document.querySelector('#settingsCellInput') || null;
             return input || null;
-          }, panel:'cells', spotlightPadding:4 },
+          }, panel:'cells', spotlightPadding:8 },
         { id:'settings-timer-tab', title:'تعديل المؤقت', text:'هذا تبويب المؤقت. منه تختار عدد الثواني المناسب للجولات حسب عمر المشاركين أو طبيعة النشاط.', target:'[data-settings-tab="timer"]', panel:'timer' },
         { id:'settings-timer-range', title:'سلايدر المؤقت', text:'حرّك هذا السلايدر لزيادة وقت المؤقت أو تقليله، ثم احفظ التعديل ليطبق في اللعبة.', target:'#settingsTimerRange', panel:'timer' },
         { id:'settings-save', title:'حفظ وخروج', text:'بعد الانتهاء من أي تعديل، اضغط هنا لحفظ الإعدادات والرجوع مباشرة إلى صفحة اللعبة.', target:'#settingsSaveExit', panel:'timer', buttonText:'تم' }
       ];
-      if(directPlayMode){
-        return steps.filter(step => step.id !== 'freeze' && step.id !== 'first-player');
-      }
-      return steps;
+    }
+
+    function buildEducationGuideSteps(roomLike){
+      const playMode = getEducationGuideActualPlayMode(roomLike);
+      const shared = buildEducationGuideSharedSteps();
+
+      const multiSteps = [
+        { id:'welcome-multi', title:'شرح اللعبة التعليمية', text:'هذا الشرح خاص بنمط الأجهزة المتعددة. ستتعرف فيه على الخريطة، واسم أول لاعب، وزر تجميد الأزرار، وباقي الإعدادات خطوة بخطوة.', centered:true, buttonText:'ابدأ' },
+        { id:'map', title:'الخريطة', text:'هذه هي خريطة اللعب. المقدم يضغط على أي خلية لاختيار حرف أو محتوى، ومنه يظهر السؤال أو المهمة المرتبطة بها.', target:'#mapBox', closeSettings:true },
+        { id:'score', title:'اسم الفريقين والنتيجة', text:'هنا تظهر أسماء الفريقين ونتيجتهم. بعد الإجابة الصحيحة يضغط المقدم على اسم الفريق المستحق ليتم اعتماد النقطة وتلوين الخلية.', target:'.scoreBoard', closeSettings:true },
+        { id:'first-player', title:'اسم اللاعب الذي يضغط أولًا', text:'هذا الشريط يعرض اسم أول لاعب يضغط الجرس من أجهزة اللاعبين، وهنا يعرف المقدم من له أولوية الإجابة داخل الجولة.', targetResolver:() => GAME_UI?.els?.firstPressBar || document.getElementById('firstPressBar') || null, closeSettings:true },
+        { id:'freeze', title:'تجميد الأزرار', text:'هذا الزر يجمّد ضغطات اللاعبين مؤقتًا إذا احتاج المقدم يوقف السبام أو يرتب الجولة قبل السماح بالضغط مرة أخرى.', targetResolver:() => GAME_UI?.els?.freezeBtn || document.getElementById('freezeBtn') || null, closeSettings:true },
+        { id:'timer', title:'المؤقت', text:'هذا هو المؤقت. يبدأ العد بعد اعتماد أول لاعب، ويستخدم لتحديد وقت الإجابة داخل الجولة.', targetResolver:() => GAME_UI?.els?.timerClock || document.getElementById('timerClock') || null, closeSettings:true },
+        { id:'next-question', title:'تغيير السؤال', text:'هذا زر تغيير السؤال في مكانه الجديد. يبدّل السؤال الحالي إلى سؤال آخر لنفس الحرف أو لنفس محتوى الخلية إذا احتجت سؤالًا بديلًا.', targetResolver:() => GAME_UI?.els?.nextQ || document.getElementById('nextQ') || null, closeSettings:true },
+        ...shared
+      ];
+
+      const singleSteps = [
+        { id:'welcome-single', title:'شرح اللعبة التعليمية', text:'هذا الشرح خاص بنمط اللعب من جهاز واحد. ستتعرف على أهم أزرار اللعبة وطريقة استخدامها خطوة بخطوة.', centered:true, buttonText:'ابدأ' },
+        { id:'map', title:'الخريطة', text:'هذه هي خريطة اللعب. المقدم يضغط على أي خلية لاختيار حرف أو محتوى، ومنه يظهر السؤال أو المهمة المرتبطة بها.', target:'#mapBox', closeSettings:true },
+        { id:'score', title:'اسم الفريقين والنتيجة', text:'هنا تظهر أسماء الفريقين ونتيجتهم. بعد الإجابة الصحيحة يضغط المقدم على اسم الفريق المستحق ليتم اعتماد النقطة وتلوين الخلية.', target:'.scoreBoard', closeSettings:true },
+        { id:'timer', title:'المؤقت', text:'هذا هو المؤقت. يستخدم لتحديد وقت الإجابة داخل الجولة.', targetResolver:() => GAME_UI?.els?.timerClock || document.getElementById('timerClock') || null, closeSettings:true },
+        { id:'next-question', title:'تغيير السؤال', text:'هذا زر تغيير السؤال. يبدّل السؤال الحالي إلى سؤال آخر لنفس الحرف أو لنفس محتوى الخلية إذا احتجت سؤالًا بديلًا.', targetResolver:() => GAME_UI?.els?.nextQ || document.getElementById('nextQ') || null, closeSettings:true },
+        ...shared
+      ];
+
+      return playMode === 'multi' ? multiSteps : singleSteps;
     }
 
     function getEducationGuideTarget(step){
