@@ -5102,8 +5102,36 @@ function hideEidIntro(immediate){
       onMapReady: null,
       placeHexes: null,
       applyZoomFix: null,
-      resizeBound: false
+      resizeBound: false,
+      resizeObserver: null,
+      relayoutRaf1: 0,
+      relayoutRaf2: 0,
+      relayoutTimer1: 0,
+      relayoutTimer2: 0
     };
+
+    function scheduleMapRelayout(reason){
+      if(!GAME_UI.placeHexes) return;
+      try{
+        if(GAME_UI.relayoutRaf1) cancelAnimationFrame(GAME_UI.relayoutRaf1);
+        if(GAME_UI.relayoutRaf2) cancelAnimationFrame(GAME_UI.relayoutRaf2);
+        if(GAME_UI.relayoutTimer1) clearTimeout(GAME_UI.relayoutTimer1);
+        if(GAME_UI.relayoutTimer2) clearTimeout(GAME_UI.relayoutTimer2);
+      }catch(e){}
+
+      const run = () => {
+        try{ GAME_UI.placeHexes && GAME_UI.placeHexes(); }catch(e){}
+        try{ GAME_UI.applyZoomFix && GAME_UI.applyZoomFix(); }catch(e){}
+      };
+
+      GAME_UI.relayoutRaf1 = requestAnimationFrame(() => {
+        GAME_UI.relayoutRaf2 = requestAnimationFrame(() => {
+          run();
+          GAME_UI.relayoutTimer1 = setTimeout(run, 90);
+          GAME_UI.relayoutTimer2 = setTimeout(run, 220);
+        });
+      });
+    }
 
     function teamColor(team){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
@@ -8553,14 +8581,21 @@ function hideEidIntro(immediate){
         applyZoomFix();
       }
       GAME_UI.placeHexes = placeHexes;
-      GAME_UI.onMapReady = () => requestAnimationFrame(placeHexes);
+      GAME_UI.onMapReady = () => scheduleMapRelayout("map_ready");
       GAME_UI.onMapReady();
+
+      try{ GAME_UI.resizeObserver && GAME_UI.resizeObserver.disconnect && GAME_UI.resizeObserver.disconnect(); }catch(e){}
+      if(window.ResizeObserver){
+        GAME_UI.resizeObserver = new ResizeObserver(() => scheduleMapRelayout("resize_observer"));
+        try{ GAME_UI.resizeObserver.observe(mapBox); }catch(e){}
+        try{ GAME_UI.resizeObserver.observe(mapScale); }catch(e){}
+      }
 
       if(!GAME_UI.resizeBound){
         GAME_UI.resizeBound = true;
-        window.addEventListener("resize", () => {
-          try{ placeHexes(); applyZoomFix(); }catch(e){}
-        });
+        window.addEventListener("resize", () => { scheduleMapRelayout("window_resize"); }, { passive:true });
+        window.addEventListener("orientationchange", () => { scheduleMapRelayout("orientationchange"); }, { passive:true });
+        window.addEventListener("pageshow", () => { scheduleMapRelayout("pageshow"); }, { passive:true });
       }
 
       queueEducationGuideSync();
@@ -9055,17 +9090,23 @@ function hideEidIntro(immediate){
         applyZoomFix();
       }
       GAME_UI.placeHexes = placeHexes;
-      GAME_UI.onMapReady = () => requestAnimationFrame(placeHexes);
+      GAME_UI.onMapReady = () => scheduleMapRelayout("map_ready");
       GAME_UI.onMapReady();
       zoom.addEventListener("input", applyZoomFix);
       zoom.addEventListener("change", applyZoomFix);
 
+      try{ GAME_UI.resizeObserver && GAME_UI.resizeObserver.disconnect && GAME_UI.resizeObserver.disconnect(); }catch(e){}
+      if(window.ResizeObserver){
+        GAME_UI.resizeObserver = new ResizeObserver(() => scheduleMapRelayout("resize_observer"));
+        try{ GAME_UI.resizeObserver.observe(mapBox); }catch(e){}
+        try{ GAME_UI.resizeObserver.observe(mapScale); }catch(e){}
+      }
+
       if(!GAME_UI.resizeBound){
         GAME_UI.resizeBound = true;
-        window.addEventListener("resize", ()=> {
-          placeHexes();
-          GAME_UI.applyZoomFix && GAME_UI.applyZoomFix();
-        }, {passive:true});
+        window.addEventListener("resize", () => { scheduleMapRelayout("window_resize"); }, { passive:true });
+        window.addEventListener("orientationchange", () => { scheduleMapRelayout("orientationchange"); }, { passive:true });
+        window.addEventListener("pageshow", () => { scheduleMapRelayout("pageshow"); }, { passive:true });
       }
 
       const nm = String((room?.name ?? room?.gameName ?? room?.title ?? "") || "").trim();
