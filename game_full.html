@@ -4719,28 +4719,16 @@ if(homeBtn && role !== "host"){
       return isCelebrationAudioLocked(roomLike) || isVoisPlaying();
     }
 
-    function isBellAllowedOnThisDevice(roomLike){
-      const room = roomLike || LIVE.room || {};
-      if(role === "host" || role === "display") return false;
-      if(!isSoundEnabled(room)) return false;
-      const currentMe = LIVE.me || null;
-      if(!currentMe) return false;
-      return true;
-    }
-
     function playRong(roomLike){
       try{
-        const room = roomLike || LIVE.room || {};
-        if(!isBellAllowedOnThisDevice(room)) return false;
-        if(shouldBlockBellFx(room)) return false;
+        if(!isSoundEnabled(roomLike || LIVE.room || {})) return false;
+        if(shouldBlockBellFx(roomLike)) return false;
         return SOUND.playBell();
       }catch(e){ return false; }
     }
     function playRongOrFallback(roomLike){
-      const room = roomLike || LIVE.room || {};
-      if(!isBellAllowedOnThisDevice(room)) return false;
-      if(shouldBlockBellFx(room)) return false;
-      return playRong(room);
+      if(shouldBlockBellFx(roomLike)) return false;
+      return playRong(roomLike);
     }
     function stopRong(){
       try{
@@ -8658,6 +8646,20 @@ function hideEidIntro(immediate){
           const updates = {};
           updates[`rooms/${code}/current`] = { ...cur, qIndex: pick.qIndex };
           updates[`rooms/${code}/${pick.cursorField}/${cur.letter}`] = pick.nextCursor;
+
+          try{
+            const optimisticRoom = {
+              ...(LIVE.room || {}),
+              current: { ...cur, qIndex: pick.qIndex },
+              [pick.cursorField]: {
+                ...(((LIVE.room || {})[pick.cursorField] && typeof ((LIVE.room || {})[pick.cursorField]) === "object") ? ((LIVE.room || {})[pick.cursorField]) : {}),
+                [cur.letter]: pick.nextCursor
+              }
+            };
+            LIVE.room = normalizeLiveRoom(optimisticRoom);
+            scheduleRender();
+          }catch(e){}
+
           await update(ref(db), updates);
         });
       }
@@ -9474,29 +9476,21 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           }else if(sig && sig !== LAST_BUZZER_SIG){
             LAST_BUZZER_SIG = sig;
 
-            if(role !== "host" && role !== "display"){
-              const currentMe = LIVE.me || null;
-              const myPid = String(pid || currentMe?.pid || localStorage.getItem(`sabaq_pid_${code}`) || "");
-              if(currentMe && myPid && String(b.pid||"") === String(myPid)){
+            if(role !== "host"){
+              const myPid = pid || localStorage.getItem(`sabaq_pid_${code}`) || "";
+              if(myPid && String(b.pid||"") === String(myPid)){
                 const latestRoomForAudio = room || LIVE.room || {};
                 if(!shouldBlockBellFx(latestRoomForAudio)){
                   playRongOrFallback(latestRoomForAudio);
                 }else{
                   stopRong();
                 }
-              }else{
-                stopRong();
               }
-            }else{
-              stopRong();
             }
-          }else if(role === "host" || role === "display"){
-            stopRong();
           }
         }else{
           LAST_BUZZER_SIG = "";
           STABLE_BUZZER = null;
-          stopRong();
         }
       }catch(e){}
 
