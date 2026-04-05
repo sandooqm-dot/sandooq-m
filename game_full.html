@@ -983,6 +983,11 @@
       user-select:none;
       transition: fill .18s ease, stroke .18s ease;
     }
+    .overlaySvg .cellLetter.mathBidiCell,
+    .settingsMiniBoardSvg .settingsMiniCellText.mathBidiCell{
+      direction:ltr;
+      unicode-bidi:bidi-override;
+    }
     .overlaySvg .cellLetter.state0,
     .overlaySvg .cellLetter.state1{
       fill:var(--cell-letter, #5d2a9d);
@@ -3731,6 +3736,30 @@
       return String(board?.letters?.[row]?.[col] || "");
     }
 
+    function shouldForceArabicMathLTR(rawValue){
+      const value = String(rawValue || '').trim();
+      if(!value) return false;
+      return /[٠-٩]/.test(value) && /[+\-−–—=÷×*\/\%^√<>≤≥(){}\[\]|:?]/.test(value);
+    }
+
+    function applyCellTextDirection(el, rawValue){
+      if(!el) return;
+      const forceLTR = shouldForceArabicMathLTR(rawValue);
+      if(forceLTR){
+        el.setAttribute('direction', 'ltr');
+        el.setAttribute('unicode-bidi', 'bidi-override');
+        el.style.direction = 'ltr';
+        el.style.unicodeBidi = 'bidi-override';
+        el.classList.add('mathBidiCell');
+      }else{
+        el.removeAttribute('direction');
+        el.removeAttribute('unicode-bidi');
+        el.style.removeProperty('direction');
+        el.style.removeProperty('unicode-bidi');
+        el.classList.remove('mathBidiCell');
+      }
+    }
+
     function getBoard(room){
       const expectedSeed = getExpectedBoardSeed(room);
       const fromRoom = normalizeBoardState(room?.board, room);
@@ -5102,36 +5131,8 @@ function hideEidIntro(immediate){
       onMapReady: null,
       placeHexes: null,
       applyZoomFix: null,
-      resizeBound: false,
-      resizeObserver: null,
-      relayoutRaf1: 0,
-      relayoutRaf2: 0,
-      relayoutTimer1: 0,
-      relayoutTimer2: 0
+      resizeBound: false
     };
-
-    function scheduleMapRelayout(reason){
-      if(!GAME_UI.placeHexes) return;
-      try{
-        if(GAME_UI.relayoutRaf1) cancelAnimationFrame(GAME_UI.relayoutRaf1);
-        if(GAME_UI.relayoutRaf2) cancelAnimationFrame(GAME_UI.relayoutRaf2);
-        if(GAME_UI.relayoutTimer1) clearTimeout(GAME_UI.relayoutTimer1);
-        if(GAME_UI.relayoutTimer2) clearTimeout(GAME_UI.relayoutTimer2);
-      }catch(e){}
-
-      const run = () => {
-        try{ GAME_UI.placeHexes && GAME_UI.placeHexes(); }catch(e){}
-        try{ GAME_UI.applyZoomFix && GAME_UI.applyZoomFix(); }catch(e){}
-      };
-
-      GAME_UI.relayoutRaf1 = requestAnimationFrame(() => {
-        GAME_UI.relayoutRaf2 = requestAnimationFrame(() => {
-          run();
-          GAME_UI.relayoutTimer1 = setTimeout(run, 90);
-          GAME_UI.relayoutTimer2 = setTimeout(run, 220);
-        });
-      });
-    }
 
     function teamColor(team){
       return team === "green" ? "rgba(26,163,74,.9)" : "rgba(242,140,0,.9)";
@@ -7425,7 +7426,7 @@ function hideEidIntro(immediate){
           const label = escapeHtml(getRoundCellLabel(activeCellsRound, idx));
           const isActive = activeCellsIndex === idx ? 'active' : '';
           const textSvg = rawVal
-            ? `<text class="settingsMiniCellText" x="${(x + cellW/2).toFixed(2)}" y="${(y + cellH/2 + 1).toFixed(2)}">${escapeHtml(rawVal)}</text>`
+            ? `<text class="settingsMiniCellText${shouldForceArabicMathLTR(rawVal) ? ' mathBidiCell' : ''}" x="${(x + cellW/2).toFixed(2)}" y="${(y + cellH/2 + 1).toFixed(2)}"${shouldForceArabicMathLTR(rawVal) ? ' direction="ltr" unicode-bidi="bidi-override"' : ''}>${escapeHtml(rawVal)}</text>`
             : '';
           groups.push(`
             <g class="settingsMiniCellHit ${isActive}" data-mini-cell="${idx}" role="button" tabindex="0" aria-label="${label}" >
@@ -8425,7 +8426,9 @@ function hideEidIntro(immediate){
           txt.classList.add("cellLetter");
           txt.setAttribute("data-row", row);
           txt.setAttribute("data-col", col);
-          txt.textContent = getDisplayedCellValue(board, row, col);
+          const rawCellValue = getDisplayedCellValue(board, row, col);
+          txt.textContent = rawCellValue;
+          applyCellTextDirection(txt, rawCellValue);
           g.appendChild(poly);
           g.appendChild(txt);
           overlay.appendChild(g);
@@ -8474,44 +8477,6 @@ function hideEidIntro(immediate){
           return pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
         }
         return hexPointsPointyTop(x, y, w, h);
-      }
-
-      function fitCellTextToHex(txt, value, cellW, cellH, isTvMode){
-        const rawValue = String(value ?? "").trim();
-        txt.textContent = rawValue;
-
-        const maxFont = Math.min(Math.min(cellW, cellH) * (isTvMode ? 0.50 : 0.44), isTvMode ? 72 : 64);
-        const minFont = Math.max(14, Math.min(cellW, cellH) * 0.18);
-        const maxTextWidth = cellW * 0.80;
-        const maxTextHeight = cellH * 0.42;
-
-        let fontSize = Math.max(minFont, maxFont);
-        txt.setAttribute("font-size", fontSize.toFixed(2));
-        txt.style.fontSize = fontSize.toFixed(2) + "px";
-        txt.style.strokeWidth = Math.max(1.4, fontSize * 0.07).toFixed(2) + "px";
-
-        if(!rawValue) return;
-
-        try{
-          const textWidth = Number(txt.getComputedTextLength?.() || 0);
-          const textBox = txt.getBBox?.();
-          const widthRatio = textWidth > 0 ? (maxTextWidth / textWidth) : 1;
-          const heightRatio = (textBox && textBox.height > 0) ? (maxTextHeight / textBox.height) : 1;
-          const ratio = Math.min(1, widthRatio, heightRatio);
-          if(Number.isFinite(ratio) && ratio < 1){
-            fontSize = Math.max(minFont, fontSize * ratio);
-          }
-        }catch(e){
-          const approxChars = Math.max(1, rawValue.length);
-          const approxWidth = approxChars * fontSize * 0.58;
-          if(approxWidth > maxTextWidth){
-            fontSize = Math.max(minFont, fontSize * (maxTextWidth / approxWidth));
-          }
-        }
-
-        txt.setAttribute("font-size", fontSize.toFixed(2));
-        txt.style.fontSize = fontSize.toFixed(2) + "px";
-        txt.style.strokeWidth = Math.max(1.2, fontSize * 0.065).toFixed(2) + "px";
       }
 
       function placeHexes(){
@@ -8564,7 +8529,6 @@ function hideEidIntro(immediate){
         const offsetX = ((W - (maxX - minX)) / 2) - minX;
         const offsetY = ((H - (maxY - minY)) / 2) - minY;
 
-        const isTvMode = document.body.classList.contains("tvMode");
         let i = 0;
         for(const meta of cellsMeta){
           const x = meta.x + offsetX;
@@ -8574,28 +8538,31 @@ function hideEidIntro(immediate){
           poly.setAttribute("points", polygonPointsForShape(shape, x, y, cellW, cellH));
           txt.setAttribute("x", (x + cellW/2).toFixed(2));
           txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
-          fitCellTextToHex(txt, getDisplayedCellValue(board, meta.row, meta.col), cellW, cellH, isTvMode);
+
+          const isTvMode = document.body.classList.contains("tvMode");
+          const baseLetterSize = Math.min(cellW, cellH) * (isTvMode ? 0.50 : 0.44);
+          const finalLetterSize = Math.max(30, Math.min(baseLetterSize, isTvMode ? 72 : 64));
+          txt.setAttribute("font-size", finalLetterSize.toFixed(2));
+          txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
+          txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
+
+          const rawCellValue = getDisplayedCellValue(board, meta.row, meta.col);
+          txt.textContent = rawCellValue;
+          applyCellTextDirection(txt, rawCellValue);
           i++;
         }
 
         applyZoomFix();
       }
       GAME_UI.placeHexes = placeHexes;
-      GAME_UI.onMapReady = () => scheduleMapRelayout("map_ready");
+      GAME_UI.onMapReady = () => requestAnimationFrame(placeHexes);
       GAME_UI.onMapReady();
-
-      try{ GAME_UI.resizeObserver && GAME_UI.resizeObserver.disconnect && GAME_UI.resizeObserver.disconnect(); }catch(e){}
-      if(window.ResizeObserver){
-        GAME_UI.resizeObserver = new ResizeObserver(() => scheduleMapRelayout("resize_observer"));
-        try{ GAME_UI.resizeObserver.observe(mapBox); }catch(e){}
-        try{ GAME_UI.resizeObserver.observe(mapScale); }catch(e){}
-      }
 
       if(!GAME_UI.resizeBound){
         GAME_UI.resizeBound = true;
-        window.addEventListener("resize", () => { scheduleMapRelayout("window_resize"); }, { passive:true });
-        window.addEventListener("orientationchange", () => { scheduleMapRelayout("orientationchange"); }, { passive:true });
-        window.addEventListener("pageshow", () => { scheduleMapRelayout("pageshow"); }, { passive:true });
+        window.addEventListener("resize", () => {
+          try{ placeHexes(); applyZoomFix(); }catch(e){}
+        });
       }
 
       queueEducationGuideSync();
@@ -8712,20 +8679,6 @@ function hideEidIntro(immediate){
           const updates = {};
           updates[`rooms/${code}/current`] = { ...cur, qIndex: pick.qIndex };
           updates[`rooms/${code}/${pick.cursorField}/${cur.letter}`] = pick.nextCursor;
-
-          try{
-            const optimisticRoom = {
-              ...(LIVE.room || {}),
-              current: { ...cur, qIndex: pick.qIndex },
-              [pick.cursorField]: {
-                ...(((LIVE.room || {})[pick.cursorField] && typeof ((LIVE.room || {})[pick.cursorField]) === "object") ? ((LIVE.room || {})[pick.cursorField]) : {}),
-                [cur.letter]: pick.nextCursor
-              }
-            };
-            LIVE.room = normalizeLiveRoom(optimisticRoom);
-            scheduleRender();
-          }catch(e){}
-
           await update(ref(db), updates);
         });
       }
@@ -8998,7 +8951,9 @@ function hideEidIntro(immediate){
           txt.classList.add("cellLetter");
           txt.setAttribute("data-row", row);
           txt.setAttribute("data-col", col);
-          txt.textContent = getDisplayedCellValue(board, row, col);
+          const rawCellValue = getDisplayedCellValue(board, row, col);
+          txt.textContent = rawCellValue;
+          applyCellTextDirection(txt, rawCellValue);
           g.appendChild(poly);
           g.appendChild(txt);
           overlay.appendChild(g);
@@ -9084,29 +9039,25 @@ function hideEidIntro(immediate){
           txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
           txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
 
-          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
+          const rawCellValue = getDisplayedCellValue(board, meta.row, meta.col);
+          txt.textContent = rawCellValue;
+          applyCellTextDirection(txt, rawCellValue);
           i++;
         }
         applyZoomFix();
       }
       GAME_UI.placeHexes = placeHexes;
-      GAME_UI.onMapReady = () => scheduleMapRelayout("map_ready");
+      GAME_UI.onMapReady = () => requestAnimationFrame(placeHexes);
       GAME_UI.onMapReady();
       zoom.addEventListener("input", applyZoomFix);
       zoom.addEventListener("change", applyZoomFix);
 
-      try{ GAME_UI.resizeObserver && GAME_UI.resizeObserver.disconnect && GAME_UI.resizeObserver.disconnect(); }catch(e){}
-      if(window.ResizeObserver){
-        GAME_UI.resizeObserver = new ResizeObserver(() => scheduleMapRelayout("resize_observer"));
-        try{ GAME_UI.resizeObserver.observe(mapBox); }catch(e){}
-        try{ GAME_UI.resizeObserver.observe(mapScale); }catch(e){}
-      }
-
       if(!GAME_UI.resizeBound){
         GAME_UI.resizeBound = true;
-        window.addEventListener("resize", () => { scheduleMapRelayout("window_resize"); }, { passive:true });
-        window.addEventListener("orientationchange", () => { scheduleMapRelayout("orientationchange"); }, { passive:true });
-        window.addEventListener("pageshow", () => { scheduleMapRelayout("pageshow"); }, { passive:true });
+        window.addEventListener("resize", ()=> {
+          placeHexes();
+          GAME_UI.applyZoomFix && GAME_UI.applyZoomFix();
+        }, {passive:true});
       }
 
       const nm = String((room?.name ?? room?.gameName ?? room?.title ?? "") || "").trim();
@@ -9268,7 +9219,11 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           }
           cell.classList.remove("selectedCell");
           const txt = GAME_UI.letterEls?.[i];
-          if(txt){ txt.textContent = getDisplayedCellValue(board, r, c); }
+          if(txt){
+            const rawCellValue = getDisplayedCellValue(board, r, c);
+            txt.textContent = rawCellValue;
+            applyCellTextDirection(txt, rawCellValue);
+          }
         }
       }
 
