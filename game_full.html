@@ -2081,12 +2081,6 @@
       fill:#111;
       stroke:rgba(255,255,255,.55);
     }
-    .overlaySvg .cellLetter.mathText,
-    .settingsMiniCellText.mathText{
-      font-family:"Segoe UI","Tahoma","Arial","Noto Sans Arabic","Segoe UI Symbol",sans-serif;
-      font-weight:700;
-      letter-spacing:0;
-    }
     .settingsCellEditorBox{
       margin-top:16px;
       background:#fff;
@@ -2113,8 +2107,6 @@
       text-align:center;
       outline:none;
       padding:0 14px;
-      font-family:"Segoe UI","Tahoma","Arial","Noto Sans Arabic","Segoe UI Symbol",sans-serif;
-      letter-spacing:0;
     }
     .settingsCellInput::placeholder{ color:rgba(0,0,0,.34); }
     .settingsCellsHint{
@@ -5215,75 +5207,6 @@ function hideEidIntro(immediate){
       }[c]));
     }
 
-    const CELL_MATH_FONT_FAMILY = '"Segoe UI","Tahoma","Arial","Noto Sans Arabic","Segoe UI Symbol",sans-serif';
-    const CELL_MATH_CHAR_RE = /[0-9٠-٩+\-−±×÷*/=<>≤≥≈≠٪%(){}\[\]|\^√∛∜∞π∑∆∫~_:.,،٫؛؟!?²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉]/;
-
-    function isMathLikeCellValue(value){
-      const raw = String(value ?? '').trim();
-      if(!raw) return false;
-      const hasDigits = /[0-9٠-٩]/.test(raw);
-      const hasMathGlyphs = CELL_MATH_CHAR_RE.test(raw);
-      return hasMathGlyphs || hasDigits;
-    }
-
-    function applySvgCellTextMode(txt, value){
-      const raw = String(value ?? '').trim();
-      const mathLike = isMathLikeCellValue(raw);
-      txt.textContent = mathLike ? (`⁦${raw}⁩`) : raw;
-      txt.classList.toggle('mathText', mathLike);
-      txt.dataset.rawValue = raw;
-      if(mathLike){
-        txt.setAttribute('direction', 'ltr');
-        txt.setAttribute('unicode-bidi', 'bidi-override');
-        txt.style.fontFamily = CELL_MATH_FONT_FAMILY;
-        txt.style.letterSpacing = '0';
-      }else{
-        txt.removeAttribute('direction');
-        txt.removeAttribute('unicode-bidi');
-        txt.style.fontFamily = '';
-        txt.style.letterSpacing = '';
-      }
-      return { raw, mathLike };
-    }
-
-    function fitSvgTextToBox(txt, value, opts = {}){
-      const { raw } = applySvgCellTextMode(txt, value);
-      const boxW = Math.max(20, Number(opts.boxW || 0));
-      const boxH = Math.max(20, Number(opts.boxH || 0));
-      const maxFont = Math.max(10, Number(opts.maxFont || Math.min(boxW, boxH) * 0.44));
-      const minFont = Math.max(10, Number(opts.minFont || Math.min(boxW, boxH) * 0.18));
-      const maxTextWidth = Math.max(20, Number(opts.maxTextWidth || boxW * 0.8));
-      const maxTextHeight = Math.max(14, Number(opts.maxTextHeight || boxH * 0.42));
-
-      let fontSize = Math.max(minFont, maxFont);
-      txt.setAttribute('font-size', fontSize.toFixed(2));
-      txt.style.fontSize = fontSize.toFixed(2) + 'px';
-      txt.style.strokeWidth = Math.max(1.2, fontSize * 0.065).toFixed(2) + 'px';
-
-      if(!raw) return;
-
-      try{
-        const textWidth = Number(txt.getComputedTextLength?.() || 0);
-        const textBox = txt.getBBox?.();
-        const widthRatio = textWidth > 0 ? (maxTextWidth / textWidth) : 1;
-        const heightRatio = (textBox && textBox.height > 0) ? (maxTextHeight / textBox.height) : 1;
-        const ratio = Math.min(1, widthRatio, heightRatio);
-        if(Number.isFinite(ratio) && ratio < 1){
-          fontSize = Math.max(minFont, fontSize * ratio);
-        }
-      }catch(e){
-        const approxChars = Math.max(1, raw.length);
-        const approxWidth = approxChars * fontSize * 0.58;
-        if(approxWidth > maxTextWidth){
-          fontSize = Math.max(minFont, fontSize * (maxTextWidth / approxWidth));
-        }
-      }
-
-      txt.setAttribute('font-size', fontSize.toFixed(2));
-      txt.style.fontSize = fontSize.toFixed(2) + 'px';
-      txt.style.strokeWidth = Math.max(1.2, fontSize * 0.065).toFixed(2) + 'px';
-    }
-
     function cellKey(row,col){ return `${row}-${col}`; }
 
     const BBOX_CACHE = {};
@@ -7502,7 +7425,7 @@ function hideEidIntro(immediate){
           const label = escapeHtml(getRoundCellLabel(activeCellsRound, idx));
           const isActive = activeCellsIndex === idx ? 'active' : '';
           const textSvg = rawVal
-            ? `<text class="settingsMiniCellText" data-raw-value="${escapeHtml(rawVal)}" x="${(x + cellW/2).toFixed(2)}" y="${(y + cellH/2 + 1).toFixed(2)}"></text>`
+            ? `<text class="settingsMiniCellText" x="${(x + cellW/2).toFixed(2)}" y="${(y + cellH/2 + 1).toFixed(2)}">${escapeHtml(rawVal)}</text>`
             : '';
           groups.push(`
             <g class="settingsMiniCellHit ${isActive}" data-mini-cell="${idx}" role="button" tabindex="0" aria-label="${label}" >
@@ -7513,17 +7436,6 @@ function hideEidIntro(immediate){
         });
 
         miniBoardEl.innerHTML = `<svg class="settingsMiniBoardSvg" viewBox="0 0 ${renderW} ${renderH}" width="${renderW}" height="${renderH}" aria-label="خريطة مصغرة للخلايا">${groups.join('')}</svg>`;
-        miniBoardEl.querySelectorAll('.settingsMiniCellText').forEach(txt => {
-          const raw = txt.getAttribute('data-raw-value') || '';
-          fitSvgTextToBox(txt, raw, {
-            boxW: cellW,
-            boxH: cellH,
-            maxFont: Math.min(cellW, cellH) * 0.34,
-            minFont: 11,
-            maxTextWidth: cellW * 0.72,
-            maxTextHeight: cellH * 0.28
-          });
-        });
         miniBoardEl.querySelectorAll('[data-mini-cell]').forEach(btn => {
           const activate = () => {
             activeCellsIndex = Number(btn.getAttribute('data-mini-cell') || 0);
@@ -8565,14 +8477,41 @@ function hideEidIntro(immediate){
       }
 
       function fitCellTextToHex(txt, value, cellW, cellH, isTvMode){
-        fitSvgTextToBox(txt, value, {
-          boxW: cellW,
-          boxH: cellH,
-          maxFont: Math.min(Math.min(cellW, cellH) * (isTvMode ? 0.50 : 0.44), isTvMode ? 72 : 64),
-          minFont: Math.max(14, Math.min(cellW, cellH) * 0.18),
-          maxTextWidth: cellW * 0.80,
-          maxTextHeight: cellH * 0.42
-        });
+        const rawValue = String(value ?? "").trim();
+        txt.textContent = rawValue;
+
+        const maxFont = Math.min(Math.min(cellW, cellH) * (isTvMode ? 0.50 : 0.44), isTvMode ? 72 : 64);
+        const minFont = Math.max(14, Math.min(cellW, cellH) * 0.18);
+        const maxTextWidth = cellW * 0.80;
+        const maxTextHeight = cellH * 0.42;
+
+        let fontSize = Math.max(minFont, maxFont);
+        txt.setAttribute("font-size", fontSize.toFixed(2));
+        txt.style.fontSize = fontSize.toFixed(2) + "px";
+        txt.style.strokeWidth = Math.max(1.4, fontSize * 0.07).toFixed(2) + "px";
+
+        if(!rawValue) return;
+
+        try{
+          const textWidth = Number(txt.getComputedTextLength?.() || 0);
+          const textBox = txt.getBBox?.();
+          const widthRatio = textWidth > 0 ? (maxTextWidth / textWidth) : 1;
+          const heightRatio = (textBox && textBox.height > 0) ? (maxTextHeight / textBox.height) : 1;
+          const ratio = Math.min(1, widthRatio, heightRatio);
+          if(Number.isFinite(ratio) && ratio < 1){
+            fontSize = Math.max(minFont, fontSize * ratio);
+          }
+        }catch(e){
+          const approxChars = Math.max(1, rawValue.length);
+          const approxWidth = approxChars * fontSize * 0.58;
+          if(approxWidth > maxTextWidth){
+            fontSize = Math.max(minFont, fontSize * (maxTextWidth / approxWidth));
+          }
+        }
+
+        txt.setAttribute("font-size", fontSize.toFixed(2));
+        txt.style.fontSize = fontSize.toFixed(2) + "px";
+        txt.style.strokeWidth = Math.max(1.2, fontSize * 0.065).toFixed(2) + "px";
       }
 
       function placeHexes(){
@@ -8626,8 +8565,6 @@ function hideEidIntro(immediate){
         const offsetY = ((H - (maxY - minY)) / 2) - minY;
 
         const isTvMode = document.body.classList.contains("tvMode");
-        GAME_UI._lastCellW = cellW;
-        GAME_UI._lastCellH = cellH;
         let i = 0;
         for(const meta of cellsMeta){
           const x = meta.x + offsetX;
@@ -9130,8 +9067,6 @@ function hideEidIntro(immediate){
         }
         const offsetX = ((W - (maxX - minX)) / 2) - minX;
         const offsetY = ((H - (maxY - minY)) / 2) - minY;
-        GAME_UI._lastCellW = cellW;
-        GAME_UI._lastCellH = cellH;
         let i = 0;
         for(const meta of cellsMeta){
           const x = meta.x + offsetX;
@@ -9143,7 +9078,13 @@ function hideEidIntro(immediate){
           txt.setAttribute("y", (y + cellH/2 + 2).toFixed(2));
 
           const isTvMode = document.body.classList.contains("tvMode");
-          fitCellTextToHex(txt, getDisplayedCellValue(board, meta.row, meta.col), cellW, cellH, isTvMode);
+          const baseLetterSize = Math.min(cellW, cellH) * (isTvMode ? 0.50 : 0.44);
+          const finalLetterSize = Math.max(30, Math.min(baseLetterSize, isTvMode ? 72 : 64));
+          txt.setAttribute("font-size", finalLetterSize.toFixed(2));
+          txt.style.fontSize = finalLetterSize.toFixed(2) + "px";
+          txt.style.strokeWidth = Math.max(1.8, finalLetterSize * 0.07).toFixed(2) + "px";
+
+          txt.textContent = getDisplayedCellValue(board, meta.row, meta.col);
           i++;
         }
         applyZoomFix();
@@ -9327,10 +9268,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           }
           cell.classList.remove("selectedCell");
           const txt = GAME_UI.letterEls?.[i];
-          if(txt){
-            const rawCellValue = getDisplayedCellValue(board, r, c);
-            fitCellTextToHex(txt, rawCellValue, GAME_UI._lastCellW || 90, GAME_UI._lastCellH || 96, document.body.classList.contains('tvMode'));
-          }
+          if(txt){ txt.textContent = getDisplayedCellValue(board, r, c); }
         }
       }
 
