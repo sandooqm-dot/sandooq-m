@@ -1460,10 +1460,10 @@
     }
     .directQActions{
       display:flex;
+      flex-direction:column;
       align-items:center;
       justify-content:center;
       gap:12px;
-      flex-wrap:wrap;
       margin-top:6px;
     }
     .directActionBtn{
@@ -8399,8 +8399,8 @@ function hideEidIntro(immediate){
                 </div>
                 <div id="qText" class="qText directQText">اختر حرفًا من الخريطة</div>
                 <div class="directQActions">
-                  <button id="nextQ" class="pillBtn directNextBtn" type="button">تغيير السؤال</button>
                   <button id="ansBtn" class="answerBtn red directActionBtn" type="button">إظهار الإجابة</button>
+                  <button id="nextQ" class="pillBtn directNextBtn" type="button">تغيير السؤال</button>
                 </div>
               </div>
             ` : `
