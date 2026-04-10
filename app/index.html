@@ -530,6 +530,161 @@
       font-weight:700;
     }
 
+
+    .tour-overlay{
+      position:fixed;
+      inset:0;
+      z-index:12000;
+      display:none;
+    }
+
+    .tour-overlay.show{
+      display:block;
+    }
+
+    .tour-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(20,10,18,.72);
+      backdrop-filter:blur(2px);
+      -webkit-backdrop-filter:blur(2px);
+    }
+
+    .tour-highlight{
+      position:fixed;
+      border-radius:18px;
+      border:4px solid #f4c400;
+      box-shadow:0 0 0 9999px rgba(0,0,0,.28), 0 18px 34px rgba(0,0,0,.24);
+      pointer-events:none;
+      display:none;
+      z-index:12002;
+      transition:all .2s ease;
+    }
+
+    .tour-card{
+      position:fixed;
+      width:min(420px, calc(100vw - 28px));
+      background:#fff7de;
+      color:#111;
+      border:4px solid #2b1b17;
+      border-radius:24px;
+      box-shadow:0 22px 40px rgba(0,0,0,.28);
+      padding:16px 16px 14px;
+      z-index:12003;
+      text-align:right;
+      transition:all .2s ease;
+    }
+
+    .tour-card.intro{
+      width:min(500px, calc(100vw - 28px));
+      left:50% !important;
+      top:50% !important;
+      transform:translate(-50%, -50%) !important;
+      text-align:center;
+      padding:18px 18px 16px;
+    }
+
+    .tour-mascot{
+      width:110px;
+      height:110px;
+      object-fit:contain;
+      display:block;
+      margin:0 auto 10px;
+    }
+
+    .tour-title{
+      margin:0 0 8px;
+      color:#7b1f63;
+      font-size:24px;
+      line-height:1.35;
+      font-weight:700;
+      text-align:center;
+    }
+
+    .tour-text{
+      margin:0;
+      color:#1b1b1b;
+      font-size:17px;
+      line-height:1.8;
+      font-weight:700;
+      text-align:center;
+    }
+
+    .tour-step{
+      margin-top:10px;
+      text-align:center;
+      color:#6b3154;
+      font-size:14px;
+      font-weight:700;
+    }
+
+    .tour-controls{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      width:min(560px, calc(100vw - 26px));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+      z-index:12004;
+      transition:all .2s ease;
+    }
+
+    .tour-controls.top{
+      top:16px;
+      bottom:auto;
+    }
+
+    .tour-btn{
+      border:none;
+      border-radius:14px;
+      cursor:pointer;
+      font-size:17px;
+      font-weight:700;
+      padding:12px 16px;
+      box-shadow:0 10px 22px rgba(0,0,0,.18);
+      font-family:"AA-GALAXY", Arial, sans-serif;
+    }
+
+    .tour-btn.primary{
+      min-width:150px;
+      background:#f4c400;
+      color:#111;
+    }
+
+    .tour-btn.secondary{
+      background:#fff;
+      color:#5a1d58;
+      border:2px solid #e6d1e0;
+    }
+
+    .tour-btn.ghost{
+      background:#ffe9e9;
+      color:#8d1f1f;
+      border:2px solid #f2b3b3;
+    }
+
+    .tour-hidden{
+      display:none !important;
+    }
+
+    body.tour-open{
+      overflow:hidden;
+    }
+
+    @media (max-width: 420px){
+      .tour-card{ padding:14px 14px 12px; border-radius:20px; }
+      .tour-title{ font-size:21px; }
+      .tour-text{ font-size:15px; line-height:1.75; }
+      .tour-controls{ width:calc(100vw - 20px); gap:8px; }
+      .tour-btn{ font-size:15px; padding:11px 12px; }
+      .tour-btn.primary{ min-width:120px; }
+      .tour-mascot{ width:92px; height:92px; }
+    }
+
     @media (max-width: 420px){
       .option-grid{
         grid-template-columns:repeat(3, 1fr);
@@ -789,12 +944,12 @@
   <div class="wrap">
     <div class="card">
 
-      <div class="section section-name">
+      <div class="section section-name" id="tourSectionName">
         <label class="label" for="name">اسم المسابقة</label>
         <input id="name" class="center-input" placeholder="اكتب اسم المسابقة">
       </div>
 
-      <div class="section section-teams">
+      <div class="section section-teams" id="tourSectionTeams">
         <div class="label">أسماء الفريقين</div>
         <div class="row-2">
           <input id="team1" class="center-input" placeholder="اسم الفريق الأول">
@@ -802,9 +957,9 @@
         </div>
       </div>
 
-      <div class="section section-controls">
+      <div class="section section-controls" id="tourSectionControls">
         <div class="control-grid">
-          <div class="control-card">
+          <div class="control-card" id="tourPlayersCard">
             <div class="label">عدد اللاعبين</div>
             <div class="control-box">
               <div class="players-box">
@@ -815,7 +970,7 @@
             </div>
           </div>
 
-          <div class="control-card">
+          <div class="control-card" id="tourThemeCard">
             <div class="label">ثيم العيد</div>
             <div class="control-box theme-box">
               <button type="button" class="theme-toggle off" id="eidThemeToggle" aria-label="تشغيل أو إطفاء ثيم العيد" aria-pressed="false">
@@ -826,7 +981,7 @@
         </div>
       </div>
 
-      <div class="section section-rounds">
+      <div class="section section-rounds" id="tourRoundsSection">
         <div class="label">عدد جولات الفوز</div>
         <div class="option-grid" id="roundsOptions">
           <button type="button" class="opt-btn active" data-group="rounds" data-value="1">جولة</button>
@@ -835,7 +990,7 @@
         </div>
       </div>
 
-      <div class="section section-cells">
+      <div class="section section-cells" id="tourCellsSection">
         <div class="label">نوع الخلايا</div>
         <div class="option-grid" id="cellCountOptions">
           <button type="button" class="opt-btn active" data-group="cellCount" data-value="4">رباعية</button>
@@ -844,15 +999,32 @@
         </div>
       </div>
 
-      <div class="section section-colors">
+      <div class="section section-colors" id="tourColorsSection">
         <div class="label">لون الخلايا</div>
         <div class="colors-grid" id="colorPairs"></div>
       </div>
 
       <div class="action-row action-row-main">
-        <button id="btn" class="submit-btn">إنشاء اللعبة</button>
-        <button type="button" id="openHelpBtn" class="help-open-btn">التعليمات</button>
+        <button id="btn" class="submit-btn" data-tour-primary="1">إنشاء اللعبة</button>
+        <button type="button" id="openHelpBtn" class="help-open-btn" data-tour-help="1">التعليمات</button>
       </div>
+    </div>
+  </div>
+
+
+  <div class="tour-overlay" id="tourOverlay" aria-hidden="true">
+    <div class="tour-backdrop"></div>
+    <div class="tour-highlight" id="tourHighlight"></div>
+    <div class="tour-card intro" id="tourCard">
+      <img src="../guide-mascot.PNG" alt="صندوق المسابقات" class="tour-mascot" id="tourMascot">
+      <h3 class="tour-title" id="tourTitle">أنا صندوق المسابقات</h3>
+      <p class="tour-text" id="tourText">تعال معي أشرح لك هذه الصفحة بسرعة، وبعدها تكمل إعداد لعبتك براحتك.</p>
+      <div class="tour-step" id="tourStep">1 / 10</div>
+    </div>
+    <div class="tour-controls" id="tourControls">
+      <button type="button" class="tour-btn ghost" id="tourNeverBtn">عدم عرض الشرح مرة أخرى</button>
+      <button type="button" class="tour-btn secondary" id="tourSkipBtn">تخطي الشرح</button>
+      <button type="button" class="tour-btn primary" id="tourNextBtn">فهمت</button>
     </div>
   </div>
 
@@ -1284,11 +1456,137 @@
       }
     }
 
+
+    const TOUR_DISABLE_KEY = "horof_tour_disabled_v1";
+    const homeTourSteps = [
+      { target:null, title:"أنا صندوق المسابقات", text:"تعال معي أشرح لك هذه الصفحة بسرعة. هنا تبدأ اللعبة من كتابة اسم المسابقة إلى إنشاء الغرفة.", intro:true },
+      { target:"#tourSectionName", title:"اسم المسابقة", text:"اكتب هنا اسم المسابقة. هذا الاسم يظهر داخل اللعبة ويعطيها شكلًا أجمل وواضحًا للحضور." },
+      { target:"#tourSectionTeams", title:"أسماء الفريقين", text:"من هنا تكتب أسماء الفريقين. حاول تختار أسماء قصيرة وواضحة حتى تظهر بشكل جميل داخل اللعبة." },
+      { target:"#tourPlayersCard", title:"عدد اللاعبين", text:"هذا الخيار يحدد الحد الأعلى لدخول اللاعبين. استخدم السهمين لزيادة العدد أو تقليله حسب عدد المشاركين عندك." },
+      { target:"#tourThemeCard", title:"ثيم العيد", text:"إذا فعلته تظهر مؤثرات وثيم خاص بالعيد داخل اللعبة. وإذا ما تحتاجه اتركه مطفأ." },
+      { target:"#tourRoundsSection", title:"عدد جولات الفوز", text:"هنا تحدد متى تنتهي المنافسة: جولة واحدة أو ثلاث جولات أو خمس جولات." },
+      { target:"#tourCellsSection", title:"نوع الخلايا", text:"اختر شكل الخلايا في الخريطة: رباعية أو خماسية أو سداسية. هذا يغير شكل الخريطة وطريقة عرضها داخل اللعبة." },
+      { target:"#tourColorsSection", title:"لون الخلايا", text:"من هنا تختار لون الفريقين. اختر الألوان التي تناسب مناسبتك وتكون واضحة أثناء اللعب." },
+      { target:"#openHelpBtn", title:"زر التعليمات", text:"إذا احتجت ترجع للشرح لاحقًا، اضغط التعليمات وستجد طريقة اللعب وطريقة مشاركة اللاعبين وشرح الأزرار." },
+      { target:"#btn", title:"إنشاء اللعبة", text:"بعد ما تجهز كل الخيارات، اضغط إنشاء اللعبة للانتقال إلى صفحة المقدم وبدء اللعب فعليًا." }
+    ];
+
+    function setupHomeTour(){
+      const overlay = document.getElementById('tourOverlay');
+      const card = document.getElementById('tourCard');
+      const title = document.getElementById('tourTitle');
+      const text = document.getElementById('tourText');
+      const stepEl = document.getElementById('tourStep');
+      const highlight = document.getElementById('tourHighlight');
+      const controls = document.getElementById('tourControls');
+      const nextBtn = document.getElementById('tourNextBtn');
+      const skipBtn = document.getElementById('tourSkipBtn');
+      const neverBtn = document.getElementById('tourNeverBtn');
+      const mascot = document.getElementById('tourMascot');
+      if(!overlay || !card || !title || !text || !stepEl || !highlight || !controls || !nextBtn || !skipBtn || !neverBtn || !mascot) return;
+
+      let currentStep = 0;
+      let running = false;
+
+      function getSafeRect(el){
+        const rect = el.getBoundingClientRect();
+        return { top:rect.top, left:rect.left, right:rect.right, bottom:rect.bottom, width:rect.width, height:rect.height };
+      }
+
+      function placeControls(useTop){
+        controls.classList.toggle('top', !!useTop);
+      }
+
+      function showStep(index){
+        currentStep = index;
+        const step = homeTourSteps[index];
+        if(!step) return closeTour();
+        title.textContent = step.title;
+        text.textContent = step.text;
+        stepEl.textContent = `${index + 1} / ${homeTourSteps.length}`;
+        nextBtn.textContent = index === homeTourSteps.length - 1 ? 'ابدأ الآن' : 'فهمت';
+        card.classList.toggle('intro', !!step.intro);
+        mascot.classList.toggle('tour-hidden', !step.intro);
+
+        if(step.intro || !step.target){
+          highlight.style.display = 'none';
+          card.style.left = '50%';
+          card.style.top = '50%';
+          card.style.right = 'auto';
+          card.style.bottom = 'auto';
+          card.style.transform = 'translate(-50%, -50%)';
+          placeControls(false);
+          return;
+        }
+
+        const target = document.querySelector(step.target);
+        if(!target){
+          return showStep(index + 1);
+        }
+        target.scrollIntoView({ block:'center', behavior:'instant' });
+        requestAnimationFrame(() => {
+          const rect = getSafeRect(target);
+          const pad = 8;
+          highlight.style.display = 'block';
+          highlight.style.left = `${Math.max(8, rect.left - pad)}px`;
+          highlight.style.top = `${Math.max(8, rect.top - pad)}px`;
+          highlight.style.width = `${Math.min(window.innerWidth - 16, rect.width + pad * 2)}px`;
+          highlight.style.height = `${rect.height + pad * 2}px`;
+
+          const tempWidth = Math.min(420, window.innerWidth - 28);
+          const estimatedHeight = 170;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const spaceAbove = rect.top;
+          const placeAbove = spaceBelow < (estimatedHeight + 110) && spaceAbove > spaceBelow;
+          let cardTop = placeAbove ? rect.top - estimatedHeight - 16 : rect.bottom + 16;
+          cardTop = Math.max(12, Math.min(cardTop, window.innerHeight - estimatedHeight - 86));
+          let cardLeft = rect.left + (rect.width / 2) - (tempWidth / 2);
+          cardLeft = Math.max(12, Math.min(cardLeft, window.innerWidth - tempWidth - 12));
+          card.style.left = `${cardLeft}px`;
+          card.style.top = `${cardTop}px`;
+          card.style.right = 'auto';
+          card.style.bottom = 'auto';
+          card.style.transform = 'none';
+          placeControls(rect.bottom > window.innerHeight * 0.62);
+        });
+      }
+
+      function closeTour(){
+        running = false;
+        overlay.classList.remove('show');
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('tour-open');
+      }
+
+      function openTour(){
+        if(localStorage.getItem(TOUR_DISABLE_KEY) === '1') return;
+        running = true;
+        overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('tour-open');
+        showStep(0);
+      }
+
+      nextBtn.addEventListener('click', () => {
+        if(currentStep >= homeTourSteps.length - 1) return closeTour();
+        showStep(currentStep + 1);
+      });
+      skipBtn.addEventListener('click', closeTour);
+      neverBtn.addEventListener('click', () => {
+        localStorage.setItem(TOUR_DISABLE_KEY, '1');
+        closeTour();
+      });
+      window.addEventListener('resize', () => { if(running) showStep(currentStep); });
+      window.addEventListener('orientationchange', () => { if(running) setTimeout(() => showStep(currentStep), 140); });
+      requestAnimationFrame(() => setTimeout(openTour, 260));
+    }
+
     renderColorPairs();
     setupOptionButtons();
     setupPlayersControl();
     setupEidThemeToggle();
     setupHelpModal();
+    setupHomeTour();
     document.getElementById("btn").addEventListener("click", createRoom);
   </script>
 </body>
