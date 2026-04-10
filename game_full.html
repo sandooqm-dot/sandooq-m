@@ -8052,26 +8052,68 @@ function hideEidIntro(immediate){
 
     function getLobbyTourSteps(roomLike){
       const steps = [
-        { target:null, title:'أنا صندوق المسابقات', text:'أهلاً بك. سأشرح لك هذه الصفحة بسرعة حتى تعرف كيف تجهز اللعبة وتبدأها بكل سهولة.', intro:true },
-        { target:'.pickerOptionBtn.modeSingle', title:'اللعب من جهاز واحد', text:'إذا اخترت هذا الخيار، تشغّل اللعبة مباشرة من نفس الجهاز بدون روابط لاعبين أو باركود.' },
-        { target:'.pickerOptionBtn.modeMulti', title:'اللعب من أجهزة متعددة', text:'إذا اخترت هذا الخيار، يدخل اللاعبون من أجهزتهم ويشارك كل لاعب من جواله داخل الغرفة.' }
-      ];
-      const playMode = getHostLobbyExperience(roomLike) === 'education'
-        ? (getEducationPlayType(roomLike) || 'single')
-        : (getNormalPlayType(roomLike) || 'multi');
-      if(playMode === 'multi'){
-        steps.push(
-          { target:'#hostTourTeamsWrap', title:'الفريقان واللاعبون', text:'هنا يظهر الفريقان واللاعبون الذين دخلوا. يمكنك متابعة من انضم، ومعرفة توزيعهم على الفريقين.' },
-          { target:'#openJoinModalBtn', title:'إضافة أجهزة اللاعبين', text:'من هذا الزر تعرض باركود أو رابط دخول اللاعبين، بحيث ينضم كل لاعب من جهازه إلى الغرفة.' },
-          { target:'#hostTourDisplayToggleWrap', title:'شاشة عرض مستقلة', text:'هذا الخيار اختياري. عند تفعيله يتم عرض خريطة الخلايا فقط بشكل جميل ومرتب على شاشة مستقلة، وتتحكم فيها أنت من جوالك.' }
-        );
-        if(document.getElementById('openDisplayModalBtn')){
-          steps.push({ target:'#openDisplayModalBtn', title:'رابط شاشة العرض', text:'إذا فعّلت شاشة العرض المستقلة، يظهر هذا الزر لتفتح رابط الشاشة أو تنسخه للشاشة المخصصة للعرض فقط.' });
+        {
+          target:null,
+          title:'نستكمل الشرح',
+          text:'الآن لنتعرّف بسرعة على طرق اللعب وإضافة اللاعبين، حتى تختار الطريقة المناسبة وتبدأ بسهولة.',
+          intro:true
+        },
+        {
+          target:'.pickerOptionBtn.modeSingle',
+          title:'اللعب من جهاز واحد',
+          text:'اختر هذا النمط إذا كنت تريد تشغيل اللعبة مباشرة من نفس الجهاز بدون روابط لاعبين أو باركود.'
+        },
+        {
+          target:'#hostTourSingleInfo',
+          title:'لعبة عادية',
+          text:'هنا يظهر وصف اللعب من جهاز واحد. في هذا الوضع تبدأ اللعبة فوراً من نفس الجهاز بدون مشاركة روابط للاعبين.',
+          switchMode:'single'
+        },
+        {
+          target:'#startBtn',
+          title:'ابدأ اللعبة',
+          text:'بعد اختيار اللعب من جهاز واحد، اضغط هنا لبدء اللعبة مباشرة من نفس الجهاز.',
+          switchMode:'single'
+        },
+        {
+          target:'.pickerOptionBtn.modeMulti',
+          title:'اللعب من أجهزة متعددة',
+          text:'إذا أردت أن يشارك اللاعبون من جوالاتهم، اختر هذا النمط ثم أكمل تجهيز الدخول للاعبين.',
+          switchMode:'multi'
+        },
+        {
+          target:'#hostTourTeamsWrap',
+          title:'الفريقان واللاعبون',
+          text:'هنا يظهر الفريقان واللاعبون الذين دخلوا. تتابع من انضم، ومع أي فريق تم توزيعهم.',
+          switchMode:'multi'
+        },
+        {
+          target:'#openJoinModalBtn',
+          title:'إضافة أجهزة اللاعبين',
+          text:'من هذا الزر تعرض باركود أو رابط دخول اللاعبين، بحيث ينضم كل لاعب من جهازه إلى الغرفة.',
+          switchMode:'multi'
+        },
+        {
+          target:'#hostTourDisplayToggleWrap',
+          title:'شاشة عرض مستقلة',
+          text:'هذا الخيار اختياري. عند تفعيله يتم عرض خريطة الخلايا فقط بشكل جميل ومرتب على شاشة مستقلة، بينما يكون التحكم كاملًا من جوالك.',
+          switchMode:'multi'
         }
-      }else{
-        steps.push({ target:'#hostTourSingleInfo', title:'اللعب من جهاز واحد', text:'في هذا الوضع تشغّل اللعبة مباشرة من نفس الجهاز، بدون روابط لاعبين أو باركود.' });
+      ];
+      if(document.getElementById('openDisplayModalBtn')){
+        steps.push({
+          target:'#openDisplayModalBtn',
+          title:'رابط شاشة العرض',
+          text:'إذا فعّلت شاشة العرض المستقلة، يظهر هذا الزر لتفتح رابط الشاشة أو تنسخه للشاشة المخصصة للعرض فقط.',
+          switchMode:'multi'
+        });
       }
-      steps.push({ target:'#startBtn', title:'ابدأ اللعبة', text:'بعد اختيار الطريقة المناسبة وتجهيز اللاعبين، اضغط هنا لبدء اللعبة فعلياً.' });
+      steps.push({
+        target:'#startBtn',
+        title:'ابدأ اللعبة',
+        text:'بعد اختيار الطريقة المناسبة وتجهيز اللاعبين، اضغط هنا لبدء اللعبة فعلياً.',
+        switchMode:'multi'
+      });
       return steps;
     }
 
@@ -8102,6 +8144,13 @@ function hideEidIntro(immediate){
       LOBBY_TOUR.card.classList.toggle('intro', !!step.intro);
       LOBBY_TOUR.mascot.classList.toggle('lobbyTourHidden', !step.intro);
 
+      if(step.switchMode){
+        try{
+          const btn = document.querySelector(step.switchMode === 'single' ? '.pickerOptionBtn.modeSingle' : '.pickerOptionBtn.modeMulti');
+          btn?.click();
+        }catch(_e){}
+      }
+
       if(step.intro || !step.target){
         if(LOBBY_TOUR.backdrop) LOBBY_TOUR.backdrop.classList.remove('hidden');
         if(LOBBY_TOUR.highlight) LOBBY_TOUR.highlight.style.display = 'none';
@@ -8114,38 +8163,46 @@ function hideEidIntro(immediate){
         return;
       }
 
-      const target = document.querySelector(step.target);
-      if(!target){
-        return showLobbyTourStep(index + 1);
-      }
-      target.scrollIntoView({ block:'center', behavior:'instant' });
-      requestAnimationFrame(() => {
-        const rect = target.getBoundingClientRect();
-        const pad = 8;
-        if(LOBBY_TOUR.backdrop) LOBBY_TOUR.backdrop.classList.add('hidden');
-        if(LOBBY_TOUR.highlight){
-          LOBBY_TOUR.highlight.style.display = 'block';
-          LOBBY_TOUR.highlight.style.left = `${Math.max(8, rect.left - pad)}px`;
-          LOBBY_TOUR.highlight.style.top = `${Math.max(8, rect.top - pad)}px`;
-          LOBBY_TOUR.highlight.style.width = `${Math.min(window.innerWidth - 16, rect.width + pad * 2)}px`;
-          LOBBY_TOUR.highlight.style.height = `${rect.height + pad * 2}px`;
+      const placeStep = () => {
+        const target = document.querySelector(step.target);
+        if(!target){
+          return showLobbyTourStep(index + 1);
         }
-        const tempWidth = Math.min(420, window.innerWidth - 28);
-        const estimatedHeight = 170;
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        const placeAbove = spaceBelow < (estimatedHeight + 110) && spaceAbove > spaceBelow;
-        let cardTop = placeAbove ? rect.top - estimatedHeight - 16 : rect.bottom + 16;
-        cardTop = Math.max(12, Math.min(cardTop, window.innerHeight - estimatedHeight - 86));
-        let cardLeft = rect.left + (rect.width / 2) - (tempWidth / 2);
-        cardLeft = Math.max(12, Math.min(cardLeft, window.innerWidth - tempWidth - 12));
-        LOBBY_TOUR.card.style.left = `${cardLeft}px`;
-        LOBBY_TOUR.card.style.top = `${cardTop}px`;
-        LOBBY_TOUR.card.style.right = 'auto';
-        LOBBY_TOUR.card.style.bottom = 'auto';
-        LOBBY_TOUR.card.style.transform = 'none';
-        placeLobbyTourControls(rect.bottom > window.innerHeight * 0.62);
-      });
+        target.scrollIntoView({ block:'center', behavior:'instant' });
+        requestAnimationFrame(() => {
+          const rect = target.getBoundingClientRect();
+          const pad = 8;
+          if(LOBBY_TOUR.backdrop) LOBBY_TOUR.backdrop.classList.add('hidden');
+          if(LOBBY_TOUR.highlight){
+            LOBBY_TOUR.highlight.style.display = 'block';
+            LOBBY_TOUR.highlight.style.left = `${Math.max(8, rect.left - pad)}px`;
+            LOBBY_TOUR.highlight.style.top = `${Math.max(8, rect.top - pad)}px`;
+            LOBBY_TOUR.highlight.style.width = `${Math.min(window.innerWidth - 16, rect.width + pad * 2)}px`;
+            LOBBY_TOUR.highlight.style.height = `${rect.height + pad * 2}px`;
+          }
+          const tempWidth = Math.min(420, window.innerWidth - 28);
+          const estimatedHeight = 170;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const spaceAbove = rect.top;
+          const placeAbove = spaceBelow < (estimatedHeight + 110) && spaceAbove > spaceBelow;
+          let cardTop = placeAbove ? rect.top - estimatedHeight - 16 : rect.bottom + 16;
+          cardTop = Math.max(12, Math.min(cardTop, window.innerHeight - estimatedHeight - 86));
+          let cardLeft = rect.left + (rect.width / 2) - (tempWidth / 2);
+          cardLeft = Math.max(12, Math.min(cardLeft, window.innerWidth - tempWidth - 12));
+          LOBBY_TOUR.card.style.left = `${cardLeft}px`;
+          LOBBY_TOUR.card.style.top = `${cardTop}px`;
+          LOBBY_TOUR.card.style.right = 'auto';
+          LOBBY_TOUR.card.style.bottom = 'auto';
+          LOBBY_TOUR.card.style.transform = 'none';
+          placeLobbyTourControls(rect.bottom > window.innerHeight * 0.62);
+        });
+      };
+
+      if(step.switchMode){
+        setTimeout(placeStep, 120);
+      }else{
+        placeStep();
+      }
     }
 
     function goNextLobbyTourStep(){
