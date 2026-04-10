@@ -550,6 +550,10 @@
       -webkit-backdrop-filter:blur(2px);
     }
 
+    .tour-backdrop.hidden{
+      display:none;
+    }
+
     .tour-highlight{
       position:fixed;
       border-radius:18px;
@@ -1462,7 +1466,7 @@
       { target:null, title:"أنا صندوق المسابقات", text:"تعال معي أشرح لك هذه الصفحة بسرعة. هنا تبدأ اللعبة من كتابة اسم المسابقة إلى إنشاء الغرفة.", intro:true },
       { target:"#tourSectionName", title:"اسم المسابقة", text:"اكتب هنا اسم المسابقة. هذا الاسم يظهر داخل اللعبة ويعطيها شكلًا أجمل وواضحًا للحضور." },
       { target:"#tourSectionTeams", title:"أسماء الفريقين", text:"من هنا تكتب أسماء الفريقين. حاول تختار أسماء قصيرة وواضحة حتى تظهر بشكل جميل داخل اللعبة." },
-      { target:"#tourPlayersCard", title:"عدد اللاعبين", text:"هذا الخيار يحدد الحد الأعلى لدخول اللاعبين. استخدم السهمين لزيادة العدد أو تقليله حسب عدد المشاركين عندك." },
+      { target:"#tourPlayersCard", title:"عدد اللاعبين", text:"هذا الخيار تستخدمه إذا اخترت اللعب بأجهزة متعددة. من هنا تحدد عدد اللاعبين المشاركين، وتستخدم السهمين لزيادة العدد أو تقليله حسب عدد المشاركين عندك." },
       { target:"#tourThemeCard", title:"ثيم العيد", text:"إذا فعلته تظهر مؤثرات وثيم خاص بالعيد داخل اللعبة. وإذا ما تحتاجه اتركه مطفأ." },
       { target:"#tourRoundsSection", title:"عدد جولات الفوز", text:"هنا تحدد متى تنتهي المنافسة: جولة واحدة أو ثلاث جولات أو خمس جولات." },
       { target:"#tourCellsSection", title:"نوع الخلايا", text:"اختر شكل الخلايا في الخريطة: رباعية أو خماسية أو سداسية. هذا يغير شكل الخريطة وطريقة عرضها داخل اللعبة." },
@@ -1478,6 +1482,7 @@
       const text = document.getElementById('tourText');
       const stepEl = document.getElementById('tourStep');
       const highlight = document.getElementById('tourHighlight');
+      const backdrop = overlay.querySelector('.tour-backdrop');
       const controls = document.getElementById('tourControls');
       const nextBtn = document.getElementById('tourNextBtn');
       const skipBtn = document.getElementById('tourSkipBtn');
@@ -1509,6 +1514,7 @@
         mascot.classList.toggle('tour-hidden', !step.intro);
 
         if(step.intro || !step.target){
+          if(backdrop) backdrop.classList.remove('hidden');
           highlight.style.display = 'none';
           card.style.left = '50%';
           card.style.top = '50%';
@@ -1525,6 +1531,7 @@
         }
         target.scrollIntoView({ block:'center', behavior:'instant' });
         requestAnimationFrame(() => {
+          if(backdrop) backdrop.classList.add('hidden');
           const rect = getSafeRect(target);
           const pad = 8;
           highlight.style.display = 'block';
@@ -1553,6 +1560,7 @@
 
       function closeTour(){
         running = false;
+        if(backdrop) backdrop.classList.remove('hidden');
         overlay.classList.remove('show');
         overlay.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('tour-open');
@@ -1561,6 +1569,7 @@
       function openTour(){
         if(localStorage.getItem(TOUR_DISABLE_KEY) === '1') return;
         running = true;
+        if(backdrop) backdrop.classList.remove('hidden');
         overlay.classList.add('show');
         overlay.setAttribute('aria-hidden', 'false');
         document.body.classList.add('tour-open');
