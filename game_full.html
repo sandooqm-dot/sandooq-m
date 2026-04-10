@@ -3219,6 +3219,14 @@
       top:50% !important;
       transform:translate(-50%, -50%);
     }
+    .eduGuideMascot{
+      width:108px;
+      height:108px;
+      object-fit:contain;
+      display:none;
+      margin:0 auto 12px;
+    }
+    .eduGuideMascot.show{ display:block; }
     .eduGuideProgress{
       font-size:14px;
       font-weight:900;
@@ -7170,6 +7178,7 @@ function hideEidIntro(immediate){
       overlay:null,
       spotlight:null,
       card:null,
+      mascotEl:null,
       progressEl:null,
       titleEl:null,
       textEl:null,
@@ -7191,6 +7200,7 @@ function hideEidIntro(immediate){
       overlay.innerHTML = `
         <div id="eduGuideSpotlight" class="eduGuideSpotlight"></div>
         <div id="eduGuideCard" class="eduGuideCard centered" role="dialog" aria-modal="true" aria-label="شرح واجهة اللعبة">
+          <img id="eduGuideMascot" class="eduGuideMascot" src="guide-mascot.PNG" alt="صندوق المسابقات">
           <div id="eduGuideProgress" class="eduGuideProgress"></div>
           <h3 id="eduGuideTitle" class="eduGuideTitle"></h3>
           <p id="eduGuideText" class="eduGuideText"></p>
@@ -7203,6 +7213,7 @@ function hideEidIntro(immediate){
       EDUCATION_GUIDE.overlay = overlay;
       EDUCATION_GUIDE.spotlight = overlay.querySelector('#eduGuideSpotlight');
       EDUCATION_GUIDE.card = overlay.querySelector('#eduGuideCard');
+      EDUCATION_GUIDE.mascotEl = overlay.querySelector('#eduGuideMascot');
       EDUCATION_GUIDE.progressEl = overlay.querySelector('#eduGuideProgress');
       EDUCATION_GUIDE.titleEl = overlay.querySelector('#eduGuideTitle');
       EDUCATION_GUIDE.textEl = overlay.querySelector('#eduGuideText');
@@ -7219,12 +7230,16 @@ function hideEidIntro(immediate){
         ? getEducationPlayType(roomLike)
         : getNormalPlayType(roomLike);
       const directPlayMode = selectedGuidePlayMode === 'single';
+      const timerText = directPlayMode
+        ? 'هذا هو المؤقت. في اللعب من جهاز واحد يبدأ العد مباشرة عند الضغط على دائرة المؤقت، وتستخدمه لحساب وقت الإجابة داخل الجولة.'
+        : 'هذا هو المؤقت. يبدأ العد بعد اعتماد أول لاعب أو بدء دوره، ويستخدم لتحديد الوقت المتاح للإجابة داخل الجولة.';
       const steps = [
         {
           id:'welcome',
           title:'هنا واجهة اللعبة',
           text:'من هذه الصفحة تدير الجولة كاملة: تختار من الخريطة، تتابع النتيجة، وتتحكم بأزرار اللعب الأساسية.',
           centered:true,
+          showMascot:true,
           buttonText:'ابدأ الشرح'
         },
         {
@@ -7251,7 +7266,7 @@ function hideEidIntro(immediate){
         {
           id:'timer',
           title:'المؤقت',
-          text:'هذا هو المؤقت الخاص بالإجابة. يبدأ العد عند اعتماد الدور، ويحدد الوقت المتاح للاعب قبل انتهاء الفرصة.',
+          text: timerText,
           target:'#timerClock',
           closeSettings:true
         },
@@ -7274,7 +7289,102 @@ function hideEidIntro(immediate){
           title:'مربع السؤال',
           text:'هذا هو مربع السؤال. تظهر فيه تعليمات الجولة أو نص السؤال بعد اختيار الخلية من الخريطة.',
           target:'.questionCard',
-          closeSettings:true,
+          closeSettings:true
+        },
+        {
+          id:'settings-button',
+          title:'الإعدادات',
+          text:'من هذا الزر تدخل إلى صفحة الإعدادات، ومنها تغيّر نوع الأسئلة، وتضيف أسئلتك، وتعدّل محتوى الخلايا، وتضبط المؤقت.',
+          target:'#settingsBtn',
+          closeSettings:true
+        },
+        {
+          id:'settings-main',
+          title:'الرئيسية داخل الإعدادات',
+          text:'هذا هو تبويب الرئيسية. منه تغيّر بسرعة نوع الأسئلة المعروض، ونوع محتوى الخلايا، وتشغيل أو إطفاء أصوات اللعبة.',
+          target:'[data-settings-panel="main"] .settingsCard',
+          panel:'main'
+        },
+        {
+          id:'settings-questions-choice',
+          title:'نوع عرض الأسئلة',
+          text:'من هنا تختار بين أسئلة اللعبة الجاهزة أو الأسئلة المخصصة التي تضيفها بنفسك للمسابقة.',
+          targetResolver:() => document.querySelector('[data-main-choice-group="questions"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main'
+        },
+        {
+          id:'settings-cells-choice',
+          title:'عرض محتوى الخلايا',
+          text:'من هنا تحدد هل الخلايا تعرض حروف اللعبة الجاهزة أو تعرض المحتوى المخصص الذي ستكتبه يدويًا لكل جولة.',
+          targetResolver:() => document.querySelector('[data-main-choice-group="cells"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main'
+        },
+        {
+          id:'settings-sound-choice',
+          title:'أصوات اللعبة',
+          text:'من هنا تتحكم بأصوات اللعبة كاملة. إذا اخترت إطفاء فلن تعمل أصوات الجرس أو الاحتفال أو غيرها حتى تعيد تشغيلها.',
+          targetResolver:() => document.querySelector('[data-main-choice-group="sound"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main'
+        },
+        {
+          id:'settings-questions-tab',
+          title:'إضافة الأسئلة',
+          text:'هذا تبويب إضافة الأسئلة. بالضغط عليه تدخل إلى قائمة الحروف حتى تضيف لكل حرف أسئلة وأجوبة خاصة بك.',
+          target:'[data-settings-tab="questions"]',
+          panel:'questions'
+        },
+        {
+          id:'settings-questions-list',
+          title:'قائمة الحروف',
+          text:'هنا تظهر الحروف. افتح الحرف الذي تريده ثم أضف السؤال والجواب، وبعد الحفظ ستقدر تستخدمها داخل اللعبة.',
+          target:'#settingsQuestionsList',
+          panel:'questions'
+        },
+        {
+          id:'settings-cells-tab',
+          title:'محتوى الخلايا',
+          text:'هذا تبويب محتوى الخلايا. منه تخصص محتوى كل خلية يدويًا بحسب الجولة التي تريدها.',
+          target:'[data-settings-tab="cells"]',
+          panel:'cells'
+        },
+        {
+          id:'settings-mini-board',
+          title:'الخريطة المصغرة',
+          text:'هذه خريطة مصغرة للجولة. اضغط على أي خلية منها لتحديدها قبل كتابة المحتوى الخاص بها.',
+          target:'#settingsMiniBoard',
+          panel:'cells'
+        },
+        {
+          id:'settings-cell-input',
+          title:'كتابة محتوى الخلية',
+          text:'بعد تحديد الخلية من الخريطة المصغرة، اكتب محتواها في هذا الحقل تحديدًا. ويمكنك التنقل بين الجولات وتخصيص كل جولة على حدة.',
+          targetResolver:() => {
+            const input = SETTINGS_UI?.els?.backdrop?.querySelector?.('#settingsCellInput') || document.querySelector('#settingsCellInput') || null;
+            return input || null;
+          },
+          panel:'cells',
+          spotlightPadding:4
+        },
+        {
+          id:'settings-timer-tab',
+          title:'تعديل المؤقت',
+          text:'هذا تبويب المؤقت. منه تختار عدد الثواني المناسب للجولات حسب عمر المشاركين أو طبيعة النشاط.',
+          target:'[data-settings-tab="timer"]',
+          panel:'timer'
+        },
+        {
+          id:'settings-timer-range',
+          title:'سحب مدة المؤقت',
+          text:'حرّك هذا السلايدر حتى تحدد الوقت المناسب، ثم سيظهر العدد مباشرة أسفله قبل الحفظ.',
+          target:'#settingsTimerRange',
+          panel:'timer'
+        },
+        {
+          id:'settings-home-action',
+          title:'حفظ وخروج',
+          text:'بعد أي تعديل في الإعدادات اضغط هنا لحفظ التغييرات والرجوع مباشرة إلى صفحة اللعب.',
+          target:'#settingsSaveExit',
+          panel:'timer',
           buttonText:'تم'
         }
       ];
@@ -7370,6 +7480,9 @@ function hideEidIntro(immediate){
           EDUCATION_GUIDE.progressEl.textContent = `${EDUCATION_GUIDE.currentIndex + 1} / ${EDUCATION_GUIDE.steps.length}`;
           EDUCATION_GUIDE.titleEl.textContent = currentStep.title || 'شرح اللعبة';
           EDUCATION_GUIDE.textEl.textContent = currentStep.text || '';
+          if(EDUCATION_GUIDE.mascotEl){
+            EDUCATION_GUIDE.mascotEl.classList.toggle('show', !!currentStep.showMascot);
+          }
           EDUCATION_GUIDE.nextBtn.textContent = currentStep.buttonText || (EDUCATION_GUIDE.currentIndex === EDUCATION_GUIDE.steps.length - 1 ? 'تم' : 'فهمت');
           if(target){
             const rect = target.getBoundingClientRect();
