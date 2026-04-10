@@ -3031,6 +3031,156 @@
 
 
 
+
+
+    /* ✅ شرح صفحة اللوبي للمقدم */
+    .lobbyTourOverlay{
+      position:fixed;
+      inset:0;
+      z-index:46800;
+      display:none;
+    }
+    .lobbyTourOverlay.show{ display:block; }
+    .lobbyTourBackdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(20,10,18,.76);
+      backdrop-filter:blur(2px);
+      -webkit-backdrop-filter:blur(2px);
+    }
+    .lobbyTourBackdrop.hidden{ display:none; }
+    .lobbyTourHighlight{
+      position:fixed;
+      border-radius:22px;
+      border:4px solid #f4c400;
+      box-shadow:0 0 0 9999px rgba(0,0,0,.26), 0 18px 34px rgba(0,0,0,.24);
+      pointer-events:none;
+      display:none;
+      z-index:46802;
+      transition:all .2s ease;
+    }
+    .lobbyTourCard{
+      position:fixed;
+      width:min(420px, calc(100vw - 28px));
+      background:#fff7de;
+      color:#111;
+      border:4px solid #2b1b17;
+      border-radius:24px;
+      box-shadow:0 22px 40px rgba(0,0,0,.28);
+      padding:16px 16px 14px;
+      z-index:46803;
+      text-align:right;
+      transition:all .2s ease;
+    }
+    .lobbyTourCard.intro{
+      width:min(500px, calc(100vw - 28px));
+      left:50% !important;
+      top:50% !important;
+      transform:translate(-50%, -50%) !important;
+      text-align:center;
+      padding:18px 18px 16px;
+    }
+    .lobbyTourMascot{
+      width:110px;
+      height:110px;
+      object-fit:contain;
+      display:block;
+      margin:0 auto 10px;
+    }
+    .lobbyTourTitle{
+      margin:0 0 8px;
+      color:#7b1f63;
+      font-size:24px;
+      line-height:1.35;
+      font-weight:900;
+      text-align:center;
+    }
+    .lobbyTourText{
+      margin:0;
+      color:#1b1b1b;
+      font-size:17px;
+      line-height:1.8;
+      font-weight:900;
+      text-align:center;
+    }
+    .lobbyTourStep{
+      margin-top:10px;
+      text-align:center;
+      color:#6b3154;
+      font-size:14px;
+      font-weight:900;
+    }
+    .lobbyTourControls{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      width:min(760px, calc(100vw - 24px));
+      display:grid;
+      grid-template-columns:minmax(128px,1fr) minmax(170px,1.06fr) minmax(128px,1fr);
+      align-items:center;
+      gap:16px;
+      z-index:46804;
+      transition:all .2s ease;
+    }
+    .lobbyTourControls.top{
+      top:16px;
+      bottom:auto;
+    }
+    .lobbyTourBtn{
+      border:none;
+      border-radius:16px;
+      cursor:pointer;
+      font-size:18px;
+      font-weight:900;
+      min-height:68px;
+      padding:14px 16px;
+      box-shadow:0 10px 22px rgba(0,0,0,.18);
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      width:100%;
+      white-space:normal;
+      line-height:1.2;
+      text-align:center;
+    }
+    .lobbyTourBtn.primary{
+      min-width:0;
+      background:#f4c400;
+      color:#111;
+      font-size:22px;
+      order:2;
+    }
+    .lobbyTourBtn.secondary{
+      background:#fff;
+      color:#5a1d58;
+      border:2px solid #e6d1e0;
+      order:3;
+    }
+    .lobbyTourBtn.ghost{
+      background:#ffe9e9;
+      color:#8d1f1f;
+      border:2px solid #f2b3b3;
+      order:1;
+      font-size:16px;
+    }
+    .lobbyTourHidden{ display:none !important; }
+    body.lobby-tour-open{ overflow:hidden; }
+
+    @media (max-width: 420px){
+      .lobbyTourCard{ padding:14px 14px 12px; border-radius:20px; }
+      .lobbyTourTitle{ font-size:21px; }
+      .lobbyTourText{ font-size:15px; line-height:1.75; }
+      .lobbyTourControls{
+        width:calc(100vw - 18px);
+        gap:8px;
+        grid-template-columns:minmax(104px,1fr) minmax(132px,1.04fr) minmax(104px,1fr);
+      }
+      .lobbyTourBtn{ font-size:15px; min-height:64px; padding:12px 8px; }
+      .lobbyTourBtn.primary{ min-width:0; font-size:20px; order:2; }
+      .lobbyTourBtn.secondary{ order:3; }
+      .lobbyTourBtn.ghost{ order:1; font-size:14px; }
+      .lobbyTourMascot{ width:92px; height:92px; }
+    }
+
     /* ✅ النمط التعليمي التفاعلي */
     .eduGuideOverlay{
       position:fixed;
@@ -3435,6 +3585,25 @@
 
   <div class="wrap">
     <div id="main" class="card">جاري التحميل...</div>
+  </div>
+
+
+
+
+  <div id="lobbyTourOverlay" class="lobbyTourOverlay" aria-hidden="true">
+    <div class="lobbyTourBackdrop"></div>
+    <div id="lobbyTourHighlight" class="lobbyTourHighlight"></div>
+    <div id="lobbyTourCard" class="lobbyTourCard intro" role="dialog" aria-modal="true" aria-label="شرح صفحة المقدم">
+      <img src="guide-mascot.PNG" alt="صندوق المسابقات" class="lobbyTourMascot" id="lobbyTourMascot">
+      <h3 id="lobbyTourTitle" class="lobbyTourTitle"></h3>
+      <p id="lobbyTourText" class="lobbyTourText"></p>
+      <div id="lobbyTourStep" class="lobbyTourStep"></div>
+    </div>
+    <div id="lobbyTourControls" class="lobbyTourControls">
+      <button id="lobbyTourNeverBtn" class="lobbyTourBtn ghost" type="button">لاتعرض الشرح مرة ثانية</button>
+      <button id="lobbyTourNextBtn" class="lobbyTourBtn primary" type="button">فهمت</button>
+      <button id="lobbyTourSkipBtn" class="lobbyTourBtn secondary" type="button">تخطي الشرح</button>
+    </div>
   </div>
 
 
@@ -7820,6 +7989,196 @@ function hideEidIntro(immediate){
       queueEducationGuideSync();
     }
 
+
+
+    const LOBBY_TOUR_DISABLE_KEY = "horof_tour_disabled_v1";
+    const LOBBY_TOUR = {
+      openedOnce: false,
+      active: false,
+      currentIndex: 0,
+      steps: [],
+      overlay: null,
+      backdrop: null,
+      highlight: null,
+      card: null,
+      mascot: null,
+      titleEl: null,
+      textEl: null,
+      stepEl: null,
+      controls: null,
+      nextBtn: null,
+      skipBtn: null,
+      neverBtn: null
+    };
+
+    function ensureLobbyTour(){
+      if(LOBBY_TOUR.overlay) return;
+      const overlay = document.getElementById('lobbyTourOverlay');
+      if(!overlay) return;
+      LOBBY_TOUR.overlay = overlay;
+      LOBBY_TOUR.backdrop = overlay.querySelector('.lobbyTourBackdrop');
+      LOBBY_TOUR.highlight = document.getElementById('lobbyTourHighlight');
+      LOBBY_TOUR.card = document.getElementById('lobbyTourCard');
+      LOBBY_TOUR.mascot = document.getElementById('lobbyTourMascot');
+      LOBBY_TOUR.titleEl = document.getElementById('lobbyTourTitle');
+      LOBBY_TOUR.textEl = document.getElementById('lobbyTourText');
+      LOBBY_TOUR.stepEl = document.getElementById('lobbyTourStep');
+      LOBBY_TOUR.controls = document.getElementById('lobbyTourControls');
+      LOBBY_TOUR.nextBtn = document.getElementById('lobbyTourNextBtn');
+      LOBBY_TOUR.skipBtn = document.getElementById('lobbyTourSkipBtn');
+      LOBBY_TOUR.neverBtn = document.getElementById('lobbyTourNeverBtn');
+      if(!LOBBY_TOUR.nextBtn) return;
+      LOBBY_TOUR.nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        goNextLobbyTourStep();
+      });
+      LOBBY_TOUR.skipBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeLobbyTour();
+      });
+      LOBBY_TOUR.neverBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try{ localStorage.setItem(LOBBY_TOUR_DISABLE_KEY, '1'); }catch(_e){}
+        closeLobbyTour();
+      });
+      overlay.addEventListener('click', (e) => {
+        if(!LOBBY_TOUR.active) return;
+        if(e.target.closest('#lobbyTourSkipBtn') || e.target.closest('#lobbyTourNeverBtn')) return;
+        goNextLobbyTourStep();
+      });
+      window.addEventListener('resize', () => { if(LOBBY_TOUR.active) showLobbyTourStep(LOBBY_TOUR.currentIndex); }, { passive:true });
+      window.addEventListener('orientationchange', () => { if(LOBBY_TOUR.active) setTimeout(() => showLobbyTourStep(LOBBY_TOUR.currentIndex), 140); }, { passive:true });
+    }
+
+    function getLobbyTourSteps(roomLike){
+      const steps = [
+        { target:null, title:'أنا صندوق المسابقات', text:'أهلاً بك. سأشرح لك هذه الصفحة بسرعة حتى تعرف كيف تجهز اللعبة وتبدأها بكل سهولة.', intro:true },
+        { target:'#hostTourPlayModeSection', title:'طريقة التشغيل', text:'من هنا تختار هل تريد اللعب من جهاز واحد أو من أجهزة متعددة. اختر الطريقة المناسبة لك قبل البدء.' }
+      ];
+      const playMode = getHostLobbyExperience(roomLike) === 'education'
+        ? (getEducationPlayType(roomLike) || 'single')
+        : (getNormalPlayType(roomLike) || 'multi');
+      if(playMode === 'multi'){
+        steps.push(
+          { target:'#hostTourTeamsWrap', title:'الفريقان واللاعبون', text:'هنا يظهر الفريقان واللاعبون الذين دخلوا. يمكنك متابعة من انضم، ومعرفة توزيعهم على الفريقين.' },
+          { target:'#openJoinModalBtn', title:'إضافة أجهزة اللاعبين', text:'من هذا الزر تعرض باركود أو رابط دخول اللاعبين، بحيث ينضم كل لاعب من جهازه إلى الغرفة.' },
+          { target:'#hostTourDisplayToggleWrap', title:'شاشة عرض مستقلة', text:'هذا الخيار اختياري. فعّله فقط إذا كنت تريد فتح شاشة عرض منفصلة للجمهور أو للتلفاز.' }
+        );
+        if(document.getElementById('openDisplayModalBtn')){
+          steps.push({ target:'#openDisplayModalBtn', title:'رابط شاشة العرض', text:'إذا فعّلت شاشة العرض المستقلة، يظهر هذا الزر لتفتح رابط الشاشة أو تنسخه للشاشة المخصصة للعرض فقط.' });
+        }
+      }else{
+        steps.push({ target:'#hostTourSingleInfo', title:'اللعب من جهاز واحد', text:'في هذا الوضع تشغّل اللعبة مباشرة من نفس الجهاز، بدون روابط لاعبين أو باركود.' });
+      }
+      steps.push({ target:'#startBtn', title:'ابدأ اللعبة', text:'بعد اختيار الطريقة المناسبة وتجهيز اللاعبين، اضغط هنا لبدء اللعبة فعلياً.' });
+      return steps;
+    }
+
+    function placeLobbyTourControls(useTop){
+      if(!LOBBY_TOUR.controls) return;
+      LOBBY_TOUR.controls.classList.toggle('top', !!useTop);
+    }
+
+    function closeLobbyTour(){
+      if(!LOBBY_TOUR.overlay) return;
+      LOBBY_TOUR.active = false;
+      LOBBY_TOUR.overlay.classList.remove('show');
+      LOBBY_TOUR.overlay.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('lobby-tour-open');
+      if(LOBBY_TOUR.backdrop) LOBBY_TOUR.backdrop.classList.remove('hidden');
+      if(LOBBY_TOUR.highlight) LOBBY_TOUR.highlight.style.display = 'none';
+    }
+
+    function showLobbyTourStep(index){
+      if(!LOBBY_TOUR.overlay || !LOBBY_TOUR.steps.length) return;
+      const step = LOBBY_TOUR.steps[index];
+      if(!step){ closeLobbyTour(); return; }
+      LOBBY_TOUR.currentIndex = index;
+      LOBBY_TOUR.titleEl.textContent = step.title || '';
+      LOBBY_TOUR.textEl.textContent = step.text || '';
+      LOBBY_TOUR.stepEl.textContent = `${index + 1} / ${LOBBY_TOUR.steps.length}`;
+      LOBBY_TOUR.nextBtn.textContent = index === LOBBY_TOUR.steps.length - 1 ? 'تم' : 'فهمت';
+      LOBBY_TOUR.card.classList.toggle('intro', !!step.intro);
+      LOBBY_TOUR.mascot.classList.toggle('lobbyTourHidden', !step.intro);
+
+      if(step.intro || !step.target){
+        if(LOBBY_TOUR.backdrop) LOBBY_TOUR.backdrop.classList.remove('hidden');
+        if(LOBBY_TOUR.highlight) LOBBY_TOUR.highlight.style.display = 'none';
+        LOBBY_TOUR.card.style.left = '50%';
+        LOBBY_TOUR.card.style.top = '50%';
+        LOBBY_TOUR.card.style.right = 'auto';
+        LOBBY_TOUR.card.style.bottom = 'auto';
+        LOBBY_TOUR.card.style.transform = 'translate(-50%, -50%)';
+        placeLobbyTourControls(false);
+        return;
+      }
+
+      const target = document.querySelector(step.target);
+      if(!target){
+        return showLobbyTourStep(index + 1);
+      }
+      target.scrollIntoView({ block:'center', behavior:'instant' });
+      requestAnimationFrame(() => {
+        const rect = target.getBoundingClientRect();
+        const pad = 8;
+        if(LOBBY_TOUR.backdrop) LOBBY_TOUR.backdrop.classList.add('hidden');
+        if(LOBBY_TOUR.highlight){
+          LOBBY_TOUR.highlight.style.display = 'block';
+          LOBBY_TOUR.highlight.style.left = `${Math.max(8, rect.left - pad)}px`;
+          LOBBY_TOUR.highlight.style.top = `${Math.max(8, rect.top - pad)}px`;
+          LOBBY_TOUR.highlight.style.width = `${Math.min(window.innerWidth - 16, rect.width + pad * 2)}px`;
+          LOBBY_TOUR.highlight.style.height = `${rect.height + pad * 2}px`;
+        }
+        const tempWidth = Math.min(420, window.innerWidth - 28);
+        const estimatedHeight = 170;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const placeAbove = spaceBelow < (estimatedHeight + 110) && spaceAbove > spaceBelow;
+        let cardTop = placeAbove ? rect.top - estimatedHeight - 16 : rect.bottom + 16;
+        cardTop = Math.max(12, Math.min(cardTop, window.innerHeight - estimatedHeight - 86));
+        let cardLeft = rect.left + (rect.width / 2) - (tempWidth / 2);
+        cardLeft = Math.max(12, Math.min(cardLeft, window.innerWidth - tempWidth - 12));
+        LOBBY_TOUR.card.style.left = `${cardLeft}px`;
+        LOBBY_TOUR.card.style.top = `${cardTop}px`;
+        LOBBY_TOUR.card.style.right = 'auto';
+        LOBBY_TOUR.card.style.bottom = 'auto';
+        LOBBY_TOUR.card.style.transform = 'none';
+        placeLobbyTourControls(rect.bottom > window.innerHeight * 0.62);
+      });
+    }
+
+    function goNextLobbyTourStep(){
+      if(!LOBBY_TOUR.active) return;
+      if(LOBBY_TOUR.currentIndex >= LOBBY_TOUR.steps.length - 1){
+        closeLobbyTour();
+        return;
+      }
+      showLobbyTourStep(LOBBY_TOUR.currentIndex + 1);
+    }
+
+    function queueHostLobbyTourStart(roomLike){
+      ensureLobbyTour();
+      if(!LOBBY_TOUR.overlay) return;
+      if(String(roomLike?.status || '') !== 'lobby') return;
+      if(LOBBY_TOUR.active){
+        showLobbyTourStep(LOBBY_TOUR.currentIndex);
+        return;
+      }
+      if(LOBBY_TOUR.openedOnce) return;
+      try{
+        if(localStorage.getItem(LOBBY_TOUR_DISABLE_KEY) === '1') return;
+      }catch(_e){}
+      LOBBY_TOUR.steps = getLobbyTourSteps(roomLike);
+      if(!LOBBY_TOUR.steps.length) return;
+      LOBBY_TOUR.openedOnce = true;
+      LOBBY_TOUR.active = true;
+      LOBBY_TOUR.overlay.classList.add('show');
+      LOBBY_TOUR.overlay.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('lobby-tour-open');
+      if(LOBBY_TOUR.backdrop) LOBBY_TOUR.backdrop.classList.remove('hidden');
+      setTimeout(() => showLobbyTourStep(0), 220);
+    }
+
     function renderHostLobby(room){
       setTopSettingsButton(false);
       document.body.classList.remove("tvMode");
@@ -7862,15 +8221,7 @@ function hideEidIntro(immediate){
       main.innerHTML = `
         <div class="lobbyCard pickerLobbyCard">
           <div class="pickerHeaderSection">
-            <div class="pickerField">
-              <div class="pickerFieldLabel">نوع اللعبة</div>
-              <div class="pickerOptionGrid">
-                <button class="pickerOptionBtn typeNormal ${selectedGameType === "normal" ? "activeChoice" : ""}" type="button" data-picker-game-type="normal">لعبة عادية</button>
-                <button class="pickerOptionBtn typeEducation ${selectedGameType === "education" ? "activeChoice" : ""}" type="button" data-picker-game-type="education">لعبة تعليمية</button>
-              </div>
-            </div>
-
-            <div class="pickerField">
+            <div class="pickerField" id="hostTourPlayModeSection">
               <div class="pickerFieldLabel">طريقة التشغيل</div>
               <div class="pickerOptionGrid">
                 <button class="pickerOptionBtn modeMulti ${selectedPlayType === "multi" ? "activeChoice" : ""}" type="button" data-picker-play-mode="multi">اللعب من أجهزة متعددة</button>
@@ -7881,7 +8232,7 @@ function hideEidIntro(immediate){
 
           <div class="pickerMainPanel">
             ${showPlayerLinks ? `
-              <div class="compactTeamsWrap">
+              <div class="compactTeamsWrap" id="hostTourTeamsWrap">
                 <div class="teams">
                   <div class="teamCol teamGreen" style="background:${escapeHtml(visualTeams.green.color)};color:${escapeHtml(greenText)};border-color:rgba(0,0,0,.70)">
                     <div class="teamTitle" style="color:${escapeHtml(greenText)}">${escapeHtml(visualTeams.green.name)}</div>
@@ -7896,7 +8247,7 @@ function hideEidIntro(immediate){
 
               <div class="compactDisplayActionsRow">
                 <button id="openJoinModalBtn" class="compactActionBtn players" type="button">إضافة أجهزة اللاعبين</button>
-                <label class="compactDisplayToggleBtn" for="pickerDisplayOnlyToggle">
+                <label id="hostTourDisplayToggleWrap" class="compactDisplayToggleBtn" for="pickerDisplayOnlyToggle">
                   <span class="compactDisplayToggleTextWrap">
                     <span class="compactDisplayToggleLabel">شاشة عرض مستقلة</span>
                     <span class="compactDisplayOptional">اختياري</span>
@@ -7906,13 +8257,13 @@ function hideEidIntro(immediate){
               </div>
 
               ${showDisplayLink ? `
-                <div class="compactActionsRow" style="margin-top:4px">
+                <div id="hostTourDisplayLinkRow" class="compactActionsRow" style="margin-top:4px">
                   <button id="openDisplayModalBtn" class="compactActionBtn display" type="button">رابط شاشة العرض</button>
                 </div>
                 <div class="compactModeHint">رابط شاشة العرض مخصص للشاشة فقط وليس للاعبين.</div>
               ` : ``}
             ` : `
-              <div class="compactSingleCard">
+              <div id="hostTourSingleInfo" class="compactSingleCard">
                 <div class="compactSingleTitle">${singleTitle}</div>
                 <p class="compactSingleDesc">${singleDesc}</p>
               </div>
@@ -8102,6 +8453,9 @@ function hideEidIntro(immediate){
           setTimeout(()=> copyDisplayModalBtn.textContent = "نسخ رابط شاشة العرض", 1200);
         });
       }
+
+
+      queueHostLobbyTourStart(room);
 
       document.getElementById("startBtn")?.addEventListener("click", async () => {
         const latestRoomForStart = getRoomWithPersistentCustomQuestions(room || LIVE.room || {});
