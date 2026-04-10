@@ -629,9 +629,9 @@
       transform:translateX(-50%);
       width:min(760px, calc(100vw - 24px));
       display:grid;
-      grid-template-columns:minmax(128px,1fr) minmax(190px,1.2fr) minmax(152px,1fr);
+      grid-template-columns:minmax(128px,1fr) minmax(170px,1.06fr) minmax(128px,1fr);
       align-items:center;
-      gap:18px;
+      gap:16px;
       z-index:12004;
       transition:all .2s ease;
     }
@@ -658,10 +658,10 @@
     }
 
     .tour-btn.primary{
-      min-width:220px;
+      min-width:0;
       background:#f4c400;
       color:#111;
-      font-size:24px;
+      font-size:22px;
       order:2;
     }
 
@@ -669,14 +669,14 @@
       background:#fff;
       color:#5a1d58;
       border:2px solid #e6d1e0;
-      order:3;
+      order:1;
     }
 
     .tour-btn.ghost{
       background:#ffe9e9;
       color:#8d1f1f;
       border:2px solid #f2b3b3;
-      order:1;
+      order:3;
       font-size:16px;
     }
 
@@ -693,14 +693,14 @@
       .tour-title{ font-size:21px; }
       .tour-text{ font-size:15px; line-height:1.75; }
       .tour-controls{
-        width:calc(100vw - 16px);
-        gap:10px;
-        grid-template-columns:minmax(108px,1fr) minmax(148px,1.18fr) minmax(132px,1fr);
+        width:calc(100vw - 18px);
+        gap:8px;
+        grid-template-columns:minmax(104px,1fr) minmax(132px,1.04fr) minmax(104px,1fr);
       }
-      .tour-btn{ font-size:15px; min-height:64px; padding:12px 10px; }
-      .tour-btn.primary{ min-width:0; font-size:22px; order:2; }
-      .tour-btn.secondary{ order:3; }
-      .tour-btn.ghost{ order:1; font-size:14px; }
+      .tour-btn{ font-size:15px; min-height:64px; padding:12px 8px; }
+      .tour-btn.primary{ min-width:0; font-size:20px; order:2; }
+      .tour-btn.secondary{ order:1; }
+      .tour-btn.ghost{ order:3; font-size:14px; }
       .tour-mascot{ width:92px; height:92px; }
     }
 
