@@ -3179,6 +3179,15 @@
       .lobbyTourBtn.secondary{ order:3; }
       .lobbyTourBtn.ghost{ order:1; font-size:14px; }
       .lobbyTourMascot{ width:92px; height:92px; }
+      .eduGuideControls{
+        width:calc(100vw - 18px);
+        gap:8px;
+        grid-template-columns:minmax(104px,1fr) minmax(132px,1.04fr) minmax(104px,1fr);
+      }
+      .eduGuideBtn{ font-size:15px; min-height:64px; padding:12px 8px; }
+      .eduGuideBtn.primary{ min-width:0; font-size:20px; order:2; }
+      .eduGuideBtn.secondary{ order:3; }
+      .eduGuideBtn.ghost{ order:1; font-size:14px; }
     }
 
     /* ✅ النمط التعليمي التفاعلي */
@@ -3250,28 +3259,57 @@
       color:#3d2750;
       text-align:center;
     }
-    .eduGuideActions{
-      display:flex;
-      justify-content:center;
-      margin-top:16px;
+    .eduGuideControls{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      width:min(760px, calc(100vw - 24px));
+      display:grid;
+      grid-template-columns:minmax(128px,1fr) minmax(170px,1.06fr) minmax(128px,1fr);
+      align-items:center;
+      gap:16px;
+      z-index:47003;
+      transition:all .2s ease;
     }
-    .eduGuideNext{
-      min-width:180px;
-      height:58px;
-      padding:0 16px;
+    .eduGuideBtn{
       border:none;
-      border-radius:18px;
-      background:#ffd54a;
-      color:#111;
-      font-size:24px;
-      font-weight:900;
+      border-radius:16px;
       cursor:pointer;
-      border:4px solid rgba(0,0,0,.86);
-      box-shadow:0 8px 0 rgba(0,0,0,.14);
+      font-size:18px;
+      font-weight:900;
+      min-height:68px;
+      padding:14px 16px;
+      box-shadow:0 10px 22px rgba(0,0,0,.18);
+      font-family:"AA-GALAXY", Arial, sans-serif;
+      width:100%;
+      white-space:normal;
+      line-height:1.2;
+      text-align:center;
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
     }
-    .eduGuideNext:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.14); }
+    .eduGuideBtn.primary{
+      min-width:0;
+      background:#f4c400;
+      color:#111;
+      font-size:22px;
+      order:2;
+    }
+    .eduGuideBtn.secondary{
+      background:#fff;
+      color:#5a1d58;
+      border:2px solid #e6d1e0;
+      order:3;
+    }
+    .eduGuideBtn.ghost{
+      background:#ffe9e9;
+      color:#8d1f1f;
+      border:2px solid #f2b3b3;
+      order:1;
+      font-size:16px;
+    }
+    .eduGuideBtn:active{ transform:translateY(1px); }
 
     @media (max-width:520px){
       body.tvMode .wrap{ padding-top:86px; }
@@ -7183,9 +7221,22 @@ function hideEidIntro(immediate){
       titleEl:null,
       textEl:null,
       nextBtn:null,
+      skipBtn:null,
+      neverBtn:null,
+      controls:null,
       syncTimer:null,
       room:null
     };
+
+    const EDUCATION_GUIDE_DISABLE_KEY = "horof_game_guide_disabled_v1";
+
+    function isEducationGuideDisabledForever(){
+      try{ return localStorage.getItem(EDUCATION_GUIDE_DISABLE_KEY) === '1'; }catch(e){ return false; }
+    }
+
+    function disableEducationGuideForever(){
+      try{ localStorage.setItem(EDUCATION_GUIDE_DISABLE_KEY, '1'); }catch(e){}
+    }
 
     function isEducationGuideMode(roomLike){
       const room = roomLike || LIVE.room || {};
@@ -7204,9 +7255,11 @@ function hideEidIntro(immediate){
           <div id="eduGuideProgress" class="eduGuideProgress"></div>
           <h3 id="eduGuideTitle" class="eduGuideTitle"></h3>
           <p id="eduGuideText" class="eduGuideText"></p>
-          <div class="eduGuideActions">
-            <button id="eduGuideNext" class="eduGuideNext" type="button">فهمت</button>
-          </div>
+        </div>
+        <div id="eduGuideControls" class="eduGuideControls">
+          <button id="eduGuideSkip" class="eduGuideBtn secondary" type="button">تخطي الشرح</button>
+          <button id="eduGuideNext" class="eduGuideBtn primary" type="button">فهمت</button>
+          <button id="eduGuideNever" class="eduGuideBtn ghost" type="button">لاتعرض الشرح مرة ثانية</button>
         </div>
       `;
       document.body.appendChild(overlay);
@@ -7217,8 +7270,34 @@ function hideEidIntro(immediate){
       EDUCATION_GUIDE.progressEl = overlay.querySelector('#eduGuideProgress');
       EDUCATION_GUIDE.titleEl = overlay.querySelector('#eduGuideTitle');
       EDUCATION_GUIDE.textEl = overlay.querySelector('#eduGuideText');
+      EDUCATION_GUIDE.controls = overlay.querySelector('#eduGuideControls');
       EDUCATION_GUIDE.nextBtn = overlay.querySelector('#eduGuideNext');
-      EDUCATION_GUIDE.nextBtn.addEventListener('click', () => goEducationGuideNext());
+      EDUCATION_GUIDE.skipBtn = overlay.querySelector('#eduGuideSkip');
+      EDUCATION_GUIDE.neverBtn = overlay.querySelector('#eduGuideNever');
+      EDUCATION_GUIDE.nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        goEducationGuideNext();
+      });
+      EDUCATION_GUIDE.skipBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        finishEducationGuide();
+      });
+      EDUCATION_GUIDE.neverBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        disableEducationGuideForever();
+        finishEducationGuide();
+      });
+      overlay.addEventListener('click', (e) => {
+        if(!EDUCATION_GUIDE.active) return;
+        if(e.target.closest('#eduGuideSkip') || e.target.closest('#eduGuideNever')) return;
+        goEducationGuideNext();
+      });
+      EDUCATION_GUIDE.controls?.addEventListener('click', (e) => e.stopPropagation());
+      EDUCATION_GUIDE.card?.addEventListener('click', (e) => {
+        if(!EDUCATION_GUIDE.active) return;
+        e.stopPropagation();
+        goEducationGuideNext();
+      });
       EDUCATION_GUIDE.ready = true;
       window.addEventListener('resize', () => queueEducationGuideSync(), { passive:true });
       window.addEventListener('scroll', () => queueEducationGuideSync(), { passive:true });
@@ -7231,7 +7310,7 @@ function hideEidIntro(immediate){
         : getNormalPlayType(roomLike);
       const directPlayMode = selectedGuidePlayMode === 'single';
       const timerText = directPlayMode
-        ? 'هذا هو المؤقت. في اللعب من جهاز واحد يبدأ العد مباشرة عند الضغط على دائرة المؤقت، وتستخدمه لحساب وقت الإجابة داخل الجولة.'
+        ? 'هذا المؤقت يبدأ العد مباشرة عند الضغط على دائرة المؤقت، وتستخدمه لحساب وقت الإجابة.'
         : 'هذا هو المؤقت. يبدأ العد بعد اعتماد أول لاعب أو بدء دوره، ويستخدم لتحديد الوقت المتاح للإجابة داخل الجولة.';
       const steps = [
         {
@@ -7351,7 +7430,7 @@ function hideEidIntro(immediate){
           id:'settings-mini-board',
           title:'الخريطة المصغرة',
           text:'هذه خريطة مصغرة للجولة. اضغط على أي خلية منها لتحديدها قبل كتابة المحتوى الخاص بها.',
-          target:'#settingsMiniBoard',
+          targetResolver:() => document.querySelector('#settingsMiniBoard .settingsMiniBoardSvg') || document.querySelector('#settingsMiniBoard'),
           panel:'cells'
         },
         {
@@ -7360,7 +7439,8 @@ function hideEidIntro(immediate){
           text:'بعد تحديد الخلية من الخريطة المصغرة، اكتب محتواها في هذا الحقل تحديدًا. ويمكنك التنقل بين الجولات وتخصيص كل جولة على حدة.',
           targetResolver:() => {
             const input = SETTINGS_UI?.els?.backdrop?.querySelector?.('#settingsCellInput') || document.querySelector('#settingsCellInput') || null;
-            return input || null;
+            const box = input?.closest?.('.settingsCellEditorBox') || document.querySelector('.settingsCellEditorBox') || null;
+            return box || input || null;
           },
           panel:'cells',
           spotlightPadding:4
@@ -7425,16 +7505,17 @@ function hideEidIntro(immediate){
       const vh = window.innerHeight;
       const pad = 14;
       const gap = 14;
+      const controlsReserve = 108;
       const cardW = Math.min(vw - (pad * 2), 420);
       card.style.width = `${cardW}px`;
       const cardH = card.offsetHeight || 220;
-      const spaceBelow = vh - targetRect.bottom;
+      const spaceBelow = (vh - controlsReserve) - targetRect.bottom;
       const spaceAbove = targetRect.top;
       let top = targetRect.bottom + gap;
       if(spaceBelow < cardH + 24 && spaceAbove > spaceBelow){
         top = targetRect.top - cardH - gap;
       }
-      top = Math.max(pad, Math.min(vh - cardH - pad, top));
+      top = Math.max(pad, Math.min(vh - controlsReserve - cardH - pad, top));
       let left = targetRect.left + (targetRect.width / 2) - (cardW / 2);
       left = Math.max(pad, Math.min(vw - cardW - pad, left));
       card.style.left = `${left}px`;
@@ -7538,6 +7619,11 @@ function hideEidIntro(immediate){
 
     function syncEducationGuide(roomLike){
       const room = roomLike || LIVE.room || {};
+      if(isEducationGuideDisabledForever()){
+        if(EDUCATION_GUIDE.active) finishEducationGuide();
+        EDUCATION_GUIDE.completedOnce = true;
+        return;
+      }
       if(!isEducationGuideMode(room)){
         if(EDUCATION_GUIDE.active) finishEducationGuide();
         return;
