@@ -545,7 +545,7 @@
     .tour-backdrop{
       position:absolute;
       inset:0;
-      background:rgba(20,10,18,.72);
+      background:rgba(20,10,18,.82);
       backdrop-filter:blur(2px);
       -webkit-backdrop-filter:blur(2px);
     }
@@ -558,7 +558,7 @@
       position:fixed;
       border-radius:18px;
       border:4px solid #f4c400;
-      box-shadow:0 0 0 9999px rgba(0,0,0,.28), 0 18px 34px rgba(0,0,0,.24);
+      box-shadow:0 0 0 9999px rgba(0,0,0,.42), 0 18px 34px rgba(0,0,0,.24);
       pointer-events:none;
       display:none;
       z-index:12002;
@@ -627,12 +627,11 @@
       left:50%;
       bottom:18px;
       transform:translateX(-50%);
-      width:min(560px, calc(100vw - 26px));
-      display:flex;
+      width:min(760px, calc(100vw - 28px));
+      display:grid;
+      grid-template-columns:minmax(150px,1fr) minmax(220px,1.2fr) minmax(220px,1fr);
       align-items:center;
-      justify-content:center;
-      gap:10px;
-      flex-wrap:wrap;
+      gap:18px;
       z-index:12004;
       transition:all .2s ease;
     }
@@ -644,31 +643,37 @@
 
     .tour-btn{
       border:none;
-      border-radius:14px;
+      border-radius:16px;
       cursor:pointer;
-      font-size:17px;
+      font-size:19px;
       font-weight:700;
-      padding:12px 16px;
+      min-height:64px;
+      padding:14px 20px;
       box-shadow:0 10px 22px rgba(0,0,0,.18);
       font-family:"AA-GALAXY", Arial, sans-serif;
+      width:100%;
     }
 
     .tour-btn.primary{
-      min-width:150px;
+      min-width:220px;
       background:#f4c400;
       color:#111;
+      font-size:22px;
+      order:2;
     }
 
     .tour-btn.secondary{
       background:#fff;
       color:#5a1d58;
       border:2px solid #e6d1e0;
+      order:1;
     }
 
     .tour-btn.ghost{
       background:#ffe9e9;
       color:#8d1f1f;
       border:2px solid #f2b3b3;
+      order:3;
     }
 
     .tour-hidden{
@@ -683,9 +688,15 @@
       .tour-card{ padding:14px 14px 12px; border-radius:20px; }
       .tour-title{ font-size:21px; }
       .tour-text{ font-size:15px; line-height:1.75; }
-      .tour-controls{ width:calc(100vw - 20px); gap:8px; }
-      .tour-btn{ font-size:15px; padding:11px 12px; }
-      .tour-btn.primary{ min-width:120px; }
+      .tour-controls{
+        width:calc(100vw - 18px);
+        gap:12px;
+        grid-template-columns:1fr;
+      }
+      .tour-btn{ font-size:16px; min-height:58px; padding:12px 14px; }
+      .tour-btn.primary{ min-width:0; font-size:20px; order:1; }
+      .tour-btn.secondary{ order:2; }
+      .tour-btn.ghost{ order:3; }
       .tour-mascot{ width:92px; height:92px; }
     }
 
@@ -1026,9 +1037,9 @@
       <div class="tour-step" id="tourStep">1 / 10</div>
     </div>
     <div class="tour-controls" id="tourControls">
-      <button type="button" class="tour-btn ghost" id="tourNeverBtn">عدم عرض الشرح مرة أخرى</button>
       <button type="button" class="tour-btn secondary" id="tourSkipBtn">تخطي الشرح</button>
       <button type="button" class="tour-btn primary" id="tourNextBtn">فهمت</button>
+      <button type="button" class="tour-btn ghost" id="tourNeverBtn">عدم عرض الشرح مرة أخرى</button>
     </div>
   </div>
 
@@ -1576,14 +1587,29 @@
         showStep(0);
       }
 
-      nextBtn.addEventListener('click', () => {
+      function goNextStep(){
+        if(!running) return;
         if(currentStep >= homeTourSteps.length - 1) return closeTour();
         showStep(currentStep + 1);
+      }
+
+      nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        goNextStep();
       });
-      skipBtn.addEventListener('click', closeTour);
-      neverBtn.addEventListener('click', () => {
+      skipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeTour();
+      });
+      neverBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         localStorage.setItem(TOUR_DISABLE_KEY, '1');
         closeTour();
+      });
+      overlay.addEventListener('click', (e) => {
+        if(!running) return;
+        if(e.target.closest('#tourSkipBtn') || e.target.closest('#tourNeverBtn')) return;
+        goNextStep();
       });
       window.addEventListener('resize', () => { if(running) showStep(currentStep); });
       window.addEventListener('orientationchange', () => { if(running) setTimeout(() => showStep(currentStep), 140); });
