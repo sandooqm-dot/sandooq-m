@@ -3122,6 +3122,7 @@
       gap:16px;
       z-index:46804;
       transition:all .2s ease;
+      direction:ltr;
     }
     .lobbyTourControls.top{
       top:16px;
@@ -3141,6 +3142,7 @@
       white-space:normal;
       line-height:1.2;
       text-align:center;
+      direction:rtl;
     }
     .lobbyTourBtn.primary{
       min-width:0;
@@ -3271,6 +3273,7 @@
       gap:16px;
       z-index:47003;
       transition:all .2s ease;
+      direction:ltr;
     }
     .eduGuideBtn{
       border:none;
@@ -3286,6 +3289,7 @@
       white-space:normal;
       line-height:1.2;
       text-align:center;
+      direction:rtl;
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
     }
@@ -7225,6 +7229,8 @@ function hideEidIntro(immediate){
       neverBtn:null,
       controls:null,
       syncTimer:null,
+      layoutToken:0,
+      layoutTimers:[],
       room:null
     };
 
@@ -7491,6 +7497,84 @@ function hideEidIntro(immediate){
       }catch(e){}
     }
 
+    function clearEducationGuideLayoutTimers(){
+      try{
+        (EDUCATION_GUIDE.layoutTimers || []).forEach((entry) => {
+          if(!entry) return;
+          if(entry.type === 'raf') cancelAnimationFrame(entry.id);
+          else clearTimeout(entry.id);
+        });
+      }catch(e){}
+      EDUCATION_GUIDE.layoutTimers = [];
+    }
+
+    function addEducationGuideLayoutTimer(type, id){
+      if(!id) return id;
+      if(!Array.isArray(EDUCATION_GUIDE.layoutTimers)) EDUCATION_GUIDE.layoutTimers = [];
+      EDUCATION_GUIDE.layoutTimers.push({ type, id });
+      return id;
+    }
+
+    function isEducationGuideTargetReady(target){
+      if(!target || typeof target.getBoundingClientRect !== 'function') return false;
+      const rect = target.getBoundingClientRect();
+      return !!rect && rect.width >= 24 && rect.height >= 24;
+    }
+
+    function positionEducationGuideStep(step, stepToken, attempt = 0){
+      if(!EDUCATION_GUIDE.active) return;
+      if(stepToken !== EDUCATION_GUIDE.layoutToken) return;
+      const wantsTarget = !!(step?.target || step?.targetResolver);
+      const retryDelays = [70, 140, 260, 420];
+      const doMeasure = () => {
+        if(!EDUCATION_GUIDE.active) return;
+        if(stepToken !== EDUCATION_GUIDE.layoutToken) return;
+
+        const liveStep = EDUCATION_GUIDE.steps[EDUCATION_GUIDE.currentIndex];
+        if(!liveStep || liveStep !== step) return;
+
+        const target = getEducationGuideTarget(liveStep);
+        if(wantsTarget && !isEducationGuideTargetReady(target)){
+          if(attempt < retryDelays.length){
+            addEducationGuideLayoutTimer('timeout', setTimeout(() => {
+              positionEducationGuideStep(liveStep, stepToken, attempt + 1);
+            }, retryDelays[attempt]));
+          }
+          return;
+        }
+
+        if(!target){
+          placeEducationGuideCard(null, true);
+          return;
+        }
+
+        const rect = target.getBoundingClientRect();
+        const pad = Number(liveStep.spotlightPadding ?? 10);
+        EDUCATION_GUIDE.spotlight.style.left = `${Math.max(8, rect.left - pad)}px`;
+        EDUCATION_GUIDE.spotlight.style.top = `${Math.max(8, rect.top - pad)}px`;
+        EDUCATION_GUIDE.spotlight.style.width = `${Math.max(36, rect.width + (pad * 2))}px`;
+        EDUCATION_GUIDE.spotlight.style.height = `${Math.max(36, rect.height + (pad * 2))}px`;
+        placeEducationGuideCard(rect, false);
+
+        if(attempt === 0){
+          [120, 260].forEach((delayMs) => {
+            addEducationGuideLayoutTimer('timeout', setTimeout(() => {
+              positionEducationGuideStep(liveStep, stepToken, attempt + 1);
+            }, delayMs));
+          });
+        }
+      };
+
+      const target = getEducationGuideTarget(step);
+      if(target){
+        try{ target.scrollIntoView({ block:'center', inline:'center', behavior:'auto' }); }catch(e){}
+      }
+
+      addEducationGuideLayoutTimer('raf', requestAnimationFrame(() => {
+        addEducationGuideLayoutTimer('raf', requestAnimationFrame(doMeasure));
+      }));
+    }
+
     function placeEducationGuideCard(targetRect, centered){
       const card = EDUCATION_GUIDE.card;
       const spotlight = EDUCATION_GUIDE.spotlight;
@@ -7537,46 +7621,21 @@ function hideEidIntro(immediate){
         try{ SETTINGS_UI.els.setActiveTab(step.panel); }catch(e){}
       }
       window.clearTimeout(EDUCATION_GUIDE.syncTimer);
+      clearEducationGuideLayoutTimers();
       EDUCATION_GUIDE.syncTimer = window.setTimeout(() => {
-        const liveStep = EDUCATION_GUIDE.steps[EDUCATION_GUIDE.currentIndex];
-        if(!EDUCATION_GUIDE.active || !liveStep) return;
-        let target = getEducationGuideTarget(liveStep);
-        if((liveStep.target || liveStep.targetResolver) && !target){
-          goEducationGuideNext(true);
-          return;
+        const currentStep = EDUCATION_GUIDE.steps[EDUCATION_GUIDE.currentIndex];
+        if(!EDUCATION_GUIDE.active || !currentStep) return;
+        EDUCATION_GUIDE.overlay.classList.add('show');
+        EDUCATION_GUIDE.progressEl.textContent = `${EDUCATION_GUIDE.currentIndex + 1} / ${EDUCATION_GUIDE.steps.length}`;
+        EDUCATION_GUIDE.titleEl.textContent = currentStep.title || 'شرح اللعبة';
+        EDUCATION_GUIDE.textEl.textContent = currentStep.text || '';
+        if(EDUCATION_GUIDE.mascotEl){
+          EDUCATION_GUIDE.mascotEl.classList.toggle('show', !!currentStep.showMascot);
         }
-        if(target){
-          try{ target.scrollIntoView({ block:'center', inline:'center', behavior:'smooth' }); }catch(e){}
-        }
-        requestAnimationFrame(() => {
-          if(!EDUCATION_GUIDE.active) return;
-          const currentStep = EDUCATION_GUIDE.steps[EDUCATION_GUIDE.currentIndex];
-          if(!currentStep) return;
-          target = getEducationGuideTarget(currentStep);
-          if((currentStep.target || currentStep.targetResolver) && !target){
-            goEducationGuideNext(true);
-            return;
-          }
-          EDUCATION_GUIDE.overlay.classList.add('show');
-          EDUCATION_GUIDE.progressEl.textContent = `${EDUCATION_GUIDE.currentIndex + 1} / ${EDUCATION_GUIDE.steps.length}`;
-          EDUCATION_GUIDE.titleEl.textContent = currentStep.title || 'شرح اللعبة';
-          EDUCATION_GUIDE.textEl.textContent = currentStep.text || '';
-          if(EDUCATION_GUIDE.mascotEl){
-            EDUCATION_GUIDE.mascotEl.classList.toggle('show', !!currentStep.showMascot);
-          }
-          EDUCATION_GUIDE.nextBtn.textContent = currentStep.buttonText || (EDUCATION_GUIDE.currentIndex === EDUCATION_GUIDE.steps.length - 1 ? 'تم' : 'فهمت');
-          if(target){
-            const rect = target.getBoundingClientRect();
-            const pad = Number(currentStep.spotlightPadding ?? 10);
-            EDUCATION_GUIDE.spotlight.style.left = `${Math.max(8, rect.left - pad)}px`;
-            EDUCATION_GUIDE.spotlight.style.top = `${Math.max(8, rect.top - pad)}px`;
-            EDUCATION_GUIDE.spotlight.style.width = `${Math.max(36, rect.width + (pad * 2))}px`;
-            EDUCATION_GUIDE.spotlight.style.height = `${Math.max(36, rect.height + (pad * 2))}px`;
-            placeEducationGuideCard(rect, false);
-          }else{
-            placeEducationGuideCard(null, true);
-          }
-        });
+        EDUCATION_GUIDE.nextBtn.textContent = currentStep.buttonText || (EDUCATION_GUIDE.currentIndex === EDUCATION_GUIDE.steps.length - 1 ? 'تم' : 'فهمت');
+        const layoutToken = (Number(EDUCATION_GUIDE.layoutToken || 0) + 1);
+        EDUCATION_GUIDE.layoutToken = layoutToken;
+        positionEducationGuideStep(currentStep, layoutToken, 0);
       }, step.panel ? 90 : 40);
     }
 
@@ -7602,9 +7661,11 @@ function hideEidIntro(immediate){
       if(!EDUCATION_GUIDE.ready) return;
       EDUCATION_GUIDE.active = false;
       EDUCATION_GUIDE.completedOnce = true;
+      EDUCATION_GUIDE.layoutToken = Number(EDUCATION_GUIDE.layoutToken || 0) + 1;
       EDUCATION_GUIDE.overlay.classList.remove('show');
       EDUCATION_GUIDE.spotlight.classList.remove('show');
       window.clearTimeout(EDUCATION_GUIDE.syncTimer);
+      clearEducationGuideLayoutTimers();
       closeEducationGuideSettingsIfNeeded();
     }
 
