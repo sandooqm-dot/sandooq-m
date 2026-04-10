@@ -8053,7 +8053,8 @@ function hideEidIntro(immediate){
     function getLobbyTourSteps(roomLike){
       const steps = [
         { target:null, title:'أنا صندوق المسابقات', text:'أهلاً بك. سأشرح لك هذه الصفحة بسرعة حتى تعرف كيف تجهز اللعبة وتبدأها بكل سهولة.', intro:true },
-        { target:'#hostTourPlayModeSection', title:'طريقة التشغيل', text:'من هنا تختار هل تريد اللعب من جهاز واحد أو من أجهزة متعددة. اختر الطريقة المناسبة لك قبل البدء.' }
+        { target:'.pickerOptionBtn.modeSingle', title:'اللعب من جهاز واحد', text:'إذا اخترت هذا الخيار، تشغّل اللعبة مباشرة من نفس الجهاز بدون روابط لاعبين أو باركود.' },
+        { target:'.pickerOptionBtn.modeMulti', title:'اللعب من أجهزة متعددة', text:'إذا اخترت هذا الخيار، يدخل اللاعبون من أجهزتهم ويشارك كل لاعب من جواله داخل الغرفة.' }
       ];
       const playMode = getHostLobbyExperience(roomLike) === 'education'
         ? (getEducationPlayType(roomLike) || 'single')
@@ -8062,7 +8063,7 @@ function hideEidIntro(immediate){
         steps.push(
           { target:'#hostTourTeamsWrap', title:'الفريقان واللاعبون', text:'هنا يظهر الفريقان واللاعبون الذين دخلوا. يمكنك متابعة من انضم، ومعرفة توزيعهم على الفريقين.' },
           { target:'#openJoinModalBtn', title:'إضافة أجهزة اللاعبين', text:'من هذا الزر تعرض باركود أو رابط دخول اللاعبين، بحيث ينضم كل لاعب من جهازه إلى الغرفة.' },
-          { target:'#hostTourDisplayToggleWrap', title:'شاشة عرض مستقلة', text:'هذا الخيار اختياري. فعّله فقط إذا كنت تريد فتح شاشة عرض منفصلة للجمهور أو للتلفاز.' }
+          { target:'#hostTourDisplayToggleWrap', title:'شاشة عرض مستقلة', text:'هذا الخيار اختياري. عند تفعيله يتم عرض خريطة الخلايا فقط بشكل جميل ومرتب على شاشة مستقلة، وتتحكم فيها أنت من جوالك.' }
         );
         if(document.getElementById('openDisplayModalBtn')){
           steps.push({ target:'#openDisplayModalBtn', title:'رابط شاشة العرض', text:'إذا فعّلت شاشة العرض المستقلة، يظهر هذا الزر لتفتح رابط الشاشة أو تنسخه للشاشة المخصصة للعرض فقط.' });
