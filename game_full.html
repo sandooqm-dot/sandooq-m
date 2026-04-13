@@ -2209,6 +2209,100 @@
       line-height:1.35;
       margin-top:10px;
     }
+
+    .settingsTransferFields{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      margin-top:14px;
+    }
+    .settingsTransferInput{
+      width:100%;
+      height:58px;
+      border-radius:16px;
+      border:3px solid rgba(0,0,0,.14);
+      background:#fff;
+      color:#111;
+      font-size:22px;
+      font-weight:900;
+      text-align:center;
+      outline:none;
+      padding:0 16px;
+      direction:ltr;
+    }
+    .settingsTransferInput::placeholder{
+      color:rgba(0,0,0,.34);
+      direction:rtl;
+    }
+    .settingsTransferActionWrap{
+      display:flex;
+      justify-content:center;
+      margin-top:16px;
+    }
+    .settingsTransferBtn{
+      min-width:220px;
+    }
+    .transferRestoreBackdrop{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(16,12,20,.72);
+      z-index:48000;
+      padding:16px;
+    }
+    .transferRestoreBackdrop.show{ display:flex; }
+    .transferRestoreCard{
+      width:min(92vw, 520px);
+      background:#fff8d8;
+      color:#111;
+      border-radius:26px;
+      border:6px solid rgba(0,0,0,.88);
+      box-shadow:0 24px 38px rgba(0,0,0,.30);
+      padding:22px 18px 18px;
+      text-align:center;
+    }
+    .transferRestoreTitle{
+      margin:0;
+      font-size:30px;
+      font-weight:900;
+      line-height:1.35;
+      color:#111;
+    }
+    .transferRestoreActions{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top:20px;
+    }
+    .transferRestoreBtn{
+      min-width:150px;
+      height:56px;
+      padding:0 18px;
+      border:none;
+      border-radius:18px;
+      cursor:pointer;
+      font-size:24px;
+      font-weight:900;
+      border:4px solid rgba(0,0,0,.86);
+      box-shadow:0 8px 0 rgba(0,0,0,.14);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+    .transferRestoreBtn:active{ transform:translateY(1px); box-shadow:0 7px 0 rgba(0,0,0,.14); }
+    .transferRestoreBtn.primary{ background:#ffd54a; color:#111; }
+    .transferRestoreBtn.secondary{ background:#fff; color:#5a1d58; }
+    .transferRestoreBtn[disabled]{ opacity:.6; cursor:not-allowed; }
+    .transferRestoreStatus{
+      min-height:22px;
+      margin-top:12px;
+      font-size:14px;
+      font-weight:900;
+      color:#7b1f63;
+    }
     @media (max-width:700px){
       .settingsOptionGrid{ grid-template-columns:1fr; }
       .settingsChoiceRow{ grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -6718,6 +6812,399 @@ function hideEidIntro(immediate){
       }catch(e){}
     }
 
+    const SETTINGS_TRANSFER_API_URL = "/api2/settings-transfer?game=horof";
+    const SETTINGS_TRANSFER_CONSUME_API_URL = "/api2/settings-transfer/consume";
+    const SETTINGS_TRANSFER_DISCARD_API_URL = "/api2/settings-transfer/discard";
+
+    const TRANSFER_PROMPT = {
+      ready:false,
+      active:false,
+      busy:false,
+      stage:'restore',
+      lookupKey:'',
+      lastCheckedKey:'',
+      pendingEnvelope:null,
+      els:{}
+    };
+
+    function getStoredAccountEmail(){
+      const keys = ["sandooq_user_email", "user_email", "auth_email", "customer_email", "email"];
+      try{
+        for(const store of [localStorage, sessionStorage]){
+          for(const k of keys){
+            const v = String(store.getItem(k) || '').trim().toLowerCase();
+            if(v) return v;
+          }
+        }
+      }catch(e){}
+      return '';
+    }
+
+    function getStoredActivationCode(){
+      const keys = [
+        "sandooq_activation_code",
+        "sandooq_code_v1",
+        "sandooq_code",
+        "activation_code",
+        "license_code",
+        "customer_code",
+        "LS_CODE",
+        "horof_activation_code"
+      ];
+      try{
+        for(const store of [localStorage, sessionStorage]){
+          for(const k of keys){
+            const v = String(store.getItem(k) || '').trim();
+            if(v) return v;
+          }
+        }
+      }catch(e){}
+      return '';
+    }
+
+    function getTransferDeviceId(){
+      const key = 'horof_transfer_device_id_v1';
+      try{
+        let v = localStorage.getItem(key);
+        if(v && String(v).trim()) return String(v).trim();
+        v = 'td_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-5);
+        localStorage.setItem(key, v);
+        return v;
+      }catch(e){
+        return 'td_' + Math.random().toString(36).slice(2,10);
+      }
+    }
+
+    function getTransferApiHeaders(withJson=false){
+      const headers = { "Accept": "application/json" };
+      if(withJson) headers["Content-Type"] = "application/json";
+      const token = getStoredApiToken();
+      if(token) headers["Authorization"] = `Bearer ${token}`;
+      return headers;
+    }
+
+    function normalizeTransferSnapshot(raw){
+      const src = (raw && typeof raw === 'object') ? raw : {};
+      const hostSettings = (src.hostSettings && typeof src.hostSettings === 'object') ? src.hostSettings : {};
+      return {
+        updatedAt: Number(src.updatedAt || Date.now()) || Date.now(),
+        timerSel: Math.max(1, Math.min(50, Number(src.timerSel || 10) || 10)),
+        hostSettings: {
+          manualCellRounds: sanitizeManualCellRounds(hostSettings.manualCellRounds || {}),
+          cellContentMode: String(hostSettings.cellContentMode === 'manual' ? 'manual' : 'default'),
+          questionMode: String(hostSettings.questionMode === 'custom' ? 'custom' : 'default'),
+          soundEnabled: hostSettings.soundEnabled !== false
+        },
+        customQuestions: normalizeCustomQuestionsMap(src.customQuestions || {}),
+        customQuestionsUpdatedAt: Number(src.customQuestionsUpdatedAt || src.updatedAt || Date.now()) || Date.now(),
+        sourceDeviceId: String(src.sourceDeviceId || src.source_device_id || '').trim()
+      };
+    }
+
+    function buildTransferSnapshotFromRoom(roomLike){
+      const baseRoom = getRoomWithPersistentCustomQuestions(roomLike || LIVE.room || {});
+      const settings = (baseRoom.settings && typeof baseRoom.settings === 'object') ? baseRoom.settings : {};
+      return normalizeTransferSnapshot({
+        updatedAt: Date.now(),
+        timerSel: Number(baseRoom?.timer?.sel || 10) || 10,
+        hostSettings: {
+          manualCellRounds: settings.manualCellRounds || {},
+          cellContentMode: settings.cellContentMode === 'manual' ? 'manual' : 'default',
+          questionMode: String(baseRoom.questionMode || 'default'),
+          soundEnabled: settings.soundEnabled !== false
+        },
+        customQuestions: baseRoom.customQuestions || {},
+        customQuestionsUpdatedAt: Number(baseRoom.customQuestionsUpdatedAt || Date.now()) || Date.now(),
+        sourceDeviceId: getTransferDeviceId()
+      });
+    }
+
+    async function fetchTransferSnapshotEnvelope(email, activationCode){
+      const url = `${SETTINGS_TRANSFER_API_URL}&email=${encodeURIComponent(String(email || '').trim().toLowerCase())}&activation_code=${encodeURIComponent(String(activationCode || '').trim())}`;
+      const res = await fetch(url, {
+        method:'GET',
+        credentials:'include',
+        cache:'no-store',
+        headers:getTransferApiHeaders(false)
+      });
+      const j = await res.json().catch(() => null);
+      if(!res.ok || !j?.ok) throw new Error(String(j?.error || `HTTP_${res.status || 0}`));
+      return {
+        exists: !!j?.exists,
+        snapshot: normalizeTransferSnapshot(j?.snapshot || {}),
+        sourceDeviceId: String(j?.sourceDeviceId || j?.source_device_id || j?.snapshot?.sourceDeviceId || '').trim()
+      };
+    }
+
+    async function saveTransferSnapshotEnvelope(email, activationCode, snapshot){
+      const res = await fetch(SETTINGS_TRANSFER_API_URL.replace(/\?game=horof$/, ''), {
+        method:'POST',
+        credentials:'include',
+        cache:'no-store',
+        headers:getTransferApiHeaders(true),
+        body: JSON.stringify({
+          game:'horof',
+          email: String(email || '').trim().toLowerCase(),
+          activation_code: String(activationCode || '').trim(),
+          snapshot: normalizeTransferSnapshot(snapshot || {})
+        })
+      });
+      const j = await res.json().catch(() => null);
+      if(!res.ok || !j?.ok) throw new Error(String(j?.error || `HTTP_${res.status || 0}`));
+      return j;
+    }
+
+    async function consumeTransferSnapshotEnvelope(email, activationCode, action='restore'){
+      const targetUrl = action === 'discard' ? SETTINGS_TRANSFER_DISCARD_API_URL : SETTINGS_TRANSFER_CONSUME_API_URL;
+      const res = await fetch(targetUrl, {
+        method:'POST',
+        credentials:'include',
+        cache:'no-store',
+        headers:getTransferApiHeaders(true),
+        body: JSON.stringify({
+          game:'horof',
+          email: String(email || '').trim().toLowerCase(),
+          activation_code: String(activationCode || '').trim()
+        })
+      });
+      const j = await res.json().catch(() => null);
+      if(!res.ok || !j?.ok) throw new Error(String(j?.error || `HTTP_${res.status || 0}`));
+      return {
+        ok:true,
+        snapshot: normalizeTransferSnapshot(j?.snapshot || {}),
+        exists: !!j?.exists
+      };
+    }
+
+    async function applyTransferredSnapshotToCurrentDevice(rawSnapshot, opts={}){
+      const snapshot = normalizeTransferSnapshot(rawSnapshot || {});
+      const timerSel = Math.max(1, Math.min(50, Number(snapshot.timerSel || 10) || 10));
+      const manualCellRounds = sanitizeManualCellRounds(snapshot.hostSettings?.manualCellRounds || {});
+      const pendingCellContentMode = String(snapshot.hostSettings?.cellContentMode === 'manual' ? 'manual' : 'default');
+      const pendingQuestionMode = String(snapshot.hostSettings?.questionMode === 'custom' ? 'custom' : 'default');
+      const pendingSoundEnabled = snapshot.hostSettings?.soundEnabled !== false;
+      const pendingCustomQuestions = normalizeCustomQuestionsMap(snapshot.customQuestions || {});
+      const customQuestionsUpdatedAt = Number(snapshot.customQuestionsUpdatedAt || snapshot.updatedAt || Date.now()) || Date.now();
+
+      savePersistedHostSettingsEnvelope({
+        updatedAt: customQuestionsUpdatedAt,
+        manualCellRounds,
+        cellContentMode: pendingCellContentMode,
+        questionMode: pendingQuestionMode,
+        soundEnabled: pendingSoundEnabled
+      });
+      savePersistedCustomQuestions(pendingCustomQuestions, customQuestionsUpdatedAt);
+      CUSTOM_Q_PERSIST.remote = { updatedAt: customQuestionsUpdatedAt, customQuestions: pendingCustomQuestions };
+      CUSTOM_Q_PERSIST.remoteLoaded = true;
+
+      const baseRoom = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
+      const nextSettings = {
+        ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
+        manualCellRounds,
+        cellContentMode: pendingCellContentMode,
+        soundEnabled: !!pendingSoundEnabled
+      };
+      const roomForBoard = {
+        ...(baseRoom || {}),
+        settings: nextSettings,
+        questionMode: pendingQuestionMode,
+        customQuestions: pendingCustomQuestions,
+        customQuestionsUpdatedAt,
+        timer: {
+          ...(((baseRoom && baseRoom.timer) && typeof baseRoom.timer === 'object') ? baseRoom.timer : {}),
+          sel: timerSel,
+          dur: timerSel,
+          running:false,
+          startTs:0,
+          done:false
+        }
+      };
+      const nextSeed = Date.now();
+      const nextBoard = rememberBoard(buildBoardState(roomForBoard, nextSeed), roomForBoard) || buildBoardState(roomForBoard, nextSeed);
+      const roomPatch = {
+        ...(LIVE.room || roomForBoard || {}),
+        settings: nextSettings,
+        questionMode: pendingQuestionMode,
+        customQuestions: pendingCustomQuestions,
+        customQuestionsUpdatedAt,
+        timer: {
+          ...(((LIVE.room && LIVE.room.timer) && typeof LIVE.room.timer === 'object') ? LIVE.room.timer : {}),
+          sel: timerSel,
+          dur: timerSel,
+          running:false,
+          startTs:0,
+          done:false
+        },
+        board: nextBoard,
+        round: {
+          ...(((LIVE.room && LIVE.room.round) && typeof LIVE.room.round === 'object') ? LIVE.room.round : {}),
+          boardSeed: Number(nextBoard.seed || 0) || nextSeed
+        }
+      };
+
+      LIVE.room = normalizeLiveRoom(roomPatch);
+      SETTINGS_UI.roomLatest = LIVE.room;
+      SETTINGS_UI.pendingCustomQuestions = pendingCustomQuestions;
+      if(SETTINGS_UI.ready && SETTINGS_UI.els?.syncFromRoom){
+        SETTINGS_UI.els.syncFromRoom(LIVE.room);
+      }
+      scheduleRender();
+
+      if(role === 'host' && opts.pushToRoom !== false){
+        const updates = {};
+        updates[`rooms/${code}/timer/sel`] = timerSel;
+        updates[`rooms/${code}/timer/dur`] = timerSel;
+        updates[`rooms/${code}/timer/running`] = false;
+        updates[`rooms/${code}/timer/done`] = false;
+        updates[`rooms/${code}/timer/startTs`] = 0;
+        updates[`rooms/${code}/questionMode`] = pendingQuestionMode;
+        updates[`rooms/${code}/customQuestions`] = pendingCustomQuestions;
+        updates[`rooms/${code}/customQuestionsUpdatedAt`] = customQuestionsUpdatedAt;
+        updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
+        updates[`rooms/${code}/settings/cellContentMode`] = pendingCellContentMode;
+        updates[`rooms/${code}/settings/soundEnabled`] = !!pendingSoundEnabled;
+        updates[`rooms/${code}/board`] = nextBoard;
+        updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || nextSeed;
+        await update(ref(db), updates);
+      }
+      return LIVE.room;
+    }
+
+    function ensureTransferRestorePrompt(){
+      if(TRANSFER_PROMPT.ready) return;
+      const overlay = document.createElement('div');
+      overlay.id = 'transferRestoreBackdrop';
+      overlay.className = 'transferRestoreBackdrop';
+      overlay.innerHTML = `
+        <div class="transferRestoreCard" role="dialog" aria-modal="true" aria-label="استعادة التعديلات المحفوظة">
+          <h3 id="transferRestoreTitle" class="transferRestoreTitle">استعادة التعديلات المحفوظة</h3>
+          <div class="transferRestoreActions">
+            <button id="transferRestoreYes" class="transferRestoreBtn primary" type="button">نعم</button>
+            <button id="transferRestoreNo" class="transferRestoreBtn secondary" type="button">لا</button>
+          </div>
+          <div id="transferRestoreStatus" class="transferRestoreStatus"></div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      const titleEl = overlay.querySelector('#transferRestoreTitle');
+      const yesBtn = overlay.querySelector('#transferRestoreYes');
+      const noBtn = overlay.querySelector('#transferRestoreNo');
+      const statusEl = overlay.querySelector('#transferRestoreStatus');
+
+      async function onYes(){
+        if(TRANSFER_PROMPT.busy) return;
+        const env = TRANSFER_PROMPT.pendingEnvelope;
+        if(!env) return;
+        if(TRANSFER_PROMPT.stage === 'confirm-reject'){
+          TRANSFER_PROMPT.busy = true;
+          statusEl.textContent = '...';
+          yesBtn.disabled = true;
+          noBtn.disabled = true;
+          try{ await consumeTransferSnapshotEnvelope(env.email, env.activationCode, 'discard'); }catch(e){}
+          closeTransferRestorePrompt();
+          return;
+        }
+        TRANSFER_PROMPT.busy = true;
+        statusEl.textContent = '...';
+        yesBtn.disabled = true;
+        noBtn.disabled = true;
+        try{
+          let snapshot = env.snapshot;
+          try{
+            const consumed = await consumeTransferSnapshotEnvelope(env.email, env.activationCode, 'restore');
+            if(consumed?.snapshot) snapshot = consumed.snapshot;
+          }catch(e){}
+          await applyTransferredSnapshotToCurrentDevice(snapshot, { pushToRoom:true });
+          closeTransferRestorePrompt();
+        }catch(e){
+          statusEl.textContent = 'تعذر استعادة التعديلات الآن';
+          yesBtn.disabled = false;
+          noBtn.disabled = false;
+          TRANSFER_PROMPT.busy = false;
+        }
+      }
+
+      function onNo(){
+        if(TRANSFER_PROMPT.busy) return;
+        if(TRANSFER_PROMPT.stage === 'confirm-reject'){
+          TRANSFER_PROMPT.stage = 'restore';
+          titleEl.textContent = 'استعادة التعديلات المحفوظة';
+          statusEl.textContent = '';
+          yesBtn.textContent = 'نعم';
+          noBtn.textContent = 'لا';
+          return;
+        }
+        TRANSFER_PROMPT.stage = 'confirm-reject';
+        titleEl.textContent = 'هل أنت متأكد من عدم استعادة محتوياتك المحفوظة؟';
+        statusEl.textContent = '';
+        yesBtn.textContent = 'نعم';
+        noBtn.textContent = 'لا';
+      }
+
+      yesBtn.addEventListener('click', onYes);
+      noBtn.addEventListener('click', onNo);
+
+      TRANSFER_PROMPT.ready = true;
+      TRANSFER_PROMPT.els = { overlay, titleEl, yesBtn, noBtn, statusEl };
+    }
+
+    function closeTransferRestorePrompt(){
+      ensureTransferRestorePrompt();
+      TRANSFER_PROMPT.active = false;
+      TRANSFER_PROMPT.busy = false;
+      TRANSFER_PROMPT.stage = 'restore';
+      TRANSFER_PROMPT.pendingEnvelope = null;
+      const { overlay, titleEl, yesBtn, noBtn, statusEl } = TRANSFER_PROMPT.els;
+      titleEl.textContent = 'استعادة التعديلات المحفوظة';
+      statusEl.textContent = '';
+      yesBtn.textContent = 'نعم';
+      noBtn.textContent = 'لا';
+      yesBtn.disabled = false;
+      noBtn.disabled = false;
+      overlay.classList.remove('show');
+    }
+
+    function openTransferRestorePrompt(envelope){
+      ensureTransferRestorePrompt();
+      try{ if(LOBBY_TOUR.active) closeLobbyTour(); }catch(e){}
+      try{ if(EDUCATION_GUIDE.active) finishEducationGuide(); }catch(e){}
+      TRANSFER_PROMPT.pendingEnvelope = envelope;
+      TRANSFER_PROMPT.lookupKey = `${String(envelope?.email || '').trim().toLowerCase()}::${String(envelope?.activationCode || '').trim()}`;
+      TRANSFER_PROMPT.active = true;
+      TRANSFER_PROMPT.busy = false;
+      TRANSFER_PROMPT.stage = 'restore';
+      TRANSFER_PROMPT.els.titleEl.textContent = 'استعادة التعديلات المحفوظة';
+      TRANSFER_PROMPT.els.statusEl.textContent = '';
+      TRANSFER_PROMPT.els.yesBtn.textContent = 'نعم';
+      TRANSFER_PROMPT.els.noBtn.textContent = 'لا';
+      TRANSFER_PROMPT.els.yesBtn.disabled = false;
+      TRANSFER_PROMPT.els.noBtn.disabled = false;
+      TRANSFER_PROMPT.els.overlay.classList.add('show');
+    }
+
+    async function maybeCheckTransferRestorePrompt(){
+      if(role !== 'host') return;
+      if(TRANSFER_PROMPT.active || TRANSFER_PROMPT.busy) return;
+      const email = getStoredAccountEmail();
+      const activationCode = getStoredActivationCode();
+      if(!email || !activationCode) return;
+      const lookupKey = `${email}::${activationCode}`;
+      if(TRANSFER_PROMPT.lastCheckedKey === lookupKey) return;
+      TRANSFER_PROMPT.lastCheckedKey = lookupKey;
+      try{
+        const env = await fetchTransferSnapshotEnvelope(email, activationCode);
+        if(!env?.exists) return;
+        const sourceDeviceId = String(env.sourceDeviceId || env.snapshot?.sourceDeviceId || '').trim();
+        if(sourceDeviceId && sourceDeviceId === getTransferDeviceId()) return;
+        openTransferRestorePrompt({
+          email,
+          activationCode,
+          snapshot: env.snapshot,
+          sourceDeviceId
+        });
+      }catch(e){}
+    }
+
     function getStoredApiToken(){
       const keys = ["sandooq_token_v1", "sandooq_session_v1", "token", "auth_token"];
       try{
@@ -7209,7 +7696,7 @@ function hideEidIntro(immediate){
       };
     }
 
-    const SETTINGS_UI = { ready:false, els:{}, roomLatest:null };
+    const SETTINGS_UI = { ready:false, els:{}, roomLatest:null, pendingCustomQuestions:{} };
 
     const EDUCATION_GUIDE = {
       ready:false,
@@ -7716,6 +8203,7 @@ function hideEidIntro(immediate){
                 <button class="settingsTabBtn" type="button" data-settings-tab="questions">إضافة الأسئلة</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="cells">محتوى الخلايا</button>
                 <button class="settingsTabBtn" type="button" data-settings-tab="timer">المؤقت</button>
+                <button class="settingsTabBtn" type="button" data-settings-tab="transfer">ترحيل الإعدادات</button>
               </div>
             </div>
           </div>
@@ -7798,6 +8286,19 @@ function hideEidIntro(immediate){
               </div>
             </section>
 
+            <section class="settingsSection" data-settings-panel="transfer">
+              <div class="settingsCard settingsDirectCard">
+                <h3 class="settingsSectionTitle compact">ترحيل الإعدادات</h3>
+                <div class="settingsTransferFields">
+                  <input id="settingsTransferEmail" class="settingsTransferInput" type="email" inputmode="email" autocomplete="email" placeholder="الإيميل">
+                  <input id="settingsTransferCode" class="settingsTransferInput" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="كود التفعيل">
+                </div>
+                <div class="settingsTransferActionWrap">
+                  <button id="settingsTransferSaveBtn" class="settingsActionBtn settingsTransferBtn" type="button">حفظ وترحيل</button>
+                </div>
+              </div>
+            </section>
+
             <section class="settingsSection" data-settings-panel="help">
               <div class="settingsCard settingsDirectCard">
                 <h3 class="settingsSectionTitle compact">التعليمات</h3>
@@ -7838,6 +8339,9 @@ function hideEidIntro(immediate){
       const timerValue = bd.querySelector('#settingsTimerValue');
       const statusEl = bd.querySelector('#settingsStatus');
       const mainChoiceButtons = Array.from(bd.querySelectorAll('[data-main-choice-group]'));
+      const transferEmailInput = bd.querySelector('#settingsTransferEmail');
+      const transferCodeInput = bd.querySelector('#settingsTransferCode');
+      const transferSaveBtn = bd.querySelector('#settingsTransferSaveBtn');
       const questionsList = bd.querySelector('#settingsQuestionsList');
       const roundButtons = Array.from(bd.querySelectorAll('[data-cells-round]'));
       const countButtons = Array.from(bd.querySelectorAll('[data-cells-count]'));
@@ -8114,6 +8618,8 @@ function hideEidIntro(immediate){
         SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.roomLatest?.customQuestions || {});
         loadManualRoundsFromRoom(SETTINGS_UI.roomLatest);
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest);
+        if(transferEmailInput) transferEmailInput.value = getStoredAccountEmail();
+        if(transferCodeInput) transferCodeInput.value = getStoredActivationCode();
         setStatus('');
       }
 
@@ -8235,6 +8741,46 @@ function hideEidIntro(immediate){
       if(timerRange && timerValue){
         timerRange.addEventListener('input', () => {
           timerValue.textContent = `${timerRange.value || 10} ثانية`;
+        });
+      }
+
+      if(transferSaveBtn){
+        transferSaveBtn.addEventListener('click', async () => {
+          const email = String(transferEmailInput?.value || '').trim().toLowerCase();
+          const activationCode = String(transferCodeInput?.value || '').trim();
+          if(!email || !activationCode){
+            setStatus('أكمل الإيميل وكود التفعيل أولاً.', true);
+            setActiveTab('transfer');
+            return;
+          }
+          const ok = window.confirm('هل أنت متأكد من ترحيل محتوى الإعدادات؟');
+          if(!ok) return;
+          try{
+            if(transferSaveBtn) transferSaveBtn.disabled = true;
+            setStatus('جاري ترحيل الإعدادات...');
+            const baseRoomForTransfer = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
+            const transferSnapshot = normalizeTransferSnapshot({
+              updatedAt: Date.now(),
+              timerSel: Math.max(1, Math.min(50, Number(timerRange?.value || baseRoomForTransfer?.timer?.sel || 10) || 10)),
+              hostSettings: {
+                manualCellRounds: JSON.parse(JSON.stringify(pendingManualCellRounds || {})),
+                cellContentMode: pendingCellContentMode,
+                questionMode: pendingQuestionMode,
+                soundEnabled: !!pendingSoundEnabled
+              },
+              customQuestions: normalizeCustomQuestionsMap((SETTINGS_UI && SETTINGS_UI.pendingCustomQuestions) || baseRoomForTransfer?.customQuestions || {}),
+              customQuestionsUpdatedAt: Number(baseRoomForTransfer?.customQuestionsUpdatedAt || Date.now()) || Date.now(),
+              sourceDeviceId: getTransferDeviceId()
+            });
+            await saveTransferSnapshotEnvelope(email, activationCode, transferSnapshot);
+            setStatus('تم حفظ الترحيل بنجاح.');
+            try{ localStorage.setItem('sandooq_user_email', email); }catch(e){}
+          }catch(err){
+            console.error(err);
+            setStatus('تعذر ترحيل الإعدادات الآن.', true);
+          }finally{
+            if(transferSaveBtn) transferSaveBtn.disabled = false;
+          }
         });
       }
 
@@ -10666,6 +11212,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
       onValue(ref(db, `rooms/${code}`), (s) => {
         LIVE.room = normalizeLiveRoom(s.val() || {});
         if(isWrittenModeEnabled(LIVE.room)) setLocalWrittenModeFlag(true);
+        maybeCheckTransferRestorePrompt();
         scheduleRender();
       });
     }
@@ -10675,6 +11222,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-03-25-7 (streamer isolated start fix: host starts room first, stores handoff, then opens streamer page) -->
+  <!-- VERSION: game_full.html — v2026-04-14-1 (ترحيل الإعدادات: تبويب جديد بجانب المؤقت + استعادة محفوظة مرة واحدة على نفس الإيميل وكود التفعيل) -->
 </body>
 </html>
