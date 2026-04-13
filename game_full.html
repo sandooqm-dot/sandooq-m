@@ -6813,8 +6813,8 @@ function hideEidIntro(immediate){
     }
 
     const SETTINGS_TRANSFER_API_URL = "/api2/settings-transfer?game=horof";
-    const SETTINGS_TRANSFER_CONSUME_API_URL = "/api2/settings-transfer/consume";
-    const SETTINGS_TRANSFER_DISCARD_API_URL = "/api2/settings-transfer/discard";
+    const SETTINGS_TRANSFER_CONSUME_API_URL = "/api2/consume";
+    const SETTINGS_TRANSFER_DISCARD_API_URL = "/api2/consume";
 
     const TRANSFER_PROMPT = {
       ready:false,
@@ -6828,16 +6828,7 @@ function hideEidIntro(immediate){
     };
 
     function getStoredAccountEmail(){
-      const keys = [
-        "sandooq_user_email",
-        "sandooq_email_v1",
-        "sandooq_email",
-        "user_email",
-        "auth_email",
-        "customer_email",
-        "LS_EMAIL",
-        "email"
-      ];
+      const keys = ["sandooq_user_email", "user_email", "auth_email", "customer_email", "email"];
       try{
         for(const store of [localStorage, sessionStorage]){
           for(const k of keys){
@@ -6846,21 +6837,12 @@ function hideEidIntro(immediate){
           }
         }
       }catch(e){}
-      try{
-        const qp = [
-          params.get('email'),
-          params.get('user_email'),
-          params.get('account_email')
-        ].map(v => String(v || '').trim().toLowerCase()).find(Boolean);
-        if(qp) return qp;
-      }catch(e){}
       return '';
     }
 
     function getStoredActivationCode(){
       const keys = [
         "sandooq_activation_code",
-        "sandooq_activation_code_v1",
         "sandooq_code_v1",
         "sandooq_code",
         "activation_code",
@@ -6876,14 +6858,6 @@ function hideEidIntro(immediate){
             if(v) return v;
           }
         }
-      }catch(e){}
-      try{
-        const qp = [
-          params.get('activation_code'),
-          params.get('license_code'),
-          params.get('customer_code')
-        ].map(v => String(v || '').trim()).find(Boolean);
-        if(qp) return qp;
       }catch(e){}
       return '';
     }
@@ -6990,7 +6964,8 @@ function hideEidIntro(immediate){
         body: JSON.stringify({
           game:'horof',
           email: String(email || '').trim().toLowerCase(),
-          activation_code: String(activationCode || '').trim()
+          activation_code: String(activationCode || '').trim(),
+          action: (action === 'discard' ? 'discard' : 'consume')
         })
       });
       const j = await res.json().catch(() => null);
@@ -8800,15 +8775,11 @@ function hideEidIntro(immediate){
             });
             await saveTransferSnapshotEnvelope(email, activationCode, transferSnapshot);
             setStatus('تم حفظ الترحيل بنجاح.');
-            try{
-              const emailKeys = ['sandooq_user_email','sandooq_email_v1','sandooq_email','user_email','auth_email','customer_email'];
-              const codeKeys = ['sandooq_activation_code','sandooq_activation_code_v1','sandooq_code_v1','sandooq_code','activation_code','LS_CODE','horof_activation_code'];
-              for(const k of emailKeys) localStorage.setItem(k, email);
-              for(const k of codeKeys) localStorage.setItem(k, activationCode);
-            }catch(e){}
+            try{ localStorage.setItem('sandooq_user_email', email); }catch(e){}
+            try{ localStorage.setItem('sandooq_activation_code', activationCode); }catch(e){}
           }catch(err){
             console.error(err);
-            setStatus('تعذر ترحيل الإعدادات الآن.', true);
+            setStatus(`تعذر ترحيل الإعدادات الآن: ${String(err?.message || err || 'UNKNOWN_ERROR')}`, true);
           }finally{
             if(transferSaveBtn) transferSaveBtn.disabled = false;
           }
@@ -11253,6 +11224,6 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
   </script>
 
-  <!-- VERSION: game_full.html — v2026-04-14-3 (إصلاح استعادة الترحيل: قراءة/حفظ الإيميل وكود التفعيل بشكل صحيح قبل الشرح) -->
+  <!-- VERSION: game_full.html — v2026-04-14-1 (ترحيل الإعدادات: تبويب جديد بجانب المؤقت + استعادة محفوظة مرة واحدة على نفس الإيميل وكود التفعيل) -->
 </body>
 </html>
