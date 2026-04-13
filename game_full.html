@@ -6813,8 +6813,8 @@ function hideEidIntro(immediate){
     }
 
     const SETTINGS_TRANSFER_API_URL = "/api2/settings-transfer?game=horof";
-    const SETTINGS_TRANSFER_CONSUME_API_URL = "/api2/settings-transfer/consume";
-    const SETTINGS_TRANSFER_DISCARD_API_URL = "/api2/settings-transfer/discard";
+    const SETTINGS_TRANSFER_CONSUME_API_URL = "/api2/consume";
+    const SETTINGS_TRANSFER_DISCARD_API_URL = "/api2/consume";
 
     const TRANSFER_PROMPT = {
       ready:false,
@@ -6955,7 +6955,8 @@ function hideEidIntro(immediate){
     }
 
     async function consumeTransferSnapshotEnvelope(email, activationCode, action='restore'){
-      const targetUrl = action === 'discard' ? SETTINGS_TRANSFER_DISCARD_API_URL : SETTINGS_TRANSFER_CONSUME_API_URL;
+      const normalizedAction = action === 'discard' ? 'discard' : 'consume';
+      const targetUrl = normalizedAction === 'discard' ? SETTINGS_TRANSFER_DISCARD_API_URL : SETTINGS_TRANSFER_CONSUME_API_URL;
       const res = await fetch(targetUrl, {
         method:'POST',
         credentials:'include',
@@ -6964,7 +6965,8 @@ function hideEidIntro(immediate){
         body: JSON.stringify({
           game:'horof',
           email: String(email || '').trim().toLowerCase(),
-          activation_code: String(activationCode || '').trim()
+          activation_code: String(activationCode || '').trim(),
+          action: normalizedAction
         })
       });
       const j = await res.json().catch(() => null);
@@ -6972,7 +6974,8 @@ function hideEidIntro(immediate){
       return {
         ok:true,
         snapshot: normalizeTransferSnapshot(j?.snapshot || {}),
-        exists: !!j?.exists
+        exists: !!j?.exists,
+        action: normalizedAction
       };
     }
 
