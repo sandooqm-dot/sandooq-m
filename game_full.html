@@ -5430,6 +5430,35 @@ function hideEidIntro(immediate){
       relayoutTimer2: 0
     };
 
+
+    // ✅ (جديد) وضع التعديل السريع (مؤقت للخطوة 3 فقط)
+    const EASY_EDIT_UI = {
+      active: false,
+      hintEl: null,
+      ensure(){
+        if(this.hintEl) return this.hintEl;
+        const el = document.createElement('div');
+        el.id = 'easyEditHint';
+        el.setAttribute('aria-live','polite');
+        el.style.cssText =
+          'position:fixed;left:50%;top:98px;transform:translateX(-50%);z-index:46000;' +
+          'display:none;max-width:min(92vw, 560px);padding:12px 14px;border-radius:18px;' +
+          'background:#fff;color:#111;border:4px solid rgba(0,0,0,.85);' +
+          'box-shadow:0 18px 28px rgba(0,0,0,.26);font-size:18px;font-weight:900;' +
+          'line-height:1.35;text-align:center;';
+        el.textContent = 'اضغط على الخلية لإضافة الأسئلة';
+        document.body.appendChild(el);
+        this.hintEl = el;
+        return el;
+      },
+      setActive(v){
+        this.active = !!v;
+        const el = this.ensure();
+        el.style.display = this.active ? 'block' : 'none';
+      }
+    };
+
+
     function scheduleMapRelayout(reason){
       if(!GAME_UI.placeHexes) return;
       try{
@@ -8418,6 +8447,7 @@ function hideEidIntro(immediate){
           }
         }
         else if(g === 'easyEdit') pendingEasyEditEnabled = (v === 'on');
+        try{ if(!pendingEasyEditEnabled) EASY_EDIT_UI.setActive(false); }catch(e){}
         renderMainChoices();
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest || LIVE.room || {});
       }
@@ -8827,7 +8857,29 @@ function hideEidIntro(immediate){
           }catch(e){ location.href = '/app'; }
         });
       }
-      bd.querySelector('#settingsSaveExit').addEventListener('click', saveAndClose);
+      
+      const easyEditStartBtn = bd.querySelector('#easyEditStartBtn');
+      if(easyEditStartBtn){
+        easyEditStartBtn.addEventListener('click', () => {
+          try{
+            if(String(role || '') !== 'host') return;
+
+            // إغلاق صفحة الإعدادات والرجوع فورًا للعبة
+            bd.style.display = 'none';
+            queueEducationGuideSync();
+
+            // إظهار تنبيه أعلى الخريطة (خطوة 3 فقط — بدون تغيير الخلايا)
+            const liveRoomNow = LIVE.room || SETTINGS_UI.roomLatest || {};
+            if(String(liveRoomNow.status || '') === 'started' && pendingEasyEditEnabled){
+              EASY_EDIT_UI.setActive(true);
+            }else{
+              EASY_EDIT_UI.setActive(false);
+            }
+          }catch(e){}
+        });
+      }
+
+bd.querySelector('#settingsSaveExit').addEventListener('click', saveAndClose);
 
       SETTINGS_UI.ready = true;
       SETTINGS_UI.els = {
@@ -9097,6 +9149,7 @@ function hideEidIntro(immediate){
     }
 
     function renderHostLobby(room){
+      try{ EASY_EDIT_UI.setActive(false); }catch(e){}
       setTopSettingsButton(false);
       document.body.classList.remove("tvMode");
       main.classList.remove("inGame");
