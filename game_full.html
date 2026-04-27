@@ -1961,6 +1961,39 @@
       color:#566176;
     }
     .settingsChoiceBlock + .settingsChoiceBlock{ margin-top:16px; }
+
+    /* ✅ (جديد) وضع التعديل السهل للخلايا */
+    .settingsEasyStartWrap{
+      margin-top:12px;
+      display:none;
+      justify-content:center;
+    }
+    .settingsEasyStartBtn{
+      min-width:260px;
+    }
+
+    .easyEditHint{
+      width:min(92vw, 760px);
+      margin:0 auto 10px;
+      padding:14px 16px;
+      border-radius:22px;
+      background:#fff8d7;
+      color:#111;
+      border:6px solid rgba(0,0,0,.85);
+      box-shadow:0 14px 24px rgba(0,0,0,.18);
+      font-size:22px;
+      font-weight:900;
+      line-height:1.5;
+      text-align:center;
+    }
+    @media (orientation: landscape){
+      .easyEditHint{
+        width:100%;
+        margin:0 auto 10px;
+        font-size:20px;
+      }
+    }
+
     .settingsChoiceTitle{
       margin:0 0 12px;
       font-size:22px;
@@ -3995,25 +4028,46 @@
       const roomRefLike = roomLike || {};
       const settings = (roomRefLike.settings && typeof roomRefLike.settings === 'object') ? roomRefLike.settings : {};
       const mode = String(settings.cellContentMode || 'default');
-      if(mode !== 'manual') return base;
-      const currentRound = Math.max(1, Number(roomRefLike?.round?.current || 1));
-      const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
-      const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
-      if(!manualConfig || !Array.isArray(manualConfig.values)) return base;
-      const manualSize = normalizeCellCount(manualConfig?.cellCount || base.size || getBoardSize(roomRefLike || {}));
-      if(manualSize !== Number(base.size || 0)){
-        const rebuilt = buildBoardState({ ...roomRefLike, settings }, Number(base.seed || Date.now()) || Date.now());
-        return cloneBoardState(rebuilt, roomRefLike);
-      }
-      const out = cloneBoardState(base, roomRefLike);
-      const vals = manualConfig.values.map(v => String(v || ''));
-      for(let r=0; r<manualSize; r++){
-        for(let c=0; c<manualSize; c++){
-          const idx = (r * manualSize) + c;
-          const raw = String(vals[idx] || '').trim();
-          if(raw) out.letters[r][c] = raw;
+
+      let out = cloneBoardState(base, roomRefLike);
+
+      // ✅ الوضع الحالي (بدون تغيير): المحتوى المخصص عبر تبويب "محتوى الخلايا"
+      if(mode === 'manual'){
+        const currentRound = Math.max(1, Number(roomRefLike?.round?.current || 1));
+        const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
+        const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
+
+        if(manualConfig && Array.isArray(manualConfig.values)){
+          const manualSize = normalizeCellCount(manualConfig?.cellCount || out.size || getBoardSize(roomRefLike || {}));
+          if(manualSize !== Number(out.size || 0)){
+            const rebuilt = buildBoardState({ ...roomRefLike, settings }, Number(out.seed || Date.now()) || Date.now());
+            out = cloneBoardState(rebuilt, roomRefLike);
+          }else{
+            const vals = manualConfig.values.map(v => String(v || ''));
+            for(let r=0; r<manualSize; r++){
+              for(let c=0; c<manualSize; c++){
+                const idx = (r * manualSize) + c;
+                const raw = String(vals[idx] || '').trim();
+                if(raw) out.letters[r][c] = raw;
+              }
+            }
+          }
         }
       }
+
+      // ✅ (جديد) وضع "إضافة الأسئلة" السهل: يطبّق القيم حتى لو كانت فاضية
+      if(settings.easyCellsEnabled === true){
+        const size = Math.max(1, Number(out.size || getBoardSize(roomRefLike || {}) || 5));
+        const easy = sanitizeEasyCells(settings.easyCells || {}, size);
+        const vals = Array.isArray(easy.values) ? easy.values : [];
+        for(let r=0; r<size; r++){
+          for(let c=0; c<size; c++){
+            const idx = (r * size) + c;
+            out.letters[r][c] = String(vals[idx] || "");
+          }
+        }
+      }
+
       return out;
     }
 
@@ -5450,7 +5504,13 @@ function hideEidIntro(immediate){
           GAME_UI.relayoutTimer1 = setTimeout(run, 90);
           GAME_UI.relayoutTimer2 = setTimeout(run, 220);
         });
-      });
+      }
+
+      function renderEasyStartWrap(){
+        if(!easyStartWrap) return;
+        easyStartWrap.style.display = pendingEasyCellsEnabled ? 'flex' : 'none';
+      }
+);
     }
 
     function teamColor(team){
@@ -6690,17 +6750,21 @@ function hideEidIntro(immediate){
     function loadPersistedHostSettingsEnvelope(){
       try{
         const raw = localStorage.getItem(getHostSettingsStorageKey());
-        if(!raw) return { updatedAt:0, manualCellRounds:{}, cellContentMode:'default', questionMode:'default', soundEnabled:true };
+        if(!raw) return { updatedAt:0, manualCellRounds:{}, cellContentMode:'default', questionMode:'default', soundEnabled:true, easyCellsEnabled:false, easyCells:{cellCount:5, values:[]}, easyCellQuestions:{}, easyCellCursor:{} };
         const parsed = JSON.parse(raw);
         return {
           updatedAt: Number(parsed?.updatedAt || 0),
           manualCellRounds: sanitizeManualCellRounds(parsed?.manualCellRounds || {}),
           cellContentMode: String(parsed?.cellContentMode === 'manual' ? 'manual' : 'default'),
           questionMode: String(parsed?.questionMode === 'custom' ? 'custom' : 'default'),
-          soundEnabled: parsed?.soundEnabled !== false
+          soundEnabled: parsed?.soundEnabled !== false,
+          easyCellsEnabled: parsed?.easyCellsEnabled === true,
+          easyCells: sanitizeEasyCells(parsed?.easyCells || {}, 5),
+          easyCellQuestions: normalizeEasyCellQuestionsMap(parsed?.easyCellQuestions || {}),
+          easyCellCursor: (parsed?.easyCellCursor && typeof parsed.easyCellCursor === 'object') ? parsed.easyCellCursor : {}
         };
       }catch(e){
-        return { updatedAt:0, manualCellRounds:{}, cellContentMode:'default', questionMode:'default', soundEnabled:true };
+        return { updatedAt:0, manualCellRounds:{}, cellContentMode:'default', questionMode:'default', soundEnabled:true, easyCellsEnabled:false, easyCells:{cellCount:5, values:[]}, easyCellQuestions:{}, easyCellCursor:{} };
       }
     }
 
@@ -6712,7 +6776,11 @@ function hideEidIntro(immediate){
           manualCellRounds: sanitizeManualCellRounds(data?.manualCellRounds || {}),
           cellContentMode: String(data?.cellContentMode === 'manual' ? 'manual' : 'default'),
           questionMode: String(data?.questionMode === 'custom' ? 'custom' : 'default'),
-          soundEnabled: data?.soundEnabled !== false
+          soundEnabled: data?.soundEnabled !== false,
+          easyCellsEnabled: data?.easyCellsEnabled === true,
+          easyCells: sanitizeEasyCells(data?.easyCells || {}, 5),
+          easyCellQuestions: normalizeEasyCellQuestionsMap(data?.easyCellQuestions || {}),
+          easyCellCursor: (data?.easyCellCursor && typeof data.easyCellCursor === 'object') ? data.easyCellCursor : {}
         };
         localStorage.setItem(getHostSettingsStorageKey(), JSON.stringify(payload));
       }catch(e){}
@@ -6734,7 +6802,23 @@ function hideEidIntro(immediate){
       if(typeof baseSettings.soundEnabled !== 'boolean' && persisted.soundEnabled === false){
         baseSettings.soundEnabled = false;
       }
+
+      // ✅ (جديد) دمج وضع "إضافة الأسئلة" السهل + محتوى الخلايا الفارغ
+      if(typeof baseSettings.easyCellsEnabled !== 'boolean' && persisted.easyCellsEnabled === true){
+        baseSettings.easyCellsEnabled = true;
+      }
+      if((!baseSettings.easyCells || typeof baseSettings.easyCells !== 'object') && persisted.easyCells && Array.isArray(persisted.easyCells.values) && persisted.easyCells.values.length){
+        baseSettings.easyCells = sanitizeEasyCells(persisted.easyCells || {}, getBoardSize(baseRoom || {}) || 5);
+      }
+
       const next = { ...baseRoom, settings: baseSettings };
+
+      if((!next.easyCellQuestions || typeof next.easyCellQuestions !== 'object') && persisted.easyCellQuestions && typeof persisted.easyCellQuestions === 'object'){
+        next.easyCellQuestions = normalizeEasyCellQuestionsMap(persisted.easyCellQuestions || {});
+      }
+      if((!next.easyCellCursor || typeof next.easyCellCursor !== 'object') && persisted.easyCellCursor && typeof persisted.easyCellCursor === 'object'){
+        next.easyCellCursor = persisted.easyCellCursor || {};
+      }
       const roomQuestionMode = String(baseRoom.questionMode || 'default');
       if(roomQuestionMode !== 'custom' && persisted.questionMode === 'custom'){
         next.questionMode = 'custom';
@@ -7064,6 +7148,7 @@ function hideEidIntro(immediate){
         updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
         updates[`rooms/${code}/settings/cellContentMode`] = pendingCellContentMode;
         updates[`rooms/${code}/settings/soundEnabled`] = !!pendingSoundEnabled;
+          updates[`rooms/${code}/settings/easyCellsEnabled`] = !!pendingEasyCellsEnabled;
         updates[`rooms/${code}/board`] = nextBoard;
         updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || nextSeed;
         await update(ref(db), updates);
@@ -8236,11 +8321,11 @@ function hideEidIntro(immediate){
                 <div class="settingsChoiceBlock">
                   <h4 class="settingsChoiceTitle">إضافة الأسئلة</h4>
                   <div class="settingsChoiceRow">
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="easyEdit" data-main-choice-value="on">تشغيل</button>
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="easyEdit" data-main-choice-value="off">تعطيل</button>
+                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="easyqa" data-main-choice-value="on">تشغيل</button>
+                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="easyqa" data-main-choice-value="off">تعطيل</button>
                   </div>
-                  <div id="easyEditStartWrap" class="settingsDualActions" style="margin-top:12px; display:none;">
-                    <button id="easyEditStartBtn" class="settingsActionBtn" type="button">لبدء التعديل اضغط هنا</button>
+                  <div id="settingsEasyStartWrap" class="settingsEasyStartWrap">
+                    <button id="settingsEasyStartBtn" class="settingsActionBtn settingsEasyStartBtn" type="button">لبدء التعديل اضغط هنا</button>
                   </div>
                 </div>
               </div>
@@ -8350,7 +8435,6 @@ function hideEidIntro(immediate){
       const timerValue = bd.querySelector('#settingsTimerValue');
       const statusEl = bd.querySelector('#settingsStatus');
       const mainChoiceButtons = Array.from(bd.querySelectorAll('[data-main-choice-group]'));
-      const easyEditStartWrap = bd.querySelector('#easyEditStartWrap');
       const transferEmailInput = bd.querySelector('#settingsTransferEmail');
       const transferCodeInput = bd.querySelector('#settingsTransferCode');
       const transferSaveBtn = bd.querySelector('#settingsTransferSaveBtn');
@@ -8360,12 +8444,14 @@ function hideEidIntro(immediate){
       const miniBoardEl = bd.querySelector('#settingsMiniBoard');
       const cellInputEl = bd.querySelector('#settingsCellInput');
       const selectedCellLabelEl = bd.querySelector('#settingsSelectedCellLabel');
+      const easyStartWrap = bd.querySelector('#settingsEasyStartWrap');
+      const easyStartBtn = bd.querySelector('#settingsEasyStartBtn');
       let activeTab = 'main';
       let activeCellsRound = 1;
       let pendingQuestionMode = 'default';
       let pendingCellContentMode = 'default';
       let pendingSoundEnabled = true;
-      let pendingEasyEditEnabled = false;
+      let pendingEasyCellsEnabled = false;
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
       SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.pendingCustomQuestions || {});
@@ -8396,12 +8482,9 @@ function hideEidIntro(immediate){
           if(group === 'questions') active = (value === pendingQuestionMode);
           else if(group === 'cells') active = (value === pendingCellContentMode);
           else if(group === 'sound') active = ((value === 'on') === !!pendingSoundEnabled);
-          else if(group === 'easyEdit') active = ((value === 'on') === !!pendingEasyEditEnabled);
+          else if(group === 'easyqa') active = ((value === 'on') === !!pendingEasyCellsEnabled);
           btn.classList.toggle('activeChoice', active);
         });
-        if(easyEditStartWrap){
-          easyEditStartWrap.style.display = pendingEasyEditEnabled ? 'flex' : 'none';
-        }
       }
 
       function setMainChoice(group, value){
@@ -8417,8 +8500,11 @@ function hideEidIntro(immediate){
             try{ stopEidIntroAudio(); }catch(e){}
           }
         }
-        else if(g === 'easyEdit') pendingEasyEditEnabled = (v === 'on');
+        else if(g === 'easyqa'){
+          pendingEasyCellsEnabled = (v !== 'off');
+        }
         renderMainChoices();
+        renderEasyStartWrap();
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest || LIVE.room || {});
       }
 
@@ -8629,7 +8715,9 @@ function hideEidIntro(immediate){
         pendingQuestionMode = getQuestionMode(r);
         pendingCellContentMode = (settings.cellContentMode === 'manual') ? 'manual' : 'default';
         pendingSoundEnabled = settings.soundEnabled !== false;
+        pendingEasyCellsEnabled = settings.easyCellsEnabled === true;
         renderMainChoices();
+        renderEasyStartWrap();
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
         if(timerValue) timerValue.textContent = `${timerRange.value || selectedTimer || 10} ثانية`;
         SETTINGS_UI.roomLatest = getRoomWithPersistentCustomQuestions(r || {});
@@ -8655,7 +8743,8 @@ function hideEidIntro(immediate){
             ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
             manualCellRounds,
             cellContentMode: pendingCellContentMode,
-            soundEnabled: !!pendingSoundEnabled
+            soundEnabled: !!pendingSoundEnabled,
+            easyCellsEnabled: !!pendingEasyCellsEnabled
           };
           const roomForBoard = { ...baseRoom, settings: nextSettings };
           const currentSeed = Number(baseRoom?.round?.boardSeed || baseRoom?.board?.seed || Date.now()) || Date.now();
@@ -8686,6 +8775,7 @@ function hideEidIntro(immediate){
             LIVE.room.settings.manualCellRounds = manualCellRounds;
             LIVE.room.settings.cellContentMode = pendingCellContentMode;
             LIVE.room.settings.soundEnabled = !!pendingSoundEnabled;
+            LIVE.room.settings.easyCellsEnabled = !!pendingEasyCellsEnabled;
             LIVE.room.questionMode = pendingQuestionMode;
             LIVE.room.timer.sel = timerSel;
             LIVE.room.timer.dur = timerSel;
@@ -8701,7 +8791,11 @@ function hideEidIntro(immediate){
             manualCellRounds,
             cellContentMode: pendingCellContentMode,
             questionMode: pendingQuestionMode,
-            soundEnabled: !!pendingSoundEnabled
+            soundEnabled: !!pendingSoundEnabled,
+            easyCellsEnabled: !!pendingEasyCellsEnabled,
+            easyCells: nextSettings.easyCells || baseRoom?.settings?.easyCells || {},
+            easyCellQuestions: baseRoom?.easyCellQuestions || LIVE.room?.easyCellQuestions || {},
+            easyCellCursor: baseRoom?.easyCellCursor || LIVE.room?.easyCellCursor || {}
           });
           CUSTOM_Q_PERSIST.remote = { updatedAt: customQuestionsUpdatedAt, customQuestions: pendingCustomQuestions };
           CUSTOM_Q_PERSIST.remoteLoaded = true;
@@ -8841,6 +8935,7 @@ function hideEidIntro(immediate){
 
     function openSettings(room){
       ensureSettingsModal();
+      try{ EASY_EDITOR.editing = false; EASY_EDITOR.preEdit = false; setEasyEditHintVisible(false); }catch(e){}
       SETTINGS_UI.roomLatest = room || LIVE.room || {};
       SETTINGS_UI.els.syncFromRoom(SETTINGS_UI.roomLatest);
       SETTINGS_UI.els.setActiveTab('main');
@@ -9567,6 +9662,234 @@ function hideEidIntro(immediate){
 
     const ANSWER_UI = { revealed:false, sig:"" };
 
+    // ✅ (جديد) وضع "إضافة الأسئلة" السهل داخل صفحة اللعب (بدون حذف أي شيء سابق)
+    const MAX_EASY_Q_PER_CELL = 10;
+
+    const EASY_EDITOR = {
+      editing:false,
+      preEdit:false,
+      ready:false,
+      backdrop:null,
+      els:{},
+      cell:{ row:null, col:null }
+    };
+
+    function isEasyCellsEnabled(roomLike){
+      const s = (roomLike?.settings && typeof roomLike.settings === "object") ? roomLike.settings : {};
+      return s.easyCellsEnabled === true;
+    }
+
+    function normalizeEasyCellQuestionsMap(raw){
+      const out = {};
+      const src = (raw && typeof raw === "object") ? raw : {};
+      for(const key of Object.keys(src || {})){
+        const k = String(key || "").trim();
+        if(!k) continue;
+        const v = src[key];
+        let arr = [];
+        if(Array.isArray(v)) arr = v;
+        else if(v && typeof v === "object") arr = [v];
+        const cleaned = arr.map(normalizeCustomQuestionEntry).filter(Boolean).slice(0, MAX_EASY_Q_PER_CELL);
+        if(cleaned.length) out[k] = cleaned;
+      }
+      return out;
+    }
+
+    function sanitizeEasyCells(raw, fallbackCount){
+      const count = normalizeCellCount(raw?.cellCount || fallbackCount || 5);
+      const need = count * count;
+      const valsSrc = Array.isArray(raw?.values) ? raw.values : [];
+      const values = Array.from({ length: need }, (_, i) => String(valsSrc[i] || ""));
+      return { cellCount: count, values };
+    }
+
+    function getEasyCellQuestions(roomLike, row, col){
+      const room = roomLike || {};
+      const map = (room.easyCellQuestions && typeof room.easyCellQuestions === "object") ? room.easyCellQuestions : {};
+      const key = cellKey(Number(row), Number(col));
+      const list = map?.[key];
+      if(Array.isArray(list)) return list.map(normalizeCustomQuestionEntry).filter(Boolean);
+      if(list && typeof list === "object") return [normalizeCustomQuestionEntry(list)].filter(Boolean);
+      return [];
+    }
+
+    function getNextEasyCellSelection(roomLike, row, col){
+      const room = roomLike || {};
+      const key = cellKey(Number(row), Number(col));
+      const list = getEasyCellQuestions(room, row, col);
+      const cursorMap = (room.easyCellCursor && typeof room.easyCellCursor === "object") ? room.easyCellCursor : {};
+      if(!list.length){
+        return { list, cursorField: "easyCellCursor", cursorKey: key, qIndex: 0, nextCursor: 0 };
+      }
+      const hasSaved = Object.prototype.hasOwnProperty.call(cursorMap || {}, key);
+      let qIndex = hasSaved ? Number(cursorMap?.[key]) : Math.floor(Math.random() * list.length);
+      if(!Number.isFinite(qIndex) || qIndex < 0) qIndex = 0;
+      qIndex = qIndex % list.length;
+      return { list, cursorField:"easyCellCursor", cursorKey:key, qIndex, nextCursor: (qIndex + 1) % list.length };
+    }
+
+    function setEasyEditHintVisible(show){
+      const el = document.getElementById("easyEditHint");
+      if(!el) return;
+      el.style.display = show ? "block" : "none";
+    }
+
+    function ensureEasyCellEditorModal(){
+      if(EASY_EDITOR.ready) return;
+
+      const backdrop = document.createElement("div");
+      backdrop.id = "easyCellBackdrop";
+      backdrop.className = "cqBackdrop";
+      backdrop.innerHTML = `
+        <div class="cqModal" role="dialog" aria-modal="true" aria-label="تعديل الخلية">
+          <button id="easyCellClose" class="cqCloseRed" aria-label="إغلاق">X</button>
+          <div class="cqTitle">تعديل الخلية</div>
+          <div class="cqHint">اكتب محتوى الخلية ثم أضف سؤالاً وجواباً واحدًا أو أكثر.</div>
+
+          <div class="cqItem">
+            <div class="cqLbl">محتوى الخلية</div>
+            <input id="easyCellContent" class="settingsCellInput" type="text" inputmode="text" placeholder="اكتب محتوى الخلية">
+            <div id="easyPairs" class="cqPairs" style="margin-top:10px"></div>
+
+            <div style="display:flex;justify-content:center;margin-top:10px">
+              <button id="easyAddPair" class="settingsActionBtn" type="button">اضافة سؤال وجواب جديد</button>
+            </div>
+
+            <div style="display:flex;justify-content:center;margin-top:12px">
+              <button id="easySaveCell" class="btn btnYellow" type="button" style="min-width:220px">حفظ</button>
+            </div>
+
+            <div id="easyCellSavedMsg" class="cqSavedMsg" style="margin-top:10px"></div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const close = () => {
+        backdrop.style.display = "none";
+        EASY_EDITOR.cell = { row:null, col:null };
+      };
+
+      backdrop.querySelector("#easyCellClose")?.addEventListener("click", close);
+      backdrop.addEventListener("click", (e) => { if(e.target === backdrop) close(); });
+
+      EASY_EDITOR.ready = true;
+      EASY_EDITOR.backdrop = backdrop;
+      EASY_EDITOR.els = {
+        content: backdrop.querySelector("#easyCellContent"),
+        pairs: backdrop.querySelector("#easyPairs"),
+        add: backdrop.querySelector("#easyAddPair"),
+        save: backdrop.querySelector("#easySaveCell"),
+        msg: backdrop.querySelector("#easyCellSavedMsg"),
+        close
+      };
+
+      EASY_EDITOR.els.add.addEventListener("click", () => {
+        const wrap = EASY_EDITOR.els.pairs;
+        const count = wrap.querySelectorAll(".cqPair").length;
+        if(count >= MAX_EASY_Q_PER_CELL){
+          EASY_EDITOR.els.msg.textContent = `الحد الأقصى ${MAX_EASY_Q_PER_CELL} أسئلة لهذه الخلية`;
+          setTimeout(()=>{ EASY_EDITOR.els.msg.textContent = ""; }, 1400);
+          return;
+        }
+        const pair = createPairEl("", "");
+        wrap.appendChild(pair);
+      });
+
+      EASY_EDITOR.els.save.addEventListener("click", async () => {
+        if(role !== "host") return;
+
+        const r = Number(EASY_EDITOR.cell.row);
+        const c = Number(EASY_EDITOR.cell.col);
+        if(!Number.isFinite(r) || !Number.isFinite(c)) return;
+
+        const contentVal = String(EASY_EDITOR.els.content.value || "");
+        const key = cellKey(r,c);
+
+        const outPairs = [];
+        EASY_EDITOR.els.pairs.querySelectorAll(".cqPair").forEach(p => {
+          const q = (p.querySelector(".cqQ")?.value || "").trim();
+          const a = (p.querySelector(".cqA")?.value || "").trim();
+          if(q || a) outPairs.push({ q, a });
+        });
+        const cleanPairs = outPairs.map(normalizeCustomQuestionEntry).filter(Boolean).slice(0, MAX_EASY_Q_PER_CELL);
+
+        const boardNow = getBoard(LIVE.room || {});
+        const size = Math.max(1, Number(boardNow?.size || 5));
+        const need = size * size;
+
+        const settingsNow = (LIVE.room?.settings && typeof LIVE.room.settings === "object") ? LIVE.room.settings : {};
+        const prevEasyCells = sanitizeEasyCells(settingsNow.easyCells || {}, size);
+        const nextValues = Array.from({ length: need }, (_, i) => String(prevEasyCells.values?.[i] || ""));
+        const idx = (r * size) + c;
+        if(idx >= 0 && idx < nextValues.length){
+          nextValues[idx] = contentVal;
+        }
+        const nextEasyCells = { cellCount: size, values: nextValues };
+
+        const nextQuestions = normalizeEasyCellQuestionsMap({
+          ...((LIVE.room?.easyCellQuestions && typeof LIVE.room.easyCellQuestions === "object") ? LIVE.room.easyCellQuestions : {})
+        });
+        if(cleanPairs.length) nextQuestions[key] = cleanPairs;
+        else delete nextQuestions[key];
+
+        try{
+          const updates = {};
+          updates[`rooms/${code}/settings/easyCellsEnabled`] = true;
+          updates[`rooms/${code}/settings/easyCells`] = nextEasyCells;
+          updates[`rooms/${code}/easyCellQuestions`] = nextQuestions;
+          await update(ref(db), updates);
+
+          if(!LIVE.room.settings || typeof LIVE.room.settings !== "object") LIVE.room.settings = {};
+          LIVE.room.settings.easyCellsEnabled = true;
+          LIVE.room.settings.easyCells = nextEasyCells;
+          LIVE.room.easyCellQuestions = nextQuestions;
+          scheduleRender();
+
+          const env = loadPersistedHostSettingsEnvelope();
+          savePersistedHostSettingsEnvelope({
+            ...env,
+            updatedAt: Date.now(),
+            easyCellsEnabled: true,
+            easyCells: nextEasyCells,
+            easyCellQuestions: nextQuestions,
+            easyCellCursor: (LIVE.room?.easyCellCursor && typeof LIVE.room.easyCellCursor === "object") ? LIVE.room.easyCellCursor : {}
+          });
+
+          EASY_EDITOR.els.msg.textContent = "تم الحفظ";
+          setTimeout(()=>{ EASY_EDITOR.els.msg.textContent = ""; }, 900);
+
+          EASY_EDITOR.els.close();
+          EASY_EDITOR.editing = false;
+          setEasyEditHintVisible(false);
+          openSettings(LIVE.room || {});
+        }catch(e){
+          EASY_EDITOR.els.msg.textContent = "تعذر الحفظ";
+          setTimeout(()=>{ EASY_EDITOR.els.msg.textContent = ""; }, 1400);
+        }
+      });
+    }
+
+    function openEasyCellEditor(row, col){
+      ensureEasyCellEditorModal();
+      EASY_EDITOR.cell = { row:Number(row), col:Number(col) };
+
+      const boardNow = getBoard(LIVE.room || {});
+      const val = String(boardNow?.letters?.[row]?.[col] || "");
+      EASY_EDITOR.els.content.value = val;
+      syncCellInputDirection(EASY_EDITOR.els.content, val);
+
+      EASY_EDITOR.els.pairs.innerHTML = "";
+      const list = getEasyCellQuestions(LIVE.room || {}, row, col);
+      if(list.length){
+        list.forEach(item => EASY_EDITOR.els.pairs.appendChild(createPairEl(item.q || "", item.a || "")));
+      }else{
+        EASY_EDITOR.els.pairs.appendChild(createPairEl("", ""));
+      }
+      EASY_EDITOR.backdrop.style.display = "flex";
+      try{ EASY_EDITOR.els.content.focus(); }catch(e){}
+    }
+
     // ✅✅✅ (جديد) رسم واجهة اللعب مرة واحدة فقط (بدون رمشة)
     function renderGame(room, me){
       GAME_UI.mounted = true;
@@ -9581,6 +9904,7 @@ function hideEidIntro(immediate){
 
       const isHost = role === "host";
       const started = room.status === "started";
+      try{ setEasyEditHintVisible(isHost && (!!EASY_EDITOR.editing || !!EASY_EDITOR.preEdit)); }catch(e){}
       const writtenModeActive = isWrittenModeEnabled(room);
       setTopSettingsButton(!!isHost, () => openSettings(LIVE.room || room));
 
@@ -9633,6 +9957,7 @@ function hideEidIntro(immediate){
       main.innerHTML = `
         <div class="gameLayout">
           <div class="landRight">
+            <div id="easyEditHint" class="easyEditHint" style="display:none">اضغط على الخلية لإضافة الأسئلة</div>
             <div class="mapOuter">
               <div id="mapScale" class="mapScale" style="--zoom:1">
                 <div id="mapBox" class="mapBox">
@@ -10037,6 +10362,22 @@ function hideEidIntro(immediate){
       if(isHost && GAME_UI.els.nextQ){
         GAME_UI.els.nextQ.addEventListener("click", async () => {
           const cur = LIVE.room.current || {};
+          const hasPos = Number.isFinite(Number(cur.row)) && Number.isFinite(Number(cur.col));
+
+          // ✅ (جديد) إذا كانت الخلية لها أكثر من سؤال في الوضع السهل، نبدّل بينها هنا فقط
+          if(isEasyCellsEnabled(LIVE.room) && hasPos){
+            const pick = getNextEasyCellSelection(LIVE.room, Number(cur.row), Number(cur.col));
+            if(pick && pick.list && pick.list.length){
+              const updates = {};
+              updates[`rooms/${code}/current`] = { ...cur, qIndex: pick.qIndex };
+              updates[`rooms/${code}/${pick.cursorField}/${pick.cursorKey}`] = pick.nextCursor;
+              await update(ref(db), updates);
+              return;
+            }
+            // إذا ما فيه أسئلة لهذه الخلية في الوضع السهل: لا نبدّل أي شيء
+            return;
+          }
+
           if(!cur.letter) return;
 
           const pick = getNextQuestionSelection(LIVE.room, cur.letter);
@@ -10079,6 +10420,12 @@ function hideEidIntro(immediate){
             const k = cellKey(r,c);
             const letter = String(boardNow?.letters?.[r]?.[c] || "");
 
+            // ✅ (جديد) وضع التعديل السهل: الضغط يفتح محرر الخلية بدل اختيار السؤال
+            if(EASY_EDITOR.editing){
+              openEasyCellEditor(r, c);
+              return;
+            }
+
             const activeMapNow = Number(LIVE.room.activeMap || 0);
             const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
             const st = Number(mapStatesNow?.[k] ?? 0);
@@ -10100,12 +10447,19 @@ function hideEidIntro(immediate){
                 }
               }
 
-              const pick = getNextQuestionSelection(LIVE.room, letter);
+              let pick = getNextQuestionSelection(LIVE.room, letter);
+              if(isEasyCellsEnabled(LIVE.room)){
+                const easyPick = getNextEasyCellSelection(LIVE.room, r, c);
+                if(easyPick && easyPick.list && easyPick.list.length){
+                  pick = easyPick;
+                }
+              }
 
               updates[`rooms/${code}/mapStates/${activeMapNow}/${k}`] = 1;
               updates[`rooms/${code}/current`] = { letter, qIndex: pick.qIndex, row: r, col: c, map: activeMapNow };
               if(pick.list.length){
-                updates[`rooms/${code}/${pick.cursorField}/${letter}`] = pick.nextCursor;
+                const cursorKey = (pick.cursorField === "easyCellCursor") ? pick.cursorKey : letter;
+                updates[`rooms/${code}/${pick.cursorField}/${cursorKey}`] = pick.nextCursor;
               }
 
               try{
@@ -10255,7 +10609,29 @@ function hideEidIntro(immediate){
 
             <div id="tvGameName" class="tvGameName"></div>
 
-            <div class="tvScoreWrap" aria-hidden="true">
+            <div class="t
+      if(easyStartBtn){
+        easyStartBtn.addEventListener('click', () => {
+          if(role !== 'host') return;
+          const live = LIVE.room || SETTINGS_UI.roomLatest || {};
+          if(String(live.status || '') !== 'started'){
+            setStatus('ابدأ اللعبة أولاً ثم ارجع هنا.', true);
+            return;
+          }
+          try{
+            // ✅ الخطوة (3) فقط: فتح وضع التعديل بشكل مرئي (بدون تفريغ الخلايا وبدون حفظ/إرسال)
+            EASY_EDITOR.preEdit = true;   // يظهر التلميح فقط
+            EASY_EDITOR.editing = false;  // لا نفعل محرر الخلية الآن
+            bd.style.display = 'none';
+            setEasyEditHintVisible(true);
+            queueEducationGuideSync();
+            scheduleRender();
+          }catch(e){}
+        });
+      }
+
+
+vScoreWrap" aria-hidden="true">
               <div class="scoreBoard">
                 <div id="teamGreenBtn" class="teamPill green" style="background:${escapeHtml(visualTeams.green.color)};color:${escapeHtml(getReadableTextColor(visualTeams.green.color))}">${escapeHtml(visualTeams.green.name)}</div>
                 <div id="scoreGreen" class="scoreBox">${visualScores.green}</div>
@@ -10601,7 +10977,22 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         let curA = "";
         let hasQuestion = false;
 
-        if(cur.letter){
+        const easyActive = isEasyCellsEnabled(room) && Number.isFinite(Number(cur.row)) && Number.isFinite(Number(cur.col));
+        const easyList = easyActive ? getEasyCellQuestions(room, Number(cur.row), Number(cur.col)) : [];
+
+        if(easyActive){
+          if(easyList.length){
+            const idx = Number(cur.qIndex || 0) % easyList.length;
+            const item = easyList[idx] || {};
+            curQ = item?.q ?? "—";
+            curA = (item?.a ?? "").trim();
+            hasQuestion = true;
+          }else{
+            curQ = "هذه الخلية لا تحتوي على أسئلة بعد";
+            curA = "";
+            hasQuestion = true;
+          }
+        }else if(cur.letter){
           const mode = getQuestionMode(room);
 
           let list = [];
@@ -10640,7 +11031,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
 
         if(qText) qText.textContent = curQ;
 
-        const sig = `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number(room.customQuestionsUpdatedAt||0)}`;
+        const sig = (easyList && easyList.length)
+          ? `E|${cellKey(Number(cur.row), Number(cur.col))}|${Number(cur.qIndex||0)}|${easyList.length}`
+          : `${String(cur.letter||"")}|${Number(cur.qIndex||0)}|${getQuestionMode(room)}|${Number(room.customQuestionsUpdatedAt||0)}`;
         if(ANSWER_UI.sig !== sig){
           ANSWER_UI.sig = sig;
           ANSWER_UI.revealed = false;
@@ -10676,6 +11069,22 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
                 // نعيد القراءة من LIVE حتى لو تغيّر السؤال بسرعة
                 const rr = LIVE.room;
                 const cc = rr.current || {};
+
+                // ✅ (جديد) في وضع الخلايا المخصصة: جِب الإجابة من أسئلة الخلية نفسها
+                const easyOn = isEasyCellsEnabled(rr) && Number.isFinite(Number(cc.row)) && Number.isFinite(Number(cc.col));
+                const easyList = easyOn ? getEasyCellQuestions(rr, Number(cc.row), Number(cc.col)) : [];
+                if(easyList.length){
+                  const idx = Number(cc.qIndex || 0) % easyList.length;
+                  const a = (easyList[idx]?.a ?? "").trim();
+                  if(!a) return;
+
+                  ANSWER_UI.revealed = true;
+                  ansBtn.classList.remove("red");
+                  ansBtn.classList.add("green");
+                  ansBtn.textContent = a;
+                  return;
+                }
+
                 if(!cc.letter) return;
 
                 let list = [];
@@ -10989,7 +11398,9 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
         customQuestions: (room.customQuestions && typeof room.customQuestions === "object") ? room.customQuestions : {},
         customQuestionsUpdatedAt: Number(room.customQuestionsUpdatedAt || 0),
         questionCursorDefault: (room.questionCursorDefault && typeof room.questionCursorDefault === "object") ? room.questionCursorDefault : {},
-        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {}
+        questionCursorCustom: (room.questionCursorCustom && typeof room.questionCursorCustom === "object") ? room.questionCursorCustom : {},
+        easyCellQuestions: (room.easyCellQuestions && typeof room.easyCellQuestions === "object") ? room.easyCellQuestions : {},
+        easyCellCursor: (room.easyCellCursor && typeof room.easyCellCursor === "object") ? room.easyCellCursor : {}
       };
 
       const expectedSeed = getExpectedBoardSeed(normalized);
