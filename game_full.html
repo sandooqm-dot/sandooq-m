@@ -8233,6 +8233,16 @@ function hideEidIntro(immediate){
                     <button class="settingsChoiceBtn" type="button" data-main-choice-group="sound" data-main-choice-value="off">إطفاء</button>
                   </div>
                 </div>
+                <div class="settingsChoiceBlock">
+                  <h4 class="settingsChoiceTitle">إضافة الأسئلة</h4>
+                  <div class="settingsChoiceRow">
+                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="easyEdit" data-main-choice-value="on">تشغيل</button>
+                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="easyEdit" data-main-choice-value="off">تعطيل</button>
+                  </div>
+                  <div id="easyEditStartWrap" class="settingsDualActions" style="margin-top:12px; display:none;">
+                    <button id="easyEditStartBtn" class="settingsActionBtn" type="button">لبدء التعديل اضغط هنا</button>
+                  </div>
+                </div>
               </div>
               <div class="settingsMainBottomActions">
                 <button id="settingsHelpQuick" class="settingsMainBottomBtn settingsMainBottomBtnHelp" type="button">التعليمات</button>
@@ -8340,6 +8350,7 @@ function hideEidIntro(immediate){
       const timerValue = bd.querySelector('#settingsTimerValue');
       const statusEl = bd.querySelector('#settingsStatus');
       const mainChoiceButtons = Array.from(bd.querySelectorAll('[data-main-choice-group]'));
+      const easyEditStartWrap = bd.querySelector('#easyEditStartWrap');
       const transferEmailInput = bd.querySelector('#settingsTransferEmail');
       const transferCodeInput = bd.querySelector('#settingsTransferCode');
       const transferSaveBtn = bd.querySelector('#settingsTransferSaveBtn');
@@ -8354,6 +8365,7 @@ function hideEidIntro(immediate){
       let pendingQuestionMode = 'default';
       let pendingCellContentMode = 'default';
       let pendingSoundEnabled = true;
+      let pendingEasyEditEnabled = false;
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
       SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.pendingCustomQuestions || {});
@@ -8384,8 +8396,12 @@ function hideEidIntro(immediate){
           if(group === 'questions') active = (value === pendingQuestionMode);
           else if(group === 'cells') active = (value === pendingCellContentMode);
           else if(group === 'sound') active = ((value === 'on') === !!pendingSoundEnabled);
+          else if(group === 'easyEdit') active = ((value === 'on') === !!pendingEasyEditEnabled);
           btn.classList.toggle('activeChoice', active);
         });
+        if(easyEditStartWrap){
+          easyEditStartWrap.style.display = pendingEasyEditEnabled ? 'flex' : 'none';
+        }
       }
 
       function setMainChoice(group, value){
@@ -8401,6 +8417,7 @@ function hideEidIntro(immediate){
             try{ stopEidIntroAudio(); }catch(e){}
           }
         }
+        else if(g === 'easyEdit') pendingEasyEditEnabled = (v === 'on');
         renderMainChoices();
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest || LIVE.room || {});
       }
