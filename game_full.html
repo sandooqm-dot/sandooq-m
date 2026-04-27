@@ -4047,6 +4047,19 @@
     }
 
     function getDisplayedCellValue(boardLike, row, col){
+      try{
+        if(String(role || "") === "host" && window.__HOROF_EASY_EDIT_ACTIVE){
+          const store = window.__HOROF_EASY_EDIT_STORE;
+          if(store && store.cells){
+            const k = `${Number(row)}-${Number(col)}`;
+            const cell = store.cells[k];
+            if(cell && typeof cell === "object"){
+              return String(cell.content || "");
+            }
+          }
+          return "";
+        }
+      }catch(e){}
       const board = boardLike || {};
       return String(board?.letters?.[row]?.[col] || "");
     }
@@ -5453,10 +5466,212 @@ function hideEidIntro(immediate){
       },
       setActive(v){
         this.active = !!v;
+        try{ window.__HOROF_EASY_EDIT_ACTIVE = !!this.active; }catch(e){}
         const el = this.ensure();
         el.style.display = this.active ? 'block' : 'none';
+
+        // ✅ عند تفعيل/إيقاف وضع التعديل: نحدّث شكل الخلايا فقط (بدون أي لمس لمنطق اللعبة)
+        try{ easyEditRefreshMapStyles(); }catch(e){}
+        try{ scheduleMapRelayout(this.active ? "easy_edit_on" : "easy_edit_off"); }catch(e){}
+
+        if(!this.active){
+          try{ EASY_EDIT_EDITOR.close(); }catch(e){}
+        }
       }
     };
+
+    // ✅ (خطوة 4 + 5) تخزين مؤقت للتعديل (داخل نفس الجلسة فقط) + نافذة منبثقة للتعديل
+    try{
+      if(!window.__HOROF_EASY_EDIT_STORE) window.__HOROF_EASY_EDIT_STORE = { cells: {} };
+      if(typeof window.__HOROF_EASY_EDIT_ACTIVE !== "boolean") window.__HOROF_EASY_EDIT_ACTIVE = false;
+    }catch(e){}
+
+    function easyEditGetStore(){
+      try{ return window.__HOROF_EASY_EDIT_STORE || { cells:{} }; }catch(e){ return { cells:{} }; }
+    }
+    function easyEditGetCell(key){
+      const store = easyEditGetStore();
+      const k = String(key || "");
+      const cell = store.cells && store.cells[k];
+      return (cell && typeof cell === "object") ? cell : null;
+    }
+    function easyEditSetCell(key, patch){
+      const store = easyEditGetStore();
+      const k = String(key || "");
+      if(!store.cells) store.cells = {};
+      const prev = easyEditGetCell(k) || {};
+      store.cells[k] = { ...prev, ...(patch && typeof patch === "object" ? patch : {}) };
+      try{ window.__HOROF_EASY_EDIT_STORE = store; }catch(e){}
+    }
+
+    function easyEditRefreshMapStyles(){
+      try{
+        if(!GAME_UI || !GAME_UI.cells || !GAME_UI.cells.length) return;
+        const room = LIVE && LIVE.room ? LIVE.room : {};
+        const activeMapNow = Number(room.activeMap || 0);
+        const mapStatesNow = (room.mapStates && room.mapStates[String(activeMapNow)]) ? room.mapStates[String(activeMapNow)] : {};
+        for(let i=0;i<GAME_UI.cells.length;i++){
+          const cell = GAME_UI.cells[i];
+          const r = Number(cell.getAttribute("data-row"));
+          const c = Number(cell.getAttribute("data-col"));
+          const k = cellKey(r,c);
+          const st = Number(mapStatesNow?.[k] ?? 0);
+          setStateClass(cell, st);
+        }
+      }catch(e){}
+    }
+
+    const EASY_EDIT_EDITOR = {
+      openKey: "",
+      backdrop: null,
+      card: null,
+      els: null,
+      ensure(){
+        if(this.backdrop) return;
+        const backdrop = document.createElement("div");
+        backdrop.id = "easyEditEditorBackdrop";
+        backdrop.style.cssText =
+          "position:fixed;inset:0;display:none;align-items:center;justify-content:center;" +
+          "background:rgba(0,0,0,.55);z-index:47050;padding:14px;";
+        const card = document.createElement("div");
+        card.id = "easyEditEditorCard";
+        card.style.cssText =
+          "width:min(92vw, 720px);max-height:min(84vh, 760px);overflow:auto;" +
+          "background:#fff;color:#111;border-radius:22px;border:8px solid rgba(0,0,0,.85);" +
+          "box-shadow:0 24px 38px rgba(0,0,0,.30);padding:16px 14px 14px;text-align:right;position:relative;";
+
+        const closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.textContent = "×";
+        closeBtn.setAttribute("aria-label","إغلاق");
+        closeBtn.style.cssText =
+          "position:absolute;left:10px;top:10px;width:46px;height:46px;border:none;border-radius:14px;" +
+          "background:#ff2d2d;color:#fff;font-size:30px;font-weight:900;cursor:pointer;" +
+          "border:4px solid rgba(0,0,0,.85);box-shadow:0 10px 18px rgba(0,0,0,.16);";
+        closeBtn.addEventListener("click", () => this.close());
+
+        const title = document.createElement("div");
+        title.id = "easyEditEditorTitle";
+        title.style.cssText = "text-align:center;font-size:24px;font-weight:900;margin:8px 52px 14px;color:#7b1f63;";
+        title.textContent = "تعديل الخلية";
+
+        const fieldWrap = document.createElement("div");
+        fieldWrap.style.cssText = "display:flex;flex-direction:column;gap:12px;";
+
+        const mkLabel = (t) => {
+          const l = document.createElement("div");
+          l.style.cssText = "font-size:18px;font-weight:900;color:#111;margin:0 0 6px;text-align:right;";
+          l.textContent = t;
+          return l;
+        };
+        const mkInput = (ph) => {
+          const inp = document.createElement("input");
+          inp.type = "text";
+          inp.placeholder = ph || "";
+          inp.style.cssText =
+            "width:100%;height:56px;border-radius:16px;border:3px solid rgba(0,0,0,.16);" +
+            "background:#fff;color:#111;font-size:20px;font-weight:900;text-align:center;outline:none;padding:0 14px;";
+          return inp;
+        };
+        const mkTA = (ph) => {
+          const ta = document.createElement("textarea");
+          ta.placeholder = ph || "";
+          ta.rows = 3;
+          ta.style.cssText =
+            "width:100%;border-radius:16px;border:3px solid rgba(0,0,0,.16);" +
+            "background:#fff;color:#111;font-size:18px;font-weight:900;line-height:1.6;" +
+            "outline:none;padding:10px 12px;resize:vertical;min-height:84px;";
+          return ta;
+        };
+
+        const f1 = document.createElement("div");
+        f1.appendChild(mkLabel("محتوى الخلية"));
+        const cellContent = mkInput("مثال: حرف / رقم / كلمة");
+        f1.appendChild(cellContent);
+
+        const f2 = document.createElement("div");
+        f2.appendChild(mkLabel("سؤال الخلية"));
+        const q1 = mkTA("اكتب السؤال هنا...");
+        f2.appendChild(q1);
+
+        const f3 = document.createElement("div");
+        f3.appendChild(mkLabel("جواب الخلية"));
+        const a1 = mkTA("اكتب الجواب هنا...");
+        f3.appendChild(a1);
+
+        fieldWrap.appendChild(f1);
+        fieldWrap.appendChild(f2);
+        fieldWrap.appendChild(f3);
+
+        const actions = document.createElement("div");
+        actions.style.cssText = "display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.textContent = "حفظ";
+        saveBtn.style.cssText =
+          "min-width:180px;height:56px;border:none;border-radius:18px;cursor:pointer;" +
+          "background:#ffd54a;color:#111;font-size:22px;font-weight:900;" +
+          "border:4px solid rgba(0,0,0,.86);box-shadow:0 8px 0 rgba(0,0,0,.14);";
+        saveBtn.addEventListener("click", () => {
+          const key = String(this.openKey || "");
+          if(!key) return this.close();
+          // ✅ حفظ محلي مؤقت (للمعاينة فقط في هذه الخطوة)
+          easyEditSetCell(key, {
+            content: String(cellContent.value || "").trim(),
+            q1: String(q1.value || "").trim(),
+            a1: String(a1.value || "").trim()
+          });
+          this.close();
+          try{ scheduleMapRelayout("easy_edit_saved"); }catch(e){}
+        });
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.textContent = "إلغاء";
+        cancelBtn.style.cssText =
+          "min-width:180px;height:56px;border:none;border-radius:18px;cursor:pointer;" +
+          "background:#fff;color:#5a1d58;font-size:22px;font-weight:900;" +
+          "border:4px solid rgba(0,0,0,.22);box-shadow:0 8px 0 rgba(0,0,0,.10);";
+        cancelBtn.addEventListener("click", () => this.close());
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelBtn);
+
+        card.appendChild(closeBtn);
+        card.appendChild(title);
+        card.appendChild(fieldWrap);
+        card.appendChild(actions);
+        backdrop.appendChild(card);
+
+        backdrop.addEventListener("click", (e) => {
+          if(e.target === backdrop) this.close();
+        });
+
+        document.body.appendChild(backdrop);
+
+        this.backdrop = backdrop;
+        this.card = card;
+        this.els = { title, cellContent, q1, a1 };
+      },
+      open(row, col){
+        this.ensure();
+        const r = Number(row), c = Number(col);
+        this.openKey = `${r}-${c}`;
+        const cell = easyEditGetCell(this.openKey) || {};
+        this.els.title.textContent = `تعديل الخلية (${r+1}-${c+1})`;
+        this.els.cellContent.value = String(cell.content || "");
+        this.els.q1.value = String(cell.q1 || "");
+        this.els.a1.value = String(cell.a1 || "");
+        this.backdrop.style.display = "flex";
+      },
+      close(){
+        if(!this.backdrop) return;
+        this.backdrop.style.display = "none";
+        this.openKey = "";
+      }
+    };
+
 
 
     function scheduleMapRelayout(reason){
@@ -5686,8 +5901,12 @@ function hideEidIntro(immediate){
     }
 
     function setStateClass(el, st){
+      let useSt = st;
+      try{
+        if(String(role || "") === "host" && window.__HOROF_EASY_EDIT_ACTIVE) useSt = 0;
+      }catch(e){}
       el.classList.remove("state0","state1","state2","state3","pulse");
-      el.classList.add(`state${st}`);
+      el.classList.add(`state${useSt}`);
       const row = String(el?.getAttribute?.("data-row") ?? "");
       const col = String(el?.getAttribute?.("data-col") ?? "");
       const txt = (row !== "" && col !== "")
@@ -5695,7 +5914,7 @@ function hideEidIntro(immediate){
         : null;
       if(txt){
         txt.classList.remove("state0","state1","state2","state3");
-        txt.classList.add(`state${st}`);
+        txt.classList.add(`state${useSt}`);
       }
     }
 
@@ -6153,7 +6372,7 @@ function hideEidIntro(immediate){
 
     async function assignCurrentCellToTeam(team){
       if(role !== "host") return;
-      if(LIVE.room.status !== "started") return;
+      if(LIVE.room.status !== "started" && !window.__HOROF_EASY_EDIT_ACTIVE) return;
       if(team !== "green" && team !== "orange") return;
 
       const cur = LIVE.room.current || {};
@@ -10124,12 +10343,18 @@ bd.querySelector('#settingsSaveExit').addEventListener('click', saveAndClose);
 
             const boardNow = getBoard(LIVE.room);
             const expectedBoardSeed = Number(LIVE.room?.round?.boardSeed || 0);
-            if(expectedBoardSeed && Number(boardNow?.seed || 0) !== expectedBoardSeed) return;
+            if(!window.__HOROF_EASY_EDIT_ACTIVE && expectedBoardSeed && Number(boardNow?.seed || 0) !== expectedBoardSeed) return;
             const sizeNow = Math.max(1, Number(boardNow.size || 5));
             const r = Number(cell.getAttribute("data-row"));
             const c = Number(cell.getAttribute("data-col"));
             if(r < 0 || c < 0 || r >= sizeNow || c >= sizeNow) return;
-            const k = cellKey(r,c);
+
+            // ✅ (خطوة 5) في وضع التعديل: نفتح نافذة التعديل فقط بدون أي تغيير لحالة اللعب
+            if(window.__HOROF_EASY_EDIT_ACTIVE){
+              try{ EASY_EDIT_EDITOR.open(r, c); }catch(e){}
+              return;
+            }
+                        const k = cellKey(r,c);
             const letter = String(boardNow?.letters?.[r]?.[c] || "");
 
             const activeMapNow = Number(LIVE.room.activeMap || 0);
