@@ -4050,9 +4050,12 @@
       try{
         if(String(role || "") === "host" && window.__HOROF_EASY_EDIT_ACTIVE){
           const store = window.__HOROF_EASY_EDIT_STORE;
-          if(store && store.cells){
+          const activeRound = Number(store?.activeRound || 1) || 1;
+          const roundBucket = (store && store.rounds) ? (store.rounds[String(activeRound)] || store.rounds[activeRound]) : null;
+          const cells = (roundBucket && roundBucket.cells) ? roundBucket.cells : ((store && store.cells) ? store.cells : null); // backward compat
+          if(cells){
             const k = `${Number(row)}-${Number(col)}`;
-            const cell = store.cells[k];
+            const cell = cells[k];
             if(cell && typeof cell === "object"){
               return String(cell.content || "");
             }
@@ -4064,7 +4067,8 @@
       return String(board?.letters?.[row]?.[col] || "");
     }
 
-    function getBoard(room){
+
+function getBoard(room){
       const expectedSeed = getExpectedBoardSeed(room);
       const fromRoom = normalizeBoardState(room?.board, room);
 
@@ -5454,7 +5458,7 @@ function hideEidIntro(immediate){
         el.id = 'easyEditHint';
         el.setAttribute('aria-live','polite');
         el.style.cssText =
-          'position:fixed;left:50%;top:98px;transform:translateX(-50%);z-index:46000;' +
+          'position:fixed;left:50%;top:98px;transform:translateX(-50%);z-index:46040;' +
           'display:none;max-width:min(92vw, 560px);padding:12px 14px;border-radius:18px;' +
           'background:#fff;color:#111;border:4px solid rgba(0,0,0,.85);' +
           'box-shadow:0 18px 28px rgba(0,0,0,.26);font-size:18px;font-weight:900;' +
@@ -5470,6 +5474,10 @@ function hideEidIntro(immediate){
         const el = this.ensure();
         el.style.display = this.active ? 'block' : 'none';
 
+        // ✅ (خطوة 6 + 7) تعتيم الصفحة ما عدا الخريطة + لوحة الجولات
+        try{ EASY_EDIT_STAGE && EASY_EDIT_STAGE.setActive && EASY_EDIT_STAGE.setActive(this.active); }catch(e){}
+
+
         // ✅ عند تفعيل/إيقاف وضع التعديل: نحدّث شكل الخلايا فقط (بدون أي لمس لمنطق اللعبة)
         try{ easyEditRefreshMapStyles(); }catch(e){}
         try{ scheduleMapRelayout(this.active ? "easy_edit_on" : "easy_edit_off"); }catch(e){}
@@ -5482,31 +5490,82 @@ function hideEidIntro(immediate){
 
     // ✅ (خطوة 4 + 5) تخزين مؤقت للتعديل (داخل نفس الجلسة فقط) + نافذة منبثقة للتعديل
     try{
-      if(!window.__HOROF_EASY_EDIT_STORE) window.__HOROF_EASY_EDIT_STORE = { cells: {} };
+      if(!window.__HOROF_EASY_EDIT_STORE) window.__HOROF_EASY_EDIT_STORE = { activeRound: 1, rounds: {} };
       if(typeof window.__HOROF_EASY_EDIT_ACTIVE !== "boolean") window.__HOROF_EASY_EDIT_ACTIVE = false;
     }catch(e){}
 
     function easyEditGetStore(){
-      try{ return window.__HOROF_EASY_EDIT_STORE || { cells:{} }; }catch(e){ return { cells:{} }; }
-    }
-    function easyEditGetCell(key){
-      const store = easyEditGetStore();
-      const k = String(key || "");
-      const cell = store.cells && store.cells[k];
-      return (cell && typeof cell === "object") ? cell : null;
-    }
-    function easyEditSetCell(key, patch){
-      const store = easyEditGetStore();
-      const k = String(key || "");
-      if(!store.cells) store.cells = {};
-      const prev = easyEditGetCell(k) || {};
-      store.cells[k] = { ...prev, ...(patch && typeof patch === "object" ? patch : {}) };
-      try{ window.__HOROF_EASY_EDIT_STORE = store; }catch(e){}
+      try{
+        const s = window.__HOROF_EASY_EDIT_STORE;
+        if(!s || typeof s !== "object"){
+          return { activeRound: 1, rounds: { "1": { cells: {} } } };
+        }
+        // ✅ توافق للخلف: لو كانت نسخة قديمة فيها store.cells
+        if(!s.rounds || typeof s.rounds !== "object"){
+          const legacyCells = (s.cells && typeof s.cells === "object") ? s.cells : {};
+          s.rounds = { "1": { cells: legacyCells } };
+          try{ delete s.cells; }catch(e){}
+        }
+        const ar = Number(s.activeRound || 1) || 1;
+        s.activeRound = ar;
+        if(!s.rounds[String(ar)]) s.rounds[String(ar)] = { cells: {} };
+        if(!s.rounds[String(ar)].cells || typeof s.rounds[String(ar)].cells !== "object") s.rounds[String(ar)].cells = {};
+        window.__HOROF_EASY_EDIT_STORE = s;
+        return s;
+      }catch(e){
+        return { activeRound: 1, rounds: { "1": { cells: {} } } };
+      }
     }
 
-    function easyEditRefreshMapStyles(){
+    function easyEditGetActiveRound(){
+      const s = easyEditGetStore();
+      return Number(s.activeRound || 1) || 1;
+    }
+
+    function easyEditSetActiveRound(n){
+      const s = easyEditGetStore();
+      const r = Math.max(1, Number(n || 1) || 1);
+      s.activeRound = r;
+      if(!s.rounds) s.rounds = {};
+      if(!s.rounds[String(r)]) s.rounds[String(r)] = { cells: {} };
+      if(!s.rounds[String(r)].cells || typeof s.rounds[String(r)].cells !== "object") s.rounds[String(r)].cells = {};
+      try{ window.__HOROF_EASY_EDIT_STORE = s; }catch(e){}
+    }
+
+    function easyEditGetCellsBucket(){
+      const s = easyEditGetStore();
+      const rk = String(easyEditGetActiveRound());
+      const bucket = (s.rounds && s.rounds[rk] && s.rounds[rk].cells) ? s.rounds[rk].cells : {};
+      return bucket && typeof bucket === "object" ? bucket : {};
+    }
+
+    function easyEditGetCell(key){
+      const cells = easyEditGetCellsBucket();
+      const k = String(key || "");
+      const cell = cells && cells[k];
+      return (cell && typeof cell === "object") ? cell : null;
+    }
+
+    function easyEditSetCell(key, patch){
+      const s = easyEditGetStore();
+      const rk = String(easyEditGetActiveRound());
+      if(!s.rounds) s.rounds = {};
+      if(!s.rounds[rk]) s.rounds[rk] = { cells: {} };
+      if(!s.rounds[rk].cells || typeof s.rounds[rk].cells !== "object") s.rounds[rk].cells = {};
+      const cells = s.rounds[rk].cells;
+
+      const k = String(key || "");
+      const prev = (cells[k] && typeof cells[k] === "object") ? cells[k] : {};
+      cells[k] = { ...prev, ...(patch && typeof patch === "object" ? patch : {}) };
+
+      try{ window.__HOROF_EASY_EDIT_STORE = s; }catch(e){}
+    }
+
+
+function easyEditRefreshMapStyles(){
       try{
         if(!GAME_UI || !GAME_UI.cells || !GAME_UI.cells.length) return;
+        const forceWhite = !!(window.__HOROF_EASY_EDIT_ACTIVE);
         const room = LIVE && LIVE.room ? LIVE.room : {};
         const activeMapNow = Number(room.activeMap || 0);
         const mapStatesNow = (room.mapStates && room.mapStates[String(activeMapNow)]) ? room.mapStates[String(activeMapNow)] : {};
@@ -5515,13 +5574,194 @@ function hideEidIntro(immediate){
           const r = Number(cell.getAttribute("data-row"));
           const c = Number(cell.getAttribute("data-col"));
           const k = cellKey(r,c);
-          const st = Number(mapStatesNow?.[k] ?? 0);
+          const st = forceWhite ? 0 : Number(mapStatesNow?.[k] ?? 0);
           setStateClass(cell, st);
         }
       }catch(e){}
     }
 
-    const EASY_EDIT_EDITOR = {
+
+
+    // ✅ (خطوة 6 + 7) تعتيم الصفحة كاملة ما عدا الخريطة + لوحة اختيار الجولة (حسب 1/3/5)
+    const EASY_EDIT_STAGE = {
+      overlay: null,
+      panel: null,
+      titleEl: null,
+      buttonsWrap: null,
+      _posBound: null,
+      _mapPrev: null,
+
+      ensureOverlay(){
+        if(this.overlay) return this.overlay;
+        const el = document.createElement("div");
+        el.id = "easyEditDimOverlay";
+        el.style.cssText =
+          "position:fixed;inset:0;display:none;z-index:46010;" +
+          "background:rgba(0,0,0,.70);" +
+          "backdrop-filter:blur(2px);" +
+          "-webkit-backdrop-filter:blur(2px);" +
+          "pointer-events:auto;";
+        document.body.appendChild(el);
+        this.overlay = el;
+        return el;
+      },
+
+      ensurePanel(){
+        if(this.panel) return this.panel;
+
+        const panel = document.createElement("div");
+        panel.id = "easyEditRoundsPanel";
+        panel.style.cssText =
+          "position:fixed;display:none;z-index:46030;pointer-events:auto;" +
+          "background:#fff;color:#111;border-radius:18px;" +
+          "border:8px solid rgba(0,0,0,.85);" +
+          "box-shadow:0 22px 36px rgba(0,0,0,.28);" +
+          "padding:12px 12px 10px;text-align:center;";
+
+        const title = document.createElement("div");
+        title.style.cssText = "font-size:18px;font-weight:900;color:#111;margin:0 0 10px;line-height:1.25;";
+        title.textContent = "إضافة أسئلة للجولات الأخرى";
+
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;";
+
+        panel.appendChild(title);
+        panel.appendChild(row);
+
+        document.body.appendChild(panel);
+
+        this.panel = panel;
+        this.titleEl = title;
+        this.buttonsWrap = row;
+        return panel;
+      },
+
+      getRoundsTotal(roomLike){
+        const room = roomLike || LIVE.room || {};
+        // نعتمد منطق الجولات الموجود: غالبًا room.round.targetWins (1/3/5)
+        const v = room?.round?.targetWins ?? room?.settings?.winRounds ?? room?.settings?.rounds ?? room?.settings?.targetWins;
+        const n = normalizeWinRounds(v);
+        return Math.max(1, Number(n || 1) || 1);
+      },
+
+      rebuildButtons(total){
+        this.ensurePanel();
+        const wrap = this.buttonsWrap;
+        if(!wrap) return;
+        wrap.innerHTML = "";
+
+        const active = easyEditGetActiveRound();
+        for(let i=1;i<=total;i++){
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = String(i);
+          btn.setAttribute("aria-label", `اختيار الجولة ${i}`);
+          const isActive = (i === active);
+          btn.style.cssText =
+            "width:54px;height:54px;border-radius:14px;cursor:pointer;" +
+            "border:6px solid rgba(0,0,0,.85);" +
+            (isActive ? "background:#ffd54a;color:#111;" : "background:#ffffff;color:#111;") +
+            "font-size:22px;font-weight:900;box-shadow:0 10px 18px rgba(0,0,0,.12);" +
+            "-webkit-tap-highlight-color:transparent;touch-action:manipulation;";
+          btn.addEventListener("click", (ev) => {
+            try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+            try{
+              easyEditSetActiveRound(i);
+              // أغلق المحرر لو مفتوح
+              try{ EASY_EDIT_EDITOR.close(); }catch(e){}
+              // حدّث الواجهة
+              try{ EASY_EDIT_STAGE.refresh(); }catch(e){}
+              try{ scheduleMapRelayout("easy_edit_round_switch"); }catch(e){}
+            }catch(e){}
+          });
+          wrap.appendChild(btn);
+        }
+      },
+
+      positionPanel(){
+        if(!this.panel) return;
+        if(this.panel.style.display === "none") return;
+
+        const sb = document.querySelector(".scoreBoard");
+        if(!sb){
+          // fallback: أعلى منتصف الصفحة
+          const w = Math.min(window.innerWidth * 0.92, 520);
+          this.panel.style.width = w + "px";
+          this.panel.style.left = ((window.innerWidth - w) / 2) + "px";
+          this.panel.style.top = "300px";
+          return;
+        }
+        const r = sb.getBoundingClientRect();
+        const w = Math.max(220, r.width);
+        const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left));
+        const top = Math.max(8, Math.min(window.innerHeight - 140, r.top - 6));
+        this.panel.style.width = w + "px";
+        this.panel.style.left = left + "px";
+        this.panel.style.top = top + "px";
+      },
+
+      elevateMap(on){
+        const mapOuter = document.querySelector(".mapOuter");
+        if(!mapOuter) return;
+
+        if(on){
+          if(this._mapPrev) return;
+          this._mapPrev = {
+            el: mapOuter,
+            pos: mapOuter.style.position || "",
+            z: mapOuter.style.zIndex || ""
+          };
+          mapOuter.style.position = "relative";
+          mapOuter.style.zIndex = "46020";
+        }else{
+          if(!this._mapPrev) return;
+          const p = this._mapPrev;
+          try{
+            p.el.style.position = p.pos;
+            p.el.style.zIndex = p.z;
+          }catch(e){}
+          this._mapPrev = null;
+        }
+      },
+
+      refresh(){
+        if(!EASY_EDIT_UI.active) return;
+        const room = LIVE.room || {};
+        const total = this.getRoundsTotal(room);
+        if(total <= 1){
+          if(this.panel) this.panel.style.display = "none";
+          return;
+        }
+        this.rebuildButtons(total);
+        if(this.panel) this.panel.style.display = "block";
+        this.positionPanel();
+      },
+
+      setActive(on){
+        const active = !!on;
+        this.ensureOverlay();
+        this.ensurePanel();
+
+        if(active){
+          this.overlay.style.display = "block";
+          this.elevateMap(true);
+          this.refresh();
+
+          if(!this._posBound){
+            this._posBound = () => { try{ EASY_EDIT_STAGE.positionPanel(); }catch(e){} };
+            window.addEventListener("resize", this._posBound, { passive:true });
+            window.addEventListener("orientationchange", this._posBound, { passive:true });
+            window.addEventListener("scroll", this._posBound, { passive:true });
+          }
+        }else{
+          if(this.overlay) this.overlay.style.display = "none";
+          if(this.panel) this.panel.style.display = "none";
+          this.elevateMap(false);
+        }
+      }
+    };
+
+const EASY_EDIT_EDITOR = {
       openKey: "",
       backdrop: null,
       card: null,
