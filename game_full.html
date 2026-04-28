@@ -3977,7 +3977,7 @@
       const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
       const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
       const cellContentMode = String(settings.cellContentMode || 'default');
-      const size = normalizeCellCount(getBoardSize(roomRefLike || {}));
+      const size = normalizeCellCount(manualConfig?.cellCount || getBoardSize(roomRefLike || {}));
       const shape = getBoardShape(roomRefLike || {});
       const seed = Number(seedTs || Date.now()) || Date.now();
       const baseLetters = generateBoardLetters(size, seed);
@@ -4015,8 +4015,12 @@
       const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
       const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
       if(!manualConfig || !Array.isArray(manualConfig.values)) return base;
-      const manualSize = normalizeCellCount(base.size || getBoardSize(roomRefLike || {}));
-            const out = cloneBoardState(base, roomRefLike);
+      const manualSize = normalizeCellCount(manualConfig?.cellCount || base.size || getBoardSize(roomRefLike || {}));
+      if(manualSize !== Number(base.size || 0)){
+        const rebuilt = buildBoardState({ ...roomRefLike, settings }, Number(base.seed || Date.now()) || Date.now());
+        return cloneBoardState(rebuilt, roomRefLike);
+      }
+      const out = cloneBoardState(base, roomRefLike);
       const vals = manualConfig.values.map(v => String(v || ''));
       for(let r=0; r<manualSize; r++){
         for(let c=0; c<manualSize; c++){
@@ -5688,30 +5692,52 @@ function easyEditRefreshMapStyles(){
         if(!wrap) return;
         wrap.innerHTML = "";
 
-        const active = easyEditGetActiveRound();
-        for(let i=1;i<=total;i++){
+        const labels = ["الجولة الأولى","الجولة الثانية","الجولة الثالثة","الجولة الرابعة","الجولة الخامسة"];
+        const maxEnabled = Math.max(1, Number(total || 1) || 1);
+        let active = easyEditGetActiveRound();
+        if(active > maxEnabled){
+          try{ easyEditSetActiveRound(maxEnabled); }catch(e){}
+          active = maxEnabled;
+        }
+
+        for(let i=1;i<=5;i++){
           const btn = document.createElement("button");
           btn.type = "button";
-          btn.textContent = String(i);
-          btn.setAttribute("aria-label", `اختيار الجولة ${i}`);
+          btn.textContent = labels[i-1] || String(i);
+          btn.setAttribute("aria-label", `اختيار ${labels[i-1] || ("الجولة " + i)}`);
+
           const isActive = (i === active);
+          const disabled = (i > maxEnabled);
+
           btn.style.cssText =
-            "width:54px;height:54px;border-radius:14px;cursor:pointer;" +
+            "flex:0 1 calc((100% - 20px)/3);min-width:96px;max-width:220px;" +
+            "min-height:54px;border-radius:16px;cursor:pointer;" +
             "border:6px solid rgba(0,0,0,.85);" +
             (isActive ? "background:#ffd54a;color:#111;" : "background:#ffffff;color:#111;") +
-            "font-size:22px;font-weight:900;box-shadow:0 10px 18px rgba(0,0,0,.12);" +
+            "font-size:16px;font-weight:900;box-shadow:0 10px 18px rgba(0,0,0,.12);" +
+            "padding:8px 8px;line-height:1.15;white-space:normal;" +
+            "display:flex;align-items:center;justify-content:center;text-align:center;" +
             "-webkit-tap-highlight-color:transparent;touch-action:manipulation;";
-          btn.addEventListener("click", (ev) => {
-            try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
-            try{
-              easyEditSetActiveRound(i);
-              // أغلق المحرر لو مفتوح
-              try{ EASY_EDIT_EDITOR.close(); }catch(e){}
-              // حدّث الواجهة
-              try{ EASY_EDIT_STAGE.refresh(); }catch(e){}
-              try{ scheduleMapRelayout("easy_edit_round_switch"); }catch(e){}
-            }catch(e){}
-          });
+
+          if(disabled){
+            btn.disabled = true;
+            btn.style.opacity = "0.42";
+            btn.style.cursor = "not-allowed";
+            btn.style.filter = "saturate(.7)";
+          }else{
+            btn.addEventListener("click", (ev) => {
+              try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+              try{
+                easyEditSetActiveRound(i);
+                // أغلق المحرر لو مفتوح
+                try{ EASY_EDIT_EDITOR.close(); }catch(e){}
+                // حدّث الواجهة
+                try{ EASY_EDIT_STAGE.refresh(); }catch(e){}
+                try{ scheduleMapRelayout("easy_edit_round_switch"); }catch(e){}
+              }catch(e){}
+            });
+          }
+
           wrap.appendChild(btn);
         }
       },
@@ -5766,10 +5792,6 @@ function easyEditRefreshMapStyles(){
         if(!EASY_EDIT_UI.active) return;
         const room = LIVE.room || {};
         const total = this.getRoundsTotal(room);
-        if(total <= 1){
-          if(this.panel) this.panel.style.display = "none";
-          return;
-        }
         this.rebuildButtons(total);
         if(this.panel) this.panel.style.display = "block";
         this.positionPanel();
