@@ -3893,7 +3893,22 @@
     }
 
     function getBoardSize(room){
-      return normalizeCellCount(room?.settings?.cellCount || room?.settings?.cellsCount || room?.settings?.boardSize || 5);
+      // ✅ Fix: بعض النسخ القديمة/صفحة البداية قد تحفظ اختيار (رباعية/خماسية/سداسية)
+      // في مفاتيح مختلفة. نحاول نقرأه بأكبر قدر ممكن بدون ما نغيّر أي منطق آخر.
+      const s = (room && room.settings && typeof room.settings === "object") ? room.settings : {};
+      const raw = (s.cellCount ?? s.cellsCount ?? s.boardSize);
+      if(raw !== undefined && raw !== null && String(raw).trim() !== ""){
+        return normalizeCellCount(raw);
+      }
+      // fallback: أحيانًا تُحفظ التسمية داخل cellType (رباعية/خماسية/سداسية)
+      const label = String(s.cellType || "").trim();
+      if(label){
+        const t = label.toLowerCase();
+        if(t.includes("سداس") || t.includes("٦") || t.includes("6")) return 6;
+        if(t.includes("خماس") || t.includes("٥") || t.includes("5")) return 5;
+        if(t.includes("ربع")  || t.includes("٤") || t.includes("4")) return 4;
+      }
+      return 5;
     }
 
     function getBoardShape(room){
@@ -4070,21 +4085,44 @@
 
 function getBoard(room){
       const expectedSeed = getExpectedBoardSeed(room);
+      const desiredSize = getBoardSize(room);
+
+      function ensureSize(boardObj){
+        if(!boardObj) return null;
+        const sizeNow = Math.max(1, Number(boardObj.size || 0) || normalizeCellCount(boardObj?.letters?.length || 0) || 0);
+        const want = Number(desiredSize || 0) || 0;
+        if(want && sizeNow && sizeNow !== want){
+          // ✅ Fix: إذا تغيّر اختيار (4/5/6) لكن room.board ما تغيّر (يبقى 4)، نعيد بناء الخريطة بنفس seed
+          const seed = Number(expectedSeed || boardObj.seed || 0) || Date.now();
+          const roomForBoard = (room && typeof room === "object")
+            ? { ...room, settings: { ...((room.settings && typeof room.settings === "object") ? room.settings : {}), cellCount: want } }
+            : { settings: { cellCount: want } };
+          const rebuilt = buildBoardState(roomForBoard, seed);
+          return rememberBoard(rebuilt, roomForBoard) || rebuilt;
+        }
+        return boardObj;
+      }
+
       const fromRoom = normalizeBoardState(room?.board, room);
 
       if(fromRoom && (!expectedSeed || Number(fromRoom.seed || 0) === expectedSeed)){
-        return applyConfiguredCellContent(rememberBoard(fromRoom, room), room);
+        const fixed = ensureSize(fromRoom) || fromRoom;
+        return applyConfiguredCellContent(rememberBoard(fixed, room), room);
       }
 
       if(expectedSeed && BOARD_CACHE_BY_SEED.has(expectedSeed)){
-        const cached = BOARD_CACHE_BY_SEED.get(expectedSeed);
+        const cached0 = BOARD_CACHE_BY_SEED.get(expectedSeed);
+        const cached = ensureSize(cached0) || cached0;
         LAST_STABLE_BOARD = cached;
         return applyConfiguredCellContent(cached, room);
       }
 
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
         if(!expectedSeed || Number(LAST_STABLE_BOARD.seed || 0) === expectedSeed){
-          return applyConfiguredCellContent(LAST_STABLE_BOARD, room);
+          const stable0 = LAST_STABLE_BOARD;
+          const stable = ensureSize(stable0) || stable0;
+          LAST_STABLE_BOARD = stable;
+          return applyConfiguredCellContent(stable, room);
         }
       }
 
@@ -4093,11 +4131,15 @@ function getBoard(room){
       }
 
       if(fromRoom){
-        return applyConfiguredCellContent(rememberBoard(fromRoom, room), room);
+        const fixed = ensureSize(fromRoom) || fromRoom;
+        return applyConfiguredCellContent(rememberBoard(fixed, room), room);
       }
 
       if(LAST_STABLE_BOARD && Array.isArray(LAST_STABLE_BOARD.letters) && LAST_STABLE_BOARD.letters.length){
-        return applyConfiguredCellContent(LAST_STABLE_BOARD, room);
+        const stable0 = LAST_STABLE_BOARD;
+        const stable = ensureSize(stable0) || stable0;
+        LAST_STABLE_BOARD = stable;
+        return applyConfiguredCellContent(stable, room);
       }
 
       return applyConfiguredCellContent(rememberBoard(buildBoardState(room || {}, Date.now()), room), room);
