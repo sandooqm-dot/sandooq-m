@@ -3977,7 +3977,7 @@
       const manualRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
       const manualConfig = manualRounds[String(currentRound)] || manualRounds[currentRound] || null;
       const cellContentMode = String(settings.cellContentMode || 'default');
-      const size = normalizeCellCount(manualConfig?.cellCount || getBoardSize(roomRefLike || {}));
+      const size = normalizeCellCount((cellContentMode === 'manual' ? (manualConfig?.cellCount) : null) || getBoardSize(roomRefLike || {}));
       const shape = getBoardShape(roomRefLike || {});
       const seed = Number(seedTs || Date.now()) || Date.now();
       const baseLetters = generateBoardLetters(size, seed);
