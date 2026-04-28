@@ -5504,6 +5504,29 @@ function hideEidIntro(immediate){
         el.textContent = 'اضغط على الخلية لإضافة الأسئلة';
         document.body.appendChild(el);
         this.hintEl = el;
+
+        // ✅ زر (حفظ التعديلات وخروج) أسفل الشاشة أثناء وضع التعديل
+        try{
+          if(!this.saveBtnEl){
+            const b = document.createElement('button');
+            b.id = 'easyEditSaveExitBtn';
+            b.type = 'button';
+            b.textContent = 'حفظ التعديلات وخروج';
+            b.style.cssText =
+              'position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);' +
+              'z-index:46035;display:none;min-width:min(92vw, 520px);height:62px;padding:0 18px;' +
+              'border:none;border-radius:20px;cursor:pointer;' +
+              'background:#ffd54a;color:#111;font-size:22px;font-weight:900;' +
+              'border:6px solid rgba(0,0,0,.86);box-shadow:0 10px 0 rgba(0,0,0,.16);' +
+              '-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
+            b.addEventListener('click', async () => {
+              try{ await easyEditSaveAllAndExit(); }catch(e){}
+            });
+            document.body.appendChild(b);
+            this.saveBtnEl = b;
+          }
+        }catch(e){}
+
         return el;
       },
       setActive(v){
@@ -5511,6 +5534,13 @@ function hideEidIntro(immediate){
         try{ window.__HOROF_EASY_EDIT_ACTIVE = !!this.active; }catch(e){}
         const el = this.ensure();
         el.style.display = this.active ? 'block' : 'none';
+        try{
+          if(this.saveBtnEl){
+            this.saveBtnEl.style.display = this.active ? 'block' : 'none';
+            this.saveBtnEl.disabled = false;
+            this.saveBtnEl.textContent = 'حفظ التعديلات وخروج';
+          }
+        }catch(e){}
 
         // ✅ (خطوة 6 + 7) تعتيم الصفحة ما عدا الخريطة + لوحة الجولات
         try{ EASY_EDIT_STAGE && EASY_EDIT_STAGE.setActive && EASY_EDIT_STAGE.setActive(this.active); }catch(e){}
@@ -5598,6 +5628,157 @@ function hideEidIntro(immediate){
 
       try{ window.__HOROF_EASY_EDIT_STORE = s; }catch(e){}
     }
+
+
+    // ✅ مفاتيح أسئلة الخلايا (لكل جولة بشكل مستقل)
+    const EASY_CELL_Q_PREFIX = "__cell__::";
+    function easyEditBuildQuestionKey(roundNum, row, col){
+      const r = Math.max(1, Math.min(5, Number(roundNum || 1) || 1));
+      return `${EASY_CELL_Q_PREFIX}${r}::${Number(row)}-${Number(col)}`;
+    }
+    function isEasyCellQuestionKey(v){
+      return String(v || "").startsWith(EASY_CELL_Q_PREFIX);
+    }
+    function isEasyEditPlayEnabled(roomLike){
+      const room = roomLike || LIVE.room || {};
+      return !!(room?.settings?.easyEditEnabled);
+    }
+
+    // ✅ (S1 + S2) حفظ التعديلات (محتوى الخلايا + أسئلة الخلايا) وتطبيقها على اللعبة ثم الرجوع للإعدادات
+    async function easyEditSaveAllAndExit(){
+      try{
+        if(String(role || "") !== "host") return;
+
+        const btn = EASY_EDIT_UI?.saveBtnEl;
+        try{
+          if(btn){
+            btn.disabled = true;
+            btn.textContent = "جاري الحفظ...";
+          }
+        }catch(e){}
+
+        const room = LIVE.room || {};
+        const boardNow = getBoard(room) || {};
+        const sizeNow = Math.max(1, Number(boardNow.size || room?.settings?.cellCount || 5) || 5);
+
+        // عدد الجولات الفعلي (1/3/5) من منطق اللعبة الحالي
+        const roundsTotal = Math.max(1, Math.min(5, Number(normalizeWinRounds(room?.round?.targetWins ?? room?.settings?.winRounds ?? 1) || 1)));
+
+        const store = easyEditGetStore();
+        const roundsObj = (store && store.rounds && typeof store.rounds === "object") ? store.rounds : {};
+
+        // 1) manualCellRounds (محتوى الخلايا لكل جولة)
+        const manualCellRounds = {};
+        for(let r=1; r<=5; r++){
+          const vals = new Array(sizeNow * sizeNow).fill("");
+          const bucket = (roundsObj[String(r)] && roundsObj[String(r)].cells && typeof roundsObj[String(r)].cells === "object")
+            ? roundsObj[String(r)].cells
+            : {};
+          for(let rr=0; rr<sizeNow; rr++){
+            for(let cc=0; cc<sizeNow; cc++){
+              const ck = `${rr}-${cc}`;
+              const cell = bucket[ck];
+              if(cell && typeof cell === "object"){
+                vals[(rr * sizeNow) + cc] = String(cell.content || "");
+              }
+            }
+          }
+          manualCellRounds[String(r)] = { cellCount: sizeNow, values: vals };
+        }
+
+        // 2) customQuestions (أسئلة الخلايا لكل جولة/خلية)
+        const baseRoom = getRoomWithPersistentCustomQuestions(room || {});
+        const existingCQ = normalizeCustomQuestionsMap(baseRoom?.customQuestions || {});
+        const keepCQ = {};
+        for(const [k,v] of Object.entries(existingCQ || {})){
+          if(!isEasyCellQuestionKey(k)) keepCQ[k] = v;
+        }
+
+        const cellCQ = {};
+        for(let r=1; r<=roundsTotal; r++){
+          const bucket = (roundsObj[String(r)] && roundsObj[String(r)].cells && typeof roundsObj[String(r)].cells === "object")
+            ? roundsObj[String(r)].cells
+            : {};
+          for(let rr=0; rr<sizeNow; rr++){
+            for(let cc=0; cc<sizeNow; cc++){
+              const ck = `${rr}-${cc}`;
+              const cell = bucket[ck];
+              if(!cell || typeof cell !== "object") continue;
+              const q = String(cell.q1 || "").trim();
+              const a = String(cell.a1 || "").trim();
+              if(!q && !a) continue;
+              const qKey = easyEditBuildQuestionKey(r, rr, cc);
+              cellCQ[qKey] = [{ q, a }].filter(x => x && (x.q || x.a));
+            }
+          }
+        }
+
+        const nextCustomQuestions = normalizeCustomQuestionsMap({ ...keepCQ, ...cellCQ });
+        const ts = Date.now();
+
+        // ✅ تحديثات الغرفة (بدون لمس منطق الجولات/اللعب)
+        const updates = {};
+        updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
+        updates[`rooms/${code}/settings/cellContentMode`] = "manual";
+        updates[`rooms/${code}/settings/easyEditEnabled`] = true;
+
+        // نجعل أسئلة اللعبة تعتمد على الأسئلة المخصصة (أسئلة الخلايا)
+        updates[`rooms/${code}/questionMode`] = "custom";
+        updates[`rooms/${code}/customQuestions`] = nextCustomQuestions;
+        updates[`rooms/${code}/customQuestionsUpdatedAt`] = ts;
+
+        await update(ref(db), updates);
+
+        // ✅ تحديث LIVE محليًا فورًا
+        try{
+          if(LIVE.room && typeof LIVE.room === "object"){
+            if(!LIVE.room.settings || typeof LIVE.room.settings !== "object") LIVE.room.settings = {};
+            LIVE.room.settings.manualCellRounds = manualCellRounds;
+            LIVE.room.settings.cellContentMode = "manual";
+            LIVE.room.settings.easyEditEnabled = true;
+            LIVE.room.questionMode = "custom";
+            LIVE.room.customQuestions = nextCustomQuestions;
+            LIVE.room.customQuestionsUpdatedAt = ts;
+          }
+        }catch(e){}
+
+        // ✅ حفظ محلي + حساب (موجود مسبقًا)
+        try{
+          savePersistedHostSettingsEnvelope({
+            updatedAt: ts,
+            manualCellRounds,
+            cellContentMode: "manual",
+            questionMode: "custom",
+            soundEnabled: (room?.settings?.soundEnabled !== false)
+          });
+        }catch(e){}
+        try{ savePersistedCustomQuestions(nextCustomQuestions, ts); }catch(e){}
+        try{ await saveRemoteCustomQuestionsEnvelope(nextCustomQuestions, ts); }catch(e){}
+
+        // ✅ حفظ لقطة "الترحيل/الاستعادة" (للحساب) — نفس النظام الموجود
+        try{
+          const email = getStoredAccountEmail();
+          const activationCode = getStoredActivationCode();
+          if(email && activationCode){
+            const snap = buildTransferSnapshotFromRoom(LIVE.room || room);
+            await saveTransferSnapshotEnvelope(email, activationCode, snap);
+          }
+        }catch(e){}
+
+        // ✅ خروج: إيقاف وضع التعديل ثم فتح الإعدادات
+        try{ EASY_EDIT_UI.setActive(false); }catch(e){}
+        try{ openSettings(LIVE.room || room); }catch(e){}
+      }finally{
+        try{
+          const btn = EASY_EDIT_UI?.saveBtnEl;
+          if(btn){
+            btn.disabled = false;
+            btn.textContent = "حفظ التعديلات وخروج";
+          }
+        }catch(e){}
+      }
+    }
+
 
 
 function easyEditRefreshMapStyles(){
@@ -10699,7 +10880,15 @@ bd.querySelector('#settingsSaveExit').addEventListener('click', saveAndClose);
               return;
             }
                         const k = cellKey(r,c);
-            const letter = String(boardNow?.letters?.[r]?.[c] || "");
+
+            // ✅ إذا كان نمط (إضافة الأسئلة) مفعل: نربط السؤال بالخلية + الجولة (بدون تغيير شكل الخلية)
+            let letter = String(boardNow?.letters?.[r]?.[c] || "");
+            try{
+              if(isEasyEditPlayEnabled(LIVE.room)){
+                const roundNum = Number(LIVE.room?.round?.current || 1) || 1;
+                letter = easyEditBuildQuestionKey(roundNum, r, c);
+              }
+            }catch(e){}
 
             const activeMapNow = Number(LIVE.room.activeMap || 0);
             const mapStatesNow = (LIVE.room.mapStates && LIVE.room.mapStates[String(activeMapNow)]) ? LIVE.room.mapStates[String(activeMapNow)] : {};
@@ -11230,7 +11419,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           if(mode === "custom"){
             list = getCustomList(room, cur.letter);
             if(!list.length){
-              curQ = `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
+              curQ = isEasyCellQuestionKey(cur.letter) ? 'لا توجد أسئلة لهذه الخلية' : `لا توجد أسئلة خاصة لهذا الحرف: ${cur.letter}`;
               curA = "";
               hasQuestion = true;
             }else{
@@ -11243,7 +11432,7 @@ if(isHost && firstPressBar && !firstPressBar.__clearHooked){
           }else{
             list = QUESTIONS[cur.letter] || [];
             if(!list.length){
-              curQ = `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
+              curQ = isEasyCellQuestionKey(cur.letter) ? 'لا توجد أسئلة لهذه الخلية' : `لا توجد أسئلة لهذا الحرف: ${cur.letter}`;
               curA = "";
               hasQuestion = true;
             }else{
