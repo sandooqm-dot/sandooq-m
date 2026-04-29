@@ -3308,7 +3308,7 @@
     .eduGuideOverlay{
       position:fixed;
       inset:0;
-      z-index:47000;
+      z-index:49000;
       display:none;
       pointer-events:auto;
     }
@@ -3320,7 +3320,7 @@
       box-shadow:0 0 0 9999px rgba(12,10,24,.76), 0 18px 36px rgba(0,0,0,.28);
       pointer-events:none;
       transition:all .22s ease;
-      z-index:47001;
+      z-index:49001;
       display:none;
     }
     .eduGuideSpotlight.show{ display:block; }
@@ -3334,7 +3334,7 @@
       box-shadow:0 24px 38px rgba(0,0,0,.34);
       padding:18px 16px 16px;
       text-align:right;
-      z-index:47002;
+      z-index:49002;
       transition:transform .22s ease, opacity .22s ease;
     }
     .eduGuideCard.centered{
@@ -3383,7 +3383,7 @@
       grid-template-columns:minmax(128px,1fr) minmax(170px,1.06fr) minmax(128px,1fr);
       align-items:center;
       gap:16px;
-      z-index:47003;
+      z-index:49003;
       transition:all .2s ease;
       direction:ltr;
     }
@@ -5910,6 +5910,7 @@ const EASY_EDIT_EDITOR = {
       backdrop: null,
       card: null,
       els: null,
+      createExtraPair: null,
       ensure(){
         if(this.backdrop) return;
         const backdrop = document.createElement("div");
@@ -5983,14 +5984,75 @@ const EASY_EDIT_EDITOR = {
         const a1 = mkTA("اكتب الجواب هنا...");
         f3.appendChild(a1);
 
+        const extraPairsWrap = document.createElement("div");
+        extraPairsWrap.id = "easyEditExtraPairsWrap";
+        extraPairsWrap.style.cssText = "display:flex;flex-direction:column;gap:12px;";
+
+        const createExtraPair = (qVal="", aVal="") => {
+          const wrap = document.createElement("div");
+          wrap.className = "easyEditExtraPair";
+          wrap.style.cssText =
+            "border:3px dashed rgba(0,0,0,.16);border-radius:18px;padding:12px;background:#fffdf7;" +
+            "display:flex;flex-direction:column;gap:10px;position:relative;";
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.textContent = "×";
+          removeBtn.setAttribute("aria-label", "حذف السؤال الإضافي");
+          removeBtn.style.cssText =
+            "position:absolute;left:10px;top:10px;width:34px;height:34px;border:none;border-radius:10px;" +
+            "background:#ff4b4b;color:#fff;font-size:22px;font-weight:900;cursor:pointer;" +
+            "border:3px solid rgba(0,0,0,.65);line-height:1;";
+          removeBtn.addEventListener("click", () => wrap.remove());
+
+          const qBox = document.createElement("div");
+          qBox.appendChild(mkLabel("سؤال إضافي"));
+          const q = mkTA("اكتب سؤالًا إضافيًا هنا...");
+          q.className = "easyEditExtraQ";
+          q.value = qVal || "";
+          qBox.appendChild(q);
+
+          const aBox = document.createElement("div");
+          aBox.appendChild(mkLabel("جواب السؤال الإضافي"));
+          const a = mkTA("اكتب الجواب هنا...");
+          a.className = "easyEditExtraA";
+          a.value = aVal || "";
+          aBox.appendChild(a);
+
+          wrap.appendChild(removeBtn);
+          wrap.appendChild(qBox);
+          wrap.appendChild(aBox);
+          return wrap;
+        };
+        this.createExtraPair = createExtraPair;
+
+        const addQuestionWrap = document.createElement("div");
+        addQuestionWrap.style.cssText = "display:flex;justify-content:center;margin-top:2px;";
+        const addQuestionBtn = document.createElement("button");
+        addQuestionBtn.id = "easyEditAddQuestionBtn";
+        addQuestionBtn.type = "button";
+        addQuestionBtn.textContent = "+";
+        addQuestionBtn.setAttribute("aria-label", "إضافة سؤال آخر لنفس الخلية");
+        addQuestionBtn.style.cssText =
+          "width:64px;height:52px;border:none;border-radius:16px;cursor:pointer;" +
+          "background:#8b5cf6;color:#fff;font-size:30px;font-weight:900;" +
+          "border:4px solid rgba(0,0,0,.86);box-shadow:0 8px 0 rgba(0,0,0,.14);";
+        addQuestionBtn.addEventListener("click", () => {
+          extraPairsWrap.appendChild(createExtraPair("", ""));
+          try{ extraPairsWrap.lastElementChild?.scrollIntoView({ block:"center", behavior:"smooth" }); }catch(e){}
+        });
+        addQuestionWrap.appendChild(addQuestionBtn);
+
         fieldWrap.appendChild(f1);
         fieldWrap.appendChild(f2);
         fieldWrap.appendChild(f3);
+        fieldWrap.appendChild(extraPairsWrap);
+        fieldWrap.appendChild(addQuestionWrap);
 
         const actions = document.createElement("div");
         actions.style.cssText = "display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;";
 
         const saveBtn = document.createElement("button");
+        saveBtn.id = "easyEditEditorSaveBtn";
         saveBtn.type = "button";
         saveBtn.textContent = "حفظ";
         saveBtn.style.cssText =
@@ -6000,11 +6062,22 @@ const EASY_EDIT_EDITOR = {
         saveBtn.addEventListener("click", () => {
           const key = String(this.openKey || "");
           if(!key) return this.close();
-          // ✅ حفظ محلي مؤقت (للمعاينة فقط في هذه الخطوة)
+          const questions = [];
+          const pushPair = (q, a) => {
+            const qq = String(q || "").trim();
+            const aa = String(a || "").trim();
+            if(qq || aa) questions.push({ q: qq, a: aa });
+          };
+          pushPair(q1.value, a1.value);
+          extraPairsWrap.querySelectorAll(".easyEditExtraPair").forEach(pair => {
+            pushPair(pair.querySelector(".easyEditExtraQ")?.value || "", pair.querySelector(".easyEditExtraA")?.value || "");
+          });
+          const firstPair = questions[0] || { q:"", a:"" };
           easyEditSetCell(key, {
             content: String(cellContent.value || "").trim(),
-            q1: String(q1.value || "").trim(),
-            a1: String(a1.value || "").trim()
+            q1: String(firstPair.q || "").trim(),
+            a1: String(firstPair.a || "").trim(),
+            questions
           });
           this.close();
           try{ scheduleMapRelayout("easy_edit_saved"); }catch(e){}
@@ -6036,17 +6109,25 @@ const EASY_EDIT_EDITOR = {
 
         this.backdrop = backdrop;
         this.card = card;
-        this.els = { title, cellContent, q1, a1 };
+        this.els = { title, cellContent, q1, a1, extraPairsWrap, addQuestionBtn, saveBtn };
       },
       open(row, col){
         this.ensure();
         const r = Number(row), c = Number(col);
         this.openKey = `${r}-${c}`;
         const cell = easyEditGetCell(this.openKey) || {};
+        const list = (Array.isArray(cell.questions) && cell.questions.length)
+          ? cell.questions
+          : ((String(cell.q1 || '').trim() || String(cell.a1 || '').trim()) ? [{ q: cell.q1 || '', a: cell.a1 || '' }] : []);
+        const first = list[0] || { q:"", a:"" };
         this.els.title.textContent = `تعديل الخلية (${r+1}-${c+1})`;
         this.els.cellContent.value = String(cell.content || "");
-        this.els.q1.value = String(cell.q1 || "");
-        this.els.a1.value = String(cell.a1 || "");
+        this.els.q1.value = String(first.q || "");
+        this.els.a1.value = String(first.a || "");
+        this.els.extraPairsWrap.innerHTML = "";
+        list.slice(1).forEach(pair => {
+          this.els.extraPairsWrap.appendChild(this.createExtraPair(String(pair?.q || ""), String(pair?.a || "")));
+        });
         this.backdrop.style.display = "flex";
       },
       close(){
@@ -6179,13 +6260,19 @@ const EASY_EDIT_EDITOR = {
           if(!cell || typeof cell !== 'object') continue;
           const content = String(cell.content || '').trim();
           if(!content) continue;
-          const q = String(cell.q1 || '').trim();
-          const a = String(cell.a1 || '').trim();
-          if(!q && !a) continue;
+          const cellQuestions = (Array.isArray(cell.questions) && cell.questions.length)
+            ? cell.questions
+            : [{ q: cell.q1 || '', a: cell.a1 || '' }];
 
-          if(!Array.isArray(base[content])) base[content] = [];
-          const exists = base[content].some(it => String(it?.q || '').trim() === q && String(it?.a || '').trim() === a);
-          if(!exists) base[content].push({ q, a });
+          for(const pair of cellQuestions){
+            const q = String(pair?.q || '').trim();
+            const a = String(pair?.a || '').trim();
+            if(!q && !a) continue;
+
+            if(!Array.isArray(base[content])) base[content] = [];
+            const exists = base[content].some(it => String(it?.q || '').trim() === q && String(it?.a || '').trim() === a);
+            if(!exists) base[content].push({ q, a });
+          }
         }
       }
       return base;
@@ -8677,6 +8764,12 @@ const EASY_EDIT_EDITOR = {
       const timerText = directPlayMode
         ? 'هذا المؤقت يبدأ العد مباشرة عند الضغط على دائرة المؤقت، وتستخدمه لحساب وقت الإجابة.'
         : 'هذا هو المؤقت. يبدأ العد بعد اعتماد أول لاعب أو بدء دوره، ويستخدم لتحديد الوقت المتاح للإجابة داخل الجولة.';
+      const firstCellTarget = () => document.querySelector('.overlaySvg .cell') || document.querySelector('#mapBox') || document.querySelector('.mapBox');
+      const firstEditorTextarea = () => document.querySelector('#easyEditEditorCard textarea');
+      const secondEditorTextarea = () => {
+        const arr = Array.from(document.querySelectorAll('#easyEditEditorCard textarea'));
+        return arr[1] || arr[0] || null;
+      };
       const steps = [
         {
           id:'welcome',
@@ -8738,65 +8831,131 @@ const EASY_EDIT_EDITOR = {
         {
           id:'settings-button',
           title:'الإعدادات',
-          text:'من هذا الزر تدخل إلى صفحة الإعدادات. الشرح العام للعبة يبقى كما هو، وهنا نوضح فقط خيارات الإعدادات الجديدة.',
+          text:'من هذا الزر تدخل إلى صفحة الإعدادات. في الخطوات التالية نشرح الخيارات المهمة داخل الإعدادات الجديدة فقط.',
           target:'#settingsBtn',
           closeSettings:true
         },
         {
           id:'settings-main',
-          title:'الرئيسية داخل الإعدادات',
-          text:'في هذه الصفحة تجد الخيارات الأساسية الجديدة: أصوات اللعبة، وزر إضافة الأسئلة، ثم أزرار التعليمات والرئيسية وألعابنا الأخرى.',
+          title:'صفحة الإعدادات',
+          text:'هنا تجد الخيارات الأساسية: أصوات اللعبة، إضافة الأسئلة، تعديل المؤقت، وحفظ وخروج. سنشرح كل واحد منها بالترتيب.',
           target:'[data-settings-panel="main"] .settingsCard',
           panel:'main'
         },
         {
           id:'settings-sound-choice',
           title:'أصوات اللعبة',
-          text:'من هنا تتحكم بأصوات اللعبة كاملة. إذا اخترت إطفاء فلن تعمل أصوات الجرس أو الاحتفال أو غيرها حتى تعيد تشغيلها.',
+          text:'من هنا تتحكم بأصوات اللعبة. تشغيل يعني تعمل أصوات الجرس والاحتفال، وإطفاء يعني تكون اللعبة بدون أصوات.',
           targetResolver:() => document.querySelector('[data-main-choice-group="sound"]')?.closest('.settingsChoiceBlock') || null,
           panel:'main'
         },
         {
           id:'settings-easy-edit-choice',
           title:'إضافة الأسئلة',
-          text:'هذا هو الخيار الجديد لإضافة الأسئلة. إذا اخترت تشغيل تستخدم أسئلتك الخاصة وتبدأ التعديل من الخريطة. وإذا اخترت تعطيل ترجع اللعبة لأسئلة اللعبة الجاهزة وتظهر تلقائيًا عند اختيار الحروف.',
+          text:'هذا الخيار يحدد مصدر الأسئلة. تشغيل يعني تستخدم أسئلتك الخاصة وتكتبها على الخلايا. تعطيل يعني ترجع اللعبة لأسئلتها الجاهزة وتظهر عند اختيار الحروف.',
           targetResolver:() => document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
-          panel:'main'
-        },
-        {
-          id:'settings-easy-edit-start',
-          title:'بدء إضافة الأسئلة',
-          text:'بعد تشغيل إضافة الأسئلة يظهر زر "لبدء التعديل اضغط هنا". اضغطه للرجوع إلى الخريطة، ثم اضغط على أي خلية لتكتب محتوى الخلية والسؤال والجواب.',
-          targetResolver:() => document.querySelector('#easyEditStartBtn') || document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
-          panel:'main'
-        },
-        {
-          id:'settings-easy-edit-save',
-          title:'حفظ أسئلتك',
-          text:'بعد الضغط على الخلية وكتابة السؤال والجواب اضغط حفظ، وكرر ذلك مع الخلايا التي تريدها. وفي النهاية اضغط "حفظ التعديلات وخروج" حتى تعتمد أسئلتك في اللعبة.',
-          targetResolver:() => document.querySelector('#easyEditStartBtn') || document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
           panel:'main'
         },
         {
           id:'settings-timer-tab',
           title:'تعديل المؤقت',
-          text:'هذا تبويب المؤقت. منه تختار عدد الثواني المناسب للجولات حسب عمر المشاركين أو طبيعة النشاط.',
+          text:'هذا تبويب المؤقت. منه تختار عدد الثواني المناسب للجولة حسب عمر المشاركين وطبيعة النشاط.',
           target:'[data-settings-tab="timer"]',
           panel:'timer'
         },
         {
           id:'settings-timer-range',
-          title:'سحب مدة المؤقت',
-          text:'حرّك هذا السلايدر حتى تحدد الوقت المناسب، ثم سيظهر العدد مباشرة أسفله قبل الحفظ.',
+          title:'مدة المؤقت',
+          text:'حرّك هذا السلايدر لتحديد وقت الإجابة. الرقم الظاهر أسفله هو الوقت الذي سيتم تطبيقه بعد الحفظ.',
           target:'#settingsTimerRange',
           panel:'timer'
         },
         {
-          id:'settings-home-action',
+          id:'settings-save-exit',
           title:'حفظ وخروج',
-          text:'بعد أي تعديل في الإعدادات اضغط هنا لحفظ التغييرات والرجوع مباشرة إلى صفحة اللعب.',
+          text:'هذا الزر يحفظ التغييرات التي عدلتها في الإعدادات، ثم يرجعك مباشرة إلى صفحة اللعب.',
           target:'#settingsSaveExit',
-          panel:'timer',
+          panel:'timer'
+        },
+        {
+          id:'settings-easy-edit-start',
+          title:'لبدء التعديل اضغط هنا',
+          text:'بعد اختيار تشغيل في إضافة الأسئلة يظهر هذا الزر. عند الضغط عليه تخرج من الإعدادات وتبدأ تعديل أسئلة الخلايا من الخريطة.',
+          targetResolver:() => document.querySelector('#easyEditStartBtn') || document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main',
+          forceEasyEditOn:true
+        },
+        {
+          id:'easy-edit-map',
+          title:'وضع إضافة الأسئلة',
+          text:'الآن أنت في وضع التعديل. اضغط على أي خلية في الخريطة لتكتب محتوى الخلية، ثم تكتب السؤال والجواب الخاص بها.',
+          target:'#mapBox',
+          activateEasyEditGuide:true
+        },
+        {
+          id:'easy-edit-rounds',
+          title:'مربعات الجولات',
+          text:'هذه المربعات تحدد الجولة التي تعدّلها الآن. إذا اخترت الجولة الثانية أو الثالثة، ستكون أسئلتها ومحتوى خلاياها مستقلًا عن الجولة الأولى.',
+          target:'#easyEditRoundsPanel',
+          activateEasyEditGuide:true
+        },
+        {
+          id:'easy-edit-cell-click',
+          title:'اختيار الخلية',
+          text:'اضغط على الخلية التي تريد تجهيزها. بعدها تفتح لك نافذة خاصة بهذه الخلية لكتابة المحتوى والسؤال والجواب.',
+          targetResolver:firstCellTarget,
+          activateEasyEditGuide:true
+        },
+        {
+          id:'easy-edit-editor-overview',
+          title:'نافذة الخلية',
+          text:'هنا يتم تجهيز الخلية المختارة. تكتب أولًا محتوى الخلية الذي سيظهر داخل الخريطة، ثم تكتب السؤال والجواب.',
+          target:'#easyEditEditorCard',
+          activateEasyEditGuide:true,
+          openSampleEditor:true
+        },
+        {
+          id:'easy-edit-cell-content',
+          title:'محتوى الخلية',
+          text:'في هذا الحقل تكتب ما سيظهر داخل الخلية نفسها، مثل حرف أو رقم أو كلمة أو رمز يناسب نشاطك.',
+          targetResolver:() => document.querySelector('#easyEditEditorCard input'),
+          openSampleEditor:true
+        },
+        {
+          id:'easy-edit-question-field',
+          title:'السؤال',
+          text:'هنا تكتب نص السؤال الذي تريد أن يظهر عندما يختار المقدم هذه الخلية أثناء اللعب.',
+          targetResolver:firstEditorTextarea,
+          openSampleEditor:true
+        },
+        {
+          id:'easy-edit-answer-field',
+          title:'الجواب',
+          text:'هنا تكتب الإجابة الصحيحة للسؤال، حتى يستطيع المقدم إظهارها أو مراجعتها أثناء الجولة.',
+          targetResolver:secondEditorTextarea,
+          openSampleEditor:true
+        },
+        {
+          id:'easy-edit-plus',
+          title:'علامة الزائد +',
+          text:'إذا أردت إضافة سؤال آخر لنفس الخلية، اضغط علامة + وسيظهر لك مربع سؤال وجواب إضافي داخل نفس الخلية.',
+          target:'#easyEditAddQuestionBtn',
+          openSampleEditor:true
+        },
+        {
+          id:'easy-edit-editor-save',
+          title:'حفظ الخلية',
+          text:'بعد كتابة محتوى الخلية والسؤال والجواب اضغط حفظ. بعدها تقدر تكمل على خلية ثانية من الخريطة.',
+          target:'#easyEditEditorSaveBtn',
+          openSampleEditor:true
+        },
+        {
+          id:'easy-edit-final-save',
+          title:'إنهاء الحفظ',
+          text:'بعد ما تخلص إضافة الأسئلة، اضغط حفظ التعديلات وخروج. بهذا يتم اعتماد تعديلاتك وترجع للعبة.',
+          targetResolver:() => document.querySelector('#easyEditSaveBar button') || document.querySelector('#easyEditSaveBar'),
+          activateEasyEditGuide:true,
+          closeSampleEditor:true,
           buttonText:'تم'
         }
       ];
@@ -8933,6 +9092,38 @@ const EASY_EDIT_EDITOR = {
       spotlight.classList.add('show');
     }
 
+    function prepareEducationGuideStep(step){
+      if(!step) return;
+      try{
+        if(step.forceEasyEditOn){
+          const onBtn = document.querySelector('[data-main-choice-group="easyEdit"][data-main-choice-value="on"]');
+          if(onBtn && !onBtn.classList.contains('activeChoice')){
+            onBtn.click();
+          }
+        }
+        if(step.activateEasyEditGuide || step.openSampleEditor){
+          try{ setStoredEasyEditEnabled(true); }catch(e){}
+          try{
+            if(SETTINGS_UI.ready && SETTINGS_UI.els?.backdrop && SETTINGS_UI.els.backdrop.style.display === 'flex'){
+              SETTINGS_UI.els.backdrop.style.display = 'none';
+            }
+          }catch(e){}
+          const liveRoomNow = LIVE.room || EDUCATION_GUIDE.room || {};
+          try{ easyEditHydrateStoreFromRoom(liveRoomNow); }catch(e){}
+          try{ easyEditSetActiveRound(1); }catch(e){}
+          try{ EASY_EDIT_UI.setActive(true); }catch(e){}
+          try{ easyEditRefreshMapLetters(); }catch(e){}
+          try{ scheduleMapRelayout('education_guide_easy_edit'); }catch(e){}
+        }
+        if(step.openSampleEditor){
+          try{ EASY_EDIT_EDITOR.open(0, 0); }catch(e){}
+        }
+        if(step.closeSampleEditor){
+          try{ EASY_EDIT_EDITOR.close(); }catch(e){}
+        }
+      }catch(e){}
+    }
+
     function renderEducationGuideStep(){
       ensureEducationGuideUI();
       if(!EDUCATION_GUIDE.active) return;
@@ -8946,6 +9137,7 @@ const EASY_EDIT_EDITOR = {
         openSettings(LIVE.room || EDUCATION_GUIDE.room || {});
         try{ SETTINGS_UI.els.setActiveTab(step.panel); }catch(e){}
       }
+      prepareEducationGuideStep(step);
       window.clearTimeout(EDUCATION_GUIDE.syncTimer);
       clearEducationGuideLayoutTimers();
       EDUCATION_GUIDE.syncTimer = window.setTimeout(() => {
