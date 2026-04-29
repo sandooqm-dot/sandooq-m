@@ -8738,29 +8738,15 @@ const EASY_EDIT_EDITOR = {
         {
           id:'settings-button',
           title:'الإعدادات',
-          text:'من هذا الزر تدخل إلى صفحة الإعدادات، ومنها تغيّر نوع الأسئلة، وتضيف أسئلتك، وتعدّل محتوى الخلايا، وتضبط المؤقت.',
+          text:'من هذا الزر تدخل إلى صفحة الإعدادات. الشرح العام للعبة يبقى كما هو، وهنا نوضح فقط خيارات الإعدادات الجديدة.',
           target:'#settingsBtn',
           closeSettings:true
         },
         {
           id:'settings-main',
           title:'الرئيسية داخل الإعدادات',
-          text:'هذا هو تبويب الرئيسية. منه تغيّر بسرعة نوع الأسئلة المعروض، ونوع محتوى الخلايا، وتشغيل أو إطفاء أصوات اللعبة.',
+          text:'في هذه الصفحة تجد الخيارات الأساسية الجديدة: أصوات اللعبة، وزر إضافة الأسئلة، ثم أزرار التعليمات والرئيسية وألعابنا الأخرى.',
           target:'[data-settings-panel="main"] .settingsCard',
-          panel:'main'
-        },
-        {
-          id:'settings-questions-choice',
-          title:'نوع عرض الأسئلة',
-          text:'من هنا تختار بين أسئلة اللعبة الجاهزة أو الأسئلة المخصصة التي تضيفها بنفسك للمسابقة.',
-          targetResolver:() => document.querySelector('[data-main-choice-group="questions"]')?.closest('.settingsChoiceBlock') || null,
-          panel:'main'
-        },
-        {
-          id:'settings-cells-choice',
-          title:'عرض محتوى الخلايا',
-          text:'من هنا تحدد هل الخلايا تعرض حروف اللعبة الجاهزة أو تعرض المحتوى المخصص الذي ستكتبه يدويًا لكل جولة.',
-          targetResolver:() => document.querySelector('[data-main-choice-group="cells"]')?.closest('.settingsChoiceBlock') || null,
           panel:'main'
         },
         {
@@ -8771,44 +8757,25 @@ const EASY_EDIT_EDITOR = {
           panel:'main'
         },
         {
-          id:'settings-questions-tab',
+          id:'settings-easy-edit-choice',
           title:'إضافة الأسئلة',
-          text:'هذا تبويب إضافة الأسئلة. بالضغط عليه تدخل إلى قائمة الحروف حتى تضيف لكل حرف أسئلة وأجوبة خاصة بك.',
-          target:'[data-settings-tab="questions"]',
-          panel:'questions'
+          text:'هذا هو الخيار الجديد لإضافة الأسئلة. إذا اخترت تشغيل تستخدم أسئلتك الخاصة وتبدأ التعديل من الخريطة. وإذا اخترت تعطيل ترجع اللعبة لأسئلة اللعبة الجاهزة وتظهر تلقائيًا عند اختيار الحروف.',
+          targetResolver:() => document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main'
         },
         {
-          id:'settings-questions-list',
-          title:'قائمة الحروف',
-          text:'هنا تظهر الحروف. افتح الحرف الذي تريده ثم أضف السؤال والجواب، وبعد الحفظ ستقدر تستخدمها داخل اللعبة.',
-          target:'#settingsQuestionsList',
-          panel:'questions'
+          id:'settings-easy-edit-start',
+          title:'بدء إضافة الأسئلة',
+          text:'بعد تشغيل إضافة الأسئلة يظهر زر "لبدء التعديل اضغط هنا". اضغطه للرجوع إلى الخريطة، ثم اضغط على أي خلية لتكتب محتوى الخلية والسؤال والجواب.',
+          targetResolver:() => document.querySelector('#easyEditStartBtn') || document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main'
         },
         {
-          id:'settings-cells-tab',
-          title:'محتوى الخلايا',
-          text:'هذا تبويب محتوى الخلايا. منه تخصص محتوى كل خلية يدويًا بحسب الجولة التي تريدها.',
-          target:'[data-settings-tab="cells"]',
-          panel:'cells'
-        },
-        {
-          id:'settings-mini-board',
-          title:'الخريطة المصغرة',
-          text:'هذه خريطة مصغرة للجولة. اضغط على أي خلية منها لتحديدها قبل كتابة المحتوى الخاص بها.',
-          targetResolver:() => document.querySelector('#settingsMiniBoard .settingsMiniBoardSvg') || document.querySelector('#settingsMiniBoard'),
-          panel:'cells'
-        },
-        {
-          id:'settings-cell-input',
-          title:'كتابة محتوى الخلية',
-          text:'بعد تحديد الخلية من الخريطة المصغرة، اكتب محتواها في هذا الحقل تحديدًا. ويمكنك التنقل بين الجولات وتخصيص كل جولة على حدة.',
-          targetResolver:() => {
-            const input = SETTINGS_UI?.els?.backdrop?.querySelector?.('#settingsCellInput') || document.querySelector('#settingsCellInput') || null;
-            const box = input?.closest?.('.settingsCellEditorBox') || document.querySelector('.settingsCellEditorBox') || null;
-            return box || input || null;
-          },
-          panel:'cells',
-          spotlightPadding:4
+          id:'settings-easy-edit-save',
+          title:'حفظ أسئلتك',
+          text:'بعد الضغط على الخلية وكتابة السؤال والجواب اضغط حفظ، وكرر ذلك مع الخلايا التي تريدها. وفي النهاية اضغط "حفظ التعديلات وخروج" حتى تعتمد أسئلتك في اللعبة.',
+          targetResolver:() => document.querySelector('#easyEditStartBtn') || document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main'
         },
         {
           id:'settings-timer-tab',
