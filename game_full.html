@@ -8831,16 +8831,9 @@ const EASY_EDIT_EDITOR = {
         {
           id:'settings-button',
           title:'الإعدادات',
-          text:'من هذا الزر تدخل إلى صفحة الإعدادات. في الخطوات التالية نشرح الخيارات المهمة داخل الإعدادات الجديدة فقط.',
+          text:'هذا الزر تدخل إلى صفحة الإعدادات، ومنها تغيّر نوع الأسئلة وتضيف أسئلتك، وتعدّل محتوى الخلايا وتضبط المؤقت',
           target:'#settingsBtn',
           closeSettings:true
-        },
-        {
-          id:'settings-main',
-          title:'صفحة الإعدادات',
-          text:'هنا تجد الخيارات الأساسية: أصوات اللعبة، إضافة الأسئلة، تعديل المؤقت، وحفظ وخروج. سنشرح كل واحد منها بالترتيب.',
-          target:'[data-settings-panel="main"] .settingsCard',
-          panel:'main'
         },
         {
           id:'settings-sound-choice',
@@ -8850,18 +8843,11 @@ const EASY_EDIT_EDITOR = {
           panel:'main'
         },
         {
-          id:'settings-easy-edit-choice',
-          title:'إضافة الأسئلة',
-          text:'هذا الخيار يحدد مصدر الأسئلة. تشغيل يعني تستخدم أسئلتك الخاصة وتكتبها على الخلايا. تعطيل يعني ترجع اللعبة لأسئلتها الجاهزة وتظهر عند اختيار الحروف.',
-          targetResolver:() => document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
-          panel:'main'
-        },
-        {
-          id:'settings-timer-tab',
+          id:'settings-timer-button',
           title:'تعديل المؤقت',
-          text:'هذا تبويب المؤقت. منه تختار عدد الثواني المناسب للجولة حسب عمر المشاركين وطبيعة النشاط.',
-          target:'[data-settings-tab="timer"]',
-          panel:'timer'
+          text:'هذا الزر ينقلك إلى إعدادات المؤقت، وهناك تحدد وقت الإجابة المناسب للجولة.',
+          target:'#settingsTimerQuickBtn',
+          panel:'main'
         },
         {
           id:'settings-timer-range',
@@ -8871,11 +8857,11 @@ const EASY_EDIT_EDITOR = {
           panel:'timer'
         },
         {
-          id:'settings-save-exit',
-          title:'حفظ وخروج',
-          text:'هذا الزر يحفظ التغييرات التي عدلتها في الإعدادات، ثم يرجعك مباشرة إلى صفحة اللعب.',
-          target:'#settingsSaveExit',
-          panel:'timer'
+          id:'settings-easy-edit-choice',
+          title:'إضافة الأسئلة',
+          text:'هذا الخيار يحدد مصدر الأسئلة. تشغيل يعني تستخدم أسئلتك الخاصة وتكتبها على الخلايا. تعطيل يعني ترجع اللعبة لأسئلتها الجاهزة وتظهر عند اختيار الحروف.',
+          targetResolver:() => document.querySelector('[data-main-choice-group="easyEdit"]')?.closest('.settingsChoiceBlock') || null,
+          panel:'main'
         },
         {
           id:'settings-easy-edit-start',
@@ -8951,11 +8937,12 @@ const EASY_EDIT_EDITOR = {
         },
         {
           id:'easy-edit-final-save',
-          title:'إنهاء الحفظ',
-          text:'بعد ما تخلص إضافة الأسئلة، اضغط حفظ التعديلات وخروج. بهذا يتم اعتماد تعديلاتك وترجع للعبة.',
+          title:'حفظ التعديلات وخروج',
+          text:'بعد ما تخلص إضافة الأسئلة، اضغط حفظ التعديلات وخروج. هذا الزر يعتمد تعديلاتك وينهي وضع التعديل.',
           targetResolver:() => document.querySelector('#easyEditSaveBar button') || document.querySelector('#easyEditSaveBar'),
           activateEasyEditGuide:true,
           closeSampleEditor:true,
+          returnToSettingsOnFinish:true,
           buttonText:'تم'
         }
       ];
@@ -9177,6 +9164,8 @@ const EASY_EDIT_EDITOR = {
 
     function finishEducationGuide(){
       if(!EDUCATION_GUIDE.ready) return;
+      const previousStep = EDUCATION_GUIDE.steps[Math.max(0, Number(EDUCATION_GUIDE.currentIndex || 0) - 1)] || null;
+      const shouldReturnToSettings = !!(previousStep && previousStep.returnToSettingsOnFinish);
       EDUCATION_GUIDE.active = false;
       EDUCATION_GUIDE.completedOnce = true;
       EDUCATION_GUIDE.layoutToken = Number(EDUCATION_GUIDE.layoutToken || 0) + 1;
@@ -9184,7 +9173,14 @@ const EASY_EDIT_EDITOR = {
       EDUCATION_GUIDE.spotlight.classList.remove('show');
       window.clearTimeout(EDUCATION_GUIDE.syncTimer);
       clearEducationGuideLayoutTimers();
-      closeEducationGuideSettingsIfNeeded();
+      if(shouldReturnToSettings){
+        try{ EASY_EDIT_EDITOR.close(); }catch(e){}
+        try{ EASY_EDIT_UI.setActive(false); }catch(e){}
+        try{ easyEditRefreshMapLetters(); }catch(e){}
+        try{ openSettings(LIVE.room || EDUCATION_GUIDE.room || {}); }catch(e){}
+      }else{
+        closeEducationGuideSettingsIfNeeded();
+      }
     }
 
     function startEducationGuide(roomLike){
@@ -9233,7 +9229,7 @@ const EASY_EDIT_EDITOR = {
                 <button class="settingsTabBtn active" type="button" data-settings-tab="main">الرئيسية</button>
                 <button class="settingsTabBtn settingsLegacyHidden" type="button" data-settings-tab="questions">إضافة الأسئلة</button>
                 <button class="settingsTabBtn settingsLegacyHidden" type="button" data-settings-tab="cells">محتوى الخلايا</button>
-                <button class="settingsTabBtn" type="button" data-settings-tab="timer">المؤقت</button>
+                <button class="settingsTabBtn settingsLegacyHidden" type="button" data-settings-tab="timer">المؤقت</button>
                 <button class="settingsTabBtn settingsLegacyHidden" type="button" data-settings-tab="transfer">ترحيل الإعدادات</button>
               </div>
             </div>
@@ -9247,6 +9243,12 @@ const EASY_EDIT_EDITOR = {
                   <div class="settingsChoiceRow">
                     <button class="settingsChoiceBtn" type="button" data-main-choice-group="sound" data-main-choice-value="on">تشغيل</button>
                     <button class="settingsChoiceBtn" type="button" data-main-choice-group="sound" data-main-choice-value="off">إطفاء</button>
+                  </div>
+                </div>
+                <div class="settingsChoiceBlock">
+                  <h4 class="settingsChoiceTitle">تعديل المؤقت</h4>
+                  <div class="settingsDualActions" style="margin-top:12px;">
+                    <button id="settingsTimerQuickBtn" class="settingsActionBtn" type="button">تعديل المؤقت</button>
                   </div>
                 </div>
                 <div class="settingsChoiceBlock">
@@ -9883,6 +9885,13 @@ const EASY_EDIT_EDITOR = {
         });
       }
       
+      const settingsTimerQuickBtn = bd.querySelector('#settingsTimerQuickBtn');
+      if(settingsTimerQuickBtn){
+        settingsTimerQuickBtn.addEventListener('click', () => {
+          setActiveTab('timer');
+        });
+      }
+
       const easyEditStartBtn = bd.querySelector('#easyEditStartBtn');
       if(easyEditStartBtn){
         easyEditStartBtn.addEventListener('click', () => {
