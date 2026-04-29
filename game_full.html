@@ -1998,7 +1998,22 @@
       border-color:rgba(0,0,0,.84);
       box-shadow:0 12px 20px rgba(0,0,0,.12);
     }
-    .settingsChoiceBtn:active{ transform:translateY(1px); }
+    
+
+    /* ✅ (جديد) ألوان زر إضافة الأسئلة (تشغيل أخضر / تعطيل أحمر) */
+    .settingsChoiceBtn.easyEditOn.activeChoice{
+      background:rgba(26,163,74,.95) !important;
+      color:#fff !important;
+      border-color:rgba(0,0,0,.84) !important;
+      box-shadow:0 12px 20px rgba(0,0,0,.12) !important;
+    }
+    .settingsChoiceBtn.easyEditOff.activeChoice{
+      background:#ff2d2d !important;
+      color:#fff !important;
+      border-color:rgba(0,0,0,.84) !important;
+      box-shadow:0 12px 20px rgba(0,0,0,.12) !important;
+    }
+.settingsChoiceBtn:active{ transform:translateY(1px); }
 
     .settingsRoundsRow,
     .settingsCountsRow{
@@ -5876,18 +5891,13 @@ const EASY_EDIT_EDITOR = {
       backdrop: null,
       card: null,
       els: null,
-      _qa: null,
       ensure(){
         if(this.backdrop) return;
-
-        const MAX_QA = Math.max(1, Math.min(7, Number((typeof MAX_CUSTOM_PER_LETTER !== "undefined") ? MAX_CUSTOM_PER_LETTER : 7) || 7));
-
         const backdrop = document.createElement("div");
         backdrop.id = "easyEditEditorBackdrop";
         backdrop.style.cssText =
           "position:fixed;inset:0;display:none;align-items:center;justify-content:center;" +
           "background:rgba(0,0,0,.55);z-index:47050;padding:14px;";
-
         const card = document.createElement("div");
         card.id = "easyEditEditorCard";
         card.style.cssText =
@@ -5939,95 +5949,102 @@ const EASY_EDIT_EDITOR = {
           return ta;
         };
 
-        // محتوى الخلية (مرة واحدة فقط)
         const f1 = document.createElement("div");
         f1.appendChild(mkLabel("محتوى الخلية"));
         const cellContent = mkInput("مثال: حرف / رقم / كلمة");
         f1.appendChild(cellContent);
-        fieldWrap.appendChild(f1);
 
-        // ✅ أسئلة/أجوبة متعددة (حتى 7)
-        const qaWrap = document.createElement("div");
-        qaWrap.id = "easyEditQaWrap";
-        qaWrap.style.cssText = "display:flex;flex-direction:column;gap:12px;margin-top:6px;";
+        
+        const f2 = document.createElement("div");
+        f2.appendChild(mkLabel("سؤال الخلية"));
+        const q1 = mkTA("اكتب السؤال هنا...");
+        f2.appendChild(q1);
 
-        const mkQABlock = (idx) => {
-          const box = document.createElement("div");
-          box.style.cssText =
-            "border:2px dashed rgba(0,0,0,.14);border-radius:18px;padding:12px 10px;" +
-            "background:rgba(0,0,0,.02);";
+        const f3 = document.createElement("div");
+        f3.appendChild(mkLabel("جواب الخلية"));
+        const a1 = mkTA("اكتب الجواب هنا...");
+        f3.appendChild(a1);
 
-          const qLbl = mkLabel(idx > 1 ? `سؤال الخلية ${idx}` : "سؤال الخلية");
-          const qTA = mkTA("اكتب السؤال هنا...");
+        // ✅ (جديد) أسئلة متعددة لنفس الخلية (حد أقصى 7)
+        const extraWrap = document.createElement("div");
+        extraWrap.id = "easyEditExtraPairs";
+        extraWrap.style.cssText = "display:flex;flex-direction:column;gap:12px;";
 
-          const aLbl = mkLabel(idx > 1 ? `جواب الخلية ${idx}` : "جواب الخلية");
-          const aTA = mkTA("اكتب الجواب هنا...");
-
-          box.appendChild(qLbl);
-          box.appendChild(qTA);
-          box.appendChild(aLbl);
-          box.appendChild(aTA);
-
-          return { box, qTA, aTA };
-        };
-
-        const qaState = {
-          items: [],
-          clear(){
-            qaWrap.innerHTML = "";
-            this.items = [];
-          },
-          add(qVal="", aVal=""){
-            if(this.items.length >= MAX_QA) return;
-            const idx = this.items.length + 1;
-            const it = mkQABlock(idx);
-            it.qTA.value = String(qVal || "");
-            it.aTA.value = String(aVal || "");
-            qaWrap.appendChild(it.box);
-            this.items.push(it);
-            this.updatePlus();
-          },
-          updatePlus(){
-            if(plusBtn){
-              const disabled = this.items.length >= MAX_QA;
-              plusBtn.disabled = disabled;
-              plusBtn.style.opacity = disabled ? "0.55" : "1";
-            }
-          },
-          collect(){
-            const out = [];
-            for(const it of this.items){
-              const q = String(it.qTA.value || "").trim();
-              const a = String(it.aTA.value || "").trim();
-              if(!q && !a) continue;
-              out.push({ q, a });
-              if(out.length >= MAX_QA) break;
-            }
-            return out;
-          }
-        };
-
-        fieldWrap.appendChild(qaWrap);
-
-        // ✅ زر + البنفسجي (يضيف سؤال/جواب جديد)
         const plusWrap = document.createElement("div");
-        plusWrap.style.cssText = "display:flex;justify-content:center;align-items:center;margin-top:2px;";
+        plusWrap.style.cssText = "display:flex;justify-content:center;align-items:center;margin-top:6px;";
+
         const plusBtn = document.createElement("button");
         plusBtn.type = "button";
+        plusBtn.setAttribute("aria-label","إضافة سؤال وجواب");
         plusBtn.textContent = "+";
-        plusBtn.setAttribute("aria-label","إضافة سؤال وجواب جديد");
         plusBtn.style.cssText =
-          "width:64px;height:54px;border:none;border-radius:18px;cursor:pointer;" +
-          "background:#8b5cf6;color:#fff;font-size:34px;font-weight:900;" +
-          "border:4px solid rgba(0,0,0,.85);box-shadow:0 8px 0 rgba(0,0,0,.18);" +
+          "width:64px;height:64px;border-radius:18px;border:none;cursor:pointer;" +
+          "background:#8b5cf6;color:#fff;font-size:44px;font-weight:900;line-height:1;" +
+          "border:4px solid rgba(0,0,0,.22);box-shadow:0 10px 18px rgba(0,0,0,.16);" +
           "-webkit-tap-highlight-color:transparent;touch-action:manipulation;";
-        plusBtn.addEventListener("click", () => { qaState.add("", ""); });
+        plusBtn.addEventListener("mousedown", (e) => { try{ e.preventDefault(); }catch(_e){} });
+
         plusWrap.appendChild(plusBtn);
+
+        const ord = ["الأول","الثاني","الثالث","الرابع","الخامس","السادس","السابع"];
+        const qArr = new Array(8).fill(null);
+        const aArr = new Array(8).fill(null);
+        qArr[1] = q1;
+        aArr[1] = a1;
+        let pairsCount = 1;
+
+        const refreshPlus = () => {
+          const atMax = pairsCount >= 7;
+          try{ plusBtn.disabled = atMax; }catch(e){}
+          plusBtn.style.opacity = atMax ? "0.55" : "1";
+          plusBtn.style.cursor = atMax ? "not-allowed" : "pointer";
+        };
+
+        const makePair = (i) => {
+          if(i < 2 || i > 7) return;
+          // سؤال i
+          const fq = document.createElement("div");
+          fq.appendChild(mkLabel(`سؤال الخلية ${ord[i-1]}`));
+          const q = mkTA(`اكتب السؤال ${ord[i-1]} هنا...`);
+          fq.appendChild(q);
+
+          // جواب i
+          const fa = document.createElement("div");
+          fa.appendChild(mkLabel(`جواب الخلية ${ord[i-1]}`));
+          const a = mkTA(`اكتب الجواب ${ord[i-1]} هنا...`);
+          fa.appendChild(a);
+
+          extraWrap.appendChild(fq);
+          extraWrap.appendChild(fa);
+
+          qArr[i] = q;
+          aArr[i] = a;
+        };
+
+        const resetPairs = () => {
+          extraWrap.innerHTML = "";
+          for(let i=2;i<=7;i++){ qArr[i] = null; aArr[i] = null; }
+          pairsCount = 1;
+          refreshPlus();
+        };
+
+        const addPair = () => {
+          if(pairsCount >= 7) return;
+          pairsCount += 1;
+          makePair(pairsCount);
+          refreshPlus();
+        };
+
+        plusBtn.addEventListener("click", () => { try{ addPair(); }catch(e){} });
+
+        fieldWrap.appendChild(f1);
+        fieldWrap.appendChild(f2);
+        fieldWrap.appendChild(f3);
+        fieldWrap.appendChild(extraWrap);
         fieldWrap.appendChild(plusWrap);
 
-        // ✅ الأزرار بالأسفل
         const actions = document.createElement("div");
-        actions.style.cssText = "display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px;";
+        actions.style.cssText = "display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;";
 
         const saveBtn = document.createElement("button");
         saveBtn.type = "button";
@@ -6039,18 +6056,30 @@ const EASY_EDIT_EDITOR = {
         saveBtn.addEventListener("click", () => {
           const key = String(this.openKey || "");
           if(!key) return this.close();
+          // ✅ حفظ محلي مؤقت (للمعاينة فقط في هذه الخطوة)
+          (function(){
+          const patch = { content: String(cellContent.value || "").trim() };
+          // q1/a1
+          patch.q1 = String(q1.value || "").trim();
+          patch.a1 = String(a1.value || "").trim();
 
-          const content = String(cellContent.value || "").trim();
-          const qas = qaState.collect();
-
-          // ✅ حفظ محلي مؤقت (داخل التعديل) — (الحفظ الدائم يتم من زر حفظ التعديلات وخروج)
-          easyEditSetCell(key, {
-            content,
-            qas,
-            q1: String(qas?.[0]?.q || "").trim(),
-            a1: String(qas?.[0]?.a || "").trim()
-          });
-
+          // ✅ باقي الأسئلة (لو موجودة)
+          try{
+            const els = EASY_EDIT_EDITOR && EASY_EDIT_EDITOR.els ? EASY_EDIT_EDITOR.els : null;
+            const qArr = els && Array.isArray(els.qArr) ? els.qArr : null;
+            const aArr = els && Array.isArray(els.aArr) ? els.aArr : null;
+            if(qArr && aArr){
+              for(let i=2;i<=7;i++){
+                const qEl = qArr[i];
+                const aEl = aArr[i];
+                if(!qEl || !aEl) continue;
+                patch[`q${i}`] = String(qEl.value || "").trim();
+                patch[`a${i}`] = String(aEl.value || "").trim();
+              }
+            }
+          }catch(e){}
+          easyEditSetCell(key, patch);
+        })();
           this.close();
           try{ scheduleMapRelayout("easy_edit_saved"); }catch(e){}
         });
@@ -6081,8 +6110,7 @@ const EASY_EDIT_EDITOR = {
 
         this.backdrop = backdrop;
         this.card = card;
-        this.els = { title, cellContent, qaWrap, plusBtn };
-        this._qa = qaState;
+        this.els = { title, cellContent, q1, a1, qArr, aArr, extraWrap, plusBtn, resetPairs, makePair, refreshPlus, getPairsCount:() => pairsCount, setPairsCount:(n) => { pairsCount = Math.max(1, Math.min(7, Number(n||1)||1)); refreshPlus(); } };
       },
       open(row, col){
         this.ensure();
@@ -6091,21 +6119,30 @@ const EASY_EDIT_EDITOR = {
         const cell = easyEditGetCell(this.openKey) || {};
         this.els.title.textContent = `تعديل الخلية (${r+1}-${c+1})`;
         this.els.cellContent.value = String(cell.content || "");
+        this.els.q1.value = String(cell.q1 || "");
+        this.els.a1.value = String(cell.a1 || "");
 
-        // build QA list
-        this._qa.clear();
-        let list = [];
+        // ✅ إعادة بناء حقول الأسئلة الإضافية بناءً على البيانات الموجودة
         try{
-          if(Array.isArray(cell.qas)) list = cell.qas;
-          else if((String(cell.q1||"").trim() || String(cell.a1||"").trim())) list = [{ q: cell.q1, a: cell.a1 }];
-        }catch(e){ list = []; }
-        if(!list.length) list = [{ q:"", a:"" }];
-
-        const MAX_QA = Math.max(1, Math.min(7, Number((typeof MAX_CUSTOM_PER_LETTER !== "undefined") ? MAX_CUSTOM_PER_LETTER : 7) || 7));
-        list.slice(0, MAX_QA).forEach(it => {
-          this._qa.add(String(it?.q || ""), String(it?.a || ""));
-        });
-        this._qa.updatePlus();
+          if(this.els && typeof this.els.resetPairs === "function"){
+            this.els.resetPairs();
+          }
+          // تحديد أعلى رقم فيه بيانات
+          let maxI = 1;
+          for(let i=2;i<=7;i++){
+            const qv = String(cell[`q${i}`] || "").trim();
+            const av = String(cell[`a${i}`] || "").trim();
+            if(qv || av) maxI = i;
+          }
+          for(let i=2;i<=maxI;i++){
+            try{ this.els.makePair(i); }catch(e){}
+            if(this.els.qArr[i]) this.els.qArr[i].value = String(cell[`q${i}`] || "");
+            if(this.els.aArr[i]) this.els.aArr[i].value = String(cell[`a${i}`] || "");
+          }
+          if(this.els && typeof this.els.setPairsCount === "function"){
+            this.els.setPairsCount(maxI);
+          }
+        }catch(e){}
 
         this.backdrop.style.display = "flex";
       },
@@ -6157,7 +6194,6 @@ const EASY_EDIT_EDITOR = {
         const settings = (baseRoom?.settings && typeof baseRoom.settings === 'object') ? baseRoom.settings : {};
         const storedRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
         const fallbackCount = (typeof getBoardSize === 'function') ? (getBoardSize(baseRoom) || 5) : 5;
-        const MAX_QA = Math.max(1, Math.min(7, Number((typeof MAX_CUSTOM_PER_LETTER !== "undefined") ? MAX_CUSTOM_PER_LETTER : 7) || 7));
 
         const s = easyEditGetStore();
         if(!s.rounds || typeof s.rounds !== 'object') s.rounds = {};
@@ -6177,22 +6213,26 @@ const EASY_EDIT_EDITOR = {
             const col = idx % cellCount;
             const k = `${row}-${col}`;
 
-            // ✅ اقرأ كل الأسئلة/الأجوبة (حتى 7) من التخزين القديم (customQuestions)
-            let qas = [];
+            const list = (baseRoom?.customQuestions && Array.isArray(baseRoom.customQuestions[raw])) ? baseRoom.customQuestions[raw] : [];
+            const qv = new Array(8).fill('');
+            const av = new Array(8).fill('');
             try{
-              const v = baseRoom?.customQuestions?.[raw];
-              if(Array.isArray(v)) qas = v;
-              else if(v && typeof v === "object") qas = [v];
+              for(let i=1;i<=7;i++){
+                const it = list[i-1] || {};
+                qv[i] = String(it?.q || '').trim();
+                av[i] = String(it?.a || '').trim();
+              }
             }catch(e){}
-            qas = (qas || []).filter(x => x && (String(x.q||"").trim() || String(x.a||"").trim()))
-              .slice(0, MAX_QA)
-              .map(x => ({ q: String(x.q||"").trim(), a: String(x.a||"").trim() }));
 
             cells[k] = {
               content: raw,
-              qas,
-              q1: String(qas?.[0]?.q || "").trim(),
-              a1: String(qas?.[0]?.a || "").trim()
+              q1: qv[1], a1: av[1],
+              q2: qv[2], a2: av[2],
+              q3: qv[3], a3: av[3],
+              q4: qv[4], a4: av[4],
+              q5: qv[5], a5: av[5],
+              q6: qv[6], a6: av[6],
+              q7: qv[7], a7: av[7]
             };
           }
 
@@ -6235,9 +6275,8 @@ const EASY_EDIT_EDITOR = {
     function easyEditMergeCustomQuestionsFromStore(customQuestions){
       const base = (typeof normalizeCustomQuestionsMap === 'function')
         ? normalizeCustomQuestionsMap(customQuestions || {})
-        : (customQuestions || {});
+        : (customQuestions && typeof customQuestions === 'object' ? customQuestions : {});
       const store = easyEditGetStore();
-      const MAX_QA = Math.max(1, Math.min(7, Number((typeof MAX_CUSTOM_PER_LETTER !== "undefined") ? MAX_CUSTOM_PER_LETTER : 7) || 7));
 
       for(let r=1; r<=5; r++){
         const rk = String(r);
@@ -6245,27 +6284,17 @@ const EASY_EDIT_EDITOR = {
         for(const k in bucket){
           const cell = bucket[k];
           if(!cell || typeof cell !== 'object') continue;
-
           const content = String(cell.content || '').trim();
           if(!content) continue;
-
-          let qas = [];
-          if(Array.isArray(cell.qas)) qas = cell.qas;
-          else{
-            const q = String(cell.q1 || '').trim();
-            const a = String(cell.a1 || '').trim();
-            if(q || a) qas = [{ q, a }];
-          }
-
-          qas = (qas || []).slice(0, MAX_QA).map(it => ({ q: String(it?.q || '').trim(), a: String(it?.a || '').trim() }))
-            .filter(it => it.q || it.a);
-
-          if(!qas.length) continue;
-
           if(!Array.isArray(base[content])) base[content] = [];
-          for(const it of qas){
-            const exists = base[content].some(x => String(x?.q || '').trim() === it.q && String(x?.a || '').trim() === it.a);
-            if(!exists) base[content].push({ q: it.q, a: it.a });
+
+          for(let i=1;i<=7;i++){
+            const q = String(cell[`q${i}`] || '').trim();
+            const a = String(cell[`a${i}`] || '').trim();
+            if(!q && !a) continue;
+
+            const exists = base[content].some(it => String(it?.q || '').trim() === q && String(it?.a || '').trim() === a);
+            if(!exists) base[content].push({ q, a });
           }
         }
       }
@@ -9301,12 +9330,7 @@ const EASY_EDIT_EDITOR = {
       let pendingQuestionMode = 'default';
       let pendingCellContentMode = 'default';
       let pendingSoundEnabled = true;
-      let pendingEasyEditEnabled = false;
-      const __EASY_EDIT_PREF_KEY = `horof_easy_edit_enabled_${code || "default"}`;
-      function __loadEasyEditPref(){ try{ return localStorage.getItem(__EASY_EDIT_PREF_KEY) === "1"; }catch(e){ return false; } }
-      function __saveEasyEditPref(v){ try{ localStorage.setItem(__EASY_EDIT_PREF_KEY, v ? "1" : "0"); }catch(e){} }
-      // ✅ حفظ آخر اختيار (تشغيل/تعطيل) في نفس الجهاز
-      pendingEasyEditEnabled = __loadEasyEditPref();
+      let pendingEasyEditEnabled = (function(){ try{ return localStorage.getItem(`horof_easy_edit_enabled_${code}`) === "1"; }catch(e){ return false; } })();
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
       SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.pendingCustomQuestions || {});
@@ -9318,43 +9342,28 @@ const EASY_EDIT_EDITOR = {
       }
 
       function setActiveTab(tab){
-        activeTab = tafunction renderMainChoices(){
+        activeTab = tab || 'main';
+        tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.settingsTab === activeTab));
+        panels.forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === activeTab));
+        queueEducationGuideSync();
+      }
+
+      const CELL_COUNT_META = {
+        4: { label:'رباعية', size:4 },
+        5: { label:'خماسية', size:5 },
+        6: { label:'سداسية', size:6 }
+      };
+      function renderMainChoices(){
         mainChoiceButtons.forEach(btn => {
           const group = String(btn.dataset.mainChoiceGroup || '');
           const value = String(btn.dataset.mainChoiceValue || '');
+          if(group === 'easyEdit'){
+            btn.classList.toggle('easyEditOn', value === 'on');
+            btn.classList.toggle('easyEditOff', value === 'off');
+          }
           let active = false;
           if(group === 'questions') active = (value === pendingQuestionMode);
           else if(group === 'cells') active = (value === pendingCellContentMode);
-          else if(group === 'sound') active = ((value === 'on') === !!pendingSoundEnabled);
-          else if(group === 'easyEdit') active = ((value === 'on') === !!pendingEasyEditEnabled);
-
-          btn.classList.toggle('activeChoice', active);
-
-          // ✅ تلوين تشغيل/تعطيل لإضافة الأسئلة (أخضر/أحمر)
-          if(group === 'easyEdit'){
-            if(active){
-              if(value === 'on'){
-                btn.style.background = 'rgba(26,163,74,.95)';
-                btn.style.color = '#fff';
-                btn.style.borderColor = 'rgba(0,0,0,.86)';
-              }else{
-                btn.style.background = '#ff2d2d';
-                btn.style.color = '#fff';
-                btn.style.borderColor = 'rgba(0,0,0,.86)';
-              }
-            }else{
-              btn.style.background = '';
-              btn.style.color = '';
-              btn.style.borderColor = '';
-            }
-          }
-        });
-        if(easyEditStartWrap){
-          easyEditStartWrap.style.display = pendingEasyEditEnabled ? 'flex' : 'none';
-        }
-      }
-
-      (value === pendingCellContentMode);
           else if(group === 'sound') active = ((value === 'on') === !!pendingSoundEnabled);
           else if(group === 'easyEdit') active = ((value === 'on') === !!pendingEasyEditEnabled);
           btn.classList.toggle('activeChoice', active);
@@ -9379,9 +9388,9 @@ const EASY_EDIT_EDITOR = {
         }
         else if(g === 'easyEdit'){
           pendingEasyEditEnabled = (v === 'on');
-          __saveEasyEditPref(!!pendingEasyEditEnabled);
-          try{ if(!pendingEasyEditEnabled) EASY_EDIT_UI.setActive(false); }catch(e){}
+          try{ localStorage.setItem(`horof_easy_edit_enabled_${code}`, pendingEasyEditEnabled ? "1" : "0"); }catch(e){}
         }
+        try{ if(!pendingEasyEditEnabled) EASY_EDIT_UI.setActive(false); }catch(e){}
         renderMainChoices();
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest || LIVE.room || {});
       }
