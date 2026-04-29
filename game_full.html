@@ -1998,22 +1998,22 @@
       border-color:rgba(0,0,0,.84);
       box-shadow:0 12px 20px rgba(0,0,0,.12);
     }
-    
 
-    /* ✅ (جديد) ألوان زر إضافة الأسئلة (تشغيل أخضر / تعطيل أحمر) */
-    .settingsChoiceBtn.easyEditOn.activeChoice{
-      background:rgba(26,163,74,.95) !important;
-      color:#fff !important;
-      border-color:rgba(0,0,0,.84) !important;
-      box-shadow:0 12px 20px rgba(0,0,0,.12) !important;
+    /* ✅ زر إضافة الأسئلة: تشغيل أخضر / تعطيل أحمر */
+    .settingsChoiceBtn[data-main-choice-group="easyEdit"][data-main-choice-value="on"].activeChoice{
+      background:rgba(26,163,74,.95);
+      color:#fff;
+      border-color:rgba(0,0,0,.84);
+      box-shadow:0 12px 20px rgba(0,0,0,.12);
     }
-    .settingsChoiceBtn.easyEditOff.activeChoice{
-      background:#ff2d2d !important;
-      color:#fff !important;
-      border-color:rgba(0,0,0,.84) !important;
-      box-shadow:0 12px 20px rgba(0,0,0,.12) !important;
+    .settingsChoiceBtn[data-main-choice-group="easyEdit"][data-main-choice-value="off"].activeChoice{
+      background:#ff4b4b;
+      color:#fff;
+      border-color:rgba(0,0,0,.84);
+      box-shadow:0 12px 20px rgba(0,0,0,.12);
     }
-.settingsChoiceBtn:active{ transform:translateY(1px); }
+
+    .settingsChoiceBtn:active{ transform:translateY(1px); }
 
     .settingsRoundsRow,
     .settingsCountsRow{
@@ -4177,6 +4177,25 @@ function getBoard(room){
     const role = params.get("role");
 const code = params.get("code");
 const hostKey = params.get("key");
+const EASY_EDIT_TOGGLE_KEY = `horof_easy_edit_toggle_v1_${code || "default"}`;
+function getStoredEasyEditEnabled(roomLike){
+  // 1) explicit local choice (persisted on device)
+  try{
+    const v = localStorage.getItem(EASY_EDIT_TOGGLE_KEY);
+    if(v === "1") return true;
+    if(v === "0") return false;
+  }catch(e){}
+
+  // 2) infer for existing customers who already used custom/manual سابقًا
+  const r = roomLike || LIVE?.room || {};
+  if(String(r?.settings?.cellContentMode || "") === "manual") return true;
+  if(String(r?.questionMode || "") === "custom") return true;
+  return false;
+}
+function setStoredEasyEditEnabled(v){
+  try{ localStorage.setItem(EASY_EDIT_TOGGLE_KEY, v ? "1" : "0"); }catch(e){}
+}
+
 const pid = (function(){
   const u = params.get("pid");
   if(u) return u;
@@ -5954,7 +5973,6 @@ const EASY_EDIT_EDITOR = {
         const cellContent = mkInput("مثال: حرف / رقم / كلمة");
         f1.appendChild(cellContent);
 
-        
         const f2 = document.createElement("div");
         f2.appendChild(mkLabel("سؤال الخلية"));
         const q1 = mkTA("اكتب السؤال هنا...");
@@ -5965,83 +5983,9 @@ const EASY_EDIT_EDITOR = {
         const a1 = mkTA("اكتب الجواب هنا...");
         f3.appendChild(a1);
 
-        // ✅ (جديد) أسئلة متعددة لنفس الخلية (حد أقصى 7)
-        const extraWrap = document.createElement("div");
-        extraWrap.id = "easyEditExtraPairs";
-        extraWrap.style.cssText = "display:flex;flex-direction:column;gap:12px;";
-
-        const plusWrap = document.createElement("div");
-        plusWrap.style.cssText = "display:flex;justify-content:center;align-items:center;margin-top:6px;";
-
-        const plusBtn = document.createElement("button");
-        plusBtn.type = "button";
-        plusBtn.setAttribute("aria-label","إضافة سؤال وجواب");
-        plusBtn.textContent = "+";
-        plusBtn.style.cssText =
-          "width:64px;height:64px;border-radius:18px;border:none;cursor:pointer;" +
-          "background:#8b5cf6;color:#fff;font-size:44px;font-weight:900;line-height:1;" +
-          "border:4px solid rgba(0,0,0,.22);box-shadow:0 10px 18px rgba(0,0,0,.16);" +
-          "-webkit-tap-highlight-color:transparent;touch-action:manipulation;";
-        plusBtn.addEventListener("mousedown", (e) => { try{ e.preventDefault(); }catch(_e){} });
-
-        plusWrap.appendChild(plusBtn);
-
-        const ord = ["الأول","الثاني","الثالث","الرابع","الخامس","السادس","السابع"];
-        const qArr = new Array(8).fill(null);
-        const aArr = new Array(8).fill(null);
-        qArr[1] = q1;
-        aArr[1] = a1;
-        let pairsCount = 1;
-
-        const refreshPlus = () => {
-          const atMax = pairsCount >= 7;
-          try{ plusBtn.disabled = atMax; }catch(e){}
-          plusBtn.style.opacity = atMax ? "0.55" : "1";
-          plusBtn.style.cursor = atMax ? "not-allowed" : "pointer";
-        };
-
-        const makePair = (i) => {
-          if(i < 2 || i > 7) return;
-          // سؤال i
-          const fq = document.createElement("div");
-          fq.appendChild(mkLabel(`سؤال الخلية ${ord[i-1]}`));
-          const q = mkTA(`اكتب السؤال ${ord[i-1]} هنا...`);
-          fq.appendChild(q);
-
-          // جواب i
-          const fa = document.createElement("div");
-          fa.appendChild(mkLabel(`جواب الخلية ${ord[i-1]}`));
-          const a = mkTA(`اكتب الجواب ${ord[i-1]} هنا...`);
-          fa.appendChild(a);
-
-          extraWrap.appendChild(fq);
-          extraWrap.appendChild(fa);
-
-          qArr[i] = q;
-          aArr[i] = a;
-        };
-
-        const resetPairs = () => {
-          extraWrap.innerHTML = "";
-          for(let i=2;i<=7;i++){ qArr[i] = null; aArr[i] = null; }
-          pairsCount = 1;
-          refreshPlus();
-        };
-
-        const addPair = () => {
-          if(pairsCount >= 7) return;
-          pairsCount += 1;
-          makePair(pairsCount);
-          refreshPlus();
-        };
-
-        plusBtn.addEventListener("click", () => { try{ addPair(); }catch(e){} });
-
         fieldWrap.appendChild(f1);
         fieldWrap.appendChild(f2);
         fieldWrap.appendChild(f3);
-        fieldWrap.appendChild(extraWrap);
-        fieldWrap.appendChild(plusWrap);
 
         const actions = document.createElement("div");
         actions.style.cssText = "display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;";
@@ -6057,29 +6001,11 @@ const EASY_EDIT_EDITOR = {
           const key = String(this.openKey || "");
           if(!key) return this.close();
           // ✅ حفظ محلي مؤقت (للمعاينة فقط في هذه الخطوة)
-          (function(){
-          const patch = { content: String(cellContent.value || "").trim() };
-          // q1/a1
-          patch.q1 = String(q1.value || "").trim();
-          patch.a1 = String(a1.value || "").trim();
-
-          // ✅ باقي الأسئلة (لو موجودة)
-          try{
-            const els = EASY_EDIT_EDITOR && EASY_EDIT_EDITOR.els ? EASY_EDIT_EDITOR.els : null;
-            const qArr = els && Array.isArray(els.qArr) ? els.qArr : null;
-            const aArr = els && Array.isArray(els.aArr) ? els.aArr : null;
-            if(qArr && aArr){
-              for(let i=2;i<=7;i++){
-                const qEl = qArr[i];
-                const aEl = aArr[i];
-                if(!qEl || !aEl) continue;
-                patch[`q${i}`] = String(qEl.value || "").trim();
-                patch[`a${i}`] = String(aEl.value || "").trim();
-              }
-            }
-          }catch(e){}
-          easyEditSetCell(key, patch);
-        })();
+          easyEditSetCell(key, {
+            content: String(cellContent.value || "").trim(),
+            q1: String(q1.value || "").trim(),
+            a1: String(a1.value || "").trim()
+          });
           this.close();
           try{ scheduleMapRelayout("easy_edit_saved"); }catch(e){}
         });
@@ -6110,7 +6036,7 @@ const EASY_EDIT_EDITOR = {
 
         this.backdrop = backdrop;
         this.card = card;
-        this.els = { title, cellContent, q1, a1, qArr, aArr, extraWrap, plusBtn, resetPairs, makePair, refreshPlus, getPairsCount:() => pairsCount, setPairsCount:(n) => { pairsCount = Math.max(1, Math.min(7, Number(n||1)||1)); refreshPlus(); } };
+        this.els = { title, cellContent, q1, a1 };
       },
       open(row, col){
         this.ensure();
@@ -6121,29 +6047,6 @@ const EASY_EDIT_EDITOR = {
         this.els.cellContent.value = String(cell.content || "");
         this.els.q1.value = String(cell.q1 || "");
         this.els.a1.value = String(cell.a1 || "");
-
-        // ✅ إعادة بناء حقول الأسئلة الإضافية بناءً على البيانات الموجودة
-        try{
-          if(this.els && typeof this.els.resetPairs === "function"){
-            this.els.resetPairs();
-          }
-          // تحديد أعلى رقم فيه بيانات
-          let maxI = 1;
-          for(let i=2;i<=7;i++){
-            const qv = String(cell[`q${i}`] || "").trim();
-            const av = String(cell[`a${i}`] || "").trim();
-            if(qv || av) maxI = i;
-          }
-          for(let i=2;i<=maxI;i++){
-            try{ this.els.makePair(i); }catch(e){}
-            if(this.els.qArr[i]) this.els.qArr[i].value = String(cell[`q${i}`] || "");
-            if(this.els.aArr[i]) this.els.aArr[i].value = String(cell[`a${i}`] || "");
-          }
-          if(this.els && typeof this.els.setPairsCount === "function"){
-            this.els.setPairsCount(maxI);
-          }
-        }catch(e){}
-
         this.backdrop.style.display = "flex";
       },
       close(){
@@ -6213,27 +6116,17 @@ const EASY_EDIT_EDITOR = {
             const col = idx % cellCount;
             const k = `${row}-${col}`;
 
-            const list = (baseRoom?.customQuestions && Array.isArray(baseRoom.customQuestions[raw])) ? baseRoom.customQuestions[raw] : [];
-            const qv = new Array(8).fill('');
-            const av = new Array(8).fill('');
+            let qFirst = '';
+            let aFirst = '';
             try{
-              for(let i=1;i<=7;i++){
-                const it = list[i-1] || {};
-                qv[i] = String(it?.q || '').trim();
-                av[i] = String(it?.a || '').trim();
+              const list = (baseRoom?.customQuestions && Array.isArray(baseRoom.customQuestions[raw])) ? baseRoom.customQuestions[raw] : [];
+              if(list && list.length){
+                qFirst = String(list[0]?.q || '').trim();
+                aFirst = String(list[0]?.a || '').trim();
               }
             }catch(e){}
 
-            cells[k] = {
-              content: raw,
-              q1: qv[1], a1: av[1],
-              q2: qv[2], a2: av[2],
-              q3: qv[3], a3: av[3],
-              q4: qv[4], a4: av[4],
-              q5: qv[5], a5: av[5],
-              q6: qv[6], a6: av[6],
-              q7: qv[7], a7: av[7]
-            };
+            cells[k] = { content: raw, q1: qFirst, a1: aFirst };
           }
 
           s.rounds[rk] = { cells };
@@ -6286,16 +6179,13 @@ const EASY_EDIT_EDITOR = {
           if(!cell || typeof cell !== 'object') continue;
           const content = String(cell.content || '').trim();
           if(!content) continue;
+          const q = String(cell.q1 || '').trim();
+          const a = String(cell.a1 || '').trim();
+          if(!q && !a) continue;
+
           if(!Array.isArray(base[content])) base[content] = [];
-
-          for(let i=1;i<=7;i++){
-            const q = String(cell[`q${i}`] || '').trim();
-            const a = String(cell[`a${i}`] || '').trim();
-            if(!q && !a) continue;
-
-            const exists = base[content].some(it => String(it?.q || '').trim() === q && String(it?.a || '').trim() === a);
-            if(!exists) base[content].push({ q, a });
-          }
+          const exists = base[content].some(it => String(it?.q || '').trim() === q && String(it?.a || '').trim() === a);
+          if(!exists) base[content].push({ q, a });
         }
       }
       return base;
@@ -6303,6 +6193,8 @@ const EASY_EDIT_EDITOR = {
 
     async function easyEditSaveAndExit(){
       if(String(role || '') !== 'host') return;
+      // ✅ هذا الزر يعني أن المقدم فعّل إضافة الأسئلة
+      setStoredEasyEditEnabled(true);
       try{
         // ✅ خذ أفضل نسخة (تجمع local/remote/room) قبل الدمج
         const baseRoom = (typeof getRoomWithPersistentCustomQuestions === 'function')
@@ -9330,7 +9222,7 @@ const EASY_EDIT_EDITOR = {
       let pendingQuestionMode = 'default';
       let pendingCellContentMode = 'default';
       let pendingSoundEnabled = true;
-      let pendingEasyEditEnabled = (function(){ try{ return localStorage.getItem(`horof_easy_edit_enabled_${code}`) === "1"; }catch(e){ return false; } })();
+      let pendingEasyEditEnabled = false;
       let activeCellsIndex = null;
       let pendingManualCellRounds = {};
       SETTINGS_UI.pendingCustomQuestions = normalizeCustomQuestionsMap(SETTINGS_UI.pendingCustomQuestions || {});
@@ -9357,10 +9249,6 @@ const EASY_EDIT_EDITOR = {
         mainChoiceButtons.forEach(btn => {
           const group = String(btn.dataset.mainChoiceGroup || '');
           const value = String(btn.dataset.mainChoiceValue || '');
-          if(group === 'easyEdit'){
-            btn.classList.toggle('easyEditOn', value === 'on');
-            btn.classList.toggle('easyEditOff', value === 'off');
-          }
           let active = false;
           if(group === 'questions') active = (value === pendingQuestionMode);
           else if(group === 'cells') active = (value === pendingCellContentMode);
@@ -9388,9 +9276,21 @@ const EASY_EDIT_EDITOR = {
         }
         else if(g === 'easyEdit'){
           pendingEasyEditEnabled = (v === 'on');
-          try{ localStorage.setItem(`horof_easy_edit_enabled_${code}`, pendingEasyEditEnabled ? "1" : "0"); }catch(e){}
+
+          // ✅ نحفظ الاختيار محليًا ليبقى بعد التحديث/الإغلاق (افتراضي: تعطيل)
+          setStoredEasyEditEnabled(!!pendingEasyEditEnabled);
+
+          // ✅ تشغيل = محتوى مخصص + أسئلة مخصصة | تعطيل = حروف وأسئلة اللعبة
+          if(pendingEasyEditEnabled){
+            pendingQuestionMode = 'custom';
+            pendingCellContentMode = 'manual';
+          }else{
+            pendingQuestionMode = 'default';
+            pendingCellContentMode = 'default';
+          }
+
+          try{ if(!pendingEasyEditEnabled) EASY_EDIT_UI.setActive(false); }catch(e){}
         }
-        try{ if(!pendingEasyEditEnabled) EASY_EDIT_UI.setActive(false); }catch(e){}
         renderMainChoices();
         buildSettingsQuestionsList(SETTINGS_UI.roomLatest || LIVE.room || {});
       }
@@ -9599,8 +9499,19 @@ const EASY_EDIT_EDITOR = {
         const r = room || {};
         const settings = (r.settings && typeof r.settings === 'object') ? r.settings : {};
         const selectedTimer = Number((r.timer && r.timer.sel) || LIVE.room?.timer?.sel || 10);
-        pendingQuestionMode = getQuestionMode(r);
-        pendingCellContentMode = (settings.cellContentMode === 'manual') ? 'manual' : 'default';
+
+        // ✅ اختيار إضافة الأسئلة محفوظ محليًا (افتراضي: تعطيل)
+        pendingEasyEditEnabled = !!getStoredEasyEditEnabled(r);
+
+        // ✅ ربط وضع إضافة الأسئلة مع عرض الخلايا + مصدر الأسئلة
+        if(pendingEasyEditEnabled){
+          pendingQuestionMode = 'custom';
+          pendingCellContentMode = 'manual';
+        }else{
+          pendingQuestionMode = 'default';
+          pendingCellContentMode = 'default';
+        }
+
         pendingSoundEnabled = settings.soundEnabled !== false;
         renderMainChoices();
         if(timerRange) timerRange.value = String(Math.max(1, Math.min(50, selectedTimer || 10)));
@@ -9619,6 +9530,18 @@ const EASY_EDIT_EDITOR = {
         try{
           if(saveBtn) saveBtn.disabled = true;
           setStatus('جاري حفظ الإعدادات...');
+
+          // ✅ احفظ اختيار إضافة الأسئلة محليًا (يبقى بعد التحديث)
+          setStoredEasyEditEnabled(!!pendingEasyEditEnabled);
+
+          // ✅ اربط مصدر الأسئلة + عرض الخلايا حسب الخيار
+          if(pendingEasyEditEnabled){
+            pendingQuestionMode = 'custom';
+            pendingCellContentMode = 'manual';
+          }else{
+            pendingQuestionMode = 'default';
+            pendingCellContentMode = 'default';
+          }
           const timerSel = Math.max(1, Math.min(50, Number(timerRange?.value || 10)));
           const manualCellRounds = JSON.parse(JSON.stringify(pendingManualCellRounds || {}));
           const baseRoom = getRoomWithPersistentCustomQuestions(LIVE.room || SETTINGS_UI.roomLatest || {});
