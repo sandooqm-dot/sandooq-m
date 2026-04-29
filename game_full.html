@@ -5518,6 +5518,9 @@ function hideEidIntro(immediate){
         // ✅ (خطوة 6 + 7) تعتيم الصفحة ما عدا الخريطة + لوحة الجولات
         try{ EASY_EDIT_STAGE && EASY_EDIT_STAGE.setActive && EASY_EDIT_STAGE.setActive(this.active); }catch(e){}
 
+        // ✅ (S1/S2) زر حفظ وخروج داخل وضع التعديل
+        try{ EASY_EDIT_SAVE_BAR && EASY_EDIT_SAVE_BAR.setActive && EASY_EDIT_SAVE_BAR.setActive(this.active); }catch(e){}
+
 
         // ✅ عند تفعيل/إيقاف وضع التعديل: نحدّث شكل الخلايا فقط (بدون أي لمس لمنطق اللعبة)
         try{ easyEditRefreshMapStyles(); }catch(e){}
@@ -6018,6 +6021,243 @@ const EASY_EDIT_EDITOR = {
         this.openKey = "";
       }
     };
+
+    const EASY_EDIT_SAVE_BAR = {
+      bar: null,
+      btn: null,
+      ensure(){
+        if(this.bar) return this.bar;
+        const bar = document.createElement('div');
+        bar.id = 'easyEditSaveBar';
+        bar.style.cssText =
+          'position:fixed;left:0;right:0;bottom:0;z-index:46035;display:none;pointer-events:auto;' +
+          'padding:12px 14px calc(12px + env(safe-area-inset-bottom));' +
+          'background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.35) 35%, rgba(0,0,0,.55) 100%);';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'حفظ التعديلات وخروج';
+        btn.style.cssText =
+          'width:min(92vw, 520px);height:62px;margin:0 auto;display:block;' +
+          'border:none;border-radius:22px;cursor:pointer;' +
+          'background:#ffd54a;color:#111;font-size:22px;font-weight:900;' +
+          'border:6px solid rgba(0,0,0,.86);box-shadow:0 12px 22px rgba(0,0,0,.22);' +
+          '-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
+        btn.addEventListener('click', () => { try{ easyEditSaveAndExit(); }catch(e){} });
+        bar.appendChild(btn);
+        document.body.appendChild(bar);
+        this.bar = bar;
+        this.btn = btn;
+        return bar;
+      },
+      setActive(on){
+        const el = this.ensure();
+        el.style.display = on ? 'block' : 'none';
+      }
+    };
+
+    function easyEditHydrateStoreFromRoom(roomLike){
+      try{
+        const baseRoom = (typeof getRoomWithPersistentCustomQuestions === 'function')
+          ? getRoomWithPersistentCustomQuestions(roomLike || LIVE.room || {})
+          : (roomLike || LIVE.room || {});
+        const settings = (baseRoom?.settings && typeof baseRoom.settings === 'object') ? baseRoom.settings : {};
+        const storedRounds = (settings.manualCellRounds && typeof settings.manualCellRounds === 'object') ? settings.manualCellRounds : {};
+        const fallbackCount = (typeof getBoardSize === 'function') ? (getBoardSize(baseRoom) || 5) : 5;
+
+        const s = easyEditGetStore();
+        if(!s.rounds || typeof s.rounds !== 'object') s.rounds = {};
+
+        for(let r=1; r<=5; r++){
+          const rk = String(r);
+          const draft = storedRounds[rk] || storedRounds[r] || {};
+          const cellCount = (typeof normalizeCellCount === 'function') ? normalizeCellCount(draft.cellCount || fallbackCount || 5) : (Number(draft.cellCount || fallbackCount || 5) || 5);
+          const values = Array.isArray(draft.values) ? draft.values : [];
+          const cells = {};
+
+          const limit = cellCount * cellCount;
+          for(let idx=0; idx<limit; idx++){
+            const raw = String(values[idx] || '').trim();
+            if(!raw) continue;
+            const row = Math.floor(idx / cellCount);
+            const col = idx % cellCount;
+            const k = `${row}-${col}`;
+
+            let qFirst = '';
+            let aFirst = '';
+            try{
+              const list = (baseRoom?.customQuestions && Array.isArray(baseRoom.customQuestions[raw])) ? baseRoom.customQuestions[raw] : [];
+              if(list && list.length){
+                qFirst = String(list[0]?.q || '').trim();
+                aFirst = String(list[0]?.a || '').trim();
+              }
+            }catch(e){}
+
+            cells[k] = { content: raw, q1: qFirst, a1: aFirst };
+          }
+
+          s.rounds[rk] = { cells };
+        }
+
+        if(!Number.isFinite(Number(s.activeRound))) s.activeRound = 1;
+        try{ window.__HOROF_EASY_EDIT_STORE = s; }catch(e){}
+      }catch(e){}
+    }
+
+    function easyEditBuildManualCellRoundsFromStore(roomLike){
+      const baseRoom = roomLike || LIVE.room || {};
+      const size = (typeof getBoardSize === 'function') ? (getBoardSize(baseRoom) || 5) : 5;
+      const store = easyEditGetStore();
+      const out = {};
+      for(let r=1; r<=5; r++){
+        const rk = String(r);
+        const bucket = (store.rounds && store.rounds[rk] && store.rounds[rk].cells) ? store.rounds[rk].cells : {};
+        const total = size * size;
+        const values = new Array(total).fill('');
+        try{
+          for(const k in bucket){
+            const cell = bucket[k];
+            if(!cell || typeof cell !== 'object') continue;
+            const mm = String(k).match(/^(\d+)-(\d+)$/);
+            if(!mm) continue;
+            const row = Number(mm[1]);
+            const col = Number(mm[2]);
+            const idx = (row * size) + col;
+            if(idx < 0 || idx >= total) continue;
+            values[idx] = String(cell.content || '').trim();
+          }
+        }catch(e){}
+        out[rk] = { cellCount: size, values };
+      }
+      return out;
+    }
+
+    function easyEditMergeCustomQuestionsFromStore(customQuestions){
+      const base = (typeof normalizeCustomQuestionsMap === 'function')
+        ? normalizeCustomQuestionsMap(customQuestions || {})
+        : (customQuestions && typeof customQuestions === 'object' ? customQuestions : {});
+      const store = easyEditGetStore();
+
+      for(let r=1; r<=5; r++){
+        const rk = String(r);
+        const bucket = (store.rounds && store.rounds[rk] && store.rounds[rk].cells) ? store.rounds[rk].cells : {};
+        for(const k in bucket){
+          const cell = bucket[k];
+          if(!cell || typeof cell !== 'object') continue;
+          const content = String(cell.content || '').trim();
+          if(!content) continue;
+          const q = String(cell.q1 || '').trim();
+          const a = String(cell.a1 || '').trim();
+          if(!q && !a) continue;
+
+          if(!Array.isArray(base[content])) base[content] = [];
+          const exists = base[content].some(it => String(it?.q || '').trim() === q && String(it?.a || '').trim() === a);
+          if(!exists) base[content].push({ q, a });
+        }
+      }
+      return base;
+    }
+
+    async function easyEditSaveAndExit(){
+      if(String(role || '') !== 'host') return;
+      try{
+        // ✅ خذ أفضل نسخة (تجمع local/remote/room) قبل الدمج
+        const baseRoom = (typeof getRoomWithPersistentCustomQuestions === 'function')
+          ? getRoomWithPersistentCustomQuestions(LIVE.room || {})
+          : (LIVE.room || {});
+        const manualCellRounds = easyEditBuildManualCellRoundsFromStore(baseRoom);
+        const mergedCustomQuestions = easyEditMergeCustomQuestionsFromStore(baseRoom.customQuestions || {});
+        const updatedAt = Date.now();
+
+        // ✅ طبّق على LIVE (بدون لمس منطق الجولات)
+        const nextRoom = (typeof normalizeLiveRoom === 'function')
+          ? normalizeLiveRoom({
+              ...(LIVE.room || baseRoom || {}),
+              questionMode: 'custom',
+              customQuestions: mergedCustomQuestions,
+              customQuestionsUpdatedAt: updatedAt,
+              settings: {
+                ...(((LIVE.room && LIVE.room.settings) && typeof LIVE.room.settings === 'object') ? LIVE.room.settings : ((baseRoom.settings && typeof baseRoom.settings === 'object') ? baseRoom.settings : {})),
+                manualCellRounds,
+                cellContentMode: 'manual'
+              }
+            })
+          : (LIVE.room || baseRoom || {});
+        LIVE.room = nextRoom;
+
+        // ✅ حفظ محلي (هذا اللي كان ناقص)
+        try{
+          if(typeof savePersistedCustomQuestions === 'function'){
+            savePersistedCustomQuestions(mergedCustomQuestions, updatedAt);
+          }
+        }catch(e){}
+        try{
+          if(typeof savePersistedHostSettingsEnvelope === 'function'){
+            savePersistedHostSettingsEnvelope({
+              updatedAt,
+              manualCellRounds,
+              cellContentMode: 'manual',
+              questionMode: 'custom',
+              soundEnabled: !(nextRoom?.settings && nextRoom.settings.soundEnabled === false)
+            });
+          }
+        }catch(e){}
+        try{
+          if(typeof CUSTOM_Q_PERSIST === 'object' && CUSTOM_Q_PERSIST){
+            CUSTOM_Q_PERSIST.remote = { updatedAt, customQuestions: mergedCustomQuestions };
+            CUSTOM_Q_PERSIST.remoteLoaded = true;
+          }
+        }catch(e){}
+        try{
+          if(typeof saveRemoteCustomQuestionsEnvelope === 'function'){
+            await saveRemoteCustomQuestionsEnvelope(mergedCustomQuestions, updatedAt);
+          }
+        }catch(e){}
+
+        // ✅ دفع للتزامن الحالي (عشان باقي الأجهزة تشوف التعديلات)
+        try{
+          const seedNow = Number(nextRoom?.round?.boardSeed || nextRoom?.board?.seed || Date.now()) || Date.now();
+          const roomForBoard = { ...(nextRoom || {}), settings: { ...((nextRoom && nextRoom.settings) ? nextRoom.settings : {}), manualCellRounds, cellContentMode:'manual' } };
+          const nextBoard = (typeof rememberBoard === 'function')
+            ? (rememberBoard(buildBoardState(roomForBoard, seedNow), roomForBoard) || buildBoardState(roomForBoard, seedNow))
+            : (nextRoom?.board || null);
+
+          const updates = {};
+          updates[`rooms/${code}/questionMode`] = 'custom';
+          updates[`rooms/${code}/customQuestions`] = mergedCustomQuestions;
+          updates[`rooms/${code}/customQuestionsUpdatedAt`] = updatedAt;
+          updates[`rooms/${code}/settings/manualCellRounds`] = manualCellRounds;
+          updates[`rooms/${code}/settings/cellContentMode`] = 'manual';
+          if(nextBoard){
+            updates[`rooms/${code}/board`] = nextBoard;
+            updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || seedNow;
+          }
+
+          if(typeof update === 'function' && typeof ref === 'function'){
+            await update(ref(db), updates);
+          }
+
+          if(nextBoard){
+            try{
+              LIVE.room = (typeof normalizeLiveRoom === 'function')
+                ? normalizeLiveRoom({
+                    ...(LIVE.room || {}),
+                    board: nextBoard,
+                    round: { ...(((LIVE.room && LIVE.room.round) && typeof LIVE.room.round === 'object') ? LIVE.room.round : {}), boardSeed: Number(nextBoard.seed || 0) || seedNow }
+                  })
+                : (LIVE.room || {});
+            }catch(e){}
+          }
+        }catch(e){}
+
+        try{ scheduleRender(); }catch(e){}
+
+        // ✅ خروج من وضع التعديل والرجوع للإعدادات
+        try{ EASY_EDIT_UI.setActive(false); }catch(e){}
+        try{ openSettings(LIVE.room || baseRoom || {}); }catch(e){}
+      }catch(e){}
+    }
+
+
 
 
 
@@ -8807,21 +9047,7 @@ const EASY_EDIT_EDITOR = {
           <div class="settingsBody">
             <section class="settingsSection active" data-settings-panel="main">
               <div class="settingsCard settingsDirectCard">
-                <div class="settingsChoiceBlock">
-                  <h4 class="settingsChoiceTitle">نوع عرض الأسئلة</h4>
-                  <div class="settingsChoiceRow">
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="questions" data-main-choice-value="default">أسئلة اللعبة</button>
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="questions" data-main-choice-value="custom">أسئلة مخصصة</button>
-                  </div>
-                </div>
-                <div class="settingsChoiceBlock">
-                  <h4 class="settingsChoiceTitle">عرض محتوى الخلايا</h4>
-                  <div class="settingsChoiceRow">
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="cells" data-main-choice-value="default">حروف اللعبة الجاهزة</button>
-                    <button class="settingsChoiceBtn" type="button" data-main-choice-group="cells" data-main-choice-value="manual">المحتوى المخصص</button>
-                  </div>
-                </div>
-                <div class="settingsChoiceBlock">
+<div class="settingsChoiceBlock">
                   <h4 class="settingsChoiceTitle">أصوات اللعبة</h4>
                   <div class="settingsChoiceRow">
                     <button class="settingsChoiceBtn" type="button" data-main-choice-group="sound" data-main-choice-value="on">تشغيل</button>
@@ -9437,7 +9663,9 @@ const EASY_EDIT_EDITOR = {
             // إظهار تنبيه أعلى الخريطة (خطوة 3 فقط — بدون تغيير الخلايا)
             const liveRoomNow = LIVE.room || SETTINGS_UI.roomLatest || {};
             if(String(liveRoomNow.status || '') === 'started' && pendingEasyEditEnabled){
+              try{ easyEditHydrateStoreFromRoom(liveRoomNow); }catch(e){}
               EASY_EDIT_UI.setActive(true);
+              try{ easyEditRefreshMapLetters(); }catch(e){}
             }else{
               EASY_EDIT_UI.setActive(false);
             }
