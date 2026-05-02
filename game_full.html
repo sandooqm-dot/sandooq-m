@@ -5744,28 +5744,28 @@ function easyEditRefreshMapStyles(){
         if(!wrap) return;
         wrap.innerHTML = "";
 
-        const roundsTotal = Math.max(1, Math.min(5, Number(total || 1) || 1));
+        // ✅ في وضع إضافة الأسئلة: كل الجولات الخمس قابلة للتعديل دائمًا
+        // حتى لو اختار المقدم من البداية جولة واحدة فقط.
+        const editableRoundsTotal = 5;
 
-        // ✅ ثبّت 5 مربعات دائمًا (الجولة الأولى..الخامسة)
         const LABELS = ["الجولة الأولى","الجولة الثانية","الجولة الثالثة","الجولة الرابعة","الجولة الخامسة"];
 
         let active = easyEditGetActiveRound();
         if(!Number.isFinite(active) || active < 1) active = 1;
-        if(active > roundsTotal){
-          active = 1;
-          try{ easyEditSetActiveRound(1); }catch(e){}
+        if(active > editableRoundsTotal){
+          active = editableRoundsTotal;
+          try{ easyEditSetActiveRound(editableRoundsTotal); }catch(e){}
         }
 
-        for(let i=1;i<=5;i++){
+        for(let i=1;i<=editableRoundsTotal;i++){
           const btn = document.createElement("button");
           btn.type = "button";
           btn.textContent = LABELS[i-1] || String(i);
           btn.setAttribute("aria-label", `اختيار ${LABELS[i-1] || ("الجولة " + i)}`);
 
           const isActive = (i === active);
-          const isDisabled = (i > roundsTotal);
 
-          btn.disabled = !!isDisabled;
+          btn.disabled = false;
 
           btn.style.cssText =
             "min-width:118px;height:54px;padding:0 10px;border-radius:14px;cursor:pointer;" +
@@ -5775,15 +5775,8 @@ function easyEditRefreshMapStyles(){
             "line-height:1.1;display:flex;align-items:center;justify-content:center;text-align:center;" +
             "white-space:normal;-webkit-tap-highlight-color:transparent;touch-action:manipulation;";
 
-          if(isDisabled){
-            btn.style.opacity = "0.35";
-            btn.style.cursor = "not-allowed";
-            btn.style.filter = "saturate(0.75)";
-          }
-
           btn.addEventListener("click", (ev) => {
             try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
-            if(isDisabled) return;
             try{
               easyEditSetActiveRound(i);
               // أغلق المحرر لو مفتوح
@@ -5875,7 +5868,7 @@ function easyEditRefreshMapStyles(){
         const room = LIVE.room || {};
         const total = this.getRoundsTotal(room);
 
-        // ✅ نعرض اللوحة دائمًا (٥ مربعات ثابتة)، ونقفل الزائد حسب عدد الجولات (1/3/5)
+        // ✅ نعرض اللوحة دائمًا (٥ مربعات ثابتة)، وكلها قابلة للتعديل مهما كان عدد الجولات المختار للعب
         this.rebuildButtons(total);
         if(this.panel) this.panel.style.display = "block";
         this.positionPanel();
