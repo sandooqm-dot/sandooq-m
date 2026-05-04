@@ -6133,6 +6133,7 @@ const EASY_EDIT_EDITOR = {
     const EASY_EDIT_SAVE_BAR = {
       bar: null,
       btn: null,
+      resetBtn: null,
       ensure(){
         if(this.bar) return this.bar;
         const bar = document.createElement('div');
@@ -6141,6 +6142,18 @@ const EASY_EDIT_EDITOR = {
           'position:fixed;left:0;right:0;bottom:0;z-index:46035;display:none;pointer-events:auto;' +
           'padding:12px 14px calc(12px + env(safe-area-inset-bottom));' +
           'background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.35) 35%, rgba(0,0,0,.55) 100%);';
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.textContent = 'مسح جميع التعديلات المضافة';
+        resetBtn.style.cssText =
+          'width:min(92vw, 520px);height:54px;margin:0 auto 10px;display:block;' +
+          'border:none;border-radius:20px;cursor:pointer;' +
+          'background:#ff4b4b;color:#fff;font-size:20px;font-weight:900;' +
+          'border:6px solid rgba(0,0,0,.86);box-shadow:0 10px 18px rgba(0,0,0,.20);' +
+          '-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
+        resetBtn.addEventListener('click', () => { try{ easyEditResetAddedChanges(); }catch(e){} });
+
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = 'حفظ التعديلات وخروج';
@@ -6151,10 +6164,12 @@ const EASY_EDIT_EDITOR = {
           'border:6px solid rgba(0,0,0,.86);box-shadow:0 12px 22px rgba(0,0,0,.22);' +
           '-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
         btn.addEventListener('click', () => { try{ easyEditSaveAndExit(); }catch(e){} });
+        bar.appendChild(resetBtn);
         bar.appendChild(btn);
         document.body.appendChild(bar);
         this.bar = bar;
         this.btn = btn;
+        this.resetBtn = resetBtn;
         return bar;
       },
       setActive(on){
@@ -6367,9 +6382,104 @@ const EASY_EDIT_EDITOR = {
 
         try{ scheduleRender(); }catch(e){}
 
-        // ✅ خروج من وضع التعديل والرجوع للإعدادات
+        // ✅ خروج من وضع التعديل والرجوع مباشرة إلى صفحة اللعبة
         try{ EASY_EDIT_UI.setActive(false); }catch(e){}
-        try{ openSettings(LIVE.room || baseRoom || {}); }catch(e){}
+        try{
+          const liveRoomNow = LIVE.room || nextRoom || baseRoom || {};
+          if(String(liveRoomNow.status || '') === 'started'){
+            renderGame(liveRoomNow, LIVE.me || null);
+          }else{
+            renderHostLobby(liveRoomNow);
+          }
+        }catch(e){}
+      }catch(e){}
+    }
+
+    async function easyEditResetAddedChanges(){
+      if(String(role || '') !== 'host') return;
+      const ok = window.confirm('تنبيه\nسيتم حذف جميع التعديلات والأسئلة والإجابات التي أضفتها على هذا الجهاز.\nلا يمكن التراجع بعد المسح.');
+      if(!ok) return;
+
+      try{
+        const updatedAt = Date.now();
+        const baseRoom = (typeof getRoomWithPersistentCustomQuestions === 'function')
+          ? getRoomWithPersistentCustomQuestions(LIVE.room || {})
+          : (LIVE.room || {});
+
+        const emptyStore = { activeRound: 1, rounds: {} };
+        for(let r=1; r<=5; r++) emptyStore.rounds[String(r)] = { cells: {} };
+        try{ window.__HOROF_EASY_EDIT_STORE = emptyStore; }catch(e){}
+        try{ easyEditSetActiveRound(1); }catch(e){}
+        try{ setStoredEasyEditEnabled(true); }catch(e){}
+
+        const nextSettings = {
+          ...(((baseRoom && baseRoom.settings) && typeof baseRoom.settings === 'object') ? baseRoom.settings : {}),
+          manualCellRounds: {},
+          cellContentMode: 'default'
+        };
+        const seedNow = Number(baseRoom?.round?.boardSeed || baseRoom?.board?.seed || Date.now()) || Date.now();
+        const roomForBoard = { ...(baseRoom || {}), settings: nextSettings, questionMode: 'default', customQuestions: {} };
+        const nextBoard = (typeof rememberBoard === 'function')
+          ? (rememberBoard(buildBoardState(roomForBoard, seedNow), roomForBoard) || buildBoardState(roomForBoard, seedNow))
+          : (baseRoom?.board || null);
+
+        if(LIVE.room && typeof LIVE.room === 'object'){
+          if(!LIVE.room.settings || typeof LIVE.room.settings !== 'object') LIVE.room.settings = {};
+          LIVE.room.questionMode = 'default';
+          LIVE.room.customQuestions = {};
+          LIVE.room.customQuestionsUpdatedAt = updatedAt;
+          LIVE.room.settings.manualCellRounds = {};
+          LIVE.room.settings.cellContentMode = 'default';
+          if(nextBoard){
+            LIVE.room.board = nextBoard;
+            if(!LIVE.room.round || typeof LIVE.room.round !== 'object') LIVE.room.round = { current:1, targetWins:1, winner:null, boardSeed:0 };
+            LIVE.room.round.boardSeed = Number(nextBoard.seed || 0) || seedNow;
+          }
+        }
+
+        try{ savePersistedCustomQuestions({}, updatedAt); }catch(e){}
+        try{
+          savePersistedHostSettingsEnvelope({
+            updatedAt,
+            manualCellRounds: {},
+            cellContentMode: 'default',
+            questionMode: 'default',
+            soundEnabled: !((LIVE.room || baseRoom)?.settings && (LIVE.room || baseRoom).settings.soundEnabled === false)
+          });
+        }catch(e){}
+        try{
+          if(typeof CUSTOM_Q_PERSIST === 'object' && CUSTOM_Q_PERSIST){
+            CUSTOM_Q_PERSIST.remote = { updatedAt, customQuestions: {} };
+            CUSTOM_Q_PERSIST.remoteLoaded = true;
+          }
+        }catch(e){}
+        try{
+          if(typeof saveRemoteCustomQuestionsEnvelope === 'function'){
+            await saveRemoteCustomQuestionsEnvelope({}, updatedAt);
+          }
+        }catch(e){}
+
+        try{
+          const updates = {};
+          updates[`rooms/${code}/questionMode`] = 'default';
+          updates[`rooms/${code}/customQuestions`] = {};
+          updates[`rooms/${code}/customQuestionsUpdatedAt`] = updatedAt;
+          updates[`rooms/${code}/settings/manualCellRounds`] = {};
+          updates[`rooms/${code}/settings/cellContentMode`] = 'default';
+          if(nextBoard){
+            updates[`rooms/${code}/board`] = nextBoard;
+            updates[`rooms/${code}/round/boardSeed`] = Number(nextBoard.seed || 0) || seedNow;
+          }
+          if(typeof update === 'function' && typeof ref === 'function'){
+            await update(ref(db), updates);
+          }
+        }catch(e){}
+
+        try{ easyEditRefreshMapLetters(); }catch(e){}
+        try{ easyEditRefreshMapStyles(); }catch(e){}
+        try{ scheduleMapRelayout('easy_edit_reset'); }catch(e){}
+        try{ scheduleRender(); }catch(e){}
+        window.alert('تم مسح التعديلات المضافة بنجاح. يمكنك إضافة أسئلتك من جديد.');
       }catch(e){}
     }
 
