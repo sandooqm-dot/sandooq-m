@@ -1,33 +1,70 @@
 // functions/_middleware.js
-// حماية /app: لازم يكون فيه session token + لازم يكون الحساب مُفعّل (Activated)
-// v10: السماح لشاشة العرض بالدخول المباشر بدون تسجيل دخول إذا كان الرابط خاص بالعرض
-//      مع الإبقاء على حماية المقدم، والسماح للاعب كما هو
+// حماية /app و game_full للنظام القديم + دعم دخول الموقع الجديد عبر sg_token
+// يدعم منتجين منفصلين يفتحان نفس اللعبة:
+// - horof
+// - horof-edu
 
 const ALLOW_GUEST_PLAYERS = true;
 
-const SCHEMA_TTL_MS = 60_000; // دقيقة (يخفف ضغط PRAGMA)
-const schemaCache = new Map(); // table -> { ts, cols:Set }
+const SCHEMA_TTL_MS = 60_000;
+const schemaCache = new Map();
+
+const NEW_AUTH_API_BASE = "https://sandooq-games-api.sandooq-m.workers.dev";
+const NEW_SITE_TOKEN_COOKIE = "sandooq_site_token_v1";
+const NEW_SITE_GAME_COOKIE = "sandooq_site_game_v1";
+const NEW_GAME_ENTRY_PATH = "/app";
+
+const NEW_TOKEN_QUERY_KEYS = [
+  "sg_token",
+  "sandooq_token",
+  "access_token",
+  "token"
+];
+
+const NEW_GAME_QUERY_KEYS = [
+  "sg_game",
+  "game_id",
+  "game"
+];
+
+const ALLOWED_SITE_GAMES = new Set([
+  "horof",
+  "horof-edu"
+]);
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+function normalizeGameId(gameId) {
+  const value = String(gameId || "").trim().toLowerCase();
+  return ALLOWED_SITE_GAMES.has(value) ? value : "";
+}
+
 function getCookie(req, name) {
   const cookie = req.headers.get("cookie") || req.headers.get("Cookie") || "";
   const parts = cookie.split(";");
+
   for (const p of parts) {
     const [k, ...rest] = p.trim().split("=");
+
     if (k === name) {
       const raw = (rest.join("=") || "").trim();
       if (!raw) return "";
       try { return decodeURIComponent(raw); } catch { return raw; }
     }
   }
+
   return "";
 }
 
 function clearCookie(name) {
   return `${name}=; Path=/; Max-Age=0; Secure; SameSite=Lax; HttpOnly`;
+}
+
+function buildSessionCookie(name, value, url) {
+  const secure = url.protocol === "https:" ? "; Secure" : "";
+  return `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax${secure}`;
 }
 
 function withNoStore(res) {
@@ -36,12 +73,14 @@ function withNoStore(res) {
     res.headers.set("Pragma", "no-cache");
     res.headers.set("Vary", "Cookie, Authorization");
   } catch {}
+
   return res;
 }
 
 async function getCols(DB, table) {
   const now = Date.now();
   const cached = schemaCache.get(table);
+
   if (cached && (now - cached.ts) < SCHEMA_TTL_MS) return cached.cols;
 
   try {
@@ -61,7 +100,11 @@ async function sha256Hex(str) {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const arr = new Uint8Array(digest);
   let hex = "";
-  for (let i = 0; i < arr.length; i++) hex += arr[i].toString(16).padStart(2, "0");
+
+  for (let i = 0; i < arr.length; i++) {
+    hex += arr[i].toString(16).padStart(2, "0");
+  }
+
   return hex;
 }
 
@@ -71,30 +114,34 @@ async function findSessionEmail(DB, env, token) {
   const cols = await getCols(DB, "sessions");
   if (!cols.size) return null;
 
-  // 1) sessions.token (الأسلوب الحالي عندك)
   if (cols.has("token")) {
     if (cols.has("email")) {
       const row = await DB.prepare(
         `SELECT email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
       ).bind(token).first();
+
       return row?.email ? normalizeEmail(row.email) : null;
     }
+
     if (cols.has("user_email")) {
       const row = await DB.prepare(
         `SELECT user_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
       ).bind(token).first();
+
       return row?.email ? normalizeEmail(row.email) : null;
     }
+
     if (cols.has("used_by_email")) {
       const row = await DB.prepare(
         `SELECT used_by_email AS email FROM sessions WHERE token = ? ORDER BY rowid DESC LIMIT 1`
       ).bind(token).first();
+
       return row?.email ? normalizeEmail(row.email) : null;
     }
+
     return null;
   }
 
-  // 2) sessions.token_hash (متوافق مع logout.js)
   if (cols.has("token_hash")) {
     const pepper = String(env?.SESSION_PEPPER || "sess_pepper_v1");
     const tokenHash = await sha256Hex(token + "|" + pepper);
@@ -103,20 +150,26 @@ async function findSessionEmail(DB, env, token) {
       const row = await DB.prepare(
         `SELECT email FROM sessions WHERE token_hash = ? LIMIT 1`
       ).bind(tokenHash).first();
+
       return row?.email ? normalizeEmail(row.email) : null;
     }
+
     if (cols.has("user_email")) {
       const row = await DB.prepare(
         `SELECT user_email AS email FROM sessions WHERE token_hash = ? LIMIT 1`
       ).bind(tokenHash).first();
+
       return row?.email ? normalizeEmail(row.email) : null;
     }
+
     if (cols.has("used_by_email")) {
       const row = await DB.prepare(
         `SELECT used_by_email AS email FROM sessions WHERE token_hash = ? LIMIT 1`
       ).bind(tokenHash).first();
+
       return row?.email ? normalizeEmail(row.email) : null;
     }
+
     return null;
   }
 
@@ -130,6 +183,7 @@ async function isActivatedViaUsers(DB, email) {
   if (!cols.size) return false;
 
   let emailCol = null;
+
   if (cols.has("email")) emailCol = "email";
   else if (cols.has("user_email")) emailCol = "user_email";
   else return false;
@@ -138,6 +192,7 @@ async function isActivatedViaUsers(DB, email) {
     const row = await DB.prepare(
       `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND is_activated = 1 LIMIT 1`
     ).bind(email).first();
+
     return !!row;
   }
 
@@ -145,6 +200,7 @@ async function isActivatedViaUsers(DB, email) {
     const row = await DB.prepare(
       `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activated = 1 LIMIT 1`
     ).bind(email).first();
+
     return !!row;
   }
 
@@ -152,6 +208,7 @@ async function isActivatedViaUsers(DB, email) {
     const row = await DB.prepare(
       `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activated_at IS NOT NULL AND activated_at != '' LIMIT 1`
     ).bind(email).first();
+
     return !!row;
   }
 
@@ -159,6 +216,7 @@ async function isActivatedViaUsers(DB, email) {
     const row = await DB.prepare(
       `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activation_code IS NOT NULL AND activation_code != '' LIMIT 1`
     ).bind(email).first();
+
     return !!row;
   }
 
@@ -166,6 +224,7 @@ async function isActivatedViaUsers(DB, email) {
     const row = await DB.prepare(
       `SELECT 1 AS ok FROM users WHERE ${emailCol} = ? AND activated_code IS NOT NULL AND activated_code != '' LIMIT 1`
     ).bind(email).first();
+
     return !!row;
   }
 
@@ -178,33 +237,61 @@ async function isActivated(DB, email) {
   if (await isActivatedViaUsers(DB, email)) return true;
 
   const aCols = await getCols(DB, "activations");
+
   if (aCols.size) {
     const where = [];
     const binds = [];
-    if (aCols.has("email")) { where.push("email = ?"); binds.push(email); }
-    if (aCols.has("user_email")) { where.push("user_email = ?"); binds.push(email); }
-    if (aCols.has("used_by_email")) { where.push("used_by_email = ?"); binds.push(email); }
+
+    if (aCols.has("email")) {
+      where.push("email = ?");
+      binds.push(email);
+    }
+
+    if (aCols.has("user_email")) {
+      where.push("user_email = ?");
+      binds.push(email);
+    }
+
+    if (aCols.has("used_by_email")) {
+      where.push("used_by_email = ?");
+      binds.push(email);
+    }
 
     if (where.length) {
       const row = await DB.prepare(
         `SELECT 1 AS ok FROM activations WHERE (${where.join(" OR ")}) LIMIT 1`
       ).bind(...binds).first();
+
       if (row) return true;
     }
   }
 
   const cCols = await getCols(DB, "codes");
+
   if (cCols.size) {
     const where = [];
     const binds = [];
-    if (cCols.has("used_by_email")) { where.push("used_by_email = ?"); binds.push(email); }
-    if (cCols.has("email")) { where.push("email = ?"); binds.push(email); }
-    if (cCols.has("user_email")) { where.push("user_email = ?"); binds.push(email); }
+
+    if (cCols.has("used_by_email")) {
+      where.push("used_by_email = ?");
+      binds.push(email);
+    }
+
+    if (cCols.has("email")) {
+      where.push("email = ?");
+      binds.push(email);
+    }
+
+    if (cCols.has("user_email")) {
+      where.push("user_email = ?");
+      binds.push(email);
+    }
 
     if (where.length) {
       const row = await DB.prepare(
         `SELECT 1 AS ok FROM codes WHERE (${where.join(" OR ")}) LIMIT 1`
       ).bind(...binds).first();
+
       if (row) return true;
     }
   }
@@ -215,17 +302,168 @@ async function isActivated(DB, email) {
 function redirectToActivate(url) {
   const next = url.pathname + (url.search || "");
   const dest = `/activate?next=${encodeURIComponent(next)}`;
+
   return withNoStore(new Response(null, {
     status: 302,
     headers: { "Location": dest }
   }));
 }
 
-// ✅ تحديد اللاعب حتى لو صفحة اللعبة فُتحت بدون role بالـ URL
+function readFirstQueryValue(url, keys) {
+  for (const key of keys) {
+    const value = String(url.searchParams.get(key) || "").trim();
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function hasNewAccessQuery(url) {
+  const keys = [
+    ...NEW_TOKEN_QUERY_KEYS,
+    ...NEW_GAME_QUERY_KEYS,
+    "sg_temp",
+    "temporary",
+    "is_temporary"
+  ];
+
+  return keys.some(key => url.searchParams.has(key));
+}
+
+function createTemporaryDeviceToken() {
+  try {
+    if (crypto.randomUUID) return "horof_site_" + crypto.randomUUID();
+  } catch {}
+
+  try {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return "horof_site_" + Array.from(bytes).map(byte => byte.toString(16).padStart(2, "0")).join("");
+  } catch {}
+
+  return "horof_site_" + Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+function redirectToUrl(targetUrl, cookies = []) {
+  const headers = new Headers();
+  headers.set("Location", targetUrl.toString());
+  headers.set("Cache-Control", "no-store");
+  headers.set("Pragma", "no-cache");
+
+  cookies.forEach(cookie => headers.append("Set-Cookie", cookie));
+
+  return new Response(null, {
+    status: 302,
+    headers
+  });
+}
+
+function redirectToCleanUrl(currentUrl, cookies = []) {
+  const target = new URL(currentUrl.toString());
+
+  [
+    ...NEW_TOKEN_QUERY_KEYS,
+    ...NEW_GAME_QUERY_KEYS,
+    "sg_temp",
+    "temporary",
+    "is_temporary"
+  ].forEach(key => target.searchParams.delete(key));
+
+  return redirectToUrl(target, cookies);
+}
+
+function isNewSystemLanding(path, url) {
+  const cleanPath = String(path || "").toLowerCase();
+
+  return (
+    hasNewAccessQuery(url) &&
+    (
+      cleanPath === "/" ||
+      cleanPath === "/index" ||
+      cleanPath === "/index.html"
+    )
+  );
+}
+
+async function checkNewSystemAccess(request, env, url) {
+  const tokenFromQuery = readFirstQueryValue(url, NEW_TOKEN_QUERY_KEYS);
+  const tokenFromCookie = getCookie(request, NEW_SITE_TOKEN_COOKIE);
+  const token = tokenFromQuery || tokenFromCookie;
+
+  if (!token) {
+    return { allowed: false };
+  }
+
+  const gameFromQuery = normalizeGameId(readFirstQueryValue(url, NEW_GAME_QUERY_KEYS));
+  const gameFromCookie = normalizeGameId(getCookie(request, NEW_SITE_GAME_COOKIE));
+  const gameId = gameFromQuery || gameFromCookie;
+
+  if (!gameId) {
+    return { allowed: false };
+  }
+
+  const cookiesToSet = [];
+
+  if (tokenFromQuery) {
+    cookiesToSet.push(buildSessionCookie(NEW_SITE_TOKEN_COOKIE, token, url));
+  }
+
+  if (gameFromQuery) {
+    cookiesToSet.push(buildSessionCookie(NEW_SITE_GAME_COOKIE, gameId, url));
+  }
+
+  try {
+    const apiResponse = await fetch(`${NEW_AUTH_API_BASE}/api/game/access`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        game_id: gameId,
+        device_token: createTemporaryDeviceToken(),
+        device_name: `Horof Site Access - ${gameId}`,
+        is_temporary: true
+      }),
+      cache: "no-store"
+    });
+
+    let data = {};
+    try {
+      data = await apiResponse.json();
+    } catch {}
+
+    if (apiResponse.ok && data && data.allowed === true) {
+      return {
+        allowed: true,
+        gameId,
+        cookies: cookiesToSet,
+        redirectCleanUrl: hasNewAccessQuery(url)
+      };
+    }
+
+    return { allowed: false };
+  } catch {
+    return { allowed: false };
+  }
+}
+
+function appendSetCookies(response, cookies = []) {
+  if (!cookies.length) return response;
+
+  const headers = new Headers(response.headers);
+  cookies.forEach(cookie => headers.append("Set-Cookie", cookie));
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 function isGuestPlayerRequest(request, url) {
   const sp = url.searchParams;
 
-  // (0) Flags سريعة (أنت ترسلها من join.html)
   const view = (sp.get("view") || "").toLowerCase();
   if (view === "player") return true;
 
@@ -235,27 +473,31 @@ function isGuestPlayerRequest(request, url) {
   const guestFlag = (sp.get("guest") || sp.get("player") || sp.get("isPlayer") || "").toLowerCase();
   if (guestFlag === "1" || guestFlag === "true" || guestFlag === "yes") return true;
 
-  // (1) pid + code
   const pid = sp.get("pid");
   const code = sp.get("code") || sp.get("room") || sp.get("roomId");
   if (pid && code) return true;
 
-  // (2) Cookies للدور (القديمة)
   const cRole = (getCookie(request, "sandooq_role") || "").toLowerCase();
   if (cRole === "player") return true;
 
   const cGuest = (getCookie(request, "sandooq_guest_player") || "").toLowerCase();
   if (cGuest === "1" || cGuest === "true" || cGuest === "yes") return true;
 
-  // (3) Cookies بديلة: pid + room_code (أنت تخزنهم)
   const cPid = getCookie(request, "sandooq_pid");
   const cCode = getCookie(request, "sandooq_room_code");
   if (cPid && cCode) return true;
 
-  // (4) Referer من صفحات انتظار/انضمام (أوسع من السابق)
   const ref = request.headers.get("referer") || request.headers.get("Referer") || "";
+
   if (ref) {
-    if (ref.includes("role=player") || ref.includes("guest=1") || ref.includes("player=1") || ref.includes("view=player")) return true;
+    if (
+      ref.includes("role=player") ||
+      ref.includes("guest=1") ||
+      ref.includes("player=1") ||
+      ref.includes("view=player")
+    ) {
+      return true;
+    }
 
     try {
       const ru = new URL(ref);
@@ -268,6 +510,7 @@ function isGuestPlayerRequest(request, url) {
       const fromWaiting = /\/(play|waiting|wait|lobby|join)\.html$/i.test(ru.pathname);
       const rpid = ru.searchParams.get("pid");
       const rcode = ru.searchParams.get("code") || ru.searchParams.get("room") || ru.searchParams.get("roomId");
+
       if (fromWaiting && ((rpid && rcode) || (rcode && (rGuest === "1" || rRole === "player" || rView === "player")))) return true;
     } catch {}
   }
@@ -275,12 +518,10 @@ function isGuestPlayerRequest(request, url) {
   return false;
 }
 
-// ✅ تحديد شاشة العرض: رابط عام لا يحتاج تسجيل دخول
 function isDisplayScreenRequest(request, url) {
   const sp = url.searchParams;
   const path = url.pathname.toLowerCase();
 
-  // 1) مسارات شائعة إذا وُجدت
   if (
     path.includes("/display") ||
     path.includes("/screen") ||
@@ -293,7 +534,6 @@ function isDisplayScreenRequest(request, url) {
     return true;
   }
 
-  // 2) بارامترات شائعة لشاشة العرض
   const view = (sp.get("view") || "").toLowerCase();
   const role = (sp.get("role") || "").toLowerCase();
   const mode = (sp.get("mode") || "").toLowerCase();
@@ -303,12 +543,12 @@ function isDisplayScreenRequest(request, url) {
   if (["screen", "display", "tv", "monitor"].includes(mode)) return true;
 
   const flagNames = ["screen", "display", "tv", "isScreen", "isDisplay", "isTv"];
+
   for (const name of flagNames) {
     const val = (sp.get(name) || "").toLowerCase();
     if (val === "1" || val === "true" || val === "yes") return true;
   }
 
-  // 3) كوكيز محتملة إن وجدت
   const cRole = (getCookie(request, "sandooq_role") || "").toLowerCase();
   if (["screen", "display", "tv", "monitor"].includes(cRole)) return true;
 
@@ -318,8 +558,8 @@ function isDisplayScreenRequest(request, url) {
   const cScreen = (getCookie(request, "sandooq_display_screen") || "").toLowerCase();
   if (cScreen === "1" || cScreen === "true" || cScreen === "yes") return true;
 
-  // 4) Referer إذا فُتح الرابط من صفحة اللوبي
   const ref = request.headers.get("referer") || request.headers.get("Referer") || "";
+
   if (ref) {
     if (
       ref.includes("view=screen") ||
@@ -363,7 +603,6 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // ✅ مسارات لازم تمر دائمًا
   if (
     path.startsWith("/cdn-cgi/") ||
     path.startsWith("/api2/") ||
@@ -375,7 +614,6 @@ export async function onRequest(context) {
     return next();
   }
 
-  // ✅ تحديد الصفحات المحمية
   const protectRootGameFull =
     path === "/game_full.html" ||
     path === "/game_full" ||
@@ -383,32 +621,46 @@ export async function onRequest(context) {
 
   const protectApp = path.startsWith("/app");
 
-  // ✅ السماح للاعب (guest) بالدخول بدون تأمين
+  const siteAccessLanding = isNewSystemLanding(path, url);
+
   if (ALLOW_GUEST_PLAYERS) {
     if ((protectRootGameFull || protectApp) && isGuestPlayerRequest(request, url)) {
       return next();
     }
   }
 
-  // ✅ السماح لشاشة العرض بالدخول المباشر بدون تسجيل دخول
   if (protectRootGameFull || protectApp) {
     if (isDisplayScreenRequest(request, url)) {
       return next();
     }
   }
 
-  const needsProtection = protectApp || protectRootGameFull;
+  const needsProtection = protectApp || protectRootGameFull || siteAccessLanding;
 
-  // إذا ما يحتاج حماية، مرّره
   if (!needsProtection) return next();
 
-  // السماح لـ OPTIONS
   if (request.method === "OPTIONS") return next();
 
-  // لازم DB
-  if (!env?.DB) return withNoStore(new Response("DB_NOT_BOUND", { status: 500 }));
+  const siteAccess = await checkNewSystemAccess(request, env, url);
 
-  // token من cookie أو Authorization
+  if (siteAccess.allowed) {
+    if (siteAccessLanding) {
+      const target = new URL(NEW_GAME_ENTRY_PATH, url.origin);
+      return redirectToUrl(target, siteAccess.cookies || []);
+    }
+
+    if (siteAccess.redirectCleanUrl) {
+      return redirectToCleanUrl(url, siteAccess.cookies || []);
+    }
+
+    const response = await next();
+    return appendSetCookies(response, siteAccess.cookies || []);
+  }
+
+  if (!env?.DB) {
+    return withNoStore(new Response("DB_NOT_BOUND", { status: 500 }));
+  }
+
   const auth = request.headers.get("Authorization") || "";
   const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
 
@@ -419,6 +671,7 @@ export async function onRequest(context) {
   if (!token) return redirectToActivate(url);
 
   const email = await findSessionEmail(env.DB, env, token);
+
   if (!email) {
     const r = redirectToActivate(url);
     r.headers.append("Set-Cookie", clearCookie("sandooq_token_v1"));
@@ -427,16 +680,8 @@ export async function onRequest(context) {
   }
 
   const activated = await isActivated(env.DB, email);
+
   if (!activated) return redirectToActivate(url);
 
   return next();
 }
-
-/*
-_middleware.js – إصدار 10
-التعديل:
-- إضافة isDisplayScreenRequest
-- السماح لرابط شاشة العرض بالدخول المباشر بدون تسجيل دخول
-- الإبقاء على حماية المقدم كما هي
-- الإبقاء على السماح للاعب كما هو
-*/
