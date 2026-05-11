@@ -368,151 +368,6 @@
     (function(){
       const qs = new URLSearchParams(location.search);
 
-      // =========================
-      // ✅ دخول الموقع الجديد
-      // إذا فتح العميل اللعبة من موقع صندوق المسابقات ومعه sg_token
-      // نحفظ التوكن على نفس دومين اللعبة ونمرره للصفحة التالية حتى لا يرجعه النظام القديم لتسجيل الدخول.
-      // =========================
-      const SITE_TOKEN_COOKIE = "sandooq_site_token_v1";
-      const SITE_GAME_COOKIE = "sandooq_site_game_v1";
-      const SITE_TOKEN_STORAGE_KEY = "sandooq_site_token_v1";
-      const SITE_GAME_STORAGE_KEY = "sandooq_site_game_v1";
-      const SITE_TEMP_STORAGE_KEY = "sandooq_site_temp_access_v1";
-      const DEFAULT_SITE_GAME_ID = "horof";
-
-      const SITE_TOKEN_QUERY_KEYS = [
-        "sg_token",
-        "sandooq_token",
-        "access_token",
-        "token"
-      ];
-
-      const SITE_GAME_QUERY_KEYS = [
-        "sg_game",
-        "game_id",
-        "game"
-      ];
-
-      const ALLOWED_SITE_GAMES = new Set([
-        "horof",
-        "horof-edu"
-      ]);
-
-      function normalizeSiteGame(value){
-        const clean = String(value || "").trim().toLowerCase();
-        return ALLOWED_SITE_GAMES.has(clean) ? clean : "";
-      }
-
-      function readFirstParam(keys){
-        for (const key of keys) {
-          const value = String(qs.get(key) || "").trim();
-          if (value) return value;
-        }
-        return "";
-      }
-
-      function readCookieValue(name){
-        try{
-          const parts = String(document.cookie || "").split(";");
-          for (const part of parts) {
-            const [k, ...rest] = part.trim().split("=");
-            if (k === name) {
-              const raw = rest.join("=");
-              return raw ? decodeURIComponent(raw) : "";
-            }
-          }
-        }catch(e){}
-        return "";
-      }
-
-      function writeCookieValue(name, value){
-        try{
-          const secure = location.protocol === "https:" ? "; Secure" : "";
-          document.cookie = `${name}=${encodeURIComponent(String(value || ""))}; Path=/; SameSite=Lax${secure}`;
-        }catch(e){}
-      }
-
-      function readStoredValue(key){
-        try{
-          return String(sessionStorage.getItem(key) || localStorage.getItem(key) || "").trim();
-        }catch(e){
-          return "";
-        }
-      }
-
-      function writeStoredValue(key, value){
-        try{ sessionStorage.setItem(key, String(value || "")); }catch(e){}
-        try{ localStorage.setItem(key, String(value || "")); }catch(e){}
-      }
-
-      function rememberSiteAccessFromUrl(){
-        const tokenFromUrl = readFirstParam(SITE_TOKEN_QUERY_KEYS);
-        const gameFromUrl = normalizeSiteGame(readFirstParam(SITE_GAME_QUERY_KEYS));
-
-        if (tokenFromUrl) {
-          const gameId = gameFromUrl || normalizeSiteGame(readStoredValue(SITE_GAME_STORAGE_KEY)) || DEFAULT_SITE_GAME_ID;
-
-          writeStoredValue(SITE_TOKEN_STORAGE_KEY, tokenFromUrl);
-          writeStoredValue(SITE_GAME_STORAGE_KEY, gameId);
-          writeStoredValue(SITE_TEMP_STORAGE_KEY, "1");
-
-          writeCookieValue(SITE_TOKEN_COOKIE, tokenFromUrl);
-          writeCookieValue(SITE_GAME_COOKIE, gameId);
-
-          return { token: tokenFromUrl, gameId };
-        }
-
-        if (gameFromUrl) {
-          writeStoredValue(SITE_GAME_STORAGE_KEY, gameFromUrl);
-          writeCookieValue(SITE_GAME_COOKIE, gameFromUrl);
-          return { token: "", gameId: gameFromUrl };
-        }
-
-        return { token: "", gameId: "" };
-      }
-
-      function getRememberedSiteToken(){
-        return (
-          readFirstParam(SITE_TOKEN_QUERY_KEYS) ||
-          readStoredValue(SITE_TOKEN_STORAGE_KEY) ||
-          readCookieValue(SITE_TOKEN_COOKIE) ||
-          ""
-        ).trim();
-      }
-
-      function getRememberedSiteGame(){
-        return (
-          normalizeSiteGame(readFirstParam(SITE_GAME_QUERY_KEYS)) ||
-          normalizeSiteGame(readStoredValue(SITE_GAME_STORAGE_KEY)) ||
-          normalizeSiteGame(readCookieValue(SITE_GAME_COOKIE)) ||
-          DEFAULT_SITE_GAME_ID
-        );
-      }
-
-      function attachSiteAccessToTarget(target){
-        const token = getRememberedSiteToken();
-        if (!token) return target;
-
-        const gameId = getRememberedSiteGame();
-
-        target.searchParams.set("sg_token", token);
-        target.searchParams.set("sg_game", gameId);
-
-        if (!target.searchParams.has("sg_temp")) {
-          target.searchParams.set("sg_temp", "1");
-        }
-
-        writeStoredValue(SITE_TOKEN_STORAGE_KEY, token);
-        writeStoredValue(SITE_GAME_STORAGE_KEY, gameId);
-        writeStoredValue(SITE_TEMP_STORAGE_KEY, "1");
-        writeCookieValue(SITE_TOKEN_COOKIE, token);
-        writeCookieValue(SITE_GAME_COOKIE, gameId);
-
-        return target;
-      }
-
-      rememberSiteAccessFromUrl();
-
       const DBG = qs.get("dbg") === "1";
       const dbgEl = document.getElementById("dbg");
       if (DBG) dbgEl.style.display = "block";
@@ -1119,10 +974,6 @@
             target.searchParams.set("sync", SYNC_BASE);
           }
 
-          // ✅ إذا كان الدخول من الموقع الجديد، مرر الصلاحية للصفحة التالية
-          // حتى يسمح الميدلوير بالدخول ولا يحول العميل لتسجيل الدخول القديم.
-          attachSiteAccessToTarget(target);
-
           location.replace(target.toString());
         }catch(e){
           location.replace(r);
@@ -1139,6 +990,6 @@
     })();
   </script>
 
-  <!-- VERSION: index.html — cost-v1 + DisplayMode-PusherFirst-LowTraffic + NewSiteAccessBridge-v1 -->
+  <!-- VERSION: index.html — cost-v1 + DisplayMode-PusherFirst-LowTraffic -->
 </body>
 </html>
