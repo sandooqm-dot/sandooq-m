@@ -32,12 +32,21 @@ const ALLOWED_SITE_GAMES = new Set([
   "horof-edu"
 ]);
 
+const HOROF_SHARED_GAME_IDS = new Set([
+  "horof",
+  "horof-edu"
+]);
+
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+function normalizeAnyGameId(gameId) {
+  return String(gameId || "").trim().toLowerCase();
+}
+
 function normalizeGameId(gameId) {
-  const value = String(gameId || "").trim().toLowerCase();
+  const value = normalizeAnyGameId(gameId);
   return ALLOWED_SITE_GAMES.has(value) ? value : "";
 }
 
@@ -349,6 +358,7 @@ function redirectToUrl(targetUrl, cookies = []) {
   headers.set("Location", targetUrl.toString());
   headers.set("Cache-Control", "no-store");
   headers.set("Pragma", "no-cache");
+  headers.set("Vary", "Cookie, Authorization");
 
   cookies.forEach(cookie => headers.append("Set-Cookie", cookie));
 
@@ -385,33 +395,110 @@ function isNewSystemLanding(path, url) {
   );
 }
 
-async function checkNewSystemAccess(request, env, url) {
-  const tokenFromQuery = readFirstQueryValue(url, NEW_TOKEN_QUERY_KEYS);
-  const tokenFromCookie = getCookie(request, NEW_SITE_TOKEN_COOKIE);
-  const token = tokenFromQuery || tokenFromCookie;
-
-  if (!token) {
-    return { allowed: false };
-  }
-
+function getRequestedGameCandidates(request, url) {
   const gameFromQuery = normalizeGameId(readFirstQueryValue(url, NEW_GAME_QUERY_KEYS));
   const gameFromCookie = normalizeGameId(getCookie(request, NEW_SITE_GAME_COOKIE));
-  const gameId = gameFromQuery || gameFromCookie;
 
-  if (!gameId) {
-    return { allowed: false };
+  if (gameFromQuery) return [gameFromQuery];
+  if (gameFromCookie) return [gameFromCookie];
+
+  return Array.from(ALLOWED_SITE_GAMES);
+}
+
+function isAllowedAccessResponse(data) {
+  if (!data || typeof data !== "object") return false;
+
+  return (
+    data.allowed === true ||
+    data.access === true ||
+    data.can_play === true ||
+    data.canPlay === true ||
+    data.has_access === true ||
+    data.hasAccess === true ||
+    data.permitted === true ||
+    data?.access?.allowed === true ||
+    data?.game?.allowed === true ||
+    (data.ok === true && (
+      data.allowed !== false &&
+      (
+        data.access === true ||
+        data.can_play === true ||
+        data.canPlay === true ||
+        data.has_access === true ||
+        data.hasAccess === true ||
+        data?.access?.allowed === true
+      )
+    ))
+  );
+}
+
+function extractOwnedGameIds(data) {
+  const ids = new Set();
+
+  function addId(value) {
+    const id = normalizeAnyGameId(value);
+    if (id) ids.add(id);
   }
 
-  const cookiesToSet = [];
+  function readGameObject(game) {
+    if (!game || typeof game !== "object") return;
 
-  if (tokenFromQuery) {
-    cookiesToSet.push(buildSessionCookie(NEW_SITE_TOKEN_COOKIE, token, url));
+    addId(game.id);
+    addId(game.slug);
+    addId(game.game_id);
+    addId(game.gameId);
+    addId(game.product_id);
+    addId(game.productId);
+    addId(game.key);
   }
 
-  if (gameFromQuery) {
-    cookiesToSet.push(buildSessionCookie(NEW_SITE_GAME_COOKIE, gameId, url));
+  function readArray(list) {
+    if (!Array.isArray(list)) return;
+
+    list.forEach(item => {
+      if (!item) return;
+      if (typeof item === "string") addId(item);
+      else readGameObject(item);
+    });
   }
 
+  if (!data || typeof data !== "object") return ids;
+
+  readArray(data.games);
+  readArray(data.owned_games);
+  readArray(data.ownedGames);
+  readArray(data.entitlements);
+  readArray(data.products);
+  readArray(data.library);
+
+  if (data.customer && typeof data.customer === "object") {
+    readArray(data.customer.games);
+    readArray(data.customer.owned_games);
+    readArray(data.customer.ownedGames);
+    readArray(data.customer.entitlements);
+    readArray(data.customer.products);
+    readArray(data.customer.library);
+  }
+
+  return ids;
+}
+
+function ownedGamesAllowRequestedGame(ownedIds, requestedGameId) {
+  const requested = normalizeGameId(requestedGameId);
+  if (!requested) return false;
+
+  if (ownedIds.has(requested)) return true;
+
+  if (HOROF_SHARED_GAME_IDS.has(requested)) {
+    for (const id of HOROF_SHARED_GAME_IDS) {
+      if (ownedIds.has(id)) return true;
+    }
+  }
+
+  return false;
+}
+
+async function verifyViaGameAccessEndpoint(token, gameId) {
   try {
     const apiResponse = await fetch(`${NEW_AUTH_API_BASE}/api/game/access`, {
       method: "POST",
@@ -433,7 +520,63 @@ async function checkNewSystemAccess(request, env, url) {
       data = await apiResponse.json();
     } catch {}
 
-    if (apiResponse.ok && data && data.allowed === true) {
+    return apiResponse.ok && isAllowedAccessResponse(data);
+  } catch {
+    return false;
+  }
+}
+
+async function verifyViaAccountMe(token, gameId) {
+  try {
+    const apiResponse = await fetch(`${NEW_AUTH_API_BASE}/api/account/me`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": `Bearer ${token}`
+      },
+      cache: "no-store"
+    });
+
+    let data = {};
+    try {
+      data = await apiResponse.json();
+    } catch {}
+
+    if (!apiResponse.ok || !data || data.ok === false) return false;
+
+    const ownedIds = extractOwnedGameIds(data);
+    return ownedGamesAllowRequestedGame(ownedIds, gameId);
+  } catch {
+    return false;
+  }
+}
+
+async function checkNewSystemAccess(request, env, url) {
+  const tokenFromQuery = readFirstQueryValue(url, NEW_TOKEN_QUERY_KEYS);
+  const tokenFromCookie = getCookie(request, NEW_SITE_TOKEN_COOKIE);
+  const token = tokenFromQuery || tokenFromCookie;
+
+  if (!token) {
+    return { allowed: false };
+  }
+
+  const gameCandidates = getRequestedGameCandidates(request, url);
+
+  for (const gameId of gameCandidates) {
+    if (!gameId) continue;
+
+    const allowedByAccess = await verifyViaGameAccessEndpoint(token, gameId);
+    const allowedByAccount = allowedByAccess ? true : await verifyViaAccountMe(token, gameId);
+
+    if (allowedByAccess || allowedByAccount) {
+      const cookiesToSet = [];
+
+      if (tokenFromQuery) {
+        cookiesToSet.push(buildSessionCookie(NEW_SITE_TOKEN_COOKIE, token, url));
+      }
+
+      cookiesToSet.push(buildSessionCookie(NEW_SITE_GAME_COOKIE, gameId, url));
+
       return {
         allowed: true,
         gameId,
@@ -441,11 +584,9 @@ async function checkNewSystemAccess(request, env, url) {
         redirectCleanUrl: hasNewAccessQuery(url)
       };
     }
-
-    return { allowed: false };
-  } catch {
-    return { allowed: false };
   }
+
+  return { allowed: false };
 }
 
 function appendSetCookies(response, cookies = []) {
@@ -453,6 +594,9 @@ function appendSetCookies(response, cookies = []) {
 
   const headers = new Headers(response.headers);
   cookies.forEach(cookie => headers.append("Set-Cookie", cookie));
+  headers.set("Cache-Control", "no-store");
+  headers.set("Pragma", "no-cache");
+  headers.set("Vary", "Cookie, Authorization");
 
   return new Response(response.body, {
     status: response.status,
@@ -603,10 +747,21 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
+  const isActivatePath = path.startsWith("/activate");
+
+  if (isActivatePath && (hasNewAccessQuery(url) || getCookie(request, NEW_SITE_TOKEN_COOKIE))) {
+    const siteAccess = await checkNewSystemAccess(request, env, url);
+
+    if (siteAccess.allowed) {
+      const target = new URL(NEW_GAME_ENTRY_PATH, url.origin);
+      return redirectToUrl(target, siteAccess.cookies || []);
+    }
+  }
+
   if (
     path.startsWith("/cdn-cgi/") ||
     path.startsWith("/api2/") ||
-    path.startsWith("/activate") ||
+    isActivatePath ||
     path === "/logo.png" ||
     path === "/favicon.ico" ||
     path === "/robots.txt"
