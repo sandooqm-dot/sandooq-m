@@ -355,6 +355,34 @@
       margin-top:8px;
     }
 
+    .home-link{
+      width:min(240px, 76%);
+      min-height:54px;
+      margin:20px auto 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:18px;
+      background:var(--closeRed);
+      color:#fff;
+      border:3px solid rgba(255,255,255,.28);
+      box-shadow:0 10px 22px rgba(0,0,0,.20);
+      font-size:22px;
+      font-weight:700;
+      line-height:1;
+      text-decoration:none;
+      cursor:pointer;
+      transition:transform .12s ease, filter .12s ease;
+    }
+
+    .home-link:active{
+      transform:scale(.97);
+    }
+
+    .home-link:hover{
+      filter:saturate(1.08);
+    }
+
     .submit-btn,
     .help-open-btn{
       width:100%;
@@ -753,6 +781,15 @@
         grid-template-columns:1fr 1fr;
         gap:8px;
       }
+
+      .home-link{
+        width:min(230px, 74%);
+        min-height:50px;
+        margin-top:18px;
+        font-size:20px;
+        border-radius:16px;
+      }
+
       .submit-btn,
       .help-open-btn{
         font-size:18px;
@@ -947,6 +984,14 @@
         border-radius:12px;
       }
 
+      .home-link{
+        width:180px;
+        min-height:42px;
+        margin-top:10px;
+        font-size:16px;
+        border-radius:14px;
+      }
+
       .help-dialog{
         width:min(720px, 100%);
       }
@@ -1028,6 +1073,7 @@
         <button type="button" id="openHelpBtn" class="help-open-btn" data-tour-help="1">التعليمات</button>
       </div>
     </div>
+    <a class="home-link" href="https://sandooq-games.com/index.html?focus=horof#games" aria-label="العودة إلى الصفحة الرئيسية">الرئيسية</a>
   </div>
 
 
@@ -1628,5 +1674,6 @@
     setupHomeTour();
     document.getElementById("btn").addEventListener("click", createRoom);
   </script>
+  <!-- VERSION: horof-index — red-bottom-home-button-v2 -->
 </body>
 </html>
